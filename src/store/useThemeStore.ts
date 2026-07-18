@@ -10,9 +10,13 @@ interface EstadoTema {
 
 const CLAVE = 've-theme'
 
-// refleja el tema en el html y lo recuerda entre sesiones
+// refleja el tema en el html y lo recuerda entre sesiones. durante un instante
+// se marca la raíz para que los colores se fundan en lugar de saltar de golpe
 function aplicar(tema: Tema) {
-  document.documentElement.classList.toggle('dark', tema === 'dark')
+  const raiz = document.documentElement
+  raiz.classList.add('tema-en-transicion')
+  raiz.classList.toggle('dark', tema === 'dark')
+  window.setTimeout(() => raiz.classList.remove('tema-en-transicion'), 400)
   try {
     localStorage.setItem(CLAVE, tema)
   } catch {
@@ -20,8 +24,7 @@ function aplicar(tema: Tema) {
   }
 }
 
-// arranca con lo último elegido; si no hay nada guardado, oscuro por defecto,
-// que es la estética base del editor
+// arranca con lo último elegido; si no hay nada guardado, claro por defecto
 function inicial(): Tema {
   try {
     const guardado = localStorage.getItem(CLAVE) as Tema | null
@@ -29,7 +32,7 @@ function inicial(): Tema {
   } catch {
     // sin acceso al almacenamiento, se cae al valor por defecto
   }
-  return 'dark'
+  return 'light'
 }
 
 export const useThemeStore = create<EstadoTema>((set, get) => ({

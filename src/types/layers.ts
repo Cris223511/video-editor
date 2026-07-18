@@ -43,7 +43,10 @@ export interface CapaImagen extends CapaBase {
   src: string // data url de la imagen
   anchoNatural: number
   altoNatural: number
-  anchoRel: number // ancho sobre el lienzo, de 0 a 1; el alto sale de la proporción
+  anchoRel: number // ancho sobre el lienzo, de 0 a 1
+  // alto sobre el lienzo. mientras no se toque queda sin definir y la imagen
+  // conserva su proporción natural; al deformarla a mano se fija aquí
+  altoRel?: number
   // recorte en fracciones desde cada borde de la imagen original
   recorte: { izq: number; der: number; arr: number; aba: number }
 }

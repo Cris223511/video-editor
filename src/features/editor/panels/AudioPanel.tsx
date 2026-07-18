@@ -1,6 +1,6 @@
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
-import { Campo, Deslizador } from '../../../components/ui/controls'
+import { Campo, Deslizador } from '../../../components/ui/Controls'
 
 // panel de audio: volumen general del proyecto y ajustes por franja. cada franja
 // se coloca y recorta en la línea de tiempo, y aquí se define su ganancia

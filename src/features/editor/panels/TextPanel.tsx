@@ -2,7 +2,7 @@ import { ReactNode } from 'react'
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { CapaTexto } from '../../../types/layers'
-import { Campo, Deslizador, ColorCampo, Interruptor, Segmentado } from '../../../components/ui/controls'
+import { Campo, Deslizador, ColorCampo, Interruptor, Segmentado } from '../../../components/ui/Controls'
 import MotionControls from './MotionControls'
 
 const FUENTES = [

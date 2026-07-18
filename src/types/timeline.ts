@@ -6,6 +6,12 @@ export interface AjusteTono {
   saturacion: number
   temperatura: number
   tinte: number
+  // corrección por zonas tonales. queda sin definir mientras no se toquen las
+  // ruedas, para no arrastrar datos de más en clips sin corregir
+  ruedas?: import('../lib/color/ruedas').Ruedas
+  // curvas por canal y maestra, también sin definir mientras sigan siendo la
+  // diagonal que no cambia nada
+  curvas?: import('../lib/color/curvas').Curvas
 }
 
 export type TipoTransicion = 'ninguna' | 'fundido' | 'desvanecer'
@@ -23,6 +29,7 @@ export interface Clip {
   id: string
   assetId: string
   inicio: number // posición en la línea de tiempo, en segundos
+  pista: number // en qué nivel se apila; 0 es el de abajo y el mayor manda al superponerse
   duracion: number // cuánto dura el clip en la pista
   recorteInicio: number // punto de entrada dentro del video fuente
   duracionFuente: number // duración total del video original, tope para recortar

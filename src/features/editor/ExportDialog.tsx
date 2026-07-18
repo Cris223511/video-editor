@@ -3,8 +3,8 @@ import Icon from '../../components/ui/Icon'
 import { useAppStore } from '../../store/useAppStore'
 import { useEditorStore } from '../../store/useEditorStore'
 import { useProjectStore } from '../../store/useProjectStore'
-import { duracionTotal } from '../../lib/timeline/timeline'
-import { formatearDuracion } from '../../lib/format/bytes'
+import { duracionTotal } from '../../lib/timeline/clips'
+import { formatearDuracion } from '../../lib/format/duracion'
 import { exportarProyecto, ControlExport } from '../../lib/export/exportar'
 
 type Fase = 'inicio' | 'exportando' | 'listo' | 'error'
@@ -20,6 +20,9 @@ export default function ExportDialog() {
   const [error, setError] = useState('')
   const [urlSalida, setUrlSalida] = useState('')
   const [extension, setExtension] = useState('mp4')
+  // 30 es el valor corriente para material de pantalla; 60 se nota en el
+  // movimiento rápido a cambio de un archivo bastante más pesado
+  const [fps, setFps] = useState(30)
   const controlRef = useRef<ControlExport | null>(null)
 
   if (!abierto) return null
@@ -49,6 +52,7 @@ export default function ExportDialog() {
       {
         ancho: estado.resolucion.ancho,
         alto: estado.resolucion.alto,
+        fps,
         colorFondo: estado.colorFondo,
         clips: estado.pista.clips,
         capas: estado.capas,
@@ -105,7 +109,32 @@ export default function ExportDialog() {
                 <span className="text-[color:var(--muted)]">Duración</span>
                 <span>{formatearDuracion(total)}</span>
               </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[color:var(--muted)]">Imágenes por segundo</span>
+                <div className="flex gap-1">
+                  {[24, 30, 60].map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => setFps(v)}
+                      className={[
+                        'rounded-lg px-2.5 py-1 text-xs font-medium transition-colors duration-200',
+                        fps === v
+                          ? 'bg-brand text-white'
+                          : 'interactivo text-[color:var(--muted)]',
+                      ].join(' ')}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+            {fps === 60 && (
+              <p className="mb-4 text-xs italic leading-relaxed text-[color:var(--muted)]">
+                A 60 imágenes por segundo el movimiento se ve más suave, pero el archivo pesa
+                bastante más y la exportación tarda lo mismo que dura el video.
+              </p>
+            )}
             <p className="mb-5 text-xs leading-relaxed text-[color:var(--muted)]">
               La exportación se hace en tu equipo, en tiempo real, con alta calidad. Mantén esta
               pestaña activa mientras dura.

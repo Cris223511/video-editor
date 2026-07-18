@@ -1,7 +1,7 @@
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { CapaFigura } from '../../../types/layers'
-import { Campo, Deslizador, ColorCampo, Interruptor } from '../../../components/ui/controls'
+import { Campo, Deslizador, ColorCampo, Interruptor } from '../../../components/ui/Controls'
 import MotionControls from './MotionControls'
 
 const FORMAS: { valor: CapaFigura['forma']; etiqueta: string }[] = [

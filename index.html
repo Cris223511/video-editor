@@ -7,11 +7,11 @@
     <title>Video Editor</title>
     <script>
       // el tema se aplica antes de pintar para evitar el parpadeo del cambio
-      // claro/oscuro al recargar. por defecto arranca en oscuro
+      // claro/oscuro al recargar. por defecto arranca en claro
       (function () {
         try {
           var guardado = localStorage.getItem('ve-theme')
-          var oscuro = guardado ? guardado === 'dark' : true
+          var oscuro = guardado === 'dark'
           document.documentElement.classList.toggle('dark', oscuro)
         } catch (e) {}
       })()

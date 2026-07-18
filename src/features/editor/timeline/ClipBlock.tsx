@@ -1,33 +1,73 @@
 import { MouseEvent as ReactMouseEvent } from 'react'
 import { Clip } from '../../../types/timeline'
 import { useEditorStore } from '../../../store/useEditorStore'
+import { useTira } from './useTira'
+import FrameStrip from './FrameStrip'
+import TransicionBlock from './TransicionBlock'
 
 interface Props {
   clip: Clip
   miniatura?: string
   nombre: string
+  url?: string
+  altoPista?: number
   pxPorSegundo: number
   puntos: number[] // instantes a los que imantar el clip al moverlo
 }
 
 const UMBRAL_PX = 8
+// separación vertical entre niveles; debe coincidir con la que usa la línea de
+// tiempo al apilar las filas, o el clip caería en la pista equivocada al soltarlo
+export const HUECO_PISTA = 6
 
 // bloque de un clip en la pista. se puede seleccionar, mover con imantado y
 // recortar por sus bordes con los tiradores laterales
-export default function ClipBlock({ clip, miniatura, nombre, pxPorSegundo, puntos }: Props) {
+export default function ClipBlock({
+  clip,
+  miniatura,
+  nombre,
+  url,
+  altoPista = 64,
+  pxPorSegundo,
+  puntos,
+}: Props) {
   const seleccionado = useEditorStore((s) => s.clipSeleccionado === clip.id)
   const seleccionar = useEditorStore((s) => s.seleccionar)
   const moverClip = useEditorStore((s) => s.moverClip)
   const recortarClip = useEditorStore((s) => s.recortarClip)
+  const moverClipAPista = useEditorStore((s) => s.moverClipAPista)
+  const altosPista = useEditorStore((s) => s.altosPista)
+  const tira = useTira(clip.assetId, url, clip.duracionFuente)
+
+  const ancho = Math.max(clip.duracion * pxPorSegundo, 8)
 
   function iniciarMover(e: ReactMouseEvent) {
     e.stopPropagation()
     seleccionar(clip.id)
     const startX = e.clientX
+    const startY = e.clientY
     const inicioOriginal = clip.inicio
     const umbral = UMBRAL_PX / pxPorSegundo
 
+    // centro vertical de cada nivel, medido desde arriba. las filas se dibujan
+    // con la pista más alta primero, así que se recorren al revés
+    const centros: number[] = new Array(altosPista.length)
+    let acumulado = 0
+    for (let p = altosPista.length - 1; p >= 0; p--) {
+      centros[p] = acumulado + altosPista[p] / 2
+      acumulado += altosPista[p] + HUECO_PISTA
+    }
+
     const mover = (ev: globalThis.MouseEvent) => {
+      // el clip cambia de nivel cuando el cursor se acerca más al centro de otra
+      // fila que a la suya, igual que arrastrando entre carriles en Premiere
+      const objetivo = centros[clip.pista] + (ev.clientY - startY)
+      let destino = clip.pista
+      for (let p = 0; p < centros.length; p++) {
+        if (Math.abs(centros[p] - objetivo) < Math.abs(centros[destino] - objetivo)) destino = p
+      }
+      if (destino !== clip.pista) moverClipAPista(clip.id, destino)
+
       const dx = (ev.clientX - startX) / pxPorSegundo
       let candidato = Math.max(0, inicioOriginal + dx)
       // imantado: si el inicio o el fin del clip caen cerca de un punto de
@@ -79,13 +119,28 @@ export default function ClipBlock({ clip, miniatura, nombre, pxPorSegundo, punto
       ].join(' ')}
       style={{
         left: clip.inicio * pxPorSegundo,
-        width: Math.max(clip.duracion * pxPorSegundo, 8),
-        backgroundImage: miniatura ? `url(${miniatura})` : undefined,
+        width: ancho,
+        // mientras la tira se extrae, el clip se ve con su miniatura muy
+        // atenuada y el azul de fondo, sin saltos bruscos al llegar
+        backgroundImage: !tira && miniatura ? `url(${miniatura})` : undefined,
         backgroundSize: 'cover',
-        backgroundColor: 'rgba(24, 97, 255, 0.2)',
+        backgroundColor: 'rgb(24 97 255 / 0.22)',
       }}
     >
-      <span className="pointer-events-none w-full truncate bg-black/60 px-2 py-0.5 text-[10px] text-white">
+      {tira && (
+        <FrameStrip
+          tira={tira}
+          ancho={ancho}
+          alto={altoPista}
+          recorteInicio={clip.recorteInicio}
+          velocidad={clip.velocidad}
+          pxPorSegundo={pxPorSegundo}
+        />
+      )}
+
+      <TransicionBlock clip={clip} pxPorSegundo={pxPorSegundo} />
+
+      <span className="pointer-events-none relative w-full truncate bg-gradient-to-t from-black/85 to-transparent px-2 pb-0.5 pt-2 text-[10px] font-medium text-white">
         {nombre}
       </span>
 

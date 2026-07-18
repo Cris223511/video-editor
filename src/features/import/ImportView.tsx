@@ -3,7 +3,8 @@ import Icon from '../../components/ui/Icon'
 import { useImportarMedios } from './useImportarMedios'
 import { useProjectStore } from '../../store/useProjectStore'
 import { useAppStore } from '../../store/useAppStore'
-import { formatearBytes, formatearDuracion } from '../../lib/format/bytes'
+import { formatearBytes } from '../../lib/format/bytes'
+import { formatearDuracion } from '../../lib/format/duracion'
 
 // primera pantalla del editor: importar medios. valida cada archivo, extrae su
 // información y lo suma al proyecto. todo ocurre en el navegador

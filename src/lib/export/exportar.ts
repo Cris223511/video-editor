@@ -2,14 +2,15 @@ import { Clip } from '../../types/timeline'
 import { Capa } from '../../types/layers'
 import { Marco } from '../../types/marco'
 import { RegionAudio } from '../../types/audio'
-import { clipEnTiempo, duracionTotal } from '../timeline/timeline'
-import { gananciaEn } from '../audio/audio'
-import { usaMatriz, matrizTono } from '../color/tono'
+import { clipEnTiempo, duracionTotal } from '../timeline/clips'
+import { gananciaEn } from '../audio/ganancia'
+import { usaMatriz, matrizTono, tablasColor } from '../color/tono'
 import { dibujarFotograma, Escena } from './compositor'
 
 export interface DatosExport {
   ancho: number
   alto: number
+  fps: number // imágenes por segundo del archivo final
   colorFondo: string
   clips: Clip[]
   capas: Capa[]
@@ -105,6 +106,20 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
         fe.setAttribute('type', 'matrix')
         fe.setAttribute('values', matrizTono(c.tono))
         filtro.appendChild(fe)
+
+        // las ruedas de color viajan como curva por canal, igual que en el visor,
+        // para que lo exportado coincida con lo que se vio al corregir
+        const tablas = tablasColor(c.tono)
+        if (tablas) {
+          const trans = document.createElementNS('http://www.w3.org/2000/svg', 'feComponentTransfer')
+          ;(['feFuncR', 'feFuncG', 'feFuncB'] as const).forEach((nombre, i) => {
+            const fn = document.createElementNS('http://www.w3.org/2000/svg', nombre)
+            fn.setAttribute('type', 'table')
+            fn.setAttribute('tableValues', tablas[i])
+            trans.appendChild(fn)
+          })
+          filtro.appendChild(trans)
+        }
         defs.appendChild(filtro)
       })
       svg.appendChild(defs)
@@ -143,7 +158,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
         await ctxAudio.resume().catch(() => {})
 
         // stream de video del canvas + audio mezclado
-        const streamVideo = canvas.captureStream(30)
+        const streamVideo = canvas.captureStream(datos.fps)
         const stream = new MediaStream([
           ...streamVideo.getVideoTracks(),
           ...destino.stream.getAudioTracks(),

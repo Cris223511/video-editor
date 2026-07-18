@@ -1,6 +1,6 @@
 import { useEditorStore } from '../../../store/useEditorStore'
-import { Campo, Deslizador } from '../../../components/ui/controls'
-import { formatearDuracion } from '../../../lib/format/bytes'
+import { Campo, Deslizador } from '../../../components/ui/Controls'
+import { formatearDuracion } from '../../../lib/format/duracion'
 
 const PRESETS = [0.25, 0.5, 1, 1.5, 2, 4]
 

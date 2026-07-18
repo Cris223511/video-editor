@@ -1,7 +1,7 @@
 import Icon from '../../components/ui/Icon'
 import { useEditorStore } from '../../store/useEditorStore'
-import { duracionTotal } from '../../lib/timeline/timeline'
-import { formatearDuracion } from '../../lib/format/bytes'
+import { duracionTotal } from '../../lib/timeline/clips'
+import { formatearDuracion } from '../../lib/format/duracion'
 
 // controles de reproducción bajo el visor: volver al inicio, reproducir o
 // pausar, y el tiempo actual frente al total

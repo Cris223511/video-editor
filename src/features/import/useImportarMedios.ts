@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useToast } from '../../components/ui/toast/ToastProvider'
+import { useToast } from '../../components/ui/ToastProvider'
 import { useProjectStore } from '../../store/useProjectStore'
 import { validarVideo } from '../../lib/validation/validateVideo'
 import { analizarVideo } from '../../lib/media/probeVideo'

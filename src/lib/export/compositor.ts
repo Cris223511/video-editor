@@ -1,7 +1,7 @@
 import { Clip } from '../../types/timeline'
 import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto } from '../../types/layers'
 import { Marco } from '../../types/marco'
-import { clipEnTiempo } from '../timeline/timeline'
+import { clipEnTiempo } from '../timeline/clips'
 import { posicionCapa } from '../layers/motion'
 import { esTonoNeutro, filtroCss } from '../color/tono'
 
@@ -125,7 +125,9 @@ function dibujarImagen(
   const sw = Math.max(1, (1 - rec.izq - rec.der) * c.anchoNatural)
   const sh = Math.max(1, (1 - rec.arr - rec.aba) * c.altoNatural)
   const w = c.anchoRel * ancho
-  const h = w * (sh / sw)
+  // si la imagen se deformó a mano manda su alto guardado; si no, se respeta la
+  // proporción del trozo visible tras el recorte
+  const h = c.altoRel !== undefined ? c.altoRel * alto : w * (sh / sw)
   ctx.save()
   ctx.globalAlpha = c.opacidad / 100
   ctx.drawImage(

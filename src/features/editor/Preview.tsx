@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../components/ui/Icon'
-import CapasOverlay from './CapasOverlay'
-import MarcoOverlay from './MarcoOverlay'
+import CapasOverlay from './overlays/CapasOverlay'
+import MarcoOverlay from './overlays/MarcoOverlay'
 import { useEditorStore } from '../../store/useEditorStore'
 import { useProjectStore } from '../../store/useProjectStore'
 import { MediaAsset } from '../../types/media'
-import { clipEnTiempo, duracionTotal } from '../../lib/timeline/timeline'
-import { gananciaEn } from '../../lib/audio/audio'
+import { clipEnTiempo, duracionTotal } from '../../lib/timeline/clips'
+import { gananciaEn } from '../../lib/audio/ganancia'
 import { rectContenido } from '../../lib/layers/rect'
 import { posicionCapa } from '../../lib/layers/motion'
 import { CapaCensura } from '../../types/layers'
 import { Clip } from '../../types/timeline'
-import { esTonoNeutro, filtroCss, matrizTono, usaMatriz } from '../../lib/color/tono'
+import { esTonoNeutro, filtroCss, matrizTono, usaMatriz, tablasColor } from '../../lib/color/tono'
 
 // visor central. monta un video por clip y solo deja visible y sonando el que
 // corresponde al cabezal. la reproducción se apoya en el tiempo nativo de cada
@@ -165,7 +165,12 @@ export default function Preview() {
       const nodo = asegurarGrafo()
       cablearVideo(act.id, v)
       if (nodo) nodo.gain.value = gananciaEn(audioRef.current.regiones, audioRef.current.general, ph)
-      v.playbackRate = act.velocidad
+      // grabando un recorrido el video corre más despacio, que es la única forma
+      // de seguir con el cursor algo que se mueve rápido sin ir a tirones. el
+      // cabezal se sigue calculando desde el tiempo real del video, así que la
+      // línea de tiempo no se descuadra
+      const st = useEditorStore.getState()
+      v.playbackRate = act.velocidad * (st.grabandoMovimiento ? st.velocidadGrabacion : 1)
       if (v.paused) {
         try {
           v.currentTime = act.recorteInicio + (ph - act.inicio) * act.velocidad
@@ -435,11 +440,23 @@ export default function Preview() {
             {filtrosMatriz.length > 0 && (
               <svg className="absolute h-0 w-0">
                 <defs>
-                  {filtrosMatriz.map((c) => (
-                    <filter key={c.id} id={`tono-${c.id}`} colorInterpolationFilters="sRGB">
-                      <feColorMatrix type="matrix" values={matrizTono(c.tono)} />
-                    </filter>
-                  ))}
+                  {filtrosMatriz.map((c) => {
+                    const tablas = tablasColor(c.tono)
+                    return (
+                      <filter key={c.id} id={`tono-${c.id}`} colorInterpolationFilters="sRGB">
+                        <feColorMatrix type="matrix" values={matrizTono(c.tono)} />
+                        {/* las ruedas se aplican como curva por canal: cada zona
+                            tonal empuja su tramo y deja el resto en su sitio */}
+                        {tablas && (
+                          <feComponentTransfer>
+                            <feFuncR type="table" tableValues={tablas[0]} />
+                            <feFuncG type="table" tableValues={tablas[1]} />
+                            <feFuncB type="table" tableValues={tablas[2]} />
+                          </feComponentTransfer>
+                        )}
+                      </filter>
+                    )
+                  })}
                 </defs>
               </svg>
             )}

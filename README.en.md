@@ -26,13 +26,13 @@
 
 ## Live demo
 
-Video Editor runs **right in the browser**, with no installation. The production version, deployed on Vercel, lives here:
+Video Editor runs **right in the browser**, with no installation:
 
 | Version | Link | Status |
 | ------- | ---- | ------ |
-| 0.1.0 | _pending deployment_ | Coming soon |
+| 0.1.0 | **[video-editor-plus.vercel.app](https://video-editor-plus.vercel.app)** | Available |
 
-> Once it is online, the link will appear in this table and you will be able to try it with a single click. What changed in each version is in the [changelog](CHANGELOG.md).
+> Open it and start editing, no account or download needed. What changed in each version is in the [changelog](CHANGELOG.md).
 
 ## Why
 

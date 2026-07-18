@@ -1,5 +1,5 @@
 import { useEditorStore } from '../../../store/useEditorStore'
-import { Campo, ColorCampo } from '../../../components/ui/controls'
+import { Campo, ColorCampo } from '../../../components/ui/Controls'
 
 const PROPORCIONES = [
   { etiqueta: '16:9', ancho: 1920, alto: 1080 },
