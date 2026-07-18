@@ -28,7 +28,7 @@
 
 Editar un video corto no debería obligarte a instalar un programa pesado, crear una cuenta ni subir tu material a la nube de alguien más. Las herramientas de escritorio son potentes, pero ocupan gigas y cuesta aprenderlas; las de la web suelen pedir suscripción, añadir una marca de agua o procesar los videos en sus servidores. Video Editor hace todo el trabajo dentro del navegador: importas, editas y exportas sin que un solo fotograma salga de tu equipo.
 
-> Proyecto en desarrollo activo. El flujo completo de importar, editar y exportar ya funciona, y se pule poco a poco.
+> Proyecto en desarrollo activo. El flujo completo de importar, editar y exportar ya funciona, y se pule poco a poco. Los cambios de cada versión están en el [historial de cambios](CHANGELOG.md).
 
 ## Demo en vivo
 

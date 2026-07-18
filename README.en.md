@@ -28,7 +28,7 @@
 
 Editing a short video should not force you to install a heavy program, create an account or upload your material to someone else's cloud. Desktop tools are powerful, but they take up gigabytes and are hard to learn; web ones usually ask for a subscription, add a watermark or process the videos on their servers. Video Editor does all the work inside the browser: you import, edit and export without a single frame leaving your computer.
 
-> Actively in development. The full import, edit and export flow already works, and it is polished little by little.
+> Actively in development. The full import, edit and export flow already works, and it is polished little by little. What changed in each version is in the [changelog](CHANGELOG.md).
 
 ## Live demo
 
