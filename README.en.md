@@ -5,9 +5,9 @@
 <h1 align="center">Video Editor</h1>
 
 <p align="center">
-  A video editor that runs entirely in the browser. Trim and join clips, add text, images, shapes
+  <b>A video editor that runs entirely in the browser.</b> Trim and join clips, add text, images, shapes
   and motion censorship, adjust the color tone and export without losing quality or frames.
-  No installation, and your videos never leave your computer.
+  <i>No installation, and your videos never leave your computer.</i>
 </p>
 
 <p align="center">
@@ -24,68 +24,76 @@
 
 ---
 
-## Why
-
-Editing a short video should not force you to install a heavy program, create an account or upload your material to someone else's cloud. Desktop tools are powerful, but they take up gigabytes and are hard to learn; web ones usually ask for a subscription, add a watermark or process the videos on their servers. Video Editor does all the work inside the browser: you import, edit and export without a single frame leaving your computer.
-
-> Actively in development. The full import, edit and export flow already works, and it is polished little by little. What changed in each version is in the [changelog](CHANGELOG.md).
-
 ## Live demo
 
-Coming soon on Vercel. The link will be added here once the project is deployed.
+Video Editor runs **right in the browser**, with no installation. The production version, deployed on Vercel, lives here:
+
+| Version | Link | Status |
+| ------- | ---- | ------ |
+| 0.1.0 | _pending deployment_ | Coming soon |
+
+> Once it is online, the link will appear in this table and you will be able to try it with a single click. What changed in each version is in the [changelog](CHANGELOG.md).
+
+## Why
+
+Editing a short video **should not** force you to install a heavy program, create an account or upload your material to someone else's cloud. Desktop tools are powerful, but they take up gigabytes and are hard to learn; web ones usually ask for a subscription, add a watermark or process the videos on their servers.
+
+Video Editor does **all the work inside the browser**: you import, edit and export without a single frame leaving your computer. It is free, open source and *with no hidden paid features*.
+
+> Actively in development. The full import, edit and export flow already works, and it is polished little by little.
 
 ## Features
 
 ### Import and media
 
-- **Validated import:** you drag or pick videos and images, and before they join the project their type, size and real signature are checked, not just the extension.
-- **Media library:** imported files stay on the side, ready to bring onto the timeline when you need them.
+- **Validated import.** You drag or pick videos and images, and before they join the project their *type, size and real signature* are checked, not just the extension.
+- **Media library.** Imported files stay on the side, ready to bring onto the timeline when you need them.
 
 ### Timeline
 
-- **Video clips:** trim, join and reorder clips on the track. The S key splits the clip at the playhead.
-- **Transitions** between clips.
-- **Layers and audio on their own track:** each element has its block and its time range, so it appears and disappears when it should.
+- **Video clips.** Trim, join and reorder clips on the track. The `S` key splits the clip at the playhead.
+- **Transitions** between clips, so the cut is not abrupt.
+- **Layers and audio on their own track.** Each element has its block and its *time range*, so it appears and disappears when it should.
 
 ### Layers and annotations
 
-- **Text** with a full editor (font, size, color, alignment and more).
-- **Images and logos** on top, with adjustable opacity.
-- **Shapes** with an option for blurred blocks.
+- **Text** with a full editor: font, size, color, alignment and more.
+- **Images and logos** on top, with adjustable **opacity**.
+- **Shapes** with an option for *blurred blocks*.
 - **Frame** decoration around the video.
 - **Canvas and background** editable when the video does not fill the whole frame.
 
 ### Motion censorship
 
-- **Censorship that follows the object:** pixelate, blur, transparency or masks that move with keyframes, to cover a face or a plate even as they move across the scene.
+- **Censorship that follows the object.** Pixelate, blur, transparency or masks that move with **keyframes**, to cover a face or a plate *even as they move across the scene*.
 
 ### Video adjustments
 
 - **Speed** of the clip, to speed it up or slow it down.
 - **Tone** like a color correction: exposure, contrast, temperature and saturation.
-- **Audio:** mute a track or raise the volume up to 200 %.
+- **Audio.** Mute a track or raise the volume *up to 200 %*.
 
 ### Export
 
-- **Export inside the browser:** the project plays back drawing each frame onto a canvas at the chosen resolution, the audio is mixed and everything is recorded together at a high bitrate. Resolution and FPS are preserved, and the audio stays in sync. Because it happens in real time, a one-minute video takes about a minute to export.
+- **Export inside the browser.** The project plays back drawing each frame onto a canvas at the chosen resolution, the audio is mixed and everything is recorded together at a high bitrate. **Resolution and FPS are preserved**, and the audio stays in sync. Because it happens in real time, a one-minute video takes about a minute to export.
 
 ### Interface
 
 - **Light and dark theme,** with dark mode by default.
-- **Contextual options panel:** each tool shows only its own controls.
-- **Everything local:** no accounts, no watermarks, no paid features.
+- **Contextual options panel** on the left: each tool shows only its own controls.
+- **Everything local:** *no accounts, no watermarks, no paid features.*
 
 ## Keyboard shortcuts
 
 | Action | Shortcut |
 | ------ | -------- |
-| Play or pause | Spacebar |
-| Split at the playhead | S |
-| Delete the selection (clip, layer or audio region) | Del or Backspace |
+| Play or pause | `Spacebar` |
+| Split at the playhead | `S` |
+| Delete the selection (clip, layer or audio region) | `Del` or `Backspace` |
 
 ## Running locally
 
-You only need Node.js 18 or later.
+You only need **Node.js 18** or later.
 
 ```
 npm install
@@ -112,7 +120,7 @@ Vite serves the app at `http://localhost:5173`.
 | State | [Zustand](https://zustand-demo.pmnd.rs/) | The project, editor and view state |
 | Export | Canvas, Web Audio and MediaRecorder | Video render and recording, all in the browser |
 
-The editing engine (validation, media analysis, render and export) lives in `src/lib`, separate from the interface in `src/components` and `src/features`, so the logic does not depend on React.
+The editing engine (validation, media analysis, render and export) lives in `src/lib`, **separate from the interface** in `src/components` and `src/features`, so the logic does not depend on React.
 
 ## Project structure
 
@@ -146,26 +154,16 @@ video-editor/
         └── editor/           preview, options panel, timeline and export
 ```
 
-## Deploying on Vercel
-
-The project is ready for Vercel (Vite framework, output in `dist`). The `vercel.json` file already includes the isolation headers in case WebCodecs is used later.
-
-1. Push the repository to GitHub.
-2. In the [Vercel](https://vercel.com/) dashboard, choose **Add New → Project** and import the repository. The Vite preset configures itself.
-3. Click **Deploy**. When it finishes, Vercel gives you the production URL.
-
-CLI alternative: install `npm i -g vercel`, run `vercel` from the project folder for a preview and `vercel --prod` for production.
-
 ## Privacy
 
-Videos are processed entirely on your computer. Nothing is uploaded to any server, neither while you edit nor when you export. The application collects no data.
+> **Your videos are processed entirely on your computer.** Nothing is uploaded to any server, neither while you edit nor when you export. The application **collects no data**.
 
 ## Contributing
 
-Bug reports and ideas are welcome in the [issues](https://github.com/Cris223511/video-editor/issues). To contribute code, open a pull request. The project runs with `npm install` and `npm run dev`, with no extra setup.
+Bug reports and ideas are welcome in the [issues](https://github.com/Cris223511/video-editor/issues). To contribute code, open a *pull request*. The project runs with `npm install` and `npm run dev`, with no extra setup.
 
 ## License
 
-MIT © [Cris223511](https://github.com/Cris223511). You can use it, modify it and share it freely. The full text is in the [LICENSE](LICENSE) file.
+**MIT** © [Cris223511](https://github.com/Cris223511). You can use it, modify it and share it freely. The full text is in the [LICENSE](LICENSE) file.
 
-If the project is useful to you, a star on the repository helps more people find it.
+*If the project is useful to you, a star on the repository helps more people find it.*

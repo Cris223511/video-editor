@@ -5,9 +5,9 @@
 <h1 align="center">Video Editor</h1>
 
 <p align="center">
-  Editor de video que funciona por completo en el navegador. Recorta y une clips, añade texto,
-  imágenes, figuras y censura en movimiento, ajusta el tono y exporta sin perder calidad ni
-  fotogramas. Sin instalar nada y sin que tus videos salgan de tu equipo.
+  <b>Editor de video que funciona por completo en el navegador.</b> Recorta y une clips, añade texto,
+  imágenes, figuras y censura en movimiento, ajusta el tono y exporta sin perder calidad ni fotogramas.
+  <i>Sin instalar nada y sin que tus videos salgan de tu equipo.</i>
 </p>
 
 <p align="center">
@@ -24,68 +24,76 @@
 
 ---
 
-## Por qué
-
-Editar un video corto no debería obligarte a instalar un programa pesado, crear una cuenta ni subir tu material a la nube de alguien más. Las herramientas de escritorio son potentes, pero ocupan gigas y cuesta aprenderlas; las de la web suelen pedir suscripción, añadir una marca de agua o procesar los videos en sus servidores. Video Editor hace todo el trabajo dentro del navegador: importas, editas y exportas sin que un solo fotograma salga de tu equipo.
-
-> Proyecto en desarrollo activo. El flujo completo de importar, editar y exportar ya funciona, y se pule poco a poco. Los cambios de cada versión están en el [historial de cambios](CHANGELOG.md).
-
 ## Demo en vivo
 
-Próximamente en Vercel. El enlace se añadirá aquí cuando el proyecto esté desplegado.
+Video Editor se usa **directamente en el navegador**, sin instalar nada. La versión de producción, desplegada en Vercel, vive aquí:
+
+| Versión | Enlace | Estado |
+| ------- | ------ | ------ |
+| 0.1.0 | _pendiente de despliegue_ | Próximamente |
+
+> En cuanto esté en línea, el enlace aparecerá en esta tabla y podrás probarlo con un solo clic. Los cambios de cada versión están en el [historial de cambios](CHANGELOG.md).
+
+## Por qué
+
+Editar un video corto **no debería** obligarte a instalar un programa pesado, crear una cuenta ni subir tu material a la nube de alguien más. Las herramientas de escritorio son potentes, pero ocupan gigas y cuesta aprenderlas; las de la web suelen pedir suscripción, añadir una marca de agua o procesar los videos en sus servidores.
+
+Video Editor hace **todo el trabajo dentro del navegador**: importas, editas y exportas sin que un solo fotograma salga de tu equipo. Es gratis, de código abierto y *sin funciones de pago escondidas*.
+
+> Proyecto en desarrollo activo. El flujo completo de importar, editar y exportar ya funciona, y se pule poco a poco.
 
 ## Características
 
 ### Importación y medios
 
-- **Importación con validación:** arrastras o eliges videos e imágenes, y antes de sumarlos al proyecto se comprueba su tipo, su tamaño y su firma real, no solo la extensión.
-- **Biblioteca de medios:** los archivos importados quedan a un lado, listos para llevarlos a la línea de tiempo cuando los necesites.
+- **Importación con validación.** Arrastras o eliges videos e imágenes, y antes de sumarlos al proyecto se comprueba su *tipo, tamaño y firma real*, no solo la extensión.
+- **Biblioteca de medios.** Los archivos importados quedan a un lado, listos para llevarlos a la línea de tiempo cuando los necesites.
 
 ### Línea de tiempo
 
-- **Clips de video:** recorta, une y reordena clips en la pista. La tecla S divide el clip por donde esté el cabezal.
-- **Transiciones** entre clips.
-- **Capas y audio en su propia pista:** cada elemento tiene su bloque y su rango de tiempo, así aparece y desaparece cuando corresponde.
+- **Clips de video.** Recorta, une y reordena clips en la pista. La tecla `S` divide el clip por donde esté el cabezal.
+- **Transiciones** entre clips, para que el corte no sea seco.
+- **Capas y audio en su propia pista.** Cada elemento tiene su bloque y su *rango de tiempo*, así aparece y desaparece cuando corresponde.
 
 ### Capas y anotaciones
 
-- **Texto** con un editor completo (tipografía, tamaño, color, alineación y más).
-- **Imágenes y logos** superpuestos, con opacidad regulable.
-- **Figuras** geométricas, con la opción de bloques difuminados.
+- **Texto** con un editor completo: tipografía, tamaño, color, alineación y más.
+- **Imágenes y logos** superpuestos, con **opacidad** regulable.
+- **Figuras** geométricas, con la opción de *bloques difuminados*.
 - **Marco** decorativo alrededor del video.
 - **Lienzo y fondo** editables cuando el video no llena todo el cuadro.
 
 ### Censura en movimiento
 
-- **Censura que sigue al objeto:** pixelado, difuminado, transparencia o máscaras que se mueven con fotogramas clave, para tapar una cara o una placa aunque se desplacen por la escena.
+- **Censura que sigue al objeto.** Pixelado, difuminado, transparencia o máscaras que se mueven con **fotogramas clave**, para tapar una cara o una placa *aunque se desplacen por la escena*.
 
 ### Ajustes del video
 
 - **Velocidad** del clip, para acelerarlo o ralentizarlo.
 - **Tono** al estilo de una corrección de color: exposición, contraste, temperatura y saturación.
-- **Audio:** silenciar una pista o subir el volumen hasta el 200 %.
+- **Audio.** Silencia una pista o sube el volumen *hasta el 200 %*.
 
 ### Exportación
 
-- **Exportación dentro del navegador:** el proyecto se reproduce dibujando cada fotograma en un lienzo a la resolución elegida, se mezcla el audio y se graba todo junto a una tasa de bits alta. No se pierde la resolución ni los FPS, y el audio queda sincronizado. Al hacerse en tiempo real, un video de un minuto tarda alrededor de un minuto en exportarse.
+- **Exportación dentro del navegador.** El proyecto se reproduce dibujando cada fotograma en un lienzo a la resolución elegida, se mezcla el audio y se graba todo junto a una tasa de bits alta. **No se pierde la resolución ni los FPS**, y el audio queda sincronizado. Al hacerse en tiempo real, un video de un minuto tarda alrededor de un minuto en exportarse.
 
 ### Interfaz
 
 - **Tema claro y oscuro,** con el modo oscuro por defecto.
-- **Panel de opciones contextual:** cada herramienta muestra solo sus controles.
-- **Todo local:** no hay cuentas, ni marcas de agua, ni funciones de pago.
+- **Panel de opciones contextual** a la izquierda: cada herramienta muestra solo sus controles.
+- **Todo local:** *sin cuentas, sin marcas de agua, sin funciones de pago.*
 
 ## Atajos de teclado
 
 | Acción | Atajo |
 | ------ | ----- |
-| Reproducir o pausar | Barra espaciadora |
-| Dividir en el cabezal | S |
-| Borrar lo seleccionado (clip, capa o región de audio) | Supr o Retroceso |
+| Reproducir o pausar | `Barra espaciadora` |
+| Dividir en el cabezal | `S` |
+| Borrar lo seleccionado (clip, capa o región de audio) | `Supr` o `Retroceso` |
 
 ## Ejecutar en local
 
-Solo hace falta Node.js 18 o superior.
+Solo hace falta **Node.js 18** o superior.
 
 ```
 npm install
@@ -112,7 +120,7 @@ Vite levanta la aplicación en `http://localhost:5173`.
 | Estado | [Zustand](https://zustand-demo.pmnd.rs/) | El estado del proyecto, el editor y la vista |
 | Exportación | Canvas, Web Audio y MediaRecorder | Render y grabación del video, todo en el navegador |
 
-El motor de edición (validación, análisis de medios, render y exportación) vive en `src/lib`, separado de la interfaz de `src/components` y `src/features`, para que la lógica no dependa de React.
+El motor de edición (validación, análisis de medios, render y exportación) vive en `src/lib`, **separado de la interfaz** de `src/components` y `src/features`, para que la lógica no dependa de React.
 
 ## Estructura del proyecto
 
@@ -146,26 +154,16 @@ video-editor/
         └── editor/           visor, panel de opciones, línea de tiempo y exportación
 ```
 
-## Despliegue en Vercel
-
-El proyecto está listo para Vercel (framework Vite, salida en `dist`). El archivo `vercel.json` ya incluye las cabeceras de aislamiento por si más adelante se usa WebCodecs.
-
-1. Sube el repositorio a GitHub.
-2. En el panel de [Vercel](https://vercel.com/), elige **Add New → Project** e importa el repositorio. El preset de Vite se autoconfigura.
-3. Pulsa **Deploy**. Al terminar, Vercel te da la URL de producción.
-
-Alternativa con la CLI: instala `npm i -g vercel`, ejecuta `vercel` desde la carpeta del proyecto para una previsualización y `vercel --prod` para producción.
-
 ## Privacidad
 
-Los videos se procesan por completo en tu equipo. Nada se sube a ningún servidor, ni mientras editas ni al exportar. La aplicación no recopila datos.
+> **Tus videos se procesan por completo en tu equipo.** Nada se sube a ningún servidor, ni mientras editas ni al exportar. La aplicación **no recopila datos**.
 
 ## Contribuir
 
-Los reportes de errores y las ideas son bienvenidos en los [issues](https://github.com/Cris223511/video-editor/issues). Para aportar código, abre un pull request. El proyecto se ejecuta con `npm install` y `npm run dev`, sin ninguna configuración adicional.
+Los reportes de errores y las ideas son bienvenidos en los [issues](https://github.com/Cris223511/video-editor/issues). Para aportar código, abre un *pull request*. El proyecto se ejecuta con `npm install` y `npm run dev`, sin ninguna configuración adicional.
 
 ## Licencia
 
-MIT © [Cris223511](https://github.com/Cris223511). Puedes usarlo, modificarlo y compartirlo con libertad. El texto completo está en el archivo [LICENSE](LICENSE).
+**MIT** © [Cris223511](https://github.com/Cris223511). Puedes usarlo, modificarlo y compartirlo con libertad. El texto completo está en el archivo [LICENSE](LICENSE).
 
-Si el proyecto te resulta útil, una estrella en el repositorio ayuda a que más personas lo encuentren.
+*Si el proyecto te resulta útil, una estrella en el repositorio ayuda a que más personas lo encuentren.*
