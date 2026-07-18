@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* tokens de color del tema. toda la interfaz se apoya en ellos para que el
+   salto entre claro y oscuro salga uniforme sin duplicar estilos */
+:root {
+  color-scheme: light;
+  --bg: #f4f6fb;
+  --surface: 255 255 255;
+  --text: #1f2733;
+  --muted: #6b7280;
+  --border: 0 0 0;
+}
+
+html.dark {
+  color-scheme: dark;
+  --bg: #16161c;
+  --surface: 30 31 39;
+  --text: #e7e9ee;
+  --muted: #9aa0ad;
+  --border: 255 255 255;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* superficie de vidrio esmerilado: fondo semitransparente con desenfoque.
+   la usan las tarjetas, la barra superior y los avisos */
+@layer components {
+  .glass {
+    background: rgb(var(--surface) / 0.72);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgb(var(--border) / 0.08);
+  }
+}
+
+/* entrada suave de los avisos por la derecha */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border) / 0.18);
+  border-radius: 8px;
+}

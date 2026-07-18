@@ -1,0 +1,457 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import Icon from '../../components/ui/Icon'
+import CapasOverlay from './CapasOverlay'
+import MarcoOverlay from './MarcoOverlay'
+import { useEditorStore } from '../../store/useEditorStore'
+import { useProjectStore } from '../../store/useProjectStore'
+import { MediaAsset } from '../../types/media'
+import { clipEnTiempo, duracionTotal } from '../../lib/timeline/timeline'
+import { gananciaEn } from '../../lib/audio/audio'
+import { rectContenido } from '../../lib/layers/rect'
+import { posicionCapa } from '../../lib/layers/motion'
+import { CapaCensura } from '../../types/layers'
+import { Clip } from '../../types/timeline'
+import { esTonoNeutro, filtroCss, matrizTono, usaMatriz } from '../../lib/color/tono'
+
+// visor central. monta un video por clip y solo deja visible y sonando el que
+// corresponde al cabezal. la reproducción se apoya en el tiempo nativo de cada
+// video para que salga fluida, y el cabezal se deriva de ese tiempo
+export default function Preview() {
+  const clips = useEditorStore((s) => s.pista.clips)
+  const playhead = useEditorStore((s) => s.playhead)
+  const reproduciendo = useEditorStore((s) => s.reproduciendo)
+  const irA = useEditorStore((s) => s.irA)
+  const pausar = useEditorStore((s) => s.pausar)
+  const hayCapas = useEditorStore((s) => s.capas.length > 0)
+  const hayCensura = useEditorStore((s) => s.capas.some((c) => c.tipo === 'censura'))
+  const resolucion = useEditorStore((s) => s.resolucion)
+  const colorFondo = useEditorStore((s) => s.colorFondo)
+  const audioRegiones = useEditorStore((s) => s.audioRegiones)
+  const volumenGlobal = useEditorStore((s) => s.volumenGlobal)
+  const medios = useProjectStore((s) => s.medios)
+
+  const videosRef = useRef<Map<string, HTMLVideoElement>>(new Map())
+  const phRef = useRef(playhead)
+  const censuraCanvasRef = useRef<HTMLCanvasElement>(null)
+  const areaRef = useRef<HTMLDivElement>(null)
+  const [areaTam, setAreaTam] = useState({ w: 0, h: 0 })
+
+  // grafo de audio: cada video se enruta por un nodo de ganancia común para
+  // poder controlar el volumen general y por franjas con Web Audio
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  const gananciaRef = useRef<GainNode | null>(null)
+  const cableadosRef = useRef<Set<string>>(new Set())
+  const audioRef = useRef({ regiones: audioRegiones, general: volumenGlobal })
+
+  useEffect(() => {
+    audioRef.current = { regiones: audioRegiones, general: volumenGlobal }
+  }, [audioRegiones, volumenGlobal])
+
+  function asegurarGrafo(): GainNode | null {
+    if (!audioCtxRef.current) {
+      const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!Ctor) return null
+      const ctx = new Ctor()
+      const nodo = ctx.createGain()
+      nodo.connect(ctx.destination)
+      audioCtxRef.current = ctx
+      gananciaRef.current = nodo
+    }
+    return gananciaRef.current
+  }
+
+  function cablearVideo(id: string, v: HTMLVideoElement) {
+    const ctx = audioCtxRef.current
+    const nodo = gananciaRef.current
+    if (!ctx || !nodo || cableadosRef.current.has(id)) return
+    try {
+      const fuente = ctx.createMediaElementSource(v)
+      fuente.connect(nodo)
+      cableadosRef.current.add(id)
+    } catch {
+      // el elemento ya estaba enrutado o el navegador no lo permite
+    }
+  }
+
+  useEffect(() => () => void audioCtxRef.current?.close().catch(() => {}), [])
+
+  // mide el área disponible para dibujar el marco del lienzo con su proporción
+  useEffect(() => {
+    const el = areaRef.current
+    if (!el) return
+    const observar = new ResizeObserver(() => setAreaTam({ w: el.clientWidth, h: el.clientHeight }))
+    observar.observe(el)
+    setAreaTam({ w: el.clientWidth, h: el.clientHeight })
+    return () => observar.disconnect()
+  }, [clips.length, hayCapas])
+
+  const clipsOrdenados = useMemo(() => [...clips].sort((a, b) => a.inicio - b.inicio), [clips])
+  const total = useMemo(() => duracionTotal(clips), [clips])
+  const assetPorId = useMemo(() => {
+    const mapa = new Map<string, MediaAsset>()
+    medios.forEach((a) => mapa.set(a.id, a))
+    return mapa
+  }, [medios])
+
+  const activo = clipEnTiempo(clipsOrdenados, playhead)
+
+  // en pausa, el cabezal manda: phRef lo sigue para arrancar donde toca
+  useEffect(() => {
+    if (!reproduciendo) phRef.current = playhead
+  }, [playhead, reproduciendo])
+
+  // en pausa cada video se coloca en su fotograma exacto y se detiene
+  useEffect(() => {
+    if (reproduciendo) return
+    const act = clipEnTiempo(clipsOrdenados, playhead)
+    clipsOrdenados.forEach((c) => {
+      const v = videosRef.current.get(c.id)
+      if (!v) return
+      if (act && c.id === act.id) {
+        const objetivo = c.recorteInicio + (playhead - c.inicio) * c.velocidad
+        if (Math.abs(v.currentTime - objetivo) > 0.05) {
+          try {
+            v.currentTime = objetivo
+          } catch {
+            // el video aún no tiene metadatos listos; se ignora
+          }
+        }
+      }
+      if (!v.paused) v.pause()
+    })
+  }, [playhead, reproduciendo, clipsOrdenados])
+
+  // durante la reproducción avanza el clip activo y salta al siguiente al
+  // terminar; el cabezal se calcula desde el tiempo real del video
+  useEffect(() => {
+    if (!reproduciendo) return
+    if (clipsOrdenados.length === 0) {
+      pausar()
+      return
+    }
+    // el contexto de audio arranca suspendido; se reanuda dentro del gesto de
+    // reproducir para que el navegador deje sonar
+    asegurarGrafo()
+    if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume().catch(() => {})
+    let raf = 0
+    let cancelado = false
+
+    const paso = () => {
+      if (cancelado) return
+      const ph = phRef.current
+      if (ph >= total) {
+        irA(total)
+        pausar()
+        return
+      }
+      const act = clipEnTiempo(clipsOrdenados, ph)
+      if (!act) {
+        phRef.current = Math.min(ph + 0.033, total)
+        irA(phRef.current)
+        raf = requestAnimationFrame(paso)
+        return
+      }
+      const v = videosRef.current.get(act.id)
+      if (!v) {
+        raf = requestAnimationFrame(paso)
+        return
+      }
+      clipsOrdenados.forEach((c) => {
+        if (c.id !== act.id) {
+          const otro = videosRef.current.get(c.id)
+          if (otro && !otro.paused) otro.pause()
+        }
+      })
+      const nodo = asegurarGrafo()
+      cablearVideo(act.id, v)
+      if (nodo) nodo.gain.value = gananciaEn(audioRef.current.regiones, audioRef.current.general, ph)
+      v.playbackRate = act.velocidad
+      if (v.paused) {
+        try {
+          v.currentTime = act.recorteInicio + (ph - act.inicio) * act.velocidad
+        } catch {
+          // sin metadatos todavía
+        }
+        v.play().catch(() => {})
+      }
+      const finUso = act.recorteInicio + act.duracion * act.velocidad
+      if (v.currentTime >= finUso - 0.02) {
+        v.pause()
+        phRef.current = Math.min(act.inicio + act.duracion, total)
+        irA(phRef.current)
+        raf = requestAnimationFrame(paso)
+        return
+      }
+      phRef.current = Math.min(
+        act.inicio + (v.currentTime - act.recorteInicio) / act.velocidad,
+        total,
+      )
+      irA(phRef.current)
+      raf = requestAnimationFrame(paso)
+    }
+
+    raf = requestAnimationFrame(paso)
+    return () => {
+      cancelado = true
+      cancelAnimationFrame(raf)
+      videosRef.current.forEach((v) => v.pause())
+    }
+  }, [reproduciendo, clipsOrdenados, total, irA, pausar])
+
+  // render de la censura: por fotograma se muestrea solo la región de cada
+  // máscara del video activo y se le aplica pixelado o desenfoque. al tocar
+  // únicamente esas zonas, el navegador lo mueve con soltura
+  useEffect(() => {
+    if (!hayCensura) {
+      const c = censuraCanvasRef.current
+      const ctx = c?.getContext('2d')
+      if (c && ctx) ctx.clearRect(0, 0, c.width, c.height)
+      return
+    }
+    let raf = 0
+    let cancelado = false
+    const off = document.createElement('canvas')
+    const offCtx = off.getContext('2d')
+
+    const dibujarUna = (
+      ctx: CanvasRenderingContext2D,
+      video: HTMLVideoElement,
+      rect: { w: number; h: number; ox: number; oy: number },
+      c: CapaCensura,
+      ph: number,
+      colorFondo: string,
+    ) => {
+      const pos = posicionCapa(c, ph)
+      const vw = video.videoWidth
+      const vh = video.videoHeight
+      const escX = vw / rect.w
+      const escY = vh / rect.h
+
+      // se arma la figura de la máscara y se calcula su caja envolvente
+      let dx = 0
+      let dy = 0
+      let w = 0
+      let h = 0
+      ctx.save()
+      ctx.beginPath()
+      if (c.forma === 'pincel') {
+        const radio = c.grosorPincel * rect.h
+        let minX = Infinity
+        let minY = Infinity
+        let maxX = -Infinity
+        let maxY = -Infinity
+        for (const trazo of c.trazos) {
+          for (const p of trazo) {
+            const px = rect.ox + (pos.x + p.x) * rect.w
+            const py = rect.oy + (pos.y + p.y) * rect.h
+            ctx.moveTo(px + radio, py)
+            ctx.arc(px, py, radio, 0, Math.PI * 2)
+            if (px - radio < minX) minX = px - radio
+            if (py - radio < minY) minY = py - radio
+            if (px + radio > maxX) maxX = px + radio
+            if (py + radio > maxY) maxY = py + radio
+          }
+        }
+        if (!isFinite(minX)) {
+          ctx.restore()
+          return
+        }
+        dx = minX
+        dy = minY
+        w = maxX - minX
+        h = maxY - minY
+      } else {
+        w = c.anchoRel * rect.w
+        h = c.altoRel * rect.h
+        const cx = rect.ox + pos.x * rect.w
+        const cy = rect.oy + pos.y * rect.h
+        dx = cx - w / 2
+        dy = cy - h / 2
+        if (c.forma === 'circulo') ctx.ellipse(cx, cy, w / 2, h / 2, 0, 0, Math.PI * 2)
+        else ctx.rect(dx, dy, w, h)
+      }
+      ctx.clip()
+
+      if (c.efecto === 'transparente') {
+        ctx.fillStyle = colorFondo
+        ctx.fillRect(dx, dy, w, h)
+      } else if (c.efecto === 'difuminar') {
+        const m = c.intensidad
+        ctx.filter = `blur(${Math.max(1, c.intensidad * 0.5)}px)`
+        ctx.drawImage(
+          video,
+          (dx - rect.ox - m) * escX,
+          (dy - rect.oy - m) * escY,
+          (w + 2 * m) * escX,
+          (h + 2 * m) * escY,
+          dx - m,
+          dy - m,
+          w + 2 * m,
+          h + 2 * m,
+        )
+        ctx.filter = 'none'
+      } else if (offCtx) {
+        const bloque = Math.max(3, c.intensidad)
+        const pw = Math.max(1, Math.round(w / bloque))
+        const phx = Math.max(1, Math.round(h / bloque))
+        off.width = pw
+        off.height = phx
+        offCtx.imageSmoothingEnabled = false
+        offCtx.drawImage(
+          video,
+          (dx - rect.ox) * escX,
+          (dy - rect.oy) * escY,
+          w * escX,
+          h * escY,
+          0,
+          0,
+          pw,
+          phx,
+        )
+        ctx.imageSmoothingEnabled = false
+        ctx.drawImage(off, 0, 0, pw, phx, dx, dy, w, h)
+        ctx.imageSmoothingEnabled = true
+      }
+      ctx.restore()
+    }
+
+    const render = () => {
+      if (cancelado) return
+      const canvas = censuraCanvasRef.current
+      const stage = canvas?.parentElement
+      const ctx = canvas?.getContext('2d')
+      if (canvas && stage && ctx) {
+        const dpr = window.devicePixelRatio || 1
+        const w = stage.clientWidth
+        const h = stage.clientHeight
+        if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+          canvas.width = Math.round(w * dpr)
+          canvas.height = Math.round(h * dpr)
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        ctx.clearRect(0, 0, w, h)
+
+        const st = useEditorStore.getState()
+        const ph = st.playhead
+        const rect = rectContenido(w, h, st.resolucion.ancho / st.resolucion.alto)
+        const ordenados = [...st.pista.clips].sort((a, b) => a.inicio - b.inicio)
+        const activoClip = clipEnTiempo(ordenados, ph)
+        const video = activoClip ? videosRef.current.get(activoClip.id) : null
+        if (video && video.videoWidth > 0) {
+          for (const capa of st.capas) {
+            if (capa.tipo !== 'censura') continue
+            if (ph < capa.inicio || ph >= capa.inicio + capa.duracion) continue
+            dibujarUna(ctx, video, rect, capa, ph, st.colorFondo)
+          }
+        }
+      }
+      raf = requestAnimationFrame(render)
+    }
+    raf = requestAnimationFrame(render)
+    return () => {
+      cancelado = true
+      cancelAnimationFrame(raf)
+    }
+  }, [hayCensura])
+
+  // opacidad de cada video teniendo en cuenta las transiciones: el clip activo
+  // entra con su transición (fundido a negro o desvanecido con el anterior), y
+  // el clip anterior se mantiene visible mientras dura un desvanecido
+  function opacidadDe(clip: Clip): number {
+    if (activo && clip.id === activo.id) {
+      let op = 1
+      const t = clip.transicion
+      if (t.tipo !== 'ninguna') {
+        const entrado = playhead - clip.inicio
+        if (entrado < t.duracion) op = Math.min(op, Math.max(0, entrado / t.duracion))
+      }
+      const idx = clipsOrdenados.findIndex((c) => c.id === clip.id)
+      const siguiente = clipsOrdenados[idx + 1]
+      if (siguiente && siguiente.transicion.tipo === 'fundido') {
+        const restante = clip.inicio + clip.duracion - playhead
+        if (restante < siguiente.transicion.duracion) {
+          op = Math.min(op, Math.max(0, restante / siguiente.transicion.duracion))
+        }
+      }
+      return op
+    }
+    if (activo && activo.transicion.tipo === 'desvanecer') {
+      const idxAct = clipsOrdenados.findIndex((c) => c.id === activo.id)
+      const anterior = idxAct > 0 ? clipsOrdenados[idxAct - 1] : null
+      if (anterior && anterior.id === clip.id) {
+        const entrado = playhead - activo.inicio
+        if (entrado < activo.transicion.duracion) {
+          return Math.max(0, 1 - entrado / activo.transicion.duracion)
+        }
+      }
+    }
+    return 0
+  }
+
+  const filtrosMatriz = clipsOrdenados.filter((c) => usaMatriz(c.tono))
+
+  const hayContenido = clipsOrdenados.length > 0 || hayCapas
+
+  // el lienzo mantiene la proporción del proyecto dentro del área disponible;
+  // su fondo se ve en las bandas cuando el video no lo cubre
+  const lienzoRect = rectContenido(areaTam.w, areaTam.h, resolucion.ancho / resolucion.alto)
+
+  return (
+    <div className="relative flex min-h-0 flex-1 items-center justify-center bg-black/40 p-4">
+      {!hayContenido ? (
+        <div className="flex flex-col items-center gap-3 text-center text-[color:var(--muted)]">
+          <Icon name="video" size={40} />
+          <p className="max-w-xs text-sm">
+            Añade un video desde la biblioteca de la izquierda para empezar a editar.
+          </p>
+        </div>
+      ) : (
+        <div ref={areaRef} className="flex h-full w-full items-center justify-center">
+          <div
+            className="relative shadow-2xl"
+            style={{ width: lienzoRect.w, height: lienzoRect.h, background: colorFondo }}
+          >
+            {clipsOrdenados.map((c) => {
+              const asset = assetPorId.get(c.assetId)
+              if (!asset) return null
+              return (
+                <video
+                  key={c.id}
+                  ref={(el) => {
+                    if (el) videosRef.current.set(c.id, el)
+                    else videosRef.current.delete(c.id)
+                  }}
+                  src={asset.url}
+                  playsInline
+                  preload="auto"
+                  className="absolute inset-0 h-full w-full object-contain"
+                  style={{
+                    opacity: opacidadDe(c),
+                    filter: esTonoNeutro(c.tono) ? undefined : filtroCss(c.tono, `tono-${c.id}`),
+                  }}
+                />
+              )
+            })}
+            {filtrosMatriz.length > 0 && (
+              <svg className="absolute h-0 w-0">
+                <defs>
+                  {filtrosMatriz.map((c) => (
+                    <filter key={c.id} id={`tono-${c.id}`} colorInterpolationFilters="sRGB">
+                      <feColorMatrix type="matrix" values={matrizTono(c.tono)} />
+                    </filter>
+                  ))}
+                </defs>
+              </svg>
+            )}
+            <canvas
+              ref={censuraCanvasRef}
+              className="pointer-events-none absolute inset-0 h-full w-full"
+            />
+            <CapasOverlay />
+            <MarcoOverlay alturaLienzo={lienzoRect.h} />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
