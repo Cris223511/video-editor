@@ -2,8 +2,9 @@ import Icon from '../ui/Icon'
 import ThemeToggle from '../ui/ThemeToggle'
 import { useAppStore } from '../../store/useAppStore'
 
-// barra superior. en el editor aparecen el botón de volver y el de exportar;
-// el logo es provisional hasta tener el propio
+// barra superior. en el editor aparecen el botón de volver y el de exportar.
+// el logo circular es el que se usa en toda la aplicación; el completo queda
+// solo para la portada del readme
 export default function TopBar() {
   const vista = useAppStore((s) => s.vista)
   const irAImportar = useAppStore((s) => s.irAImportar)
@@ -23,7 +24,7 @@ export default function TopBar() {
           </button>
         )}
         <div className="flex items-center gap-2.5">
-          <img src="/logo.jpg" alt="" className="h-7 w-7 rounded-lg object-cover" />
+          <img src="/logo-circle.png" alt="" className="h-7 w-7 object-contain" />
           <span className="text-[15px] font-semibold tracking-tight">Video Editor</span>
         </div>
       </div>

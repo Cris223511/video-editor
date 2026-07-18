@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/logo.jpg" alt="Video Editor logo" width="120">
+  <img src="public/logo.png" alt="Video Editor logo" width="120">
 </p>
 
 <h1 align="center">Video Editor</h1>
