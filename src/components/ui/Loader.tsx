@@ -7,8 +7,8 @@ export default function Loader({ texto }: { texto?: string }) {
       className="animate-fundido-in fixed inset-0 z-[100] grid place-items-center"
       style={{
         background: 'rgb(var(--surface) / 0.55)',
-        backdropFilter: 'blur(14px)',
-        WebkitBackdropFilter: 'blur(14px)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
       }}
     >
       <div className="flex flex-col items-center gap-4">

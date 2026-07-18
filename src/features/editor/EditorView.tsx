@@ -9,6 +9,7 @@ import ExportDialog from './ExportDialog'
 import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
 import { useAtajos } from './useAtajos'
+import { useAutoguardado } from './useAutoguardado'
 
 // disposición al estilo de un editor de escritorio: opciones a la izquierda,
 // visor al centro, y abajo los medios junto a la línea de tiempo. el reparto lo
@@ -19,6 +20,8 @@ export default function EditorView() {
   const [verMedios, setVerMedios] = useState(true)
 
   useAtajos()
+  // el proyecto se guarda solo unos segundos después de cada cambio
+  useAutoguardado(true)
 
   return (
     <div className="h-[calc(100dvh-3.5rem)] p-1.5">

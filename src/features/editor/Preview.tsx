@@ -26,6 +26,7 @@ export default function Preview() {
   const hayCensura = useEditorStore((s) => s.capas.some((c) => c.tipo === 'censura'))
   const resolucion = useEditorStore((s) => s.resolucion)
   const colorFondo = useEditorStore((s) => s.colorFondo)
+  const fondo = useEditorStore((s) => s.fondo)
   const audioRegiones = useEditorStore((s) => s.audioRegiones)
   const volumenGlobal = useEditorStore((s) => s.volumenGlobal)
   const medios = useProjectStore((s) => s.medios)
@@ -33,6 +34,8 @@ export default function Preview() {
   const videosRef = useRef<Map<string, HTMLVideoElement>>(new Map())
   const phRef = useRef(playhead)
   const censuraCanvasRef = useRef<HTMLCanvasElement>(null)
+  // video del relleno borroso: sigue el tiempo del clip activo sin sonar
+  const fondoRef = useRef<HTMLVideoElement | null>(null)
   const areaRef = useRef<HTMLDivElement>(null)
   const [areaTam, setAreaTam] = useState({ w: 0, h: 0 })
 
@@ -402,12 +405,31 @@ export default function Preview() {
   const lienzoRect = rectContenido(areaTam.w, areaTam.h, resolucion.ancho / resolucion.alto)
 
   return (
-    <div className="relative flex min-h-0 flex-1 items-center justify-center bg-black/40 p-4">
+    // el fondo oscuro solo tiene sentido cuando hay video: rodear la imagen de
+    // negro ayuda a juzgar el color. sin nada que mostrar, ese mismo fondo deja
+    // el texto de aviso en gris sobre gris y no se lee
+    <div
+      className={[
+        'relative flex min-h-0 flex-1 items-center justify-center p-4 transition-colors duration-300',
+        hayContenido ? 'bg-black/40' : '',
+      ].join(' ')}
+      style={hayContenido ? undefined : { background: 'rgb(var(--surface-2))' }}
+    >
       {!hayContenido ? (
-        <div className="flex flex-col items-center gap-3 text-center text-[color:var(--muted)]">
-          <Icon name="video" size={40} />
-          <p className="max-w-xs text-sm">
-            Añade un video desde la biblioteca de la izquierda para empezar a editar.
+        <div
+          className="flex max-w-sm flex-col items-center gap-3 rounded-2xl border border-dashed px-8 py-10 text-center"
+          style={{ borderColor: 'rgb(var(--border) / 0.22)' }}
+        >
+          <span
+            className="grid h-14 w-14 place-items-center rounded-full text-brand"
+            style={{ background: 'rgb(var(--accent) / 0.1)' }}
+          >
+            <Icon name="video" size={26} />
+          </span>
+          <p className="font-display text-base font-bold">Aún no hay nada en el lienzo</p>
+          <p className="text-sm leading-relaxed text-[color:var(--muted)]">
+            Importa un video desde el panel de <b>Medios</b>, abajo a la izquierda, y arrástralo
+            hasta la línea de tiempo para empezar a editar.
           </p>
         </div>
       ) : (
@@ -437,6 +459,33 @@ export default function Preview() {
                 />
               )
             })}
+
+            {/* relleno con el propio video, ampliado y borroso, para que un
+                video vertical en un lienzo cuadrado no deje dos franjas planas.
+                va detrás del video real y se recorta al lienzo. no reproduce
+                sonido porque es el mismo material que ya suena delante */}
+            {fondo === 'desenfoque' &&
+              (() => {
+                const act = clipEnTiempo(clipsOrdenados, playhead)
+                const asset = act ? assetPorId.get(act.assetId) : null
+                if (!asset) return null
+                return (
+                  <video
+                    key={`fondo-${act!.id}`}
+                    ref={(el) => {
+                      if (el) fondoRef.current = el
+                      else fondoRef.current = null
+                    }}
+                    src={asset.url}
+                    muted
+                    playsInline
+                    preload="auto"
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover"
+                    style={{ filter: 'blur(26px) brightness(0.72)', transform: 'scale(1.12)' }}
+                  />
+                )
+              })()}
             {filtrosMatriz.length > 0 && (
               <svg className="absolute h-0 w-0">
                 <defs>

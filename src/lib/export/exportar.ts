@@ -12,6 +12,7 @@ export interface DatosExport {
   alto: number
   fps: number // imágenes por segundo del archivo final
   colorFondo: string
+  fondo?: 'color' | 'desenfoque'
   clips: Clip[]
   capas: Capa[]
   marco: Marco
@@ -243,6 +244,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
           ancho,
           alto,
           colorFondo: datos.colorFondo,
+          fondo: datos.fondo,
           clips,
           capas: datos.capas,
           marco: datos.marco,

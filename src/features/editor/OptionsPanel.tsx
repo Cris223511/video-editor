@@ -1,4 +1,5 @@
 import GaleriaTransiciones from './GaleriaTransiciones'
+import SinSeleccion from '../../components/ui/SinSeleccion'
 import Icon, { NombreIcono } from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
 import { useEditorStore, Herramienta } from '../../store/useEditorStore'
@@ -11,11 +12,13 @@ import AudioPanel from './panels/AudioPanel'
 import SpeedPanel from './panels/SpeedPanel'
 import CensuraPanel from './panels/CensuraPanel'
 import TonePanel from './panels/TonePanel'
+import ProyectoPanel from './panels/ProyectoPanel'
 import LienzoPanel from './panels/LienzoPanel'
 import MarcoPanel from './panels/MarcoPanel'
 import FiguraPanel from './panels/FiguraPanel'
 
 const herramientas: { id: Herramienta; icono: NombreIcono; etiqueta: string }[] = [
+  { id: 'proyecto', icono: 'logo', etiqueta: 'Proyecto' },
   { id: 'propiedades', icono: 'ajustes', etiqueta: 'Propiedades' },
   { id: 'lienzo', icono: 'lienzo', etiqueta: 'Lienzo' },
   { id: 'marco', icono: 'marco', etiqueta: 'Marco' },
@@ -41,9 +44,9 @@ function Propiedades() {
 
   if (!clip || !asset) {
     return (
-      <p className="text-sm leading-relaxed text-[color:var(--muted)]">
-        Selecciona un clip en la línea de tiempo para ver y ajustar sus propiedades.
-      </p>
+      <SinSeleccion icono="ajustes" titulo="Ningún clip seleccionado">
+        Pulsa un clip en la línea de tiempo para ver sus datos y elegir con qué transición entra.
+      </SinSeleccion>
     )
   }
 
@@ -103,6 +106,7 @@ export default function OptionsPanel({ onOcultar }: { onOcultar?: () => void }) 
   const setHerramienta = useEditorStore((s) => s.setHerramienta)
 
   const paneles: Record<Herramienta, JSX.Element> = {
+    proyecto: <ProyectoPanel />,
     propiedades: <Propiedades />,
     lienzo: <LienzoPanel />,
     marco: <MarcoPanel />,
@@ -147,7 +151,7 @@ export default function OptionsPanel({ onOcultar }: { onOcultar?: () => void }) 
           style={{ borderBottom: '1px solid rgb(var(--border) / 0.1)' }}
         >
           {actual && <Icon name={actual.icono} size={14} className="text-brand" />}
-          <h2 className="text-[13px] font-semibold">{actual?.etiqueta}</h2>
+          <h2 className="font-display text-[13px] font-bold">{actual?.etiqueta}</h2>
           {onOcultar && (
             <Tooltip texto="Ocultar el panel" lado="abajo">
               <button

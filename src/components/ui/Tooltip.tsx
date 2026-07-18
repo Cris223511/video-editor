@@ -16,7 +16,10 @@ const lados: Record<Lado, 'top' | 'bottom' | 'right' | 'left'> = {
 // cursor se mueve entre elementos cercanos
 export function TooltipProvider({ children }: { children: ReactNode }) {
   return (
-    <Tip.Provider delayDuration={280} skipDelayDuration={300}>
+    // sin espera: el tooltip sale en cuanto el cursor entra. tener que dejar el
+    // ratón quieto un momento para saber qué hace un botón entorpece más de lo
+    // que ayuda, sobre todo en una barra llena de iconos
+    <Tip.Provider delayDuration={0} skipDelayDuration={0}>
       {children}
     </Tip.Provider>
   )
@@ -37,7 +40,7 @@ export default function Tooltip({
   children: ReactNode
 }) {
   return (
-    <Tip.Root>
+    <Tip.Root delayDuration={0}>
       <Tip.Trigger asChild>{children}</Tip.Trigger>
       <Tip.Portal>
         <Tip.Content

@@ -30,21 +30,25 @@ export default function Modal({
             <Dialog.Overlay asChild forceMount>
               <motion.div
                 initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
-                animate={{ opacity: 1, backdropFilter: 'blur(12px)' }}
+                animate={{ opacity: 1, backdropFilter: 'blur(4px)' }}
                 exit={{ opacity: 0, backdropFilter: 'blur(0px)' }}
                 transition={{ duration: 0.25, ease: 'easeOut' }}
                 className="fixed inset-0 z-50"
-                style={{ background: 'rgb(6 12 24 / 0.55)' }}
+                style={{ background: 'rgb(6 12 24 / 0.45)' }}
               />
             </Dialog.Overlay>
 
             <Dialog.Content asChild forceMount aria-describedby={undefined}>
               <motion.div
-                initial={{ opacity: 0, y: 12, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                // el centrado va dentro de la animación y no en una clase de
+                // tailwind: framer escribe su propio transform en línea al
+                // animar, y una clase -translate quedaría anulada, dejando la
+                // ventana desplazada media pantalla hacia abajo y a la derecha
+                initial={{ opacity: 0, x: '-50%', y: 'calc(-50% + 12px)', scale: 0.97 }}
+                animate={{ opacity: 1, x: '-50%', y: '-50%', scale: 1 }}
+                exit={{ opacity: 0, x: '-50%', y: 'calc(-50% + 8px)', scale: 0.98 }}
                 transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                className={`fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] ${ancho} -translate-x-1/2 -translate-y-1/2 rounded-2xl p-5 shadow-2xl`}
+                className={`fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] ${ancho} rounded-2xl p-5 shadow-2xl`}
                 style={{
                   background: 'rgb(var(--surface))',
                   border: '1px solid rgb(var(--border) / 0.12)',
@@ -52,7 +56,7 @@ export default function Modal({
               >
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <Dialog.Title className="text-[15px] font-semibold">{titulo}</Dialog.Title>
+                    <Dialog.Title className="font-display text-[15px] font-bold">{titulo}</Dialog.Title>
                     {descripcion && (
                       <Dialog.Description className="mt-0.5 text-xs text-[color:var(--muted)]">
                         {descripcion}

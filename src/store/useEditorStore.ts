@@ -20,6 +20,7 @@ const DURACION_MINIMA = 0.1
 const DURACION_MINIMA_CAPA = 0.2
 
 export type Herramienta =
+  | 'proyecto'
   | 'propiedades'
   | 'texto'
   | 'imagen'
@@ -49,6 +50,8 @@ interface EstadoEditor {
   resolucionAuto: { ancho: number; alto: number }
   lienzoManual: boolean
   colorFondo: string
+  // qué rellena las bandas cuando el video no cubre el lienzo entero
+  fondo: 'color' | 'desenfoque'
   marco: Marco
   volumenGlobal: number
   audioRegiones: RegionAudio[]
@@ -117,6 +120,7 @@ interface EstadoEditor {
   setLienzo: (ancho: number, alto: number) => void
   setLienzoAuto: () => void
   setColorFondo: (color: string) => void
+  setFondo: (f: 'color' | 'desenfoque') => void
   setMarco: (cambios: Partial<Marco>) => void
   irA: (t: number) => void
   reproducir: () => void
@@ -154,6 +158,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => ({
   resolucionAuto: { ancho: 1920, alto: 1080 },
   lienzoManual: false,
   colorFondo: '#000000',
+  fondo: 'color',
   marco: { tipo: 'ninguno', color: '#ffffff', grosor: 30, radio: 40 },
   volumenGlobal: 1,
   audioRegiones: [],
@@ -618,6 +623,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => ({
   setLienzoAuto: () => set((s) => ({ resolucion: { ...s.resolucionAuto }, lienzoManual: false })),
 
   setColorFondo: (color) => set({ colorFondo: color }),
+  setFondo: (f) => set({ fondo: f }),
 
   setMarco: (cambios) => set((s) => ({ marco: { ...s.marco, ...cambios } })),
 

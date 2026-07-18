@@ -2,7 +2,8 @@ import Dropzone from './Dropzone'
 import Icon from '../../components/ui/Icon'
 import { useImportarMedios } from './useImportarMedios'
 import { useProjectStore } from '../../store/useProjectStore'
-import { useAppStore } from '../../store/useAppStore'
+import { useNavigate } from 'react-router-dom'
+import { RUTAS } from '../../rutas'
 import { formatearBytes } from '../../lib/format/bytes'
 import { formatearDuracion } from '../../lib/format/duracion'
 
@@ -11,7 +12,8 @@ import { formatearDuracion } from '../../lib/format/duracion'
 export default function ImportView() {
   const { procesar, ocupado } = useImportarMedios()
   const { medios, quitar } = useProjectStore()
-  const irAEditor = useAppStore((s) => s.irAEditor)
+  const navegar = useNavigate()
+  const irAEditor = () => navegar(RUTAS.editor)
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:py-14">

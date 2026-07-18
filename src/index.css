@@ -1,3 +1,9 @@
+/* las tipografías van empaquetadas con la aplicación y no enlazadas a Google:
+   así el sitio carga con su letra desde el primer momento, funciona sin
+   conexión y no hay una petición a un tercero en cada visita */
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/plus-jakarta-sans';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -14,6 +20,10 @@
   --muted: #5c6e8c;
   --border: 21 52 102;
   --accent: 24 97 255;
+  /* el azul de los botones rellenos va aparte del de los enlaces: uno debe
+     leerse sobre el fondo y el otro tiene que dejar leer el blanco encima, y
+     esas dos exigencias tiran en direcciones contrarias */
+  --accent-boton: 24 97 255;
   --accent-soft: 18 165 240;
   --radius: 10px;
 }
@@ -27,6 +37,7 @@ html.dark {
   --muted: #8ea3c4;
   --border: 122 170 255;
   --accent: 59 140 255;
+  --accent-boton: 26 86 210;
   --accent-soft: 56 189 248;
 }
 
@@ -166,8 +177,25 @@ html.tema-en-transicion * {
   background: rgb(var(--accent) / 0.45);
 }
 
-/* muestras animadas de la galería de transiciones. cada una repite en bucle el
-   comportamiento real de su transición sobre dos planos de colores distintos */
+/* muestras de la galería de transiciones. en reposo se ve solo el primer plano,
+   quieto; al pasar el cursor por la tarjeta arranca la transición en bucle sobre
+   dos fotos reales, que es lo que deja comparar unas con otras */
+.demo-capa {
+  opacity: 0;
+}
+.grupo-demo:hover .demo-ninguna {
+  animation: demo-ninguna 1.8s steps(1, end) infinite;
+}
+.grupo-demo:hover .demo-desvanecer {
+  animation: demo-desvanecer 1.8s ease-in-out infinite;
+}
+.grupo-demo:hover .demo-fundido {
+  animation: demo-fundido 1.8s ease-in-out infinite;
+}
+.grupo-demo:hover .demo-negro {
+  animation: demo-negro 1.8s ease-in-out infinite;
+}
+
 @keyframes demo-ninguna {
   0%, 46% { opacity: 0; }
   50%, 100% { opacity: 1; }

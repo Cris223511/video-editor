@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import SinSeleccion from '../../../components/ui/SinSeleccion'
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { AjusteTono } from '../../../types/timeline'
@@ -46,9 +47,9 @@ export default function TonePanel() {
 
   if (!clip) {
     return (
-      <p className="text-sm leading-relaxed text-[color:var(--muted)]">
-        Selecciona un clip en la línea de tiempo para ajustar su tono.
-      </p>
+      <SinSeleccion icono="tono" titulo="Ningún clip seleccionado">
+        Pulsa un clip en la línea de tiempo para corregir su color con las ruedas y las curvas.
+      </SinSeleccion>
     )
   }
 

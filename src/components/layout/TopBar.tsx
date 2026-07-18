@@ -1,27 +1,63 @@
-import { useState } from 'react'
-import { Moon, Sun } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { FolderOpen, Moon, Save, Sun } from 'lucide-react'
 import Icon from '../ui/Icon'
 import Tooltip from '../ui/Tooltip'
-import Modal from '../ui/Modal'
-import { Interruptor } from '../ui/Controls'
+import { useToast } from '../ui/ToastProvider'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
+import { RUTAS } from '../../rutas'
 import { useProjectStore } from '../../store/useProjectStore'
 import { useThemeStore } from '../../store/useThemeStore'
+import { guardarSesion } from '../../lib/proyecto/sesion'
 import { VERSION } from '../../config/constants'
 
 // barra superior. lleva el logo, el nombre del proyecto editable, cuántos
-// medios hay cargados, el cambio rápido de tema, los ajustes y la exportación
+// medios hay cargados, el cambio de tema, el acceso a los proyectos guardados y
+// las acciones de guardar y exportar
 export default function TopBar() {
-  const vista = useAppStore((s) => s.vista)
-  const irAImportar = useAppStore((s) => s.irAImportar)
+  const { pathname } = useLocation()
+  const navegar = useNavigate()
   const abrirExport = useAppStore((s) => s.abrirExport)
   const titulo = useProjectStore((s) => s.titulo)
   const renombrar = useProjectStore((s) => s.renombrar)
   const medios = useProjectStore((s) => s.medios)
+  const sinGuardar = useProjectStore((s) => s.sinGuardar)
+  const guardadoEn = useProjectStore((s) => s.guardadoEn)
   const tema = useThemeStore((s) => s.tema)
   const alternar = useThemeStore((s) => s.alternar)
-  const [ajustes, setAjustes] = useState(false)
-  const enEditor = vista === 'editor'
+  const { mostrar } = useToast()
+  const [guardando, setGuardando] = useState(false)
+  const enEditor = pathname === RUTAS.editor
+
+  async function guardar() {
+    if (guardando) return
+    setGuardando(true)
+    try {
+      // el proyecto conserva su identidad entre guardados, así que volver a
+      // guardar actualiza el mismo en lugar de llenar la lista de copias
+      const st = useProjectStore.getState()
+      await guardarSesion(st.idProyecto, st.creado)
+      useProjectStore.setState({ sinGuardar: false, guardadoEn: Date.now() })
+      mostrar('success', 'Proyecto guardado en este equipo.')
+    } catch {
+      mostrar('error', 'No se pudo guardar. Puede que no quede espacio libre.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  // Ctrl+S guarda, que es lo que espera cualquiera al pulsarlo
+  useEffect(() => {
+    if (!enEditor) return
+    const alPulsar = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault()
+        guardar()
+      }
+    }
+    window.addEventListener('keydown', alPulsar)
+    return () => window.removeEventListener('keydown', alPulsar)
+  })
 
   return (
     <header className="glass sticky top-0 z-40 flex h-14 items-center justify-between gap-3 px-4 sm:px-6">
@@ -29,7 +65,7 @@ export default function TopBar() {
         {enEditor && (
           <Tooltip texto="Volver a los medios" lado="abajo">
             <button
-              onClick={irAImportar}
+              onClick={() => navegar(RUTAS.medios)}
               className="interactivo grid h-9 w-9 place-items-center rounded-lg text-[color:var(--muted)]"
             >
               <Icon name="atras" size={18} />
@@ -38,7 +74,13 @@ export default function TopBar() {
         )}
 
         <div className="flex min-w-0 items-center gap-2.5">
-          <img src="/logo-circle.png" alt="" className="h-7 w-7 shrink-0 object-contain" />
+          <Link
+            to={RUTAS.portada}
+            aria-label="Ir a la portada"
+            className="shrink-0 transition-transform duration-200 hover:scale-105 active:scale-95"
+          >
+            <img src="/logo-circle.png" alt="" className="h-7 w-7 object-contain" />
+          </Link>
           {enEditor ? (
             <Tooltip texto="Escribe para renombrar el proyecto" lado="abajo">
               <input
@@ -50,7 +92,9 @@ export default function TopBar() {
             </Tooltip>
           ) : (
             <div className="flex items-baseline gap-2">
-              <span className="text-[15px] font-semibold tracking-tight">Video Editor</span>
+              <Link to={RUTAS.portada} className="font-display text-[15px] font-extrabold tracking-tight">
+                Video <span className="text-brand">Editor</span>
+              </Link>
               <span className="hidden text-[11px] text-[color:var(--muted)] sm:inline">
                 Edición en tu navegador
               </span>
@@ -84,74 +128,51 @@ export default function TopBar() {
           </button>
         </Tooltip>
 
-        <Tooltip texto="Ajustes de la aplicación" lado="abajo">
-          <button
-            onClick={() => setAjustes(true)}
-            aria-label="Ajustes"
-            className="interactivo grid h-9 w-9 place-items-center rounded-lg text-[color:var(--muted)]"
+        <Tooltip texto="Ver los proyectos guardados en este equipo" lado="abajo">
+          <Link
+            to={RUTAS.proyectos}
+            aria-label="Mis proyectos"
+            className={[
+              'interactivo grid h-9 w-9 place-items-center rounded-lg',
+              pathname.startsWith(RUTAS.proyectos) ? 'text-brand' : 'text-[color:var(--muted)]',
+            ].join(' ')}
           >
-            <Icon name="ajustes" size={18} />
-          </button>
+            <FolderOpen size={18} />
+          </Link>
         </Tooltip>
 
         {enEditor && (
-          <Tooltip texto="Exportar el video" lado="abajo">
-            <button
-              onClick={abrirExport}
-              className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-brand-dark active:scale-95"
-            >
-              <Icon name="exportar" size={17} />
-              Exportar
-            </button>
-          </Tooltip>
+          <>
+            <Tooltip texto="Guardar el proyecto en este equipo" atajo="Ctrl+S" lado="abajo">
+              <button
+                onClick={guardar}
+                disabled={guardando}
+                className="interactivo inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[color:var(--muted)] disabled:opacity-50"
+              >
+                <Save size={16} />
+                <span className="hidden sm:inline">
+                  {guardando ? 'Guardando...' : sinGuardar ? 'Guardar' : guardadoEn ? 'Guardado' : 'Guardar'}
+                </span>
+                {/* el punto avisa de que hay trabajo aún no guardado, sin robar
+                    atención con un mensaje cada vez que se toca algo */}
+                {sinGuardar && !guardando && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                )}
+              </button>
+            </Tooltip>
+
+            <Tooltip texto="Exportar el video" lado="abajo">
+              <button
+                onClick={abrirExport}
+                className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-brand-dark active:scale-95"
+              >
+                <Icon name="exportar" size={17} />
+                Exportar
+              </button>
+            </Tooltip>
+          </>
         )}
       </div>
-
-      <ModalAjustes abierto={ajustes} onCerrar={() => setAjustes(false)} />
     </header>
-  )
-}
-
-// ajustes generales de la aplicación. por ahora el tema, y más adelante el
-// resto de preferencias
-function ModalAjustes({ abierto, onCerrar }: { abierto: boolean; onCerrar: () => void }) {
-  const tema = useThemeStore((s) => s.tema)
-  const fijar = useThemeStore((s) => s.fijar)
-
-  return (
-    <Modal
-      titulo="Ajustes"
-      descripcion="Preferencias generales del editor"
-      abierto={abierto}
-      onCerrar={onCerrar}
-    >
-      <div className="flex flex-col gap-4">
-        <div className="bloque flex flex-col gap-3 p-3">
-          <Interruptor
-            etiqueta="Modo oscuro"
-            ayuda="Cambia toda la interfaz a la paleta oscura. Tu elección se recuerda para la próxima vez."
-            activo={tema === 'dark'}
-            onChange={(v) => fijar(v ? 'dark' : 'light')}
-          />
-        </div>
-
-        <div className="flex items-center justify-between text-xs text-[color:var(--muted)]">
-          <span>Versión {VERSION}</span>
-          <a
-            href="https://github.com/Cris223511/video-editor"
-            target="_blank"
-            rel="noreferrer"
-            className="font-medium text-brand transition-opacity hover:opacity-75"
-          >
-            Ver el código
-          </a>
-        </div>
-
-        <p className="text-xs leading-relaxed text-[color:var(--muted)]">
-          Los videos se procesan en tu equipo. Nada se sube a ningún servidor mientras editas ni al
-          exportar.
-        </p>
-      </div>
-    </Modal>
   )
 }

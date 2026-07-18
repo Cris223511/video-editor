@@ -1,5 +1,5 @@
 import { useEditorStore } from '../../../store/useEditorStore'
-import { Campo, ColorCampo } from '../../../components/ui/Controls'
+import { Campo, ColorCampo, Segmentado } from '../../../components/ui/Controls'
 
 const PROPORCIONES = [
   { etiqueta: '16:9', ancho: 1920, alto: 1080 },
@@ -16,6 +16,8 @@ export default function LienzoPanel() {
   const resolucion = useEditorStore((s) => s.resolucion)
   const lienzoManual = useEditorStore((s) => s.lienzoManual)
   const colorFondo = useEditorStore((s) => s.colorFondo)
+  const fondo = useEditorStore((s) => s.fondo)
+  const setFondo = useEditorStore((s) => s.setFondo)
   const setLienzo = useEditorStore((s) => s.setLienzo)
   const setLienzoAuto = useEditorStore((s) => s.setLienzoAuto)
   const setColorFondo = useEditorStore((s) => s.setColorFondo)
@@ -55,6 +57,25 @@ export default function LienzoPanel() {
       >
         Ajustar al primer video
       </button>
+
+      <Campo etiqueta="Relleno de las bandas">
+        <Segmentado
+          valor={fondo}
+          opciones={[
+            { valor: 'color', etiqueta: 'Color' },
+            { valor: 'desenfoque', etiqueta: 'Video borroso' },
+          ]}
+          onChange={(v) => setFondo(v as 'color' | 'desenfoque')}
+        />
+      </Campo>
+
+      {fondo === 'desenfoque' && (
+        <p className="-mt-2 text-xs leading-relaxed text-[color:var(--muted)]">
+          Las bandas se rellenan con el propio video ampliado y desenfocado. Es lo habitual para
+          colocar una toma vertical en un lienzo cuadrado o apaisado sin dejar dos franjas planas a
+          los lados.
+        </p>
+      )}
 
       <Campo etiqueta="Color de fondo">
         <ColorCampo valor={colorFondo} onChange={setColorFondo} />

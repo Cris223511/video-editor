@@ -54,6 +54,7 @@ export default function ExportDialog() {
         alto: estado.resolucion.alto,
         fps,
         colorFondo: estado.colorFondo,
+        fondo: estado.fondo,
         clips: estado.pista.clips,
         capas: estado.capas,
         marco: estado.marco,

@@ -9,6 +9,9 @@ export interface Escena {
   ancho: number
   alto: number
   colorFondo: string
+  // 'desenfoque' rellena las bandas con el propio video ampliado y borroso, en
+  // lugar de con un color plano
+  fondo?: 'color' | 'desenfoque'
   clips: Clip[] // ya ordenados por inicio
   capas: Capa[]
   marco: Marco
@@ -426,7 +429,7 @@ export function dibujarFotograma(
   imagenDe: (capaId: string) => HTMLImageElement | undefined,
   off: HTMLCanvasElement,
 ) {
-  const { ancho, alto, colorFondo, clips, capas, marco } = escena
+  const { ancho, alto, colorFondo, fondo, clips, capas, marco } = escena
   const escala = alto / 1080
 
   ctx.setTransform(1, 0, 0, 1, 0, 0)
@@ -447,6 +450,21 @@ export function dibujarFotograma(
     const dh = video.videoHeight * escC
     ctx.save()
     ctx.globalAlpha = op
+
+    // relleno con el propio video: se amplía hasta cubrir el lienzo entero y se
+    // desenfoca. sirve para que un video vertical en un lienzo cuadrado no deje
+    // dos franjas planas a los lados. el desenfoque va con la imagen recortada
+    // por fuera del borde, así no se ven los cantos del propio relleno
+    if (fondo === 'desenfoque' && (dw < ancho - 1 || dh < alto - 1)) {
+      const escB = Math.max(ancho / video.videoWidth, alto / video.videoHeight) * 1.12
+      const bw = video.videoWidth * escB
+      const bh = video.videoHeight * escB
+      ctx.save()
+      ctx.filter = `blur(${Math.round(alto * 0.045)}px) brightness(0.72)`
+      ctx.drawImage(video, (ancho - bw) / 2, (alto - bh) / 2, bw, bh)
+      ctx.restore()
+    }
+
     if (!esTonoNeutro(clip.tono)) ctx.filter = filtroCss(clip.tono, `tonoexp-${clip.id}`)
     ctx.drawImage(video, (ancho - dw) / 2, (alto - dh) / 2, dw, dh)
     ctx.filter = 'none'

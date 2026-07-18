@@ -24,32 +24,29 @@ const MUESTRAS: Muestra[] = [
   },
 ]
 
-// la muestra es una animación real en bucle, no un icono: dos planos de colores
-// distintos entrando uno tras otro con la transición que representa la tarjeta,
-// para poder comparar de un vistazo cómo se comporta cada una
+// las mismas dos fotos en todas las muestras: así lo único que cambia entre una
+// tarjeta y otra es la transición, y se pueden comparar de verdad. son dos tomas
+// porque una transición siempre ocurre entre dos planos
+const PLANO_A =
+  'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=400&q=60'
+const PLANO_B =
+  'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=400&q=60'
+
+// la muestra se anima solo al pasar el cursor. con todas las tarjetas moviéndose
+// a la vez el panel se vuelve un caos y cuesta distinguir qué hace cada una
 function Demo({ tipo }: { tipo: TipoTransicion }) {
-  const base = 'absolute inset-0 rounded-md'
   return (
-    <div className="relative h-16 w-full overflow-hidden rounded-md bg-black">
+    <div className="demo relative aspect-video w-full overflow-hidden rounded-md bg-black">
       {/* plano saliente */}
-      <div
-        className={base}
-        style={{ background: 'linear-gradient(135deg, #1861ff, #4c8dff)' }}
-      />
+      <img src={PLANO_A} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
       {/* plano entrante, animado según la transición */}
-      <div
-        className={base}
-        style={{
-          background: 'linear-gradient(135deg, #ff3ba7, #ff8a5a)',
-          animation: `demo-${tipo} 2.6s ease-in-out infinite`,
-        }}
+      <img
+        src={PLANO_B}
+        alt=""
+        loading="lazy"
+        className={`demo-capa demo-${tipo} absolute inset-0 h-full w-full object-cover`}
       />
-      {tipo === 'fundido' && (
-        <div
-          className={base}
-          style={{ background: '#000', animation: 'demo-negro 2.6s ease-in-out infinite' }}
-        />
-      )}
+      {tipo === 'fundido' && <span className="demo-capa demo-negro absolute inset-0 bg-black" />}
     </div>
   )
 }
@@ -72,7 +69,7 @@ export default function GaleriaTransiciones({
             key={m.tipo}
             onClick={() => onElegir(m.tipo)}
             className={[
-              'group flex flex-col gap-2 rounded-xl p-2 text-left transition-all duration-200',
+              'grupo-demo flex flex-col gap-2 rounded-xl p-2 text-left transition-all duration-200',
               elegida
                 ? 'ring-2 ring-brand'
                 : 'ring-1 ring-black/10 hover:ring-brand/50 dark:ring-white/10',
