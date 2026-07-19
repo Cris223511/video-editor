@@ -7,6 +7,7 @@ import {
   Layers,
   MonitorPlay,
   Palette,
+  PlayCircle,
   Save,
   Scissors,
   Sparkles,
@@ -28,6 +29,7 @@ import DemoTransiciones from '../../components/sitio/DemoTransiciones'
 import DemoCensura from '../../components/sitio/DemoCensura'
 import DemoLienzo from '../../components/sitio/DemoLienzo'
 import DemoMontaje from '../../components/sitio/DemoMontaje'
+import DemoVideo from '../../components/sitio/DemoVideo'
 import { MaquetaLineaTiempo } from '../../components/sitio/MaquetaEditor'
 import { Aviso, Chip, IconoCirculo, RejillaFondo, Tarjeta } from '../../components/sitio/Piezas'
 import { ANCHO_CONTENIDO, RELLENO } from '../../components/sitio/Contenedor'
@@ -323,6 +325,14 @@ export default function PortadaView() {
                   descripcion:
                     'Pixelar, difuminar o tapar, en rectángulo o círculo. Arrastra el recuadro por dentro y estíralo por las esquinas.',
                   contenido: <DemoCensura />,
+                },
+                {
+                  id: 'video',
+                  nombre: 'Reproducción',
+                  icono: <PlayCircle size={15} />,
+                  descripcion:
+                    'Los mismos controles del visor: reproducir, buscar por la barra, silenciar y cambiar la velocidad, incluida la cámara lenta que se usa al grabar recorridos.',
+                  contenido: <DemoVideo />,
                 },
                 {
                   id: 'lienzo',
