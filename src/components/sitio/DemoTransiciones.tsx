@@ -134,7 +134,11 @@ export default function DemoTransiciones() {
       }}
     >
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-      <div className="relative overflow-hidden rounded-xl bg-black">
+      {/* self-start evita que el grid estire esta columna hasta igualar la
+          altura de la lista de transiciones: sin eso el fondo negro del
+          contenedor sobraba por debajo de la foto, aunque el lienzo estuviera
+          bien pintado */}
+      <div className="relative self-start overflow-hidden rounded-xl bg-black">
         <canvas
           ref={lienzo}
           className="block w-full"

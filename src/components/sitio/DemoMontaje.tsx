@@ -54,13 +54,16 @@ const AJUSTES = [
   { nombre: 'Volumen', valor: 38 },
 ]
 
-// centros aproximados de cada cajita del panel de medios, en porcentaje del
-// lienzo. las dos primeras comparten fila y la tercera ocupa el ancho entero,
-// por eso su x cae justo en medio del panel
+// centros de cada cajita del panel de medios, en porcentaje del lienzo
+// completo. el panel ocupa el rango x [8, 27] e y [2, 65] de la escena, y las
+// tres cajitas van apiladas a todo lo ancho del panel (por eso comparten la
+// misma x, el centro horizontal del panel). la y sale de convertir el centro
+// de cada cajita, expresado en porcentaje del panel, a porcentaje de la
+// escena: escena_y = 2 + (panel_y / 100) * 63
 const MEDIOS = [
-  { x: 13, y: 30 },
-  { x: 22, y: 30 },
-  { x: 17.5, y: 52 },
+  { x: 17.5, y: 42.3 },
+  { x: 17.5, y: 51.8 },
+  { x: 17.5, y: 60 },
 ]
 
 // el recorrido del cursor. la gracia está en que cada archivo se recoge de su
@@ -208,77 +211,81 @@ export default function DemoMontaje() {
           ))}
         </div>
 
-        {/* panel de medios, repartido en dos mitades: los ajustes arriba y los
-            archivos de origen abajo en dos columnas. antes iban apilados en una
-            sola tira y quedaban apretados contra el borde superior con medio
-            panel vacío por debajo. así las cajitas crecen hasta llenar el hueco
-            y el cursor tiene dónde posarse */}
+        {/* panel de medios. cada bloque va posicionado en porcentaje del propio
+            panel, igual que el resto de la pieza, para que las coordenadas de
+            MEDIOS y RUTA se puedan calcular con la misma regla en vez de
+            depender de cómo reparta el espacio un flex. los ajustes quedan
+            arriba con aire entre el rótulo y cada barra, y las tres cajitas de
+            medios bajan apiladas a todo lo ancho, del mismo tamaño entre sí,
+            hasta llenar el panel sin dejar hueco al final */}
         <div
-          className="absolute bottom-[35%] left-[8%] top-[2%] flex w-[19%] flex-col overflow-hidden rounded-lg p-[5%]"
+          className="absolute bottom-[35%] left-[8%] top-[2%] w-[19%] overflow-hidden rounded-lg"
           style={{ background: 'rgb(var(--border) / 0.09)' }}
         >
           <p
-            className="text-[7px] font-bold uppercase tracking-wider sm:text-[8px]"
-            style={{ color: 'var(--muted)' }}
+            className="absolute inset-x-[10%] text-[7px] font-bold uppercase tracking-wider sm:text-[8px]"
+            style={{ top: '4%', color: 'var(--muted)' }}
           >
             Ajustes
           </p>
-          <div className="mt-1 flex shrink-0 flex-col gap-1 sm:gap-1.5">
-            {AJUSTES.map((a) => (
-              <span key={a.nombre} className="flex items-center gap-1">
-                <span
-                  className="w-[42%] shrink-0 truncate text-[6px] sm:text-[7px]"
-                  style={{ color: 'var(--muted)' }}
-                >
-                  {a.nombre}
-                </span>
-                <span
-                  className="relative h-[3px] flex-1 rounded-full"
-                  style={{ background: 'rgb(var(--border) / 0.22)' }}
-                >
-                  <span
-                    className="absolute inset-y-0 left-0 rounded-full"
-                    style={{ width: `${a.valor}%`, background: 'rgb(var(--accent) / 0.7)' }}
-                  />
-                </span>
+          {AJUSTES.map((a, i) => (
+            <span
+              key={a.nombre}
+              className="absolute inset-x-[10%] flex items-center gap-1.5"
+              style={{ top: `${18 + i * 13}%` }}
+            >
+              <span
+                className="w-[42%] shrink-0 truncate text-[6px] sm:text-[7px]"
+                style={{ color: 'var(--muted)' }}
+              >
+                {a.nombre}
               </span>
-            ))}
-          </div>
+              <span
+                className="relative h-[3px] flex-1 rounded-full"
+                style={{ background: 'rgb(var(--border) / 0.22)' }}
+              >
+                <span
+                  className="absolute inset-y-0 left-0 rounded-full"
+                  style={{ width: `${a.valor}%`, background: 'rgb(var(--accent) / 0.7)' }}
+                />
+              </span>
+            </span>
+          ))}
 
           <p
-            className="mt-2 text-[7px] font-bold uppercase tracking-wider sm:mt-3 sm:text-[8px]"
-            style={{ color: 'var(--muted)' }}
+            className="absolute inset-x-[10%] text-[7px] font-bold uppercase tracking-wider sm:text-[8px]"
+            style={{ top: '46%', color: 'var(--muted)' }}
           >
             Medios
           </p>
-          <div className="mt-1 grid flex-1 grid-cols-2 grid-rows-2 gap-1 sm:gap-1.5">
-            {CLIPS.map((c, i) => (
+          {CLIPS.map((c, i) => (
+            <span
+              key={i}
+              className="absolute inset-x-[8%] flex flex-col gap-0.5 rounded-md p-1 transition-all duration-300"
+              style={{
+                // los topes y las alturas son los mismos que se usaron para
+                // calcular el centro de cada cajita en MEDIOS: caja 1 va de
+                // 58% a 70%, la 2 de 73% a 85% y la 3 de 87% a 97% del panel
+                top: `${[58, 73, 87][i]}%`,
+                height: `${[12, 12, 10][i]}%`,
+                background:
+                  medioTocado === i ? 'rgb(var(--accent) / 0.18)' : 'rgb(var(--border) / 0.12)',
+                outline: medioTocado === i ? '1px solid rgb(var(--accent))' : 'none',
+                opacity: t > c.entra ? 0.3 : 1,
+              }}
+            >
               <span
-                key={i}
-                className="flex min-h-0 flex-col gap-0.5 rounded-md p-1 transition-all duration-300"
-                style={{
-                  // el tercero se lleva la fila entera, que es lo que evita el
-                  // hueco suelto de la esquina
-                  gridColumn: i === 2 ? 'span 2' : undefined,
-                  background:
-                    medioTocado === i ? 'rgb(var(--accent) / 0.18)' : 'rgb(var(--border) / 0.12)',
-                  outline: medioTocado === i ? '1px solid rgb(var(--accent))' : 'none',
-                  opacity: t > c.entra ? 0.3 : 1,
-                }}
+                className="w-full flex-1 rounded"
+                style={{ background: `linear-gradient(120deg, ${c.de}, ${c.a})` }}
+              />
+              <span
+                className="truncate text-[6px] leading-tight sm:text-[7px]"
+                style={{ color: 'var(--muted)' }}
               >
-                <span
-                  className="w-full flex-1 rounded"
-                  style={{ background: `linear-gradient(120deg, ${c.de}, ${c.a})` }}
-                />
-                <span
-                  className="truncate text-[6px] leading-tight sm:text-[7px]"
-                  style={{ color: 'var(--muted)' }}
-                >
-                  {c.nombre}
-                </span>
+                {c.nombre}
               </span>
-            ))}
-          </div>
+            </span>
+          ))}
         </div>
 
         {/* visor: ocupa todo el resto de la franja superior, que es lo que la
