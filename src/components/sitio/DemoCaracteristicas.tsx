@@ -1175,7 +1175,10 @@ export default function DemoCaracteristicas({ items }: { items: Caracteristica[]
                       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                       className="hidden overflow-hidden lg:block"
                     >
-                      <span className="mt-2 block pl-12 text-sm leading-relaxed text-[color:var(--muted)]">
+                      {/* el texto va pegado a su título. con más aire en medio, la
+                          descripción parecía de otra herramienta y no de la de
+                          arriba */}
+                      <span className="mt-0.5 block pl-12 text-sm leading-relaxed text-[color:var(--muted)]">
                         {it.texto}
                       </span>
                     </motion.span>
