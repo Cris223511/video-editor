@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowDownAZ,
+  CalendarPlus,
+  PencilLine,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
   ArrowUpZA,
@@ -30,14 +32,17 @@ import { formatearBytes } from '../../lib/format/bytes'
 import { ANCHO_CONTENIDO, RELLENO } from '../../components/sitio/Contenedor'
 import FichaProyecto from './FichaProyecto'
 
-// fecha en palabras corrientes, que se lee mejor que una marca de tiempo
-function cuando(ms: number): string {
+// fecha escrita en largo, la misma forma que usa la ficha de detalles. antes la
+// tarjeta decía cosas como "hoy a las 2:22", que se lee rápido pero no sirve para
+// distinguir un proyecto de otro cuando hay varios del mismo día
+function fechaLarga(ms: number): string {
   const d = new Date(ms)
-  const dias = Math.floor((Date.now() - ms) / 86_400_000)
-  if (dias === 0) return `hoy a las ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
-  if (dias === 1) return 'ayer'
-  if (dias < 30) return `hace ${dias} días`
-  return d.toLocaleDateString()
+  const mes = d.toLocaleDateString('es', { month: 'long' })
+  const conMayuscula = mes.charAt(0).toUpperCase() + mes.slice(1)
+  const hora = d
+    .toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', hour12: true })
+    .replace(/\s?([ap])\.?\s?m\.?/i, (_, l) => ` ${l.toLowerCase()}.m.`)
+  return `${d.getDate()} de ${conMayuscula} del ${d.getFullYear()}, a las ${hora}`
 }
 
 // lista de los proyectos guardados en este equipo. desde aquí se abren, se
@@ -332,19 +337,32 @@ export default function ProyectosView() {
               </span>
             </div>
 
-            <div className="flex flex-1 flex-col gap-1 p-3">
-              <h2 className="truncate font-display text-sm font-bold">{p.titulo}</h2>
+            <div className="flex flex-1 flex-col gap-1 p-3.5">
+              {/* el título no pasa de dos líneas y se corta con puntos suspensivos:
+                  a una sola línea, cualquier nombre medianamente largo se perdía */}
+              <h2 className="line-clamp-2 font-display text-[15px] font-bold leading-snug">
+                {p.titulo}
+              </h2>
               <p className="text-[11px] text-[color:var(--muted)]">
-                {p.numMedios} {p.numMedios === 1 ? 'medio' : 'medios'} · {cuando(p.modificado)}
+                {p.numMedios} {p.numMedios === 1 ? 'medio' : 'medios'}
               </p>
 
-              <div className="mt-2 flex gap-1">
-                <button
-                  onClick={() => abrir(p.id)}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand/10 py-2 text-xs font-semibold text-brand transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand/20 hover:shadow-sm"
-                >
-                  <FolderOpen size={13} /> Abrir
-                </button>
+              {/* las dos fechas se ven aquí, sin tener que abrir la ficha, que es
+                  lo que uno mira al buscar un proyecto entre varios */}
+              <div className="mt-2 flex flex-col gap-1">
+                <p className="flex items-center gap-1.5 text-[11px] text-[color:var(--muted)]">
+                  <CalendarPlus size={13} className="shrink-0 text-brand" />
+                  <span className="truncate">Creado el {fechaLarga(p.creado)}</span>
+                </p>
+                <p className="flex items-center gap-1.5 text-[11px] text-[color:var(--muted)]">
+                  <PencilLine size={13} className="shrink-0 text-brand" />
+                  <span className="truncate">Editado el {fechaLarga(p.modificado)}</span>
+                </p>
+              </div>
+
+              {/* el botón de abrir que había aquí sobraba: la miniatura entera ya
+                  ofrece abrir el proyecto al pasar el cursor por encima */}
+              <div className="mt-3 flex justify-end gap-1">
                 <Tooltip texto="Duplicar">
                   <button
                     onClick={() => duplicar(p.id)}
