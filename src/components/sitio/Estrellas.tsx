@@ -19,17 +19,26 @@ interface Estrella {
 // recalcularan en cada pintado, el cielo entero saltaría cada vez que cambia
 // cualquier cosa de la página
 function sembrar(): Estrella[] {
-  return Array.from({ length: CANTIDAD }, () => ({
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    // ninguna llega a ser grande: pasado cierto tamaño dejan de leerse como
-    // fondo y se convierten en puntos que distraen
-    tamano: Math.random() < 0.7 ? 1 + Math.random() : 2 + Math.random() * 1.2,
-    retraso: Math.random() * 12,
-    duracion: 7 + Math.random() * 9,
-    brillo: 0.35 + Math.random() * 0.5,
-    deriva: (Math.random() - 0.5) * 26,
-  }))
+  return Array.from({ length: CANTIDAD }, () => {
+    const duracion = 7 + Math.random() * 9
+    return {
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      // ninguna llega a ser grande: pasado cierto tamaño dejan de leerse como
+      // fondo y se convierten en puntos que distraen
+      tamano: Math.random() < 0.7 ? 1 + Math.random() : 2 + Math.random() * 1.2,
+      // el retraso es negativo y nunca pasa de lo que dura un ciclo, así que cada
+      // estrella empieza por un punto distinto de su propia animación en lugar de
+      // esperar a que le llegue el turno. antes el retraso era positivo y de hasta
+      // doce segundos: al volver del tema claro el componente se construía de cero
+      // y el cielo se quedaba vacío un buen rato, que es lo que parecía que las
+      // estrellas hubieran desaparecido
+      retraso: Math.random() * duracion,
+      duracion,
+      brillo: 0.35 + Math.random() * 0.5,
+      deriva: (Math.random() - 0.5) * 26,
+    }
+  })
 }
 
 // cielo de partículas para el fondo oscuro. aparecen, se apagan y derivan muy
@@ -63,7 +72,7 @@ export default function Estrellas() {
             background: '#dbe8ff',
             boxShadow: `0 0 ${e.tamano * 2.5}px rgb(var(--accent) / 0.55)`,
             opacity: 0,
-            animation: `estrella ${e.duracion}s ease-in-out ${e.retraso}s infinite`,
+            animation: `estrella ${e.duracion}s ease-in-out -${e.retraso}s infinite`,
             // cada una deriva en su propia dirección, leída desde una variable
             ['--deriva' as string]: `${e.deriva}px`,
             ['--brillo' as string]: e.brillo,

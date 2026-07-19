@@ -238,36 +238,46 @@ html.tema-en-transicion * {
   80%, 100% { opacity: 0; }
 }
 
-/* entrada y salida de los avisos: llegan deslizándose desde la derecha y se van
-   por el mismo lado. sonner publica su estado en atributos, así que basta con
-   engancharse a ellos en lugar de reimplementar la animación */
-[data-sonner-toast][data-mounted='true'] {
-  animation: aviso-entra 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-[data-sonner-toast][data-removed='true'] {
-  animation: aviso-sale 260ms cubic-bezier(0.4, 0, 1, 1) both;
+/* Entrada y salida de los avisos, que llegan desde la derecha y se van por el
+   mismo lado.
+
+   El intento anterior usaba una animación propia sobre la transformación del
+   aviso, y ahí estaba el error: sonner guarda en esa misma transformación el
+   desplazamiento vertical con el que apila unos avisos sobre otros, leyéndolo de
+   la variable --y. Al animarla se perdía el apilado, y como la animación
+   conservaba su último valor, los avisos se quedaban amontonados en el mismo
+   sitio.
+
+   La forma sana es no tocar la transformación y reescribir solo --y en los dos
+   estados que interesan, el previo a montarse y el de retirada. El apilado
+   mientras el aviso está en pantalla queda como estaba, y el suavizado lo pone
+   la transición de 400ms que sonner ya trae puesta.
+
+   Los selectores van precedidos del contenedor para ganar en especificidad,
+   porque sonner inyecta sus estilos en la cabecera al arrancar y no hay garantía
+   de que lleguen antes que esta hoja. */
+
+/* aún sin montar: espera fuera de la pantalla, a la derecha */
+[data-sonner-toaster] [data-sonner-toast][data-y-position='top'][data-mounted='false'] {
+  --y: translateX(110%);
 }
 
-@keyframes aviso-entra {
-  from {
-    opacity: 0;
-    transform: translateX(28px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
+/* el de delante se retira por la derecha */
+[data-sonner-toaster]
+  [data-sonner-toast][data-removed='true'][data-front='true'][data-swipe-out='false'] {
+  --y: translateX(110%);
 }
 
-@keyframes aviso-sale {
-  from {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateX(32px) scale(0.96);
-  }
+/* los de atrás se van igual, pero conservando la altura que les toca en la pila
+   para que los que quedan no den un salto */
+[data-sonner-toaster]
+  [data-sonner-toast][data-removed='true'][data-front='false'][data-swipe-out='false'][data-expanded='true'] {
+  --y: translateY(calc(var(--lift) * var(--offset))) translateX(110%);
+}
+
+[data-sonner-toaster]
+  [data-sonner-toast][data-removed='true'][data-front='false'][data-swipe-out='false'][data-expanded='false'] {
+  --y: translateX(110%);
 }
 
 /* estas dos animaciones se aplican con estilo en línea y no mediante una clase,

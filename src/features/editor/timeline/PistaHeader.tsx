@@ -29,8 +29,15 @@ export default function PistaHeader({ indice, alto }: { indice: number; alto: nu
 
   return (
     <div
-      className="group relative flex items-center gap-1 rounded-l-md px-2"
-      style={{ height: alto, background: 'rgb(var(--border) / 0.06)' }}
+      className="group relative flex items-center gap-1 rounded-l-md pl-2 pr-3"
+      // el borde de la derecha marca dónde acaba la columna de nombres. sin él,
+      // el rótulo quedaba pegado al primer clip y costaba distinguir cuál era el
+      // nombre del nivel y cuál el contenido
+      style={{
+        height: alto,
+        background: 'rgb(var(--border) / 0.06)',
+        borderRight: '1px solid rgb(var(--border) / 0.14)',
+      }}
     >
       <span className="truncate text-[11px] font-medium text-[color:var(--muted)]">
         Video {indice + 1}

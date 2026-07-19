@@ -1,8 +1,9 @@
 import GaleriaTransiciones from './GaleriaTransiciones'
 import SinSeleccion from '../../components/ui/SinSeleccion'
-import Icon, { NombreIcono } from '../../components/ui/Icon'
+import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
 import { useEditorStore, Herramienta } from '../../store/useEditorStore'
+import { herramientas } from './RielHerramientas'
 import { useProjectStore } from '../../store/useProjectStore'
 import { formatearDuracion } from '../../lib/format/duracion'
 import { Campo, Deslizador } from '../../components/ui/Controls'
@@ -16,20 +17,6 @@ import ProyectoPanel from './panels/ProyectoPanel'
 import LienzoPanel from './panels/LienzoPanel'
 import MarcoPanel from './panels/MarcoPanel'
 import FiguraPanel from './panels/FiguraPanel'
-
-const herramientas: { id: Herramienta; icono: NombreIcono; etiqueta: string }[] = [
-  { id: 'proyecto', icono: 'logo', etiqueta: 'Proyecto' },
-  { id: 'propiedades', icono: 'ajustes', etiqueta: 'Propiedades' },
-  { id: 'lienzo', icono: 'lienzo', etiqueta: 'Lienzo' },
-  { id: 'marco', icono: 'marco', etiqueta: 'Marco' },
-  { id: 'texto', icono: 'texto', etiqueta: 'Texto' },
-  { id: 'imagen', icono: 'imagen', etiqueta: 'Imagen' },
-  { id: 'figura', icono: 'figura', etiqueta: 'Figura' },
-  { id: 'audio', icono: 'audio', etiqueta: 'Audio' },
-  { id: 'censura', icono: 'censura', etiqueta: 'Censura' },
-  { id: 'velocidad', icono: 'velocidad', etiqueta: 'Velocidad' },
-  { id: 'tono', icono: 'tono', etiqueta: 'Tono' },
-]
 
 // propiedades del clip seleccionado, con su transición de entrada
 function Propiedades() {
@@ -103,7 +90,6 @@ function Propiedades() {
 // las herramientas ya tienen su panel funcionando
 export default function OptionsPanel({ onOcultar }: { onOcultar?: () => void }) {
   const herramienta = useEditorStore((s) => s.herramienta)
-  const setHerramienta = useEditorStore((s) => s.setHerramienta)
 
   const paneles: Record<Herramienta, JSX.Element> = {
     proyecto: <ProyectoPanel />,
@@ -123,28 +109,6 @@ export default function OptionsPanel({ onOcultar }: { onOcultar?: () => void }) 
 
   return (
     <aside className="panel flex w-full min-w-0 overflow-hidden rounded-xl">
-      {/* riel de herramientas: cada icono lleva su nombre en un tooltip */}
-      <div
-        className="flex w-14 shrink-0 flex-col items-center gap-1 overflow-y-auto py-2"
-        style={{ borderRight: '1px solid rgb(var(--border) / 0.1)' }}
-      >
-        {herramientas.map((h) => (
-          <Tooltip key={h.id} texto={h.etiqueta} lado="derecha">
-            <button
-              onClick={() => setHerramienta(h.id)}
-              className={[
-                'grid h-11 w-11 place-items-center rounded-lg transition-all duration-200',
-                herramienta === h.id
-                  ? 'bg-brand text-white shadow-sm'
-                  : 'text-[color:var(--muted)] hover:bg-brand/10 hover:text-brand active:scale-95',
-              ].join(' ')}
-            >
-              <Icon name={h.icono} size={19} />
-            </button>
-          </Tooltip>
-        ))}
-      </div>
-
       <div className="flex min-w-0 flex-1 flex-col">
         <div
           className="flex items-center gap-2 px-3 py-2.5"

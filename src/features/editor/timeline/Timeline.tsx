@@ -1,4 +1,4 @@
-import { MouseEvent, useMemo, useRef, useState } from 'react'
+import { MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../../components/ui/Icon'
 import Tooltip from '../../../components/ui/Tooltip'
 import { TIPO_ARRASTRE } from '../MediaLibrary'
@@ -92,6 +92,33 @@ export default function Timeline({
     }
     return mapa
   }, [clips, numPistas])
+
+  // zoom con la rueda mientras se mantiene control, con el cursor sobre la línea
+  // de tiempo. el listener se pone a mano y no como propiedad de react porque
+  // hace falta declararlo como no pasivo: de lo contrario el navegador ignora la
+  // cancelación y la página acaba desplazándose además de acercarse
+  useEffect(() => {
+    const cont = scrollRef.current
+    if (!cont) return
+
+    function alGirar(e: WheelEvent) {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      const caja = cont!.getBoundingClientRect()
+      const dentro = e.clientX - caja.left
+      // el segundo que hay justo bajo el cursor antes de cambiar la escala. se
+      // conserva después ajustando el desplazamiento, y así el zoom crece hacia
+      // donde se está mirando en lugar de hacia el principio de la pista
+      const st = useEditorStore.getState()
+      const segundo = (dentro + cont!.scrollLeft) / st.pxPorSegundo
+      st.aplicarZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15)
+      const escala = useEditorStore.getState().pxPorSegundo
+      cont!.scrollLeft = segundo * escala - dentro
+    }
+
+    cont.addEventListener('wheel', alGirar, { passive: false })
+    return () => cont.removeEventListener('wheel', alGirar)
+  }, [])
 
   function moverCabezal(clientX: number) {
     const cont = scrollRef.current
