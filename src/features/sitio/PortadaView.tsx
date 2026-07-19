@@ -40,7 +40,7 @@ const MEDIOS = {
   montaje: {
     imagen:
       'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=1200&q=70',
-    video: 'https://videos.pexels.com/video-files/3195394/3195394-uhd_2560_1440_25fps.mp4',
+    video: 'https://videos.pexels.com/video-files/3195394/3195394-hd_1920_1080_25fps.mp4',
   },
   color: {
     imagen:
@@ -51,7 +51,7 @@ const MEDIOS = {
       'https://images.unsplash.com/photo-1439066615861-d1af74d74000?auto=format&fit=crop&w=900&q=70',
     // comprobado que responde: Pexels bloquea el enlace directo de la mayoría de
     // sus videos, así que solo se usan los que devuelven contenido de verdad
-    video: 'https://videos.pexels.com/video-files/3571264/3571264-uhd_3840_2160_30fps.mp4',
+    video: 'https://videos.pexels.com/video-files/3571264/3571264-hd_1920_1080_30fps.mp4',
   },
 }
 

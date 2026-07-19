@@ -7,12 +7,12 @@ const CLIPS = [
   {
     id: 'montaje',
     nombre: 'Mesa de montaje',
-    src: 'https://videos.pexels.com/video-files/3195394/3195394-uhd_2560_1440_25fps.mp4',
+    src: 'https://videos.pexels.com/video-files/3195394/3195394-hd_1920_1080_25fps.mp4',
   },
   {
     id: 'naturaleza',
     nombre: 'Paisaje',
-    src: 'https://videos.pexels.com/video-files/3571264/3571264-uhd_3840_2160_30fps.mp4',
+    src: 'https://videos.pexels.com/video-files/3571264/3571264-hd_1920_1080_30fps.mp4',
   },
   {
     id: 'ciudad',
