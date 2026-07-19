@@ -16,6 +16,7 @@ import { ResumenProyecto } from '../../lib/proyecto/formato'
 import { formatearDuracion } from '../../lib/format/duracion'
 import { formatearBytes } from '../../lib/format/bytes'
 import { ANCHO_CONTENIDO, RELLENO } from '../../components/sitio/Contenedor'
+import FichaProyecto from './FichaProyecto'
 
 // fecha en palabras corrientes, que se lee mejor que una marca de tiempo
 function cuando(ms: number): string {
@@ -39,6 +40,8 @@ export default function ProyectosView() {
   const [lista, setLista] = useState<ResumenProyecto[] | null>(null)
   const [uso, setUso] = useState<{ usado: number; total: number } | null>(null)
   const [confirmar, setConfirmar] = useState<string | null>(null)
+  // qué proyecto tiene la ficha abierta. null cuando no hay ninguna
+  const [detalles, setDetalles] = useState<string | null>(null)
   const entrada = useRef<HTMLInputElement>(null)
   const [busqueda, setBusqueda] = useState('')
   const [orden, setOrden] = useState('reciente')
@@ -278,10 +281,9 @@ export default function ProyectosView() {
               border: '1px solid rgb(var(--border) / 0.1)',
             }}
           >
-            <button
-              onClick={() => abrir(p.id)}
-              className="relative block aspect-video w-full overflow-hidden bg-black/70"
-            >
+            {/* la miniatura pasa de ser un botón a un contenedor: dentro van dos
+                acciones y un botón no puede llevar otros botones dentro */}
+            <div className="relative block aspect-video w-full overflow-hidden bg-black/70">
               {p.portada ? (
                 <img
                   src={p.portada}
@@ -296,14 +298,23 @@ export default function ProyectosView() {
               <span className="absolute bottom-2 right-2 rounded-md bg-black/75 px-1.5 py-0.5 text-[11px] font-medium text-white">
                 {formatearDuracion(p.duracion)}
               </span>
-              {/* al pasar el cursor la portada se oscurece y aparece la acción,
-                  que deja claro que la miniatura entera se puede pulsar */}
-              <span className="absolute inset-0 grid place-items-center bg-black/45 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3.5 py-1.5 text-xs font-semibold text-[#13233d]">
+              {/* al pasar el cursor la portada se oscurece y salen las dos
+                  acciones, abrir el proyecto o mirar de qué está hecho */}
+              <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/45 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                <button
+                  onClick={() => abrir(p.id)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3.5 py-1.5 text-xs font-semibold text-[#13233d] transition-transform duration-200 hover:scale-105"
+                >
                   <FolderOpen size={13} /> Abrir proyecto
-                </span>
+                </button>
+                <button
+                  onClick={() => setDetalles(p.id)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/45 px-3.5 py-1.5 text-xs font-semibold text-white transition-all duration-200 hover:scale-105 hover:bg-white/15"
+                >
+                  <SlidersHorizontal size={13} /> Ver detalles
+                </button>
               </span>
-            </button>
+            </div>
 
             <div className="flex flex-1 flex-col gap-1 p-3">
               <h2 className="truncate font-display text-sm font-bold">{p.titulo}</h2>
@@ -383,6 +394,8 @@ export default function ProyectosView() {
           reserva para la aplicación.
         </p>
       )}
+
+      <FichaProyecto id={detalles} onCerrar={() => setDetalles(null)} />
     </div>
   )
 }

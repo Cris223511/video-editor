@@ -24,7 +24,7 @@ export default function ImportView() {
   // editor, que si no aparece de golpe y desorienta
   const irAEditor = () => {
     setPreparando(true)
-    window.setTimeout(() => navegar(RUTAS.editor), 1400)
+    window.setTimeout(() => navegar(RUTAS.editor), 2000)
   }
 
   return (
