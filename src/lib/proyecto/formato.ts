@@ -45,6 +45,7 @@ export interface ProyectoGuardado {
     lienzoManual: boolean
     colorFondo: string
     fondo: 'color' | 'desenfoque'
+    desenfoqueFondo: number
     marco: Marco
   }
 }

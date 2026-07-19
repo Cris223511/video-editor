@@ -52,6 +52,8 @@ interface EstadoEditor {
   colorFondo: string
   // qué rellena las bandas cuando el video no cubre el lienzo entero
   fondo: 'color' | 'desenfoque'
+  // cuánto se desenfoca ese relleno, de 1 a 100
+  desenfoqueFondo: number
   marco: Marco
   volumenGlobal: number
   audioRegiones: RegionAudio[]
@@ -121,6 +123,7 @@ interface EstadoEditor {
   setLienzoAuto: () => void
   setColorFondo: (color: string) => void
   setFondo: (f: 'color' | 'desenfoque') => void
+  setDesenfoqueFondo: (v: number) => void
   setMarco: (cambios: Partial<Marco>) => void
   irA: (t: number) => void
   reproducir: () => void
@@ -159,6 +162,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => ({
   lienzoManual: false,
   colorFondo: '#000000',
   fondo: 'color',
+  desenfoqueFondo: 45,
   marco: { tipo: 'ninguno', color: '#ffffff', grosor: 30, radio: 40 },
   volumenGlobal: 1,
   audioRegiones: [],
@@ -624,6 +628,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => ({
 
   setColorFondo: (color) => set({ colorFondo: color }),
   setFondo: (f) => set({ fondo: f }),
+  setDesenfoqueFondo: (v) => set({ desenfoqueFondo: Math.max(1, Math.min(100, v)) }),
 
   setMarco: (cambios) => set((s) => ({ marco: { ...s.marco, ...cambios } })),
 

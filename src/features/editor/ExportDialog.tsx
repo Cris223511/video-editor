@@ -55,6 +55,7 @@ export default function ExportDialog() {
         fps,
         colorFondo: estado.colorFondo,
         fondo: estado.fondo,
+        desenfoqueFondo: estado.desenfoqueFondo,
         clips: estado.pista.clips,
         capas: estado.capas,
         marco: estado.marco,

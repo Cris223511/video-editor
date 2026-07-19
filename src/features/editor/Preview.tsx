@@ -30,6 +30,7 @@ export default function Preview() {
   const resolucion = useEditorStore((s) => s.resolucion)
   const colorFondo = useEditorStore((s) => s.colorFondo)
   const fondo = useEditorStore((s) => s.fondo)
+  const desenfoqueFondo = useEditorStore((s) => s.desenfoqueFondo)
   const audioRegiones = useEditorStore((s) => s.audioRegiones)
   const volumenGlobal = useEditorStore((s) => s.volumenGlobal)
   const medios = useProjectStore((s) => s.medios)
@@ -530,7 +531,10 @@ export default function Preview() {
                     preload="auto"
                     aria-hidden
                     className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover"
-                    style={{ filter: 'blur(26px) brightness(0.72)', transform: 'scale(1.12)' }}
+                    style={{
+                      filter: `blur(${Math.round(desenfoqueFondo * 0.6)}px) brightness(0.72)`,
+                      transform: 'scale(1.12)',
+                    }}
                   />
                 )
               })()}

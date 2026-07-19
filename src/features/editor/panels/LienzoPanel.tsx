@@ -1,5 +1,5 @@
 import { useEditorStore } from '../../../store/useEditorStore'
-import { Campo, ColorCampo, Segmentado } from '../../../components/ui/Controls'
+import { Campo, ColorCampo, Deslizador, Segmentado } from '../../../components/ui/Controls'
 
 const PROPORCIONES = [
   { etiqueta: '16:9', ancho: 1920, alto: 1080 },
@@ -18,6 +18,8 @@ export default function LienzoPanel() {
   const colorFondo = useEditorStore((s) => s.colorFondo)
   const fondo = useEditorStore((s) => s.fondo)
   const setFondo = useEditorStore((s) => s.setFondo)
+  const desenfoqueFondo = useEditorStore((s) => s.desenfoqueFondo)
+  const setDesenfoqueFondo = useEditorStore((s) => s.setDesenfoqueFondo)
   const setLienzo = useEditorStore((s) => s.setLienzo)
   const setLienzoAuto = useEditorStore((s) => s.setLienzoAuto)
   const setColorFondo = useEditorStore((s) => s.setColorFondo)
@@ -68,6 +70,12 @@ export default function LienzoPanel() {
           onChange={(v) => setFondo(v as 'color' | 'desenfoque')}
         />
       </Campo>
+
+      {fondo === 'desenfoque' && (
+        <Campo etiqueta={`Desenfoque (${desenfoqueFondo})`}>
+          <Deslizador valor={desenfoqueFondo} min={1} max={100} onChange={setDesenfoqueFondo} />
+        </Campo>
+      )}
 
       {fondo === 'desenfoque' && (
         <p className="-mt-2 text-xs leading-relaxed text-[color:var(--muted)]">

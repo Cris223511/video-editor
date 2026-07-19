@@ -36,6 +36,7 @@ export function capturarProyecto(id: string, creado: number): ProyectoGuardado {
       lienzoManual: ed.lienzoManual,
       colorFondo: ed.colorFondo,
       fondo: ed.fondo,
+      desenfoqueFondo: ed.desenfoqueFondo,
       marco: ed.marco,
     },
   }
@@ -75,6 +76,7 @@ export async function abrirSesion(id: string): Promise<boolean> {
     lienzoManual: e.lienzoManual ?? false,
     colorFondo: e.colorFondo ?? '#000000',
     fondo: e.fondo ?? 'color',
+    desenfoqueFondo: e.desenfoqueFondo ?? 45,
     marco: e.marco,
     playhead: 0,
     reproduciendo: false,

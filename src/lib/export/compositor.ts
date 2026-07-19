@@ -13,6 +13,7 @@ export interface Escena {
   // 'desenfoque' rellena las bandas con el propio video ampliado y borroso, en
   // lugar de con un color plano
   fondo?: 'color' | 'desenfoque'
+  desenfoqueFondo?: number
   clips: Clip[] // ya ordenados por inicio
   capas: Capa[]
   marco: Marco
@@ -402,7 +403,7 @@ export function dibujarFotograma(
   imagenDe: (capaId: string) => HTMLImageElement | undefined,
   off: HTMLCanvasElement,
 ) {
-  const { ancho, alto, colorFondo, fondo, clips, capas, marco } = escena
+  const { ancho, alto, colorFondo, fondo, desenfoqueFondo = 45, clips, capas, marco } = escena
   const escala = alto / 1080
 
   ctx.setTransform(1, 0, 0, 1, 0, 0)
@@ -435,7 +436,9 @@ export function dibujarFotograma(
         const bw = video.videoWidth * escB
         const bh = video.videoHeight * escB
         ctx.save()
-        ctx.filter = `blur(${Math.round(alto * 0.045)}px) brightness(0.72)`
+        // el ajuste va de 1 a 100 y se traduce a una fracción del alto, así el
+        // resultado se ve igual en cualquier resolución
+        ctx.filter = `blur(${Math.round(alto * 0.001 * desenfoqueFondo)}px) brightness(0.72)`
         ctx.drawImage(video, (ancho - bw) / 2, (alto - bh) / 2, bw, bh)
         ctx.restore()
       }

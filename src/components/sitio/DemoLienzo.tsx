@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Palette, Sparkles } from 'lucide-react'
+import { Deslizador } from '../ui/Controls'
 
 // una toma vertical, que es justo el caso donde el relleno del lienzo importa
 const FOTO =
@@ -26,6 +27,7 @@ export default function DemoLienzo() {
   const [proporcion, setProporcion] = useState(PROPORCIONES[1])
   const [relleno, setRelleno] = useState<'color' | 'desenfoque'>('desenfoque')
   const [color, setColor] = useState('#0a1a3a')
+  const [desenfoque, setDesenfoque] = useState(45)
   const [listo, setListo] = useState(false)
 
   function pintar() {
@@ -54,7 +56,9 @@ export default function DemoLienzo() {
       const bw = img.naturalWidth * escB
       const bh = img.naturalHeight * escB
       ctx.save()
-      ctx.filter = `blur(${Math.round(alto * 0.045)}px) brightness(0.72)`
+      // misma fórmula que el compositor: el ajuste de 1 a 100 se traduce a una
+      // fracción del alto, así se ve igual en cualquier resolución
+      ctx.filter = `blur(${Math.round(alto * 0.001 * desenfoque)}px) brightness(0.72)`
       ctx.drawImage(img, (ancho - bw) / 2, (alto - bh) / 2, bw, bh)
       ctx.restore()
     }
@@ -74,7 +78,7 @@ export default function DemoLienzo() {
 
   useEffect(() => {
     if (listo) pintar()
-  }, [listo, proporcion, relleno, color])
+  }, [listo, proporcion, relleno, color, desenfoque])
 
   const chip = (activo: boolean) =>
     [
@@ -144,6 +148,15 @@ export default function DemoLienzo() {
 
             {/* la paleta solo aparece con el color elegido: si estuviera siempre,
                 ofrecería cambiar algo que en ese momento no se ve */}
+            {relleno === 'desenfoque' && (
+              <div className="mt-3">
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
+                  Desenfoque: {desenfoque}
+                </p>
+                <Deslizador valor={desenfoque} min={1} max={100} onChange={setDesenfoque} />
+              </div>
+            )}
+
             {relleno === 'color' && (
               <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                 {COLORES.map((c) => (
