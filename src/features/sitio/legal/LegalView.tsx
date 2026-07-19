@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { RUTAS } from '../../../rutasDef'
 import { irA as irASeccion } from '../../../lib/scroll/useScrollSuave'
 import { Documento, PRIVACIDAD, TERMINOS } from './contenido'
+import Enriquecido from './Enriquecido'
 import { ANCHO_CONTENIDO, RELLENO } from '../../../components/sitio/Contenedor'
 
 // índice lateral. en pantalla ancha queda fijo a la izquierda y en móvil se abre
@@ -121,7 +122,7 @@ export default function LegalView({ documento }: { documento: 'terminos' | 'priv
               </h2>
               {s.parrafos.map((p, k) => (
                 <p key={k} className="mt-3 text-sm leading-relaxed text-[color:var(--muted)]">
-                  {p}
+                  <Enriquecido texto={p} />
                 </p>
               ))}
               {s.lista && (
@@ -132,7 +133,9 @@ export default function LegalView({ documento }: { documento: 'terminos' | 'priv
                       className="flex gap-2.5 text-sm leading-relaxed text-[color:var(--muted)]"
                     >
                       <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
-                      {li}
+                      <span>
+                        <Enriquecido texto={li} />
+                      </span>
                     </li>
                   ))}
                 </ul>
