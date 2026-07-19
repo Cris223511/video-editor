@@ -2,8 +2,10 @@ import { MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'reac
 import { Circle, Droplet, Grid2x2, Move, Square } from 'lucide-react'
 import { Deslizador } from '../ui/Controls'
 
-const FOTO =
-  'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1800&q=80'
+// escena de laboratorio, con una persona trabajando: tapar una cara que se
+// mueve es exactamente el caso que la censura resuelve. dirección tomada de las
+// tres de Pexels ya verificadas en DemoVideo
+const CLIP = 'https://videos.pexels.com/video-files/3195394/3195394-hd_1920_1080_25fps.mp4'
 
 // más bajo que antes: a 500 de alto la pieza dominaba la sección entera
 const ANCHO = 880
@@ -30,12 +32,12 @@ const ESQUINAS = [
   { id: 'se', x: 1, y: 1, cursor: 'nwse-resize' },
 ] as const
 
-// censura interactiva sobre una foto: se arrastra el recuadro, se redimensiona
-// por sus esquinas y se elige forma y efecto. usa la misma técnica que el
-// editor, no un filtro que la imite
+// censura interactiva sobre un clip en marcha: se arrastra el recuadro, se
+// redimensiona por sus esquinas y se elige forma y efecto. usa la misma técnica
+// que el editor, no un filtro que la imite
 export default function DemoCensura() {
   const lienzo = useRef<HTMLCanvasElement | null>(null)
-  const foto = useRef<HTMLImageElement | null>(null)
+  const medio = useRef<HTMLVideoElement | null>(null)
   const auxiliar = useRef<HTMLCanvasElement | null>(null)
   const [caja, setCaja] = useState({ x: 0.4, y: 0.26, w: 0.24, h: 0.4 })
 
@@ -53,16 +55,16 @@ export default function DemoCensura() {
   function pintar() {
     const c = lienzo.current
     const ctx = c?.getContext('2d')
-    const img = foto.current
-    if (!c || !ctx || !img) return
+    const img = medio.current
+    if (!c || !ctx || !img || !img.videoWidth) return
 
     if (c.width !== ANCHO) c.width = ANCHO
     if (c.height !== ALTO) c.height = ALTO
     ctx.clearRect(0, 0, ANCHO, ALTO)
-    // recorte que cubre, para no deformar la fotografía
-    const e = Math.max(ANCHO / img.naturalWidth, ALTO / img.naturalHeight)
-    const iw = img.naturalWidth * e
-    const ih = img.naturalHeight * e
+    // recorte que cubre, para no deformar el fotograma
+    const e = Math.max(ANCHO / img.videoWidth, ALTO / img.videoHeight)
+    const iw = img.videoWidth * e
+    const ih = img.videoHeight * e
     const ix = (ANCHO - iw) / 2
     const iy = (ALTO - ih) / 2
     ctx.drawImage(img, ix, iy, iw, ih)
@@ -77,8 +79,8 @@ export default function DemoCensura() {
       recortar(ctx, x, y, w, h)
       ctx.clip()
       ctx.filter = `blur(${Math.max(2, intensidad * 0.6)}px)`
-      // se redibuja la foto entera recortada a la zona, así el desenfoque toma
-      // color de alrededor y no deja un halo en los bordes
+      // se redibuja el fotograma entero recortado a la zona, así el desenfoque
+      // toma color de alrededor y no deja un halo en los bordes
       ctx.drawImage(img, ix, iy, iw, ih)
       ctx.restore()
     } else {
@@ -112,18 +114,22 @@ export default function DemoCensura() {
   }
 
   useEffect(() => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      foto.current = img
-      setListo(true)
-    }
-    img.src = FOTO
     auxiliar.current = document.createElement('canvas')
   }, [])
 
+  // el repintado va atado a la pantalla: cada fotograma que el navegador va a
+  // mostrar se copia al lienzo y encima se aplica la censura. como pintar()
+  // se vuelve a crear en cada render, el bucle se relanza cuando cambian los
+  // controles y siempre trabaja con los valores actuales
   useEffect(() => {
-    if (listo) pintar()
+    if (!listo) return
+    let id = 0
+    const ciclo = () => {
+      pintar()
+      id = requestAnimationFrame(ciclo)
+    }
+    id = requestAnimationFrame(ciclo)
+    return () => cancelAnimationFrame(id)
   }, [listo, efecto, forma, intensidad, caja])
 
   const MINIMO = 0.06
@@ -253,6 +259,27 @@ export default function DemoCensura() {
       </div>
 
       <div className="relative overflow-hidden rounded-xl bg-black">
+        {/* la fuente del clip vive fuera de la vista: lo que se enseña es el
+            lienzo, que es donde ocurre la censura. queda dentro del documento en
+            vez de creado a mano porque así el navegador lo decodifica con
+            normalidad y no se arriesga a que lo suspenda */}
+        <video
+          ref={medio}
+          src={CLIP}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          // COOP y COEP dejan fuera cualquier recurso ajeno que no venga por CORS,
+          // y de paso el modo anónimo evita que el clip contamine el lienzo, cosa
+          // que rompería el pixelado al releer la zona ampliada
+          crossOrigin="anonymous"
+          onLoadedData={() => setListo(true)}
+          aria-hidden
+          className="pointer-events-none absolute h-px w-px opacity-0"
+        />
+
         <canvas
           ref={lienzo}
           className="block w-full"
@@ -292,7 +319,8 @@ export default function DemoCensura() {
       </div>
 
       <p className="mt-3 text-[11px] leading-relaxed text-[color:var(--muted)]">
-        En el editor esto se aplica sobre el video, admite también <b>pincel libre</b> y puedes{' '}
+        La zona tapada sigue al clip fotograma a fotograma. En el editor admite además{' '}
+        <b>pincel libre</b> y puedes{' '}
         <b>grabar el recorrido</b> de la zona censurada siguiendo con el cursor lo que se mueve,
         incluso a cámara lenta.
       </p>

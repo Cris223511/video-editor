@@ -35,11 +35,10 @@ export default function MedioHover({
 
   function salir() {
     setEncima(false)
-    const v = ref.current
-    if (!v) return
-    v.pause()
-    // vuelve al principio, así el reposo siempre enseña el mismo fotograma
-    v.currentTime = 0
+    // el video se queda parado en el fotograma que tocaba, sin volver al
+    // principio. quien pasa el cursor por segunda vez retoma la escena donde la
+    // dejó, que se lee mucho mejor que ver siempre el mismo arranque
+    ref.current?.pause()
   }
 
   const verVideo = Boolean(video) && listo

@@ -2,21 +2,24 @@ import { useEffect, useRef, useState } from 'react'
 import { Pause, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react'
 
 // las tres direcciones que Pexels sirve de verdad. la mayoría de sus enlaces
-// directos devuelven 403, así que solo se usan las comprobadas una a una
+// directos devuelven 403, así que solo se usan las comprobadas una a una.
+// el nombre de cada pestaña describe la escena que aparece en pantalla: antes
+// prometían un montaje y una ciudad que no salían por ningún lado, y cambiar el
+// texto es más seguro que tocar unas direcciones que ya se sabe que responden
 const CLIPS = [
   {
-    id: 'montaje',
-    nombre: 'Mesa de montaje',
+    id: 'laboratorio',
+    nombre: 'Laboratorio',
     src: 'https://videos.pexels.com/video-files/3195394/3195394-hd_1920_1080_25fps.mp4',
   },
   {
-    id: 'naturaleza',
-    nombre: 'Paisaje',
+    id: 'costa',
+    nombre: 'Costa desde el aire',
     src: 'https://videos.pexels.com/video-files/3571264/3571264-hd_1920_1080_30fps.mp4',
   },
   {
-    id: 'ciudad',
-    nombre: 'Ciudad',
+    id: 'teclado',
+    nombre: 'Manos en el teclado',
     src: 'https://videos.pexels.com/video-files/852421/852421-hd_1920_1080_30fps.mp4',
   },
 ]
@@ -129,7 +132,11 @@ export default function DemoVideo() {
           onLoadedMetadata={(e) => setTotal(e.currentTarget.duration || 0)}
           onTimeUpdate={(e) => setT(e.currentTarget.currentTime)}
           onClick={alternar}
-          className="block w-full cursor-pointer transition-all duration-700 ease-out"
+          // el marco es algo más apaisado que los clips que se cargan, así que sin
+          // recorte quedaban dos bandas negras a los lados. cubriendo el marco se
+          // pierde una franja mínima por arriba y por abajo, que es preferible a
+          // enseñar hueco vacío
+          className="block w-full cursor-pointer object-cover transition-all duration-700 ease-out"
           style={{
             aspectRatio: '16 / 8',
             // en pausa se ve en blanco y negro y recupera el color al reproducir,
@@ -199,8 +206,9 @@ export default function DemoVideo() {
       </div>
 
       <p className="mt-3 text-[11px] leading-relaxed text-[color:var(--muted)]">
-        La <b>cámara lenta</b> no es un adorno: es lo que se usa en el editor para grabar el
-        recorrido de una censura siguiendo con el cursor algo que se mueve rápido.
+        La <b>cámara lenta</b> te da tiempo de reacción cuando grabas el recorrido de una censura.
+        Al seguir con el cursor una cara que se mueve rápido, el trazo sale pegado al movimiento
+        real y luego quedan muchos menos puntos que corregir a mano.
       </p>
     </div>
   )

@@ -22,8 +22,10 @@ const CANALES: { campo: keyof Curvas; etiqueta: string; color: string }[] = [
   { campo: 'b', etiqueta: 'Azul', color: '#4c8dff' },
 ]
 
-const FOTO =
-  'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1200&q=70'
+// una toma aérea de costa, con cielo, agua y tierra: los tres rangos de tono
+// que las ruedas tocan por separado se distinguen sin esfuerzo. la dirección es
+// de las comprobadas en DemoVideo, que son las únicas de Pexels que responden
+const CLIP = 'https://videos.pexels.com/video-files/3571264/3571264-hd_1920_1080_30fps.mp4'
 
 const ZONAS: { campo: keyof Ruedas; etiqueta: string }[] = [
   { campo: 'sombras', etiqueta: 'Sombras' },
@@ -31,8 +33,8 @@ const ZONAS: { campo: keyof Ruedas; etiqueta: string }[] = [
   { campo: 'altas', etiqueta: 'Luces' },
 ]
 
-// las ruedas de verdad del editor, funcionando sobre una foto. no es una
-// maqueta: usa el mismo control con captura de puntero y el mismo cálculo de
+// las ruedas de verdad del editor, corrigiendo un clip que está corriendo. no es
+// una maqueta: usa el mismo control con captura de puntero y el mismo cálculo de
 // tablas por canal que se aplica al video y a la exportación
 export default function DemoColor() {
   const [ruedas, setRuedas] = useState<Ruedas>(RUEDAS_NEUTRAS)
@@ -87,9 +89,17 @@ export default function DemoColor() {
     >
       <div className="grid gap-5 lg:grid-cols-[1.1fr_1fr]">
       <div className="relative overflow-hidden rounded-xl bg-black">
-        <img
-          src={FOTO}
-          alt="Toma de ejemplo para corregir el color"
+        <video
+          src={CLIP}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          // el sitio va aislado con COOP y COEP, y bajo esa política un recurso de
+          // otro dominio se descarta si no se pide en modo anónimo. sin este
+          // atributo el marco se quedaría en negro, igual que pasaba en MedioHover
+          crossOrigin="anonymous"
           className="h-full w-full object-cover"
           style={{
             minHeight: 300,
@@ -98,7 +108,7 @@ export default function DemoColor() {
         />
         {!tocada && (
           <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-3 text-xs font-medium text-white">
-            Arrastra una rueda para corregir esta toma
+            Arrastra una rueda para corregir este clip
           </span>
         )}
       </div>

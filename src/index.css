@@ -25,6 +25,10 @@
      esas dos exigencias tiran en direcciones contrarias */
   --accent-boton: 24 97 255;
   --accent-soft: 18 165 240;
+  /* azul para texto apoyado en un fondo celeste tenue. el del enlace, puesto
+     sobre ese fondo, se queda en un contraste de 3.8 y cuesta leerlo en tamaños
+     pequeños; este baja lo justo para pasar de 5 sin cambiar de familia */
+  --accent-texto: 12 74 200;
   /* superficies oscuras del sitio (pie y bloques de llamada). se derivan del
      azul de la marca y no de un gris azulado cualquiera, que es lo que hacía
      que el pie no pegara con la barra */
@@ -51,6 +55,9 @@ html.dark {
   --accent: 59 140 255;
   --accent-boton: 26 86 210;
   --accent-soft: 56 189 248;
+  /* en oscuro el recorrido es el contrario: el fondo celeste queda casi negro y
+     el azul tiene que aclararse para despegarse de él */
+  --accent-texto: 125 180 255;
   --alerta: 244 63 94;
   --profundo: 6 18 48;
   --profundo-2: 10 30 78;

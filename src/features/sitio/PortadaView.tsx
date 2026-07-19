@@ -191,7 +191,7 @@ export default function PortadaView() {
 
         <div className={`mx-auto w-full ${ANCHO_CONTENIDO} ${RELLENO}`}>
           <Aparece>
-            <Chip>Gratuito y de código abierto</Chip>
+            <Chip destacado>Gratuito y de código abierto</Chip>
             <Titulo nivel="xl" como="h1" className="mt-4">
               Edita tu video sin salir <Subrayado>del navegador</Subrayado>
             </Titulo>
@@ -394,7 +394,7 @@ export default function PortadaView() {
               <MedioHover
                 imagen={MEDIOS.equipo.imagen}
                 video={MEDIOS.equipo.video}
-                alt="Equipo de trabajo con material de video"
+                alt="Vista aérea de la costa, con las olas rompiendo contra las rocas"
                 proporcion="aspect-[5/4]"
               />
             </Parallax>
@@ -535,7 +535,10 @@ export default function PortadaView() {
             </p>
             <button
               onClick={irAImportar}
-              className="relative mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-[color:rgb(var(--profundo))] transition-transform duration-200 hover:scale-105 active:scale-95"
+              // al pasar el cursor sube un poco, igual que el botón del banner y
+              // que los del resto del sitio. antes crecía, y ese zoom era el único
+              // botón principal que reaccionaba de otra manera
+              className="relative mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-[color:rgb(var(--profundo))] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-95"
             >
               Abrir el editor <ArrowRight size={16} />
             </button>

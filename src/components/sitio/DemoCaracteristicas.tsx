@@ -10,14 +10,26 @@ export interface Caracteristica {
   texto: string
 }
 
-// cada escena se dibuja con el mismo reloj, que da vueltas cada ocho segundos y
-// medio.
+// cada escena se dibuja con el mismo reloj, que da una vuelta completa cada
+// once segundos y medio.
 // así ninguna escena necesita su propio requestAnimationFrame y todas quedan
 // sincronizadas con el resto de la pieza.
 //
 // el ritmo es pausado a propósito. con vueltas cortas los gestos del cursor se
 // atropellaban y no daba tiempo a leer lo que hacía en cada escena
-const CICLO = 8.5
+const CICLO = 11.5
+
+// la vuelta no se gasta entera en moverse. el último segundo y medio es un
+// descanso: el reloj de la acción se queda parado en su fotograma final y la
+// escena se deja mirar quieta antes de volver a empezar. antes el ciclo
+// terminaba y arrancaba de nuevo en el mismo instante, y ese encadenado sin
+// respiro era justo lo que hacía que la pieza pareciera acelerada
+const REPOSO = 1.5
+const ACCION = CICLO - REPOSO
+
+// lo que dura el desvanecido con el que las escenas que dejan cosas puestas
+// (el rótulo, la figura, la marca) se vacían para poder empezar limpias
+const SALIDA = 0.5
 
 // El bucle no lleva fundido, y es una decisión tomada con las capturas delante.
 //
@@ -28,7 +40,7 @@ const CICLO = 8.5
 // volumen con dos cifras superpuestas. Un texto duplicado se lee peor que un corte.
 //
 // Lo que de verdad cierra el bucle es que cada escena termine donde empieza, y así
-// están escritas: los vaivenes y los senos tienen periodo CICLO, y lo que no puede
+// están escritas: los vaivenes y los senos tienen periodo ACCION, y lo que no puede
 // cerrar por su forma, como el cursor o el cabezal, se apaga antes del final y
 // vuelve a encenderse ya colocado. Sin solape no hay nada que mezclar.
 const PERIODO = CICLO
@@ -39,7 +51,7 @@ const PISTA = 'rgb(var(--border) / 0.12)'
 
 // interpolación suave de ida y vuelta, la que usan varias escenas para moverse
 // sin que se note el salto al cerrar el bucle
-function vaiven(t: number, periodo = CICLO) {
+function vaiven(t: number, periodo = ACCION) {
   return 0.5 - 0.5 * Math.cos((2 * Math.PI * t) / periodo)
 }
 
@@ -81,7 +93,7 @@ function Marco({ children }: { children: ReactNode }) {
 // la vuelta, el regreso deja de verse y el enlace se iguala con el resto
 // el retiro va atado a la vuelta y no a un número suelto: al alargar el ciclo,
 // un valor fijo dejaba al cursor apagado casi tres segundos al final
-const RETIRO = CICLO - 1.4
+const RETIRO = ACCION - 1.1
 const REGRESO = 0.6
 
 function opacidadCursor(t: number) {
@@ -243,40 +255,48 @@ function Pie({ children, claro = false }: { children: ReactNode; claro?: boolean
 function EscenaRecorte({ t }: { t: number }) {
   const CORTE = 52
   const ORIGEN = 16
-  const yendo = t < 0.9
-  const volviendo = t > 3.5
+  const yendo = t < 1.6
+  const volviendo = t > 6.8
 
   const cabezal = yendo
-    ? ORIGEN + (CORTE - ORIGEN) * suave(t / 0.9)
+    ? ORIGEN + (CORTE - ORIGEN) * suave(t / 1.6)
     : volviendo
-      ? CORTE + (ORIGEN - CORTE) * suave((t - 3.5) / (CICLO - 3.5))
+      ? CORTE + (ORIGEN - CORTE) * suave((t - 6.8) / (ACCION - 6.8))
       : CORTE
 
-  const dividido = t >= 1.5 && t <= 3.4
+  const dividido = t >= 2.7 && t <= 6.3
   const hueco = !dividido
     ? 0
-    : t < 2.4
-      ? 9 * suave((t - 1.5) / 0.9)
-      : 9 * (1 - suave((t - 2.4) / 0.9))
+    : t < 4.2
+      ? 9 * suave((t - 2.7) / 1.5)
+      : t < 4.8
+        ? 9
+        : 9 * (1 - suave((t - 4.8) / 1.5))
 
+  // el recorrido se lee de arriba abajo: llevar el cabezal, posarse, bajar a la
+  // pista, apartar el trozo, devolverlo y salir. entre gesto y gesto hay un alto
+  // porque sin esa espera el puntero parecía huir de lo que acababa de tocar
   const cursor = enRuta(t, [
     { t: 0, x: ORIGEN, y: 30 },
-    { t: 0.9, x: CORTE, y: 30 },
-    { t: 1.4, x: CORTE, y: 44 },
-    { t: 2.4, x: CORTE + 12, y: 44 },
-    { t: 3.4, x: CORTE, y: 44 },
-    { t: 3.5, x: CORTE, y: 30 },
-    { t: CICLO, x: ORIGEN, y: 30 },
+    { t: 1.6, x: CORTE, y: 30 },
+    { t: 2.1, x: CORTE, y: 30 },
+    { t: 2.7, x: CORTE, y: 44 },
+    { t: 4.2, x: CORTE + 12, y: 44 },
+    { t: 4.8, x: CORTE + 12, y: 44 },
+    { t: 6.3, x: CORTE, y: 44 },
+    { t: 6.8, x: CORTE, y: 30 },
+    { t: 8.1, x: CORTE, y: 30 },
+    { t: ACCION, x: ORIGEN, y: 30 },
   ])
-  const pulsando = t < 0.9 || (t > 1.35 && t < 3.4) || t > 3.5
-  const etiqueta = t > 1.35 && t < 1.75 ? 'Dividir' : undefined
+  const pulsando = t < 1.6 || (t > 2.6 && t < 6.35)
+  const etiqueta = t > 2.55 && t < 3.15 ? 'Dividir' : undefined
 
   return (
     <Marco>
       <Barra
         titulo="Línea de tiempo"
         acciones={['Dividir', 'Recortar', 'Cerrar hueco']}
-        activa={t > 1.4 && t < 1.9 ? 0 : t > 2.5 && t < 3.4 ? 2 : undefined}
+        activa={t > 2.6 && t < 3.4 ? 0 : t > 4.8 && t < 6.3 ? 2 : undefined}
       />
 
       {/* regla con las marcas de segundo, que da escala a las pistas */}
@@ -377,7 +397,7 @@ function EscenaRecorte({ t }: { t: number }) {
 function EscenaCensura({ t }: { t: number }) {
   const avance = vaiven(t)
   const x = 20 + 48 * avance
-  const y = 24 + 14 * Math.sin((2 * Math.PI * t) / CICLO)
+  const y = 24 + 14 * Math.sin((2 * Math.PI * t) / ACCION)
   const grabados = Math.round(avance * 8)
 
   return (
@@ -458,38 +478,67 @@ function EscenaCensura({ t }: { t: number }) {
 // el cursor coge cada herramienta del panel, coloca el elemento sobre el lienzo
 // y lo deja seleccionado con sus tiradores. al final todo se desvanece y el
 // lienzo queda como estaba, que es lo que cierra el bucle sin corte
-function EscenaTexto({ t }: { t: number }) {
+function EscenaTexto({ t, salida }: { t: number; salida: number }) {
   const HERRAMIENTAS = [Type, Square, Circle, IconoImagen]
 
+  // los cuatro botones del panel, medidos sobre la escena ya montada. antes las
+  // coordenadas iban a ojo y el puntero pasaba de largo por debajo del último,
+  // de modo que la herramienta de imagen se encendía sin que nadie la tocara
+  const BOTON = [28.9, 37, 45.1, 53.2]
+
+  // el guion del cursor: por cada elemento va al botón que le toca, se queda un
+  // momento encima (ese alto es lo que se lee como clic) y solo entonces baja al
+  // lienzo a soltar lo que ha cogido. los cuatro botones se visitan de verdad.
+  //
+  // los sitios donde caen los elementos están elegidos por cercanía al panel, no
+  // por estética: midiendo el recorrido, los viajes de un extremo a otro salían
+  // a más del doble de velocidad que el resto y eran los que hacían que la
+  // escena pareciera atropellada. con las paradas más juntas, cada tramo cabe en
+  // su tiempo sin correr. el puntero además arranca donde acabará, así que no
+  // hay viaje de vuelta que disimular
   const cursor = enRuta(t, [
-    { t: 0, x: 30, y: 76 },
-    { t: 0.5, x: 8, y: 26 },
-    { t: 1.35, x: 44, y: 52 },
-    { t: 1.9, x: 8, y: 38 },
-    { t: 2.3, x: 62, y: 26 },
-    { t: 2.85, x: 84, y: 44 },
-    { t: 3.25, x: 8, y: 62 },
-    { t: 3.6, x: 20, y: 30 },
-    { t: CICLO, x: 30, y: 76 },
+    { t: 0, x: 26, y: 32 },
+    { t: 0.25, x: 26, y: 32 },
+    { t: 0.57, x: 8, y: BOTON[0] },
+    { t: 0.92, x: 8, y: BOTON[0] },
+    { t: 1.58, x: 40, y: 50 },
+    { t: 1.88, x: 40, y: 50 },
+    { t: 2.48, x: 8, y: BOTON[1] },
+    { t: 2.83, x: 8, y: BOTON[1] },
+    { t: 3.51, x: 46, y: 26 },
+    { t: 4.36, x: 66, y: 42 },
+    { t: 4.61, x: 66, y: 42 },
+    { t: 5.61, x: 8, y: BOTON[2] },
+    { t: 5.96, x: 8, y: BOTON[2] },
+    { t: 6.85, x: 56, y: 64 },
+    { t: 7.15, x: 56, y: 64 },
+    { t: 8.0, x: 8, y: BOTON[3] },
+    { t: 8.35, x: 8, y: BOTON[3] },
+    { t: 8.83, x: 26, y: 32 },
+    { t: ACCION, x: 26, y: 32 },
   ])
 
-  // qué botón del panel está encendido en cada tramo
-  const herramienta = t < 1.9 ? 0 : t < 3.25 ? 1 : 3
+  // el botón encendido cambia justo cuando el puntero llega, no antes
+  const herramienta = t < 2.48 ? 0 : t < 5.61 ? 1 : t < 8.0 ? 2 : 3
   const pulsando =
-    (t > 0.45 && t < 1.4) || (t > 1.85 && t < 2.9) || (t > 3.2 && t < 3.65)
+    (t > 0.9 && t < 1.63) ||
+    (t > 2.45 && t < 2.9) ||
+    (t > 3.46 && t < 4.4) ||
+    (t > 5.58 && t < 6.0) ||
+    (t > 6.8 && t < 6.95) ||
+    (t > 7.97 && t < 8.4) ||
+    (t > 8.78 && t < 8.95)
 
-  const rotulo = t > 1.35
-  const figura = t > 2.3
-  const marca = t > 3.6
-  const dibujando = t > 2.3 && t < 2.85
-  const guias = t > 0.9 && t < 1.6
+  const rotulo = t > 1.58
+  const figura = t > 3.51
+  const circulo = t > 6.85
+  const marca = t > 8.83
+  const dibujando = t > 3.51 && t < 4.36
+  const guias = t > 1.1 && t < 2.0
 
   // el rectángulo crece mientras el cursor tira de su esquina
-  const anchoFigura = dibujando ? Math.max(2, cursor.x - 62) : 22
-  const altoFigura = dibujando ? Math.max(2, cursor.y - 26) : 18
-
-  // desvanecido de cierre: en el último medio segundo el lienzo se vacía
-  const salida = t > CICLO - 0.55 ? 1 - suave((t - (CICLO - 0.55)) / 0.55) : 1
+  const anchoFigura = dibujando ? Math.max(2, cursor.x - 46) : 20
+  const altoFigura = dibujando ? Math.max(2, cursor.y - 26) : 16
 
   return (
     <Marco>
@@ -535,11 +584,11 @@ function EscenaTexto({ t }: { t: number }) {
       {guias && (
         <>
           <span
-            className="absolute inset-y-[20%] left-1/2 w-px"
+            className="absolute inset-y-[20%] left-[40%] w-px"
             style={{ background: 'rgb(var(--accent) / 0.8)', opacity: salida }}
           />
           <span
-            className="absolute inset-x-[3%] top-[56%] h-px"
+            className="absolute inset-x-[3%] top-[50%] h-px"
             style={{ background: 'rgb(var(--accent) / 0.8)', opacity: salida }}
           />
         </>
@@ -549,7 +598,7 @@ function EscenaTexto({ t }: { t: number }) {
         <span
           className="absolute rounded-md"
           style={{
-            left: '62%',
+            left: '46%',
             top: '26%',
             width: `${anchoFigura}%`,
             height: `${altoFigura}%`,
@@ -564,7 +613,7 @@ function EscenaTexto({ t }: { t: number }) {
 
       {rotulo && (
         <span
-          className="absolute left-1/2 top-[56%] -translate-x-1/2 -translate-y-1/2 rounded px-3 py-1.5 font-display text-sm font-extrabold text-white"
+          className="absolute left-[40%] top-[50%] -translate-x-1/2 -translate-y-1/2 rounded px-3 py-1.5 font-display text-sm font-extrabold text-white"
           style={{
             background: 'rgb(6 12 24 / 0.55)',
             textShadow: '0 2px 6px rgb(0 0 0 / 0.6)',
@@ -572,13 +621,32 @@ function EscenaTexto({ t }: { t: number }) {
           }}
         >
           Amanecer en la sierra
-          {t < 1.9 && <Nodos />}
+          {t < 2.48 && <Nodos />}
+        </span>
+      )}
+
+      {circulo && (
+        <span
+          className="absolute rounded-full"
+          style={{
+            left: '50%',
+            top: '55%',
+            width: '12%',
+            height: '17%',
+            border: '2px solid rgb(255 255 255 / 0.85)',
+            background: 'rgb(255 255 255 / 0.08)',
+            opacity: salida,
+          }}
+        >
+          {t < 8.0 && <Nodos />}
         </span>
       )}
 
       {marca && (
         <span
-          className="absolute left-[20%] top-[30%] grid h-[13%] w-[9%] place-items-center rounded-md"
+          // la marca cae con su esquina justo donde está la punta del puntero, no
+          // centrada en él: si el cursor queda dentro del recuadro azul se pierde
+          className="absolute left-[26.5%] top-[32.5%] grid h-[13%] w-[9%] place-items-center rounded-md"
           style={{
             background: 'linear-gradient(140deg, #2f6bd6, #38bdf8)',
             opacity: salida,
@@ -655,35 +723,44 @@ function EscenaVelocidad({ t }: { t: number }) {
 // el cursor pulsa cada proporción y el lienzo se reajusta. la última que pulsa
 // es la misma con la que empezó, así que el ciclo vuelve a su primer fotograma
 function EscenaLienzo({ t }: { t: number }) {
+  // de cada proporción se guarda el alto que ocupa dentro del visor y su
+  // relación real. el ancho no se escribe: sale de la propia relación, que es lo
+  // único que garantiza que un 1:1 se vea cuadrado. antes ancho y alto iban
+  // sueltos y el encuadre cuadrado salía claramente apaisado
   const FORMAS = [
-    { w: 62, h: 40, nombre: '16:9', x: 30 },
-    { w: 38, h: 46, nombre: '1:1', x: 50 },
-    { w: 26, h: 50, nombre: '9:16', x: 70 },
+    { alto: 60, r: 16 / 9, nombre: '16:9', x: 30, res: '1920 x 1080', uso: 'Pantalla y web' },
+    { alto: 82, r: 1, nombre: '1:1', x: 50, res: '1080 x 1080', uso: 'Publicación cuadrada' },
+    { alto: 92, r: 9 / 16, nombre: '9:16', x: 70, res: '1080 x 1920', uso: 'Vertical para móvil' },
   ]
-  // paradas del guion: cada una dice a qué proporción se salta y cuándo
+  // paradas del guion: cada una dice a qué proporción se salta y cuándo. entre
+  // una y otra pasan más de dos segundos, tiempo de sobra para ver el reencuadre
+  // y leer los datos que cambian debajo
   const PARADAS = [
     { t: 0, i: 0 },
-    { t: 0.9, i: 1 },
-    { t: 1.9, i: 2 },
-    { t: 2.9, i: 0 },
+    { t: 2.1, i: 1 },
+    { t: 4.5, i: 2 },
+    { t: 6.9, i: 0 },
   ]
 
   let k = 0
   for (let i = 0; i < PARADAS.length; i++) if (t >= PARADAS[i].t) k = i
   const destino = FORMAS[PARADAS[k].i]
   const origen = FORMAS[PARADAS[Math.max(0, k - 1)].i]
-  const p = suave((t - PARADAS[k].t) / 0.5)
-  const w = origen.w + (destino.w - origen.w) * p
-  const h = origen.h + (destino.h - origen.h) * p
+  const p = suave((t - PARADAS[k].t) / 0.7)
+  const alto = origen.alto + (destino.alto - origen.alto) * p
+  const relacion = origen.r + (destino.r - origen.r) * p
 
   const cursor = enRuta(t, [
-    { t: 0, x: FORMAS[0].x, y: 82 },
-    { t: 0.85, x: FORMAS[1].x, y: 82 },
-    { t: 1.85, x: FORMAS[2].x, y: 82 },
-    { t: 2.85, x: FORMAS[0].x, y: 82 },
-    { t: CICLO, x: FORMAS[0].x, y: 82 },
+    { t: 0, x: FORMAS[0].x, y: 75 },
+    { t: 0.55, x: FORMAS[0].x, y: 75 },
+    { t: 2.0, x: FORMAS[1].x, y: 75 },
+    { t: 2.75, x: FORMAS[1].x, y: 75 },
+    { t: 4.4, x: FORMAS[2].x, y: 75 },
+    { t: 5.15, x: FORMAS[2].x, y: 75 },
+    { t: 6.8, x: FORMAS[0].x, y: 75 },
+    { t: ACCION, x: FORMAS[0].x, y: 75 },
   ])
-  const pulsando = PARADAS.some((q) => t > q.t - 0.05 && t < q.t + 0.25)
+  const pulsando = PARADAS.some((q) => t > q.t - 0.1 && t < q.t + 0.4)
 
   return (
     <Marco>
@@ -691,10 +768,20 @@ function EscenaLienzo({ t }: { t: number }) {
 
       {/* el visor ocupa toda la franja central; el encuadre vive dentro */}
       <div className="absolute inset-x-[3%] top-[20%] h-[50%] overflow-hidden rounded-lg" style={{ background: '#0b1424' }}>
+        {/* cuadrícula del fondo del visor, la referencia que suele haber debajo
+            del encuadre para ver cuánto ocupa dentro del lienzo */}
+        <span
+          className="absolute inset-0 opacity-60"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgb(255 255 255 / 0.05) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 0.05) 1px, transparent 1px)',
+            backgroundSize: '22px 22px',
+          }}
+        />
         <div className="grid h-full place-items-center">
           <span
             className="relative overflow-hidden rounded-md"
-            style={{ width: `${w}%`, height: `${h * 1.7}%`, background: 'linear-gradient(165deg, #1d3557, #4a8fd6)' }}
+            style={{ height: `${alto}%`, aspectRatio: relacion, background: 'linear-gradient(165deg, #1d3557, #4a8fd6)' }}
           >
             {/* bandas: el mismo plano ampliado y desenfocado detrás del encuadre */}
             <span
@@ -705,8 +792,22 @@ function EscenaLienzo({ t }: { t: number }) {
               className="absolute inset-x-0 top-1/2 h-[56%] -translate-y-1/2"
               style={{ background: 'linear-gradient(165deg, #123, #2f6bd6)' }}
             />
+            {/* margen de seguridad: lo que conviene no rebasar con un rótulo si
+                el video se va a ver en pantallas que recortan los bordes */}
+            <span
+              className="absolute inset-[9%]"
+              style={{ border: '1px dashed rgb(255 255 255 / 0.35)' }}
+            />
           </span>
         </div>
+
+        {/* medidas del encuadre, dibujadas como en una regla */}
+        <span className="absolute left-2 top-2 rounded bg-black/45 px-1.5 py-0.5 font-mono text-[9px] text-white/85">
+          {destino.res}
+        </span>
+        <span className="absolute bottom-2 right-2 rounded bg-black/45 px-1.5 py-0.5 font-mono text-[9px] text-white/85">
+          {destino.nombre}
+        </span>
       </div>
 
       {/* los tres botones que el cursor va pulsando */}
@@ -715,7 +816,7 @@ function EscenaLienzo({ t }: { t: number }) {
         return (
           <span
             key={forma.nombre}
-            className="absolute top-[74%] -translate-x-1/2 rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors duration-200"
+            className="absolute top-[73%] -translate-x-1/2 rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors duration-200"
             style={{
               left: `${forma.x}%`,
               background: activa ? 'rgb(var(--accent-boton))' : 'rgb(var(--surface))',
@@ -728,6 +829,33 @@ function EscenaLienzo({ t }: { t: number }) {
         )
       })}
 
+      {/* franja de datos: para qué sirve la proporción elegida y con qué se
+          rellenan los lados. debajo de los botones sobraba sitio y la tarjeta se
+          veía a medio ocupar */}
+      <div
+        className="absolute inset-x-[3%] top-[81%] flex h-[10%] items-center gap-[3%] rounded-lg px-[3%]"
+        style={{ background: PANEL }}
+      >
+        <span className="truncate text-[9px] font-semibold" style={{ color: 'var(--muted)' }}>
+          {destino.uso}
+        </span>
+        <span className="ml-auto flex shrink-0 items-center gap-[4px]">
+          {['Desenfocado', 'Color', 'Negro'].map((modo, i) => (
+            <span
+              key={modo}
+              className="rounded px-1.5 py-[3px] text-[8px] font-semibold"
+              style={{
+                background: i === 0 ? 'rgb(var(--accent) / 0.18)' : 'rgb(var(--surface))',
+                color: i === 0 ? 'rgb(var(--accent))' : 'var(--muted)',
+                border: '1px solid rgb(var(--border) / 0.14)',
+              }}
+            >
+              {modo}
+            </span>
+          ))}
+        </span>
+      </div>
+
       <Cursor t={t} {...cursor} pulsando={pulsando} />
       <Pie>cambias la proporción y las bandas se rellenan solas</Pie>
     </Marco>
@@ -737,7 +865,7 @@ function EscenaLienzo({ t }: { t: number }) {
 // el cursor baja y sube el volumen mientras el cabezal recorre la onda. el mando
 // va de ida y vuelta, y el barrido del cabezal lo tapa el fundido de cierre
 function EscenaAudio({ t }: { t: number }) {
-  const avance = t / CICLO
+  const avance = t / ACCION
   const BARRAS = 40
   const volumen = 0.5 + 0.36 * vaiven(t)
   const mando = 16 + 74 * volumen
@@ -752,7 +880,7 @@ function EscenaAudio({ t }: { t: number }) {
           const alto =
             18 +
             Math.abs(Math.sin(k * 0.7)) * 40 +
-            Math.abs(Math.sin(k * 0.23 + (2 * Math.PI * t) / CICLO)) * 30
+            Math.abs(Math.sin(k * 0.23 + (2 * Math.PI * t) / ACCION)) * 30
           // la curva de ganancia baja al final del clip, y el mando la escala entera
           const ganancia = (f < 0.7 ? 1 : 1 - (f - 0.7) / 0.45) * volumen
           return (
@@ -824,7 +952,7 @@ function EscenaAtajos({ t }: { t: number }) {
     { tecla: 'Ctrl E', accion: 'Exportar el video', x: 27, y: 74 },
   ]
   const ORDEN = [0, 1, 2, 3, 4, 0]
-  const paso = CICLO / ORDEN.length
+  const paso = ACCION / ORDEN.length
   const slot = Math.min(ORDEN.length - 1, Math.floor(t / paso))
   const local = t - slot * paso
   const i = ORDEN[slot]
@@ -837,7 +965,7 @@ function EscenaAtajos({ t }: { t: number }) {
       x: ATAJOS[idx].x + 4,
       y: ATAJOS[idx].y + 5,
     })),
-    { t: CICLO, x: ATAJOS[0].x + 4, y: ATAJOS[0].y + 5 },
+    { t: ACCION, x: ATAJOS[0].x + 4, y: ATAJOS[0].y + 5 },
   ]
   const cursor = enRuta(t, ruta)
 
@@ -894,13 +1022,21 @@ function EscenaAtajos({ t }: { t: number }) {
 }
 
 function Escena({ id, t }: { id: string; t: number }) {
-  if (id === 'censura') return <EscenaCensura t={t} />
-  if (id === 'texto') return <EscenaTexto t={t} />
-  if (id === 'velocidad') return <EscenaVelocidad t={t} />
-  if (id === 'lienzo') return <EscenaLienzo t={t} />
-  if (id === 'audio') return <EscenaAudio t={t} />
-  if (id === 'atajos') return <EscenaAtajos t={t} />
-  return <EscenaRecorte t={t} />
+  // el reposo del final se resuelve aquí y no dentro de cada escena: pasado
+  // ACCION el reloj que ven las escenas deja de avanzar, así que todas se quedan
+  // congeladas en su último fotograma. lo único que sigue corriendo es el
+  // desvanecido de cierre, que en los últimos instantes vacía el lienzo de la
+  // escena de texto para que la vuelta arranque igual que la primera vez
+  const a = Math.min(t, ACCION)
+  const cierre = t > CICLO - SALIDA ? 1 - suave((t - (CICLO - SALIDA)) / SALIDA) : 1
+
+  if (id === 'censura') return <EscenaCensura t={a} />
+  if (id === 'texto') return <EscenaTexto t={a} salida={cierre} />
+  if (id === 'velocidad') return <EscenaVelocidad t={a} />
+  if (id === 'lienzo') return <EscenaLienzo t={a} />
+  if (id === 'audio') return <EscenaAudio t={a} />
+  if (id === 'atajos') return <EscenaAtajos t={a} />
+  return <EscenaRecorte t={a} />
 }
 
 // lista de características a la izquierda y, a la derecha, una demostración
@@ -994,14 +1130,20 @@ export default function DemoCaracteristicas({ items }: { items: Caracteristica[]
                   boxShadow: es ? '0 8px 24px rgb(21 52 102 / 0.1)' : 'none',
                 }}
               >
-                {/* la marca azul del borde es un solo elemento que se desliza de
-                    una fila a otra, no una por fila encendiéndose */}
+                {/* la marca azul del borde se enciende en la fila elegida y
+                    nada más. antes era un único elemento compartido con layoutId
+                    que viajaba de una fila a otra, y como la fila activa crece
+                    para dejar sitio a su texto, la marca cambiaba de alto durante
+                    el viaje: se veía estirarse y encogerse en diagonal. apareciendo
+                    en su sitio no hay deformación que disimular */}
                 {es && (
                   <motion.span
-                    layoutId="caracteristica-activa"
+                    key={it.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.22, ease: 'easeOut' }}
                     className="absolute left-0 top-3 bottom-3 hidden w-[3px] rounded-full lg:block"
                     style={{ background: 'rgb(var(--accent))' }}
-                    transition={{ type: 'spring', stiffness: 340, damping: 30 }}
                   />
                 )}
                 <span className="flex items-center gap-3">

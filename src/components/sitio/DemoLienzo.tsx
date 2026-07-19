@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { Palette, Sparkles } from 'lucide-react'
 import { Deslizador } from '../ui/Controls'
 
-// una toma vertical, que es justo el caso donde el relleno del lienzo importa
-const FOTO =
-  'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=800&q=70'
+// un plano apaisado de manos sobre el teclado: puesto en un lienzo cuadrado o
+// vertical deja las bandas arriba y abajo, que es justo lo que esta prueba
+// quiere enseñar. es una de las tres direcciones de Pexels ya verificadas
+const CLIP = 'https://videos.pexels.com/video-files/852421/852421-hd_1920_1080_30fps.mp4'
 
 const PROPORCIONES = [
   { id: '16-9', nombre: '16:9', ancho: 16, alto: 9, pie: 'YouTube y televisión' },
@@ -23,7 +24,7 @@ const BASE = 720
 // compositor al exportar, no una aproximación
 export default function DemoLienzo() {
   const lienzo = useRef<HTMLCanvasElement | null>(null)
-  const foto = useRef<HTMLImageElement | null>(null)
+  const medio = useRef<HTMLVideoElement | null>(null)
   const [proporcion, setProporcion] = useState(PROPORCIONES[1])
   const [relleno, setRelleno] = useState<'color' | 'desenfoque'>('desenfoque')
   const [color, setColor] = useState('#0a1a3a')
@@ -33,28 +34,30 @@ export default function DemoLienzo() {
   function pintar() {
     const c = lienzo.current
     const ctx = c?.getContext('2d')
-    const img = foto.current
-    if (!c || !ctx || !img) return
+    const img = medio.current
+    if (!c || !ctx || !img || !img.videoWidth) return
 
     const ancho = BASE
     const alto = Math.round((BASE * proporcion.alto) / proporcion.ancho)
-    c.width = ancho
-    c.height = alto
+    // asignar el tamaño ya limpia el lienzo, pero solo cuando cambia de verdad;
+    // repintando sesenta veces por segundo conviene no tocarlo si no hace falta
+    if (c.width !== ancho) c.width = ancho
+    if (c.height !== alto) c.height = alto
 
     ctx.clearRect(0, 0, ancho, alto)
     ctx.fillStyle = relleno === 'color' ? color : '#000'
     ctx.fillRect(0, 0, ancho, alto)
 
-    // la imagen cabe dentro del lienzo conservando su proporción
-    const esc = Math.min(ancho / img.naturalWidth, alto / img.naturalHeight)
-    const dw = img.naturalWidth * esc
-    const dh = img.naturalHeight * esc
+    // el fotograma cabe dentro del lienzo conservando su proporción
+    const esc = Math.min(ancho / img.videoWidth, alto / img.videoHeight)
+    const dw = img.videoWidth * esc
+    const dh = img.videoHeight * esc
 
-    // relleno con la propia imagen ampliada hasta cubrir, y desenfocada
+    // las bandas se tapan con el propio clip ampliado hasta cubrir y desenfocado
     if (relleno === 'desenfoque' && (dw < ancho - 1 || dh < alto - 1)) {
-      const escB = Math.max(ancho / img.naturalWidth, alto / img.naturalHeight) * 1.12
-      const bw = img.naturalWidth * escB
-      const bh = img.naturalHeight * escB
+      const escB = Math.max(ancho / img.videoWidth, alto / img.videoHeight) * 1.12
+      const bw = img.videoWidth * escB
+      const bh = img.videoHeight * escB
       ctx.save()
       // misma fórmula que el compositor: el ajuste de 1 a 100 se traduce a una
       // fracción del alto, así se ve igual en cualquier resolución
@@ -66,18 +69,18 @@ export default function DemoLienzo() {
     ctx.drawImage(img, (ancho - dw) / 2, (alto - dh) / 2, dw, dh)
   }
 
+  // se repinta a cada fotograma que va a mostrar la pantalla, así el lienzo
+  // enseña el clip en marcha. el bucle se rehace cuando cambia un control, y de
+  // ese modo pintar() siempre lee los valores vigentes
   useEffect(() => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      foto.current = img
-      setListo(true)
+    if (!listo) return
+    let id = 0
+    const ciclo = () => {
+      pintar()
+      id = requestAnimationFrame(ciclo)
     }
-    img.src = FOTO
-  }, [])
-
-  useEffect(() => {
-    if (listo) pintar()
+    id = requestAnimationFrame(ciclo)
+    return () => cancelAnimationFrame(id)
   }, [listo, proporcion, relleno, color, desenfoque])
 
   const chip = (activo: boolean) =>
@@ -186,13 +189,13 @@ export default function DemoLienzo() {
           </div>
 
           <p className="mt-auto text-[11px] leading-relaxed text-[color:var(--muted)]">
-            Una toma vertical en un lienzo apaisado deja dos franjas. Rellenarlas con el propio
-            video <b>desenfocado</b> evita que queden muertas.
+            Un clip apaisado dentro de un lienzo cuadrado o vertical deja dos franjas.
+            Rellenarlas con el propio video <b>desenfocado</b> evita que queden muertas.
           </p>
         </div>
 
         <div
-          className="flex items-center justify-center rounded-xl p-4"
+          className="relative flex items-center justify-center rounded-xl p-4"
           style={{
             // fondo con cuadrícula tenue en lugar de un negro plano: así el
             // hueco alrededor del lienzo se lee como espacio de trabajo
@@ -201,6 +204,24 @@ export default function DemoLienzo() {
             minHeight: '25rem',
           }}
         >
+          {/* el clip no se ve directamente: alimenta al lienzo, que es donde se
+              compone la proporción elegida junto con sus bandas */}
+          <video
+            ref={medio}
+            src={CLIP}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            // con COOP y COEP puestas, un video de otro dominio sin petición
+            // anónima se rechaza y el lienzo quedaría vacío
+            crossOrigin="anonymous"
+            onLoadedData={() => setListo(true)}
+            aria-hidden
+            className="pointer-events-none absolute h-px w-px opacity-0"
+          />
+
           <canvas
             ref={lienzo}
             className="max-h-[22rem] max-w-full rounded-lg shadow-2xl transition-all duration-300 sm:max-h-[24rem]"
