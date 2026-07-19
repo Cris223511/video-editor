@@ -15,7 +15,7 @@ export default function PlaybackControls() {
   const vacio = total === 0
 
   return (
-    <div className="flex items-center justify-center gap-4 border-t border-black/10 px-4 py-2.5 dark:border-white/10">
+    <div className="flex shrink-0 items-center justify-center gap-4 border-t border-black/10 px-4 py-1.5 dark:border-white/10">
       <button
         onClick={() => irA(0)}
         title="Ir al inicio"

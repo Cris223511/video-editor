@@ -469,7 +469,11 @@ export default function Preview() {
     // el texto de aviso en gris sobre gris y no se lee
     <div
       className={[
-        'relative flex min-h-0 flex-1 items-center justify-center p-4 transition-colors duration-300',
+        // el relleno es más generoso a los lados que arriba y abajo. el alto es lo
+        // que decide el tamaño del lienzo, porque casi todo lo que se edita es
+        // apaisado: cada píxel que se quita de arriba y de abajo se convierte en
+        // lienzo, mientras que quitarlo de los lados no cambia nada
+        'relative flex min-h-0 flex-1 items-center justify-center px-4 py-2 transition-colors duration-300',
         hayContenido ? 'bg-black/40' : '',
       ].join(' ')}
       style={hayContenido ? undefined : { background: 'rgb(var(--surface-2))' }}
