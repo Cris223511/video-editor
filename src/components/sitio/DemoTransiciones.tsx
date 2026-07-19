@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { RotateCw } from 'lucide-react'
-import { CATALOGO, Transicion } from '../../lib/transiciones/catalogo'
+import { CATALOGO, NOMBRES_GRUPO, Grupo, Transicion } from '../../lib/transiciones/catalogo'
+import Tooltip from '../ui/Tooltip'
 import { pintarTransicion } from '../../lib/transiciones/pintar'
 import { Clip } from '../../types/timeline'
 
@@ -51,8 +52,19 @@ export default function DemoTransiciones() {
   const bucle = useRef(0)
   const [elegida, setElegida] = useState('desvanecer')
   const [listo, setListo] = useState(false)
+  const [avance, setAvance] = useState(1)
 
   const lista = CATALOGO.filter((t) => ELEGIDAS.includes(t.id))
+
+  // reparto por familia, conservando el orden del catálogo
+  const grupos = (() => {
+    const mapa = new Map<Grupo, Transicion[]>()
+    for (const t of lista) {
+      if (!mapa.has(t.grupo)) mapa.set(t.grupo, [])
+      mapa.get(t.grupo)!.push(t)
+    }
+    return [...mapa.entries()]
+  })()
 
   function dibujar(t: Transicion, p: number) {
     const c = lienzo.current
@@ -95,6 +107,7 @@ export default function DemoTransiciones() {
     const inicio = performance.now()
     const paso = () => {
       const p = Math.min(1, (performance.now() - inicio) / DURACION)
+      setAvance(p)
       dibujar(t, p)
       if (p < 1) bucle.current = requestAnimationFrame(paso)
     }
@@ -127,6 +140,13 @@ export default function DemoTransiciones() {
           className="block w-full"
           style={{ aspectRatio: `${ANCHO} / ${ALTO}` }}
         />
+        {/* avance de la transición, para saber en qué punto va */}
+        <span className="absolute inset-x-0 bottom-0 h-1 bg-black/30">
+          <span
+            className="block h-full bg-brand transition-[width] duration-75"
+            style={{ width: `${avance * 100}%` }}
+          />
+        </span>
         <button
           onClick={() => reproducir(elegida)}
           className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-[#13233d] transition-transform duration-200 hover:scale-105 active:scale-95"
@@ -139,27 +159,41 @@ export default function DemoTransiciones() {
       <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
         Transición:
       </p>
-      <div className="flex flex-wrap gap-1.5">
-        {lista.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setElegida(t.id)}
-            title={t.descripcion}
-            className={[
-              'rounded-full px-3 py-1.5 text-[11px] font-medium transition-all duration-200 hover:-translate-y-0.5',
-              t.id === elegida ? 'text-white shadow-sm' : 'text-[color:var(--muted)]',
-            ].join(' ')}
-            style={
-              t.id === elegida
-                ? {
-                    background: 'rgb(var(--accent-boton))',
-                    border: '1px solid rgb(var(--accent-boton))',
-                  }
-                : { background: 'rgb(var(--border) / 0.07)', border: '1px solid rgb(var(--border) / 0.1)' }
-            }
-          >
-            {t.nombre}
-          </button>
+      {/* agrupadas por familia: ocho pastillas sueltas no dejaban ver que hay
+          criterios distintos detrás de cada grupo */}
+      <div className="flex flex-col gap-3">
+        {grupos.map(([grupo, opciones]) => (
+          <div key={grupo}>
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--muted)] opacity-70">
+              {NOMBRES_GRUPO[grupo]}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {opciones.map((t) => (
+                <Tooltip key={t.id} texto={t.descripcion} lado="arriba">
+                  <button
+                    onClick={() => setElegida(t.id)}
+                    className={[
+                      'rounded-full px-3 py-1.5 text-[11px] font-medium transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm',
+                      t.id === elegida ? 'text-white shadow-sm' : 'text-[color:var(--muted)]',
+                    ].join(' ')}
+                    style={
+                      t.id === elegida
+                        ? {
+                            background: 'rgb(var(--accent-boton))',
+                            border: '1px solid rgb(var(--accent-boton))',
+                          }
+                        : {
+                            background: 'rgb(var(--border) / 0.07)',
+                            border: '1px solid rgb(var(--border) / 0.1)',
+                          }
+                    }
+                  >
+                    {t.nombre}
+                  </button>
+                </Tooltip>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
       <p className="mt-3 text-[11px] leading-relaxed text-[color:var(--muted)]">
