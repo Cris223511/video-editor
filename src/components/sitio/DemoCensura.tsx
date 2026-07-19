@@ -196,7 +196,10 @@ export default function DemoCensura() {
     ].join(' ')
   const estiloChip = (activo: boolean) =>
     activo
-      ? { background: 'rgb(var(--accent-boton))' }
+      ? {
+          background: 'rgb(var(--accent-boton))',
+          border: '1px solid rgb(var(--accent-boton))',
+        }
       : { background: 'rgb(var(--border) / 0.07)', border: '1px solid rgb(var(--border) / 0.1)' }
 
   return (

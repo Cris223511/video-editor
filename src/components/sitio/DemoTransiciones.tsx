@@ -136,8 +136,8 @@ export default function DemoTransiciones() {
       </div>
 
       <div className="flex flex-col">
-      <p className="mb-2.5 text-xs font-semibold text-[color:var(--muted)]">
-        Elige una transición y se aplica al momento
+      <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
+        Transición:
       </p>
       <div className="flex flex-wrap gap-1.5">
         {lista.map((t) => (
@@ -151,7 +151,10 @@ export default function DemoTransiciones() {
             ].join(' ')}
             style={
               t.id === elegida
-                ? { background: 'rgb(var(--accent-boton))' }
+                ? {
+                    background: 'rgb(var(--accent-boton))',
+                    border: '1px solid rgb(var(--accent-boton))',
+                  }
                 : { background: 'rgb(var(--border) / 0.07)', border: '1px solid rgb(var(--border) / 0.1)' }
             }
           >
