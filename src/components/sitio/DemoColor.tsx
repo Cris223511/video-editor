@@ -102,7 +102,7 @@ export default function DemoColor() {
           crossOrigin="anonymous"
           className="h-full w-full object-cover"
           style={{
-            minHeight: 300,
+            minHeight: 260,
             filter: tocada ? `url(#demo-color) ${filtroNumerico}` : undefined,
           }}
         />

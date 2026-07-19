@@ -116,25 +116,25 @@ const HERRAMIENTAS = [
   {
     id: 'velocidad',
     icono: <Gauge size={17} />,
-    titulo: 'Velocidad',
+    titulo: 'Velocidad del clip',
     texto: 'Acelera o ralentiza un clip y la línea de tiempo se recalcula sola.',
   },
   {
     id: 'lienzo',
     icono: <Crop size={17} />,
-    titulo: 'Lienzo',
+    titulo: 'Lienzo y proporción',
     texto: 'Cambia la proporción y rellena las bandas con el video desenfocado.',
   },
   {
     id: 'audio',
     icono: <Volume2 size={17} />,
-    titulo: 'Audio',
+    titulo: 'Volumen y audio',
     texto: 'Ajusta el volumen general o por franjas de la línea de tiempo.',
   },
   {
     id: 'atajos',
     icono: <Keyboard size={17} />,
-    titulo: 'Atajos',
+    titulo: 'Atajos de teclado',
     texto: 'Dividir, mover el cabezal, guardar y exportar desde el teclado.',
   },
 ]
