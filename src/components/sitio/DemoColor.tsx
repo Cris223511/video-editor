@@ -87,7 +87,10 @@ export default function DemoColor() {
         border: '1px solid rgb(var(--border) / 0.1)',
       }}
     >
-      <div className="grid gap-5 lg:grid-cols-[1.1fr_1fr]">
+      {/* items-start evita que la rejilla estire el video para igualar la altura
+          de la columna de controles, que es más alta. sin esto el video salía
+          demasiado largo por mucho que se bajara su alto mínimo */}
+      <div className="grid items-start gap-5 lg:grid-cols-[1.1fr_1fr]">
       <div className="relative overflow-hidden rounded-xl bg-black">
         <video
           src={CLIP}
@@ -100,9 +103,8 @@ export default function DemoColor() {
           // otro dominio se descarta si no se pide en modo anónimo. sin este
           // atributo el marco se quedaría en negro, igual que pasaba en MedioHover
           crossOrigin="anonymous"
-          className="h-full w-full object-cover"
+          className="aspect-[5/4] w-full object-cover"
           style={{
-            minHeight: 260,
             filter: tocada ? `url(#demo-color) ${filtroNumerico}` : undefined,
           }}
         />

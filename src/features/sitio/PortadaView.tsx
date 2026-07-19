@@ -3,7 +3,6 @@ import {
   Crop,
   Download,
   Gauge,
-  Keyboard,
   Layers,
   MonitorPlay,
   Palette,
@@ -130,12 +129,6 @@ const HERRAMIENTAS = [
     icono: <Volume2 size={17} />,
     titulo: 'Volumen y audio',
     texto: 'Ajusta el volumen general o por franjas de la línea de tiempo.',
-  },
-  {
-    id: 'atajos',
-    icono: <Keyboard size={17} />,
-    titulo: 'Atajos de teclado',
-    texto: 'Dividir, mover el cabezal, guardar y exportar desde el teclado.',
   },
 ]
 
