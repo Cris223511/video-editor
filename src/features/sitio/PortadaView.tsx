@@ -45,12 +45,14 @@ const MEDIOS = {
       'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=1200&q=70',
   },
   equipo: {
-    imagen:
-      'https://images.unsplash.com/photo-1439066615861-d1af74d74000?auto=format&fit=crop&w=900&q=70',
-    // el de la costa ya lo usa la pieza de corrección de color, así que aquí va el
-    // del teclado, que además encaja con la idea de que todo pasa en tu equipo. es
-    // uno de los enlaces de Pexels comprobados que sí devuelven contenido
-    video: 'https://videos.pexels.com/video-files/852421/852421-hd_1920_1080_30fps.mp4',
+    // el respaldo se saca del propio video, guardado en public, así que lo que se
+    // ve antes de que cargue coincide con el clip en lugar de una foto distinta
+    imagen: '/poster-equipo.jpg',
+    // clip nuevo, una red de datos que enlaza sola. los otros tres videos ya
+    // estaban repartidos por las demás piezas y aquí se repetía uno; este encaja
+    // con la idea de que el material se procesa en tu propio equipo. comprobado que
+    // el enlace responde y sirve contenido de verdad
+    video: 'https://videos.pexels.com/video-files/3129671/3129671-hd_1920_1080_30fps.mp4',
   },
 }
 
@@ -388,7 +390,7 @@ export default function PortadaView() {
               <MedioHover
                 imagen={MEDIOS.equipo.imagen}
                 video={MEDIOS.equipo.video}
-                alt="Manos escribiendo en el teclado de un portátil"
+                alt="Una red de datos que enlaza puntos entre sí"
                 proporcion="aspect-[5/4]"
               />
             </Parallax>
