@@ -1123,7 +1123,14 @@ export default function DemoCaracteristicas({ items }: { items: Caracteristica[]
                 key={it.id}
                 onClick={() => elegir(it.id)}
                 aria-pressed={es}
-                className="relative shrink-0 rounded-2xl px-4 py-3 text-left transition-colors duration-200 lg:w-full lg:shrink"
+                // las filas que no están elegidas reaccionan al pasar el cursor:
+                // el fondo se insinúa, el icono se tiñe y la fila sube un pelo, para
+                // que se note que se puede elegir. la elegida ya tiene su propio
+                // realce, así que ahí el hover no añade nada
+                className={[
+                  'grupo-item relative shrink-0 rounded-2xl px-4 py-3 text-left transition-all duration-200 lg:w-full lg:shrink',
+                  es ? '' : 'hover:-translate-y-0.5',
+                ].join(' ')}
                 style={{
                   background: es ? 'rgb(var(--surface))' : 'transparent',
                   border: `1px solid rgb(var(--border) / ${es ? '0.14' : '0'})`,

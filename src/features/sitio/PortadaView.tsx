@@ -47,9 +47,10 @@ const MEDIOS = {
   equipo: {
     imagen:
       'https://images.unsplash.com/photo-1439066615861-d1af74d74000?auto=format&fit=crop&w=900&q=70',
-    // comprobado que responde: Pexels bloquea el enlace directo de la mayoría de
-    // sus videos, así que solo se usan los que devuelven contenido de verdad
-    video: 'https://videos.pexels.com/video-files/3571264/3571264-hd_1920_1080_30fps.mp4',
+    // el de la costa ya lo usa la pieza de corrección de color, así que aquí va el
+    // del teclado, que además encaja con la idea de que todo pasa en tu equipo. es
+    // uno de los enlaces de Pexels comprobados que sí devuelven contenido
+    video: 'https://videos.pexels.com/video-files/852421/852421-hd_1920_1080_30fps.mp4',
   },
 }
 
@@ -387,7 +388,7 @@ export default function PortadaView() {
               <MedioHover
                 imagen={MEDIOS.equipo.imagen}
                 video={MEDIOS.equipo.video}
-                alt="Vista aérea de la costa, con las olas rompiendo contra las rocas"
+                alt="Manos escribiendo en el teclado de un portátil"
                 proporcion="aspect-[5/4]"
               />
             </Parallax>

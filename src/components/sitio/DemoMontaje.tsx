@@ -31,6 +31,9 @@ const TOTAL = 12.8
 // ese alto la pieza encadenaba una vuelta con la siguiente y el ojo no llegaba
 // a quedarse con el montaje terminado
 const ACCION = 11.5
+// factor por el que se estira la duración real de cada vuelta. por encima de 1 va
+// más despacio, sin cambiar nada de lo que ocurre dentro del ciclo
+const RITMO = 1.3
 // margen de cortesía al final y al principio del ciclo: en esos segundos la
 // escena se atenúa y vuelve, así el salto del reloj queda tapado
 const RETORNO = 0.75
@@ -141,7 +144,12 @@ export default function DemoMontaje() {
     let raf = 0
     const inicio = performance.now()
     const paso = () => {
-      setBruto(((performance.now() - inicio) / 1000) % TOTAL)
+      // el tiempo real se divide por RITMO antes de entrar en el ciclo: el reloj
+      // interno sigue recorriendo de 0 a TOTAL, así que el guion y el recorrido
+      // del cursor cuadran igual, pero cada vuelta tarda más en pantalla. es la
+      // forma de ralentizarlo sin recolocar cada tiempo a mano
+      const t = (performance.now() - inicio) / 1000 / RITMO
+      setBruto(t % TOTAL)
       raf = requestAnimationFrame(paso)
     }
     raf = requestAnimationFrame(paso)
