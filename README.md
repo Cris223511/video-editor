@@ -26,13 +26,13 @@
 
 ## Demo en vivo
 
-Video Editor se usa **directamente en el navegador**, sin instalar nada. La versión de producción, desplegada en Vercel, vive aquí:
+Video Editor se usa **directamente en el navegador**, sin instalar nada:
 
 | Versión | Enlace | Estado |
 | ------- | ------ | ------ |
-| 0.1.0 | _pendiente de despliegue_ | Próximamente |
+| 0.1.0 | **[video-editor-plus.vercel.app](https://video-editor-plus.vercel.app)** | Disponible |
 
-> En cuanto esté en línea, el enlace aparecerá en esta tabla y podrás probarlo con un solo clic. Los cambios de cada versión están en el [historial de cambios](CHANGELOG.md).
+> Ábrelo y empieza a editar, no hace falta cuenta ni descarga. Los cambios de cada versión están en el [historial de cambios](CHANGELOG.md).
 
 ## Por qué
 

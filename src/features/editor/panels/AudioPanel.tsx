@@ -1,6 +1,6 @@
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
-import { Campo, Deslizador } from '../../../components/ui/controls'
+import { Campo, Deslizador } from '../../../components/ui/Controls'
 
 // panel de audio: volumen general del proyecto y ajustes por franja. cada franja
 // se coloca y recorta en la línea de tiempo, y aquí se define su ganancia
@@ -35,7 +35,7 @@ export default function AudioPanel() {
       <div className="border-t border-black/10 pt-3 dark:border-white/10">
         <button
           onClick={agregarRegionAudio}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand py-2 text-sm font-medium text-white transition-colors hover:bg-brand-dark"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand py-2 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95"
         >
           <Icon name="mas" size={16} /> Añadir franja de volumen
         </button>

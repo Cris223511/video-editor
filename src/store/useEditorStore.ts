@@ -11,7 +11,7 @@ import {
   crearCapaImagen,
   crearCapaTexto,
 } from '../lib/layers/defaults'
-import { duracionTotal } from '../lib/timeline/timeline'
+import { duracionTotal } from '../lib/timeline/clips'
 
 const PX_POR_SEGUNDO_DEFECTO = 60
 const PX_MIN = 12
@@ -20,6 +20,7 @@ const DURACION_MINIMA = 0.1
 const DURACION_MINIMA_CAPA = 0.2
 
 export type Herramienta =
+  | 'proyecto'
   | 'propiedades'
   | 'texto'
   | 'imagen'
@@ -33,6 +34,10 @@ export type Herramienta =
 
 interface EstadoEditor {
   pista: Track
+  // niveles de video visibles y el alto en píxeles de cada uno. los clips viven
+  // todos en la misma lista y su campo pista dice en cuál se dibujan
+  numPistas: number
+  altosPista: number[]
   capas: Capa[]
   playhead: number
   reproduciendo: boolean
@@ -45,6 +50,10 @@ interface EstadoEditor {
   resolucionAuto: { ancho: number; alto: number }
   lienzoManual: boolean
   colorFondo: string
+  // qué rellena las bandas cuando el video no cubre el lienzo entero
+  fondo: 'color' | 'desenfoque'
+  // cuánto se desenfoca ese relleno, de 1 a 100
+  desenfoqueFondo: number
   marco: Marco
   volumenGlobal: number
   audioRegiones: RegionAudio[]
@@ -58,7 +67,13 @@ interface EstadoEditor {
   resetTono: (id: string) => void
   setTransicion: (id: string, cambios: Partial<Transicion>) => void
   dividirEnCabezal: () => void
+  cerrarHueco: (desde: number, pista: number) => void
   seleccionar: (id: string | null) => void
+
+  agregarPista: () => void
+  quitarPista: (indice: number) => void
+  setAltoPista: (indice: number, alto: number) => void
+  moverClipAPista: (id: string, pista: number) => void
 
   agregarTexto: () => void
   agregarImagen: (src: string, anchoNatural: number, altoNatural: number) => void
@@ -83,6 +98,12 @@ interface EstadoEditor {
   desplazarCapa: (id: string, dx: number, dy: number) => void
   registrarPunto: (id: string, playhead: number, x: number, y: number) => void
   quitarMovimiento: (id: string) => void
+  // el recorrido grabado se puede retocar después: mover un nodo o borrarlo
+  moverKeyframe: (id: string, indice: number, x: number, y: number) => void
+  quitarKeyframe: (id: string, indice: number) => void
+  // a qué ritmo corre el video mientras se graba un recorrido
+  velocidadGrabacion: number
+  setVelocidadGrabacion: (v: number) => void
 
   dibujandoMascara: boolean
   setDibujandoMascara: (v: boolean) => void
@@ -101,6 +122,8 @@ interface EstadoEditor {
   setLienzo: (ancho: number, alto: number) => void
   setLienzoAuto: () => void
   setColorFondo: (color: string) => void
+  setFondo: (f: 'color' | 'desenfoque') => void
+  setDesenfoqueFondo: (v: number) => void
   setMarco: (cambios: Partial<Marco>) => void
   irA: (t: number) => void
   reproducir: () => void
@@ -110,6 +133,13 @@ interface EstadoEditor {
 }
 
 const pistaVacia: Track = { id: 'video-1', tipo: 'video', clips: [] }
+
+// límites de la multipista: cuántos niveles se permiten y hasta dónde puede
+// crecer o encogerse cada uno al estirar su borde inferior
+const MAX_PISTAS = 6
+const ALTO_PISTA_BASE = 64
+const ALTO_PISTA_MIN = 40
+const ALTO_PISTA_MAX = 160
 const entre01 = (v: number) => Math.max(0, Math.min(1, v))
 
 // estado del editor: una pista de video con posiciones libres, las capas que se
@@ -117,6 +147,8 @@ const entre01 = (v: number) => Math.max(0, Math.min(1, v))
 // duración de su fuente para saber hasta dónde alargarse al recortar
 export const useEditorStore = create<EstadoEditor>((set, get) => ({
   pista: pistaVacia,
+  numPistas: 1,
+  altosPista: [64],
   capas: [],
   playhead: 0,
   reproduciendo: false,
@@ -129,6 +161,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => ({
   resolucionAuto: { ancho: 1920, alto: 1080 },
   lienzoManual: false,
   colorFondo: '#000000',
+  fondo: 'color',
+  desenfoqueFondo: 45,
   marco: { tipo: 'ninguno', color: '#ffffff', grosor: 30, radio: 40 },
   volumenGlobal: 1,
   audioRegiones: [],
@@ -137,11 +171,14 @@ export const useEditorStore = create<EstadoEditor>((set, get) => ({
 
   agregarDesdeAsset: (asset) =>
     set((s) => {
-      const inicio = duracionTotal(s.pista.clips)
+      // el medio nuevo entra al final de la pista base, no del proyecto entero,
+      // para que lo apilado en niveles superiores no lo empuje hacia adelante
+      const inicio = duracionTotal(s.pista.clips.filter((c) => c.pista === 0))
       const clip = {
         id: crypto.randomUUID(),
         assetId: asset.id,
         inicio,
+        pista: 0,
         duracion: asset.duracion,
         recorteInicio: 0,
         duracionFuente: asset.duracion,
@@ -183,6 +220,30 @@ export const useEditorStore = create<EstadoEditor>((set, get) => ({
         ),
       },
     })),
+
+  // cierra el hueco que empieza en `desde` dentro de un nivel concreto: lo que
+  // venga después en esa misma pista se adelanta justo lo que medía el espacio
+  // vacío. los demás niveles no se tocan, porque su sincronía con el video ya
+  // colocado se perdería
+  cerrarHueco: (desde, pista) =>
+    set((s) => {
+      const propios = s.pista.clips.filter((c) => c.pista === pista)
+      const ordenados = [...propios].sort((a, b) => a.inicio - b.inicio)
+      const siguiente = ordenados.find((c) => c.inicio >= desde - 0.0001)
+      if (!siguiente) return {}
+      const salto = siguiente.inicio - desde
+      if (salto <= 0.0001) return {}
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) =>
+            c.pista === pista && c.inicio >= desde - 0.0001
+              ? { ...c, inicio: Math.max(0, c.inicio - salto) }
+              : c,
+          ),
+        },
+      }
+    }),
 
   recortarClip: (id, lado, delta) =>
     set((s) => {
@@ -285,6 +346,51 @@ export const useEditorStore = create<EstadoEditor>((set, get) => ({
       regionSeleccionada: id ? null : s.regionSeleccionada,
       herramienta: id ? 'propiedades' : s.herramienta,
     })),
+
+  // el nivel nuevo aparece encima de los demás, vacío y con el alto estándar
+  agregarPista: () =>
+    set((s) => ({
+      numPistas: Math.min(s.numPistas + 1, MAX_PISTAS),
+      altosPista:
+        s.numPistas < MAX_PISTAS ? [...s.altosPista, ALTO_PISTA_BASE] : s.altosPista,
+    })),
+
+  // al eliminar un nivel se van con él sus clips, y los que estaban por encima
+  // bajan una posición para que no queden filas huecas en medio
+  quitarPista: (indice) =>
+    set((s) => {
+      if (s.numPistas <= 1) return {}
+      const clips = s.pista.clips
+        .filter((c) => c.pista !== indice)
+        .map((c) => (c.pista > indice ? { ...c, pista: c.pista - 1 } : c))
+      const altosPista = s.altosPista.filter((_, i) => i !== indice)
+      const seguiaVivo = clips.some((c) => c.id === s.clipSeleccionado)
+      return {
+        numPistas: s.numPistas - 1,
+        altosPista,
+        pista: { ...s.pista, clips },
+        clipSeleccionado: seguiaVivo ? s.clipSeleccionado : null,
+        playhead: Math.min(s.playhead, duracionTotal(clips)),
+      }
+    }),
+
+  setAltoPista: (indice, alto) =>
+    set((s) => ({
+      altosPista: s.altosPista.map((a, i) =>
+        i === indice ? Math.round(Math.min(ALTO_PISTA_MAX, Math.max(ALTO_PISTA_MIN, alto))) : a,
+      ),
+    })),
+
+  moverClipAPista: (id, pista) =>
+    set((s) => {
+      const destino = Math.min(s.numPistas - 1, Math.max(0, pista))
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) => (c.id === id ? { ...c, pista: destino } : c)),
+        },
+      }
+    }),
 
   agregarTexto: () =>
     set((s) => {
@@ -412,6 +518,34 @@ export const useEditorStore = create<EstadoEditor>((set, get) => ({
       capas: s.capas.map((c) => (c.id === id ? { ...c, keyframes: [] } : c)),
     })),
 
+  moverKeyframe: (id, indice, x, y) =>
+    set((s) => ({
+      capas: s.capas.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              // solo cambia dónde pasa la capa, no cuándo: el instante de cada
+              // nodo se respeta para no descuadrar el recorrido con el video
+              keyframes: c.keyframes.map((k, i) =>
+                i === indice
+                  ? { ...k, x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) }
+                  : k,
+              ),
+            }
+          : c,
+      ),
+    })),
+
+  quitarKeyframe: (id, indice) =>
+    set((s) => ({
+      capas: s.capas.map((c) =>
+        c.id === id ? { ...c, keyframes: c.keyframes.filter((_, i) => i !== indice) } : c,
+      ),
+    })),
+
+  velocidadGrabacion: 0.5,
+  setVelocidadGrabacion: (v) => set({ velocidadGrabacion: v }),
+
   setDibujandoMascara: (v) => set({ dibujandoMascara: v }),
 
   anadirTrazo: (id, puntos) =>
@@ -493,6 +627,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => ({
   setLienzoAuto: () => set((s) => ({ resolucion: { ...s.resolucionAuto }, lienzoManual: false })),
 
   setColorFondo: (color) => set({ colorFondo: color }),
+  setFondo: (f) => set({ fondo: f }),
+  setDesenfoqueFondo: (v) => set({ desenfoqueFondo: Math.max(1, Math.min(100, v)) }),
 
   setMarco: (cambios) => set((s) => ({ marco: { ...s.marco, ...cambios } })),
 

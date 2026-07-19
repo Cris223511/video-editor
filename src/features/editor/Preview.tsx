@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../components/ui/Icon'
-import CapasOverlay from './CapasOverlay'
-import MarcoOverlay from './MarcoOverlay'
+import CapasOverlay from './overlays/CapasOverlay'
+import Vacio from '../../components/ui/Vacio'
+import MarcoOverlay from './overlays/MarcoOverlay'
 import { useEditorStore } from '../../store/useEditorStore'
 import { useProjectStore } from '../../store/useProjectStore'
 import { MediaAsset } from '../../types/media'
-import { clipEnTiempo, duracionTotal } from '../../lib/timeline/timeline'
-import { gananciaEn } from '../../lib/audio/audio'
+import { clipEnTiempo, duracionTotal } from '../../lib/timeline/clips'
+import { gananciaEn } from '../../lib/audio/ganancia'
 import { rectContenido } from '../../lib/layers/rect'
 import { posicionCapa } from '../../lib/layers/motion'
 import { CapaCensura } from '../../types/layers'
 import { Clip } from '../../types/timeline'
-import { esTonoNeutro, filtroCss, matrizTono, usaMatriz } from '../../lib/color/tono'
+import { esTonoNeutro, filtroCss, matrizTono, usaMatriz, tablasColor } from '../../lib/color/tono'
+import { anterior, pintarTransicion, progreso } from '../../lib/transiciones/pintar'
+import { buscarTransicion } from '../../lib/transiciones/catalogo'
 
 // visor central. monta un video por clip y solo deja visible y sonando el que
 // corresponde al cabezal. la reproducción se apoya en el tiempo nativo de cada
@@ -26,6 +29,8 @@ export default function Preview() {
   const hayCensura = useEditorStore((s) => s.capas.some((c) => c.tipo === 'censura'))
   const resolucion = useEditorStore((s) => s.resolucion)
   const colorFondo = useEditorStore((s) => s.colorFondo)
+  const fondo = useEditorStore((s) => s.fondo)
+  const desenfoqueFondo = useEditorStore((s) => s.desenfoqueFondo)
   const audioRegiones = useEditorStore((s) => s.audioRegiones)
   const volumenGlobal = useEditorStore((s) => s.volumenGlobal)
   const medios = useProjectStore((s) => s.medios)
@@ -33,6 +38,10 @@ export default function Preview() {
   const videosRef = useRef<Map<string, HTMLVideoElement>>(new Map())
   const phRef = useRef(playhead)
   const censuraCanvasRef = useRef<HTMLCanvasElement>(null)
+  // lienzo que solo se enciende mientras dura una transición con geometría
+  const transRef = useRef<HTMLCanvasElement>(null)
+  // video del relleno borroso: sigue el tiempo del clip activo sin sonar
+  const fondoRef = useRef<HTMLVideoElement | null>(null)
   const areaRef = useRef<HTMLDivElement>(null)
   const [areaTam, setAreaTam] = useState({ w: 0, h: 0 })
 
@@ -165,7 +174,12 @@ export default function Preview() {
       const nodo = asegurarGrafo()
       cablearVideo(act.id, v)
       if (nodo) nodo.gain.value = gananciaEn(audioRef.current.regiones, audioRef.current.general, ph)
-      v.playbackRate = act.velocidad
+      // grabando un recorrido el video corre más despacio, que es la única forma
+      // de seguir con el cursor algo que se mueve rápido sin ir a tirones. el
+      // cabezal se sigue calculando desde el tiempo real del video, así que la
+      // línea de tiempo no se descuadra
+      const st = useEditorStore.getState()
+      v.playbackRate = act.velocidad * (st.grabandoMovimiento ? st.velocidadGrabacion : 1)
       if (v.paused) {
         try {
           v.currentTime = act.recorteInicio + (ph - act.inicio) * act.velocidad
@@ -388,22 +402,88 @@ export default function Preview() {
     return 0
   }
 
+  // las transiciones de mezcla y el corte los resuelve el propio elemento de
+  // video con su opacidad, que es más fluido. las que mueven o recortan la
+  // imagen necesitan lienzo, así que solo ahí se enciende
+  const pTrans = activo ? progreso(activo, playhead) : 1
+  const tecnicaActual = activo ? buscarTransicion(activo.transicion.tipo).tecnica : 'corte'
+  const conLienzo =
+    pTrans < 1 && tecnicaActual !== 'corte' && tecnicaActual !== 'opacidad'
+
+  // dibuja la transición fotograma a fotograma mientras dura. se apoya en el
+  // mismo motor que la exportación, así que lo que se ve aquí es lo que saldrá
+  useEffect(() => {
+    if (!conLienzo || !activo) return
+    const lienzo = transRef.current
+    const ctx = lienzo?.getContext('2d')
+    if (!lienzo || !ctx) return
+
+    let raf = 0
+    const paso = () => {
+      const st = useEditorStore.getState()
+      const act = clipEnTiempo(clipsOrdenados, st.playhead)
+      if (!act) {
+        raf = requestAnimationFrame(paso)
+        return
+      }
+      const p = progreso(act, st.playhead)
+      const sal = p < 1 ? anterior(act, clipsOrdenados) : null
+
+      lienzo.width = resolucion.ancho
+      lienzo.height = resolucion.alto
+      ctx.clearRect(0, 0, lienzo.width, lienzo.height)
+      ctx.fillStyle = colorFondo
+      ctx.fillRect(0, 0, lienzo.width, lienzo.height)
+
+      const pintar = (clip: Clip, alfa: number) => {
+        const v = videosRef.current.get(clip.id)
+        if (!v || !v.videoWidth) return
+        const e = Math.min(lienzo.width / v.videoWidth, lienzo.height / v.videoHeight)
+        const dw = v.videoWidth * e
+        const dh = v.videoHeight * e
+        ctx.save()
+        ctx.globalAlpha = alfa
+        ctx.drawImage(v, (lienzo.width - dw) / 2, (lienzo.height - dh) / 2, dw, dh)
+        ctx.restore()
+      }
+
+      pintarTransicion(ctx, lienzo.width, lienzo.height, act, sal, p, pintar)
+      raf = requestAnimationFrame(paso)
+    }
+    raf = requestAnimationFrame(paso)
+    return () => cancelAnimationFrame(raf)
+  }, [conLienzo, activo, clipsOrdenados, resolucion, colorFondo])
+
   const filtrosMatriz = clipsOrdenados.filter((c) => usaMatriz(c.tono))
 
   const hayContenido = clipsOrdenados.length > 0 || hayCapas
+
 
   // el lienzo mantiene la proporción del proyecto dentro del área disponible;
   // su fondo se ve en las bandas cuando el video no lo cubre
   const lienzoRect = rectContenido(areaTam.w, areaTam.h, resolucion.ancho / resolucion.alto)
 
   return (
-    <div className="relative flex min-h-0 flex-1 items-center justify-center bg-black/40 p-4">
+    // el fondo oscuro solo tiene sentido cuando hay video: rodear la imagen de
+    // negro ayuda a juzgar el color. sin nada que mostrar, ese mismo fondo deja
+    // el texto de aviso en gris sobre gris y no se lee
+    <div
+      className={[
+        // el relleno es más generoso a los lados que arriba y abajo. el alto es lo
+        // que decide el tamaño del lienzo, porque casi todo lo que se edita es
+        // apaisado: cada píxel que se quita de arriba y de abajo se convierte en
+        // lienzo, mientras que quitarlo de los lados no cambia nada
+        'relative flex min-h-0 flex-1 items-center justify-center px-4 py-2 transition-colors duration-300',
+        hayContenido ? 'bg-black/40' : '',
+      ].join(' ')}
+      style={hayContenido ? undefined : { background: 'rgb(var(--surface-2))' }}
+    >
       {!hayContenido ? (
-        <div className="flex flex-col items-center gap-3 text-center text-[color:var(--muted)]">
-          <Icon name="video" size={40} />
-          <p className="max-w-xs text-sm">
-            Añade un video desde la biblioteca de la izquierda para empezar a editar.
-          </p>
+        <div className="w-full max-w-sm">
+          <Vacio compacto icono={<Icon name="video" size={24} />} titulo="Aún no hay nada en el lienzo">
+            Importa un video desde el panel de <b>Medios</b>, abajo a la izquierda, y arrástralo
+            hasta la línea de tiempo para empezar a editar.
+          </Vacio>
         </div>
       ) : (
         <div ref={areaRef} className="flex h-full w-full items-center justify-center">
@@ -426,20 +506,69 @@ export default function Preview() {
                   preload="auto"
                   className="absolute inset-0 h-full w-full object-contain"
                   style={{
-                    opacity: opacidadDe(c),
+                    opacity: conLienzo ? 0 : opacidadDe(c),
                     filter: esTonoNeutro(c.tono) ? undefined : filtroCss(c.tono, `tono-${c.id}`),
                   }}
                 />
               )
             })}
+
+            {/* relleno con el propio video, ampliado y borroso, para que un
+                video vertical en un lienzo cuadrado no deje dos franjas planas.
+                va detrás del video real y se recorta al lienzo. no reproduce
+                sonido porque es el mismo material que ya suena delante */}
+            {fondo === 'desenfoque' &&
+              (() => {
+                const act = clipEnTiempo(clipsOrdenados, playhead)
+                const asset = act ? assetPorId.get(act.assetId) : null
+                if (!asset) return null
+                return (
+                  <video
+                    key={`fondo-${act!.id}`}
+                    ref={(el) => {
+                      if (el) fondoRef.current = el
+                      else fondoRef.current = null
+                    }}
+                    src={asset.url}
+                    muted
+                    playsInline
+                    preload="auto"
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover"
+                    style={{
+                      filter: `blur(${Math.round(desenfoqueFondo * 0.6)}px) brightness(0.72)`,
+                      transform: 'scale(1.12)',
+                    }}
+                  />
+                )
+              })()}
+            {conLienzo && (
+              <canvas
+                ref={transRef}
+                className="pointer-events-none absolute inset-0 h-full w-full"
+              />
+            )}
+
             {filtrosMatriz.length > 0 && (
               <svg className="absolute h-0 w-0">
                 <defs>
-                  {filtrosMatriz.map((c) => (
-                    <filter key={c.id} id={`tono-${c.id}`} colorInterpolationFilters="sRGB">
-                      <feColorMatrix type="matrix" values={matrizTono(c.tono)} />
-                    </filter>
-                  ))}
+                  {filtrosMatriz.map((c) => {
+                    const tablas = tablasColor(c.tono)
+                    return (
+                      <filter key={c.id} id={`tono-${c.id}`} colorInterpolationFilters="sRGB">
+                        <feColorMatrix type="matrix" values={matrizTono(c.tono)} />
+                        {/* las ruedas se aplican como curva por canal: cada zona
+                            tonal empuja su tramo y deja el resto en su sitio */}
+                        {tablas && (
+                          <feComponentTransfer>
+                            <feFuncR type="table" tableValues={tablas[0]} />
+                            <feFuncG type="table" tableValues={tablas[1]} />
+                            <feFuncB type="table" tableValues={tablas[2]} />
+                          </feComponentTransfer>
+                        )}
+                      </filter>
+                    )
+                  })}
                 </defs>
               </svg>
             )}

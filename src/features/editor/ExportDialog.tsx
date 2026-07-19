@@ -3,8 +3,8 @@ import Icon from '../../components/ui/Icon'
 import { useAppStore } from '../../store/useAppStore'
 import { useEditorStore } from '../../store/useEditorStore'
 import { useProjectStore } from '../../store/useProjectStore'
-import { duracionTotal } from '../../lib/timeline/timeline'
-import { formatearDuracion } from '../../lib/format/bytes'
+import { duracionTotal } from '../../lib/timeline/clips'
+import { formatearDuracion } from '../../lib/format/duracion'
 import { exportarProyecto, ControlExport } from '../../lib/export/exportar'
 
 type Fase = 'inicio' | 'exportando' | 'listo' | 'error'
@@ -20,6 +20,9 @@ export default function ExportDialog() {
   const [error, setError] = useState('')
   const [urlSalida, setUrlSalida] = useState('')
   const [extension, setExtension] = useState('mp4')
+  // 30 es el valor corriente para material de pantalla; 60 se nota en el
+  // movimiento rápido a cambio de un archivo bastante más pesado
+  const [fps, setFps] = useState(30)
   const controlRef = useRef<ControlExport | null>(null)
 
   if (!abierto) return null
@@ -49,7 +52,10 @@ export default function ExportDialog() {
       {
         ancho: estado.resolucion.ancho,
         alto: estado.resolucion.alto,
+        fps,
         colorFondo: estado.colorFondo,
+        fondo: estado.fondo,
+        desenfoqueFondo: estado.desenfoqueFondo,
         clips: estado.pista.clips,
         capas: estado.capas,
         marco: estado.marco,
@@ -105,7 +111,32 @@ export default function ExportDialog() {
                 <span className="text-[color:var(--muted)]">Duración</span>
                 <span>{formatearDuracion(total)}</span>
               </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[color:var(--muted)]">Imágenes por segundo</span>
+                <div className="flex gap-1">
+                  {[24, 30, 60].map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => setFps(v)}
+                      className={[
+                        'rounded-lg px-2.5 py-1 text-xs font-medium transition-colors duration-200',
+                        fps === v
+                          ? 'bg-brand text-white'
+                          : 'interactivo text-[color:var(--muted)]',
+                      ].join(' ')}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+            {fps === 60 && (
+              <p className="mb-4 text-xs italic leading-relaxed text-[color:var(--muted)]">
+                A 60 imágenes por segundo el movimiento se ve más suave, pero el archivo pesa
+                bastante más y la exportación tarda lo mismo que dura el video.
+              </p>
+            )}
             <p className="mb-5 text-xs leading-relaxed text-[color:var(--muted)]">
               La exportación se hace en tu equipo, en tiempo real, con alta calidad. Mantén esta
               pestaña activa mientras dura.
@@ -113,7 +144,7 @@ export default function ExportDialog() {
             <button
               onClick={iniciar}
               disabled={total <= 0}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-medium text-white transition-colors hover:bg-brand-dark disabled:opacity-50"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95 disabled:opacity-50"
             >
               <Icon name="exportar" size={18} /> Exportar
             </button>
@@ -147,7 +178,7 @@ export default function ExportDialog() {
             <a
               href={urlSalida}
               download={`video-editor.${extension}`}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-medium text-white transition-colors hover:bg-brand-dark"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95"
             >
               <Icon name="exportar" size={18} /> Descargar de nuevo
             </a>
@@ -165,7 +196,7 @@ export default function ExportDialog() {
             <p className="text-sm">{error}</p>
             <button
               onClick={() => setFase('inicio')}
-              className="inline-flex w-full items-center justify-center rounded-xl bg-brand py-2.5 text-sm font-medium text-white hover:bg-brand-dark"
+              className="inline-flex w-full items-center justify-center rounded-xl bg-brand py-2.5 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95"
             >
               Reintentar
             </button>

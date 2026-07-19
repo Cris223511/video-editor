@@ -1,6 +1,6 @@
 import { CSSProperties } from 'react'
-import { useEditorStore } from '../../store/useEditorStore'
-import { Marco } from '../../types/marco'
+import { useEditorStore } from '../../../store/useEditorStore'
+import { Marco } from '../../../types/marco'
 
 // traduce el marco a estilos css. el grosor y el radio se escalan a la altura
 // del lienzo mostrado para que se vean iguales en cualquier tamaño

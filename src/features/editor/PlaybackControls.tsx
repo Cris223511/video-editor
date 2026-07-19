@@ -1,7 +1,7 @@
 import Icon from '../../components/ui/Icon'
 import { useEditorStore } from '../../store/useEditorStore'
-import { duracionTotal } from '../../lib/timeline/timeline'
-import { formatearDuracion } from '../../lib/format/bytes'
+import { duracionTotal } from '../../lib/timeline/clips'
+import { formatearDuracion } from '../../lib/format/duracion'
 
 // controles de reproducción bajo el visor: volver al inicio, reproducir o
 // pausar, y el tiempo actual frente al total
@@ -15,7 +15,7 @@ export default function PlaybackControls() {
   const vacio = total === 0
 
   return (
-    <div className="flex items-center justify-center gap-4 border-t border-black/10 px-4 py-2.5 dark:border-white/10">
+    <div className="flex shrink-0 items-center justify-center gap-4 border-t border-black/10 px-4 py-1.5 dark:border-white/10">
       <button
         onClick={() => irA(0)}
         title="Ir al inicio"
@@ -28,7 +28,7 @@ export default function PlaybackControls() {
         onClick={alternar}
         title={reproduciendo ? 'Pausar' : 'Reproducir'}
         disabled={vacio}
-        className="grid h-11 w-11 place-items-center rounded-full bg-brand text-white transition-colors hover:bg-brand-dark disabled:opacity-40"
+        className="grid h-11 w-11 place-items-center rounded-full bg-brand text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95 disabled:opacity-40"
       >
         <Icon name={reproduciendo ? 'pausa' : 'play'} size={20} />
       </button>

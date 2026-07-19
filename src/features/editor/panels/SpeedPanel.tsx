@@ -1,6 +1,7 @@
 import { useEditorStore } from '../../../store/useEditorStore'
-import { Campo, Deslizador } from '../../../components/ui/controls'
-import { formatearDuracion } from '../../../lib/format/bytes'
+import SinSeleccion from '../../../components/ui/SinSeleccion'
+import { Campo, Deslizador } from '../../../components/ui/Controls'
+import { formatearDuracion } from '../../../lib/format/duracion'
 
 const PRESETS = [0.25, 0.5, 1, 1.5, 2, 4]
 
@@ -15,9 +16,9 @@ export default function SpeedPanel() {
 
   if (!clip) {
     return (
-      <p className="text-sm leading-relaxed text-[color:var(--muted)]">
-        Selecciona un clip en la línea de tiempo para cambiar su velocidad.
-      </p>
+      <SinSeleccion icono="velocidad" titulo="Ningún clip seleccionado">
+        Pulsa un clip en la línea de tiempo para cambiar a qué velocidad se reproduce.
+      </SinSeleccion>
     )
   }
 

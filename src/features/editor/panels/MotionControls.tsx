@@ -12,6 +12,8 @@ export default function MotionControls({ capa }: { capa: CapaBase }) {
   const setGrabando = useEditorStore((s) => s.setGrabandoMovimiento)
   const registrarPunto = useEditorStore((s) => s.registrarPunto)
   const quitarMovimiento = useEditorStore((s) => s.quitarMovimiento)
+  const velocidadGrabacion = useEditorStore((s) => s.velocidadGrabacion)
+  const setVelocidadGrabacion = useEditorStore((s) => s.setVelocidadGrabacion)
 
   const puntos = capa.keyframes.length
 
@@ -37,10 +39,40 @@ export default function MotionControls({ capa }: { capa: CapaBase }) {
         {grabando ? 'Grabando: arrastra en el visor' : 'Grabar movimiento'}
       </button>
 
+      {/* seguir con el cursor algo que se mueve rápido es casi imposible a
+          velocidad normal, así que el video se puede ralentizar mientras dura la
+          grabación. el recorrido se guarda igual, en el tiempo real del video */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-[color:var(--muted)]">Velocidad al grabar</span>
+        <div className="flex gap-1">
+          {[1, 0.5, 0.25].map((v) => (
+            <button
+              key={v}
+              onClick={() => setVelocidadGrabacion(v)}
+              className={[
+                'rounded-md px-2 py-1 text-[11px] font-medium transition-colors duration-200',
+                velocidadGrabacion === v
+                  ? 'bg-brand text-white'
+                  : 'interactivo text-[color:var(--muted)]',
+              ].join(' ')}
+            >
+              {v === 1 ? 'Normal' : `${v}x`}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {grabando && (
         <p className="text-xs leading-relaxed text-[color:var(--muted)]">
           Reproduce el video y arrastra el elemento en el visor siguiendo el recorrido. Cada instante
           se guarda como un punto.
+        </p>
+      )}
+
+      {puntos > 0 && (
+        <p className="text-xs leading-relaxed text-[color:var(--muted)]">
+          El recorrido se ve dibujado sobre el visor. Arrastra cualquier nodo para corregir por dónde
+          pasa, o dale doble clic para borrarlo.
         </p>
       )}
 

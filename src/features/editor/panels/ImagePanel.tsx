@@ -1,9 +1,9 @@
 import { useRef } from 'react'
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
-import { useToast } from '../../../components/ui/toast/ToastProvider'
+import { useToast } from '../../../components/ui/ToastProvider'
 import { CapaImagen } from '../../../types/layers'
-import { Campo, Deslizador } from '../../../components/ui/controls'
+import { Campo, Deslizador } from '../../../components/ui/Controls'
 import { validarImagen } from '../../../lib/validation/validateImage'
 
 // panel de la capa de imagen o logo: subir, ajustar tamaño y opacidad. la
@@ -48,7 +48,7 @@ export default function ImagePanel() {
     <div className="flex flex-col gap-4">
       <button
         onClick={() => input.current?.click()}
-        className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand py-2 text-sm font-medium text-white transition-colors hover:bg-brand-dark"
+        className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand py-2 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95"
       >
         <Icon name="mas" size={16} /> Agregar imagen
       </button>
@@ -67,9 +67,26 @@ export default function ImagePanel() {
               valor={Math.round(capa.anchoRel * 100)}
               min={3}
               max={200}
-              onChange={(v) => actualizarCapa(capa.id, { anchoRel: v / 100 })}
+              onChange={(v) => {
+                // si la imagen se deformó a mano en el visor, el alto acompaña al
+                // ancho en la misma medida y no se pierde la forma que se le dio
+                const nuevo = v / 100
+                const factor = capa.anchoRel > 0 ? nuevo / capa.anchoRel : 1
+                actualizarCapa(capa.id, {
+                  anchoRel: nuevo,
+                  ...(capa.altoRel !== undefined ? { altoRel: capa.altoRel * factor } : {}),
+                })
+              }}
             />
           </Campo>
+          {capa.altoRel !== undefined && (
+            <button
+              onClick={() => actualizarCapa(capa.id, { altoRel: undefined })}
+              className="interactivo w-full rounded-lg px-3 py-2 text-xs font-medium text-[color:var(--muted)]"
+            >
+              Devolver la proporción original
+            </button>
+          )}
           <Campo etiqueta={`Opacidad (${capa.opacidad}%)`}>
             <Deslizador
               valor={capa.opacidad}

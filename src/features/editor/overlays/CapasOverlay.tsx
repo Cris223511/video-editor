@@ -1,9 +1,13 @@
 import { CSSProperties, MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react'
-import { useEditorStore } from '../../store/useEditorStore'
-import { Capa, CapaCensura, CapaFigura, CapaImagen } from '../../types/layers'
-import { hexAOpacidad } from '../../lib/layers/defaults'
-import { rectContenido } from '../../lib/layers/rect'
-import { posicionCapa } from '../../lib/layers/motion'
+import { useEditorStore } from '../../../store/useEditorStore'
+import { Capa, CapaCensura, CapaFigura, CapaImagen } from '../../../types/layers'
+import { hexAOpacidad } from '../../../lib/layers/defaults'
+import { rectContenido } from '../../../lib/layers/rect'
+import { posicionCapa } from '../../../lib/layers/motion'
+import { Ancla, Caja, redimensionar } from '../../../lib/layers/resize'
+import { CajaGuia, Guia, imantar } from '../../../lib/layers/guias'
+import Tiradores from './Tiradores'
+import RecorridoOverlay from './RecorridoOverlay'
 
 const entre = (min: number, max: number, v: number) => Math.max(min, Math.min(max, v))
 
@@ -74,6 +78,8 @@ export default function CapasOverlay() {
 
   const rootRef = useRef<HTMLDivElement>(null)
   const [tam, setTam] = useState({ w: 0, h: 0 })
+  // líneas de alineación que se muestran solo mientras dura el arrastre
+  const [guias, setGuias] = useState<Guia[]>([])
 
   useEffect(() => {
     const el = rootRef.current
@@ -102,6 +108,9 @@ export default function CapasOverlay() {
     e.stopPropagation()
     seleccionarCapa(capa.id)
     let ultima = normalizar(e.nativeEvent)
+    const propia = cajaDe(capa, (e.currentTarget as HTMLElement) ?? null)
+    const vecinas = cajasVecinas(capa.id)
+
     const mover = (ev: globalThis.MouseEvent) => {
       const p = normalizar(ev)
       const st = useEditorStore.getState()
@@ -110,13 +119,23 @@ export default function CapasOverlay() {
       } else if (capa.keyframes.length > 0) {
         desplazarCapa(capa.id, p.x - ultima.x, p.y - ultima.y)
       } else {
-        moverCapaLienzo(capa.id, p.x, p.y)
+        // con Alt el imantado se desactiva, por si hace falta colocar algo justo
+        // al lado de una guía sin que salte
+        if (ev.altKey || !propia) {
+          moverCapaLienzo(capa.id, p.x, p.y)
+          setGuias([])
+        } else {
+          const r = imantar({ x: p.x, y: p.y, w: propia.w, h: propia.h }, vecinas)
+          moverCapaLienzo(capa.id, r.x, r.y)
+          setGuias(r.guias)
+        }
       }
       ultima = p
     }
     const soltar = () => {
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
+      setGuias([])
     }
     window.addEventListener('mousemove', mover)
     window.addEventListener('mouseup', soltar)
@@ -148,44 +167,78 @@ export default function CapasOverlay() {
     window.addEventListener('mouseup', soltar)
   }
 
-  function iniciarRedimensionImagen(e: ReactMouseEvent, capa: CapaImagen) {
-    e.stopPropagation()
-    seleccionarCapa(capa.id)
-    const mover = (ev: globalThis.MouseEvent) => {
-      const root = rootRef.current
-      if (!root) return
-      const r = root.getBoundingClientRect()
-      const rc = rectContenido(r.width, r.height, aspecto)
-      const pos = posicionCapa(capa, useEditorStore.getState().playhead)
-      const centroX = r.left + rc.ox + pos.x * rc.w
-      const anchoRel = (Math.abs(ev.clientX - centroX) * 2) / rc.w
-      actualizarCapa(capa.id, { anchoRel: entre(0.03, 2, anchoRel) })
-    }
-    const soltar = () => {
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
-    }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+  // alto que ocupa una imagen en unidades del lienzo. mientras no se haya
+  // deformado a mano sale de su proporción natural y del recorte aplicado
+  function altoImagen(c: CapaImagen) {
+    if (c.altoRel !== undefined) return c.altoRel
+    const rec = c.recorte
+    const fw = Math.max(0.05, 1 - rec.izq - rec.der)
+    const fh = Math.max(0.05, 1 - rec.arr - rec.aba)
+    const asp = c.anchoNatural > 0 ? (fw * c.anchoNatural) / (fh * c.altoNatural) : 1
+    return (c.anchoRel * aspecto) / (asp || 1)
   }
 
-  // redimensiona por ancho y alto (censura y figuras) desde el tirador
-  function iniciarRedimensionCaja(e: ReactMouseEvent, capa: CapaCensura | CapaFigura) {
+  // caja que ocupa una capa ahora mismo, en coordenadas del lienzo. el texto no
+  // guarda medidas propias, así que se mide lo que está ocupando en pantalla
+  function cajaDe(capa: Capa, caja: HTMLElement | null): Caja | null {
+    const pos = posicionCapa(capa, useEditorStore.getState().playhead)
+    if (capa.tipo === 'censura' || capa.tipo === 'figura')
+      return { x: pos.x, y: pos.y, w: capa.anchoRel, h: capa.altoRel }
+    if (capa.tipo === 'imagen')
+      return { x: pos.x, y: pos.y, w: capa.anchoRel, h: altoImagen(capa) }
+    if (!caja) return { x: pos.x, y: pos.y, w: 0, h: 0 }
+    const r = caja.getBoundingClientRect()
+    return { x: pos.x, y: pos.y, w: r.width / rect.w, h: r.height / rect.h }
+  }
+
+  // cajas de las demás capas visibles, que son contra las que se alinea la que
+  // se está arrastrando
+  function cajasVecinas(idExcluido: string): CajaGuia[] {
+    const st = useEditorStore.getState()
+    return st.capas
+      .filter(
+        (c) =>
+          c.id !== idExcluido &&
+          st.playhead >= c.inicio &&
+          st.playhead < c.inicio + c.duracion,
+      )
+      .map((c) => cajaDe(c, null) as CajaGuia)
+  }
+
+  // redimensionado común a todo lo que va sobre el lienzo. el borde contrario al
+  // agarre no se mueve, y Shift conserva la proporción. el texto escala siempre
+  // proporcional, porque deformarlo lo dejaría ilegible
+  function iniciarRedimension(e: ReactMouseEvent, capa: Capa, ancla: Ancla) {
     e.stopPropagation()
+    e.preventDefault()
     seleccionarCapa(capa.id)
+
+    const contenedor = (e.currentTarget as HTMLElement).parentElement
+    const inicial = cajaDe(capa, contenedor)
+    if (!inicial) return
+    const tamanoInicial = capa.tipo === 'texto' ? capa.tamano : 0
+    // una capa con recorrido grabado se coloca sola en cada instante, así que
+    // recolocar su centro aquí pelearía con los keyframes
+    const fija = capa.keyframes.length === 0
+
     const mover = (ev: globalThis.MouseEvent) => {
-      const root = rootRef.current
-      if (!root) return
-      const r = root.getBoundingClientRect()
-      const rc = rectContenido(r.width, r.height, aspecto)
-      const pos = posicionCapa(capa, useEditorStore.getState().playhead)
-      const centroX = r.left + rc.ox + pos.x * rc.w
-      const centroY = r.top + rc.oy + pos.y * rc.h
-      const anchoRel = (Math.abs(ev.clientX - centroX) * 2) / rc.w
-      const altoRel = (Math.abs(ev.clientY - centroY) * 2) / rc.h
+      const p = normalizar(ev)
+      const forzarProporcion = capa.tipo === 'texto' || ev.shiftKey
+      const n = redimensionar(inicial, ancla, p.x, p.y, forzarProporcion)
+      const posicion = fija ? { x: entre(0, 1, n.x), y: entre(0, 1, n.y) } : {}
+
+      if (capa.tipo === 'texto') {
+        const factor = inicial.w > 0 ? n.w / inicial.w : 1
+        actualizarCapa(capa.id, {
+          ...posicion,
+          tamano: Math.round(entre(8, 400, tamanoInicial * factor)),
+        })
+        return
+      }
       actualizarCapa(capa.id, {
-        anchoRel: entre(0.03, 1.5, anchoRel),
-        altoRel: entre(0.03, 1.5, altoRel),
+        ...posicion,
+        anchoRel: entre(0.03, 2, n.w),
+        altoRel: entre(0.03, 2, n.h),
       })
     }
     const soltar = () => {
@@ -200,6 +253,38 @@ export default function CapasOverlay() {
 
   return (
     <div ref={rootRef} className="pointer-events-none absolute inset-0 overflow-hidden">
+      {/* recorrido de la capa seleccionada, para verlo y retocarlo */}
+      {visibles
+        .filter((c) => c.id === capaSeleccionada && c.keyframes.length > 0)
+        .map((c) => (
+          <RecorridoOverlay key={`ruta-${c.id}`} capa={c} rect={rect} normalizar={normalizar} />
+        ))}
+
+      {/* guías de alineación, visibles solo durante el arrastre */}
+      {guias.map((g) => (
+        <div
+          key={`${g.eje}-${g.pos}`}
+          className="pointer-events-none absolute z-30"
+          style={
+            g.eje === 'x'
+              ? {
+                  left: rect.ox + g.pos * rect.w,
+                  top: rect.oy,
+                  width: 1,
+                  height: rect.h,
+                  background: '#ff3ba7',
+                }
+              : {
+                  left: rect.ox,
+                  top: rect.oy + g.pos * rect.h,
+                  width: rect.w,
+                  height: 1,
+                  background: '#ff3ba7',
+                }
+          }
+        />
+      ))}
+
       {visibles.map((c) => {
         const seleccion = c.id === capaSeleccionada
         const pos = posicionCapa(c, playhead)
@@ -237,10 +322,7 @@ export default function CapasOverlay() {
               }}
             >
               {seleccion && (
-                <div
-                  onMouseDown={(e) => iniciarRedimensionCaja(e, c)}
-                  className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-nwse-resize rounded-sm border-2 border-white bg-brand"
-                />
+                <Tiradores onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
               )}
             </div>
           )
@@ -276,10 +358,7 @@ export default function CapasOverlay() {
                 {dibujoFigura(c, ancho, alto, g)}
               </svg>
               {seleccion && (
-                <div
-                  onMouseDown={(e) => iniciarRedimensionCaja(e, c)}
-                  className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-nwse-resize rounded-sm border-2 border-white bg-brand"
-                />
+                <Tiradores onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
               )}
             </div>
           )
@@ -290,14 +369,13 @@ export default function CapasOverlay() {
           const fw = Math.max(0.05, 1 - rec.izq - rec.der)
           const fh = Math.max(0.05, 1 - rec.arr - rec.aba)
           const ancho = c.anchoRel * rect.w
-          const aspecto = c.anchoNatural > 0 ? (fw * c.anchoNatural) / (fh * c.altoNatural) : 1
-          const alto = ancho / (aspecto || 1)
+          const alto = altoImagen(c) * rect.h
           return (
             <div
               key={c.id}
               onMouseDown={(e) => iniciarArrastre(e, c)}
               className={[
-                'pointer-events-auto absolute cursor-move overflow-hidden',
+                'pointer-events-auto absolute cursor-move',
                 seleccion ? 'outline outline-2 outline-brand' : '',
               ].join(' ')}
               style={{
@@ -309,23 +387,24 @@ export default function CapasOverlay() {
                 opacity: c.opacidad / 100,
               }}
             >
-              <img
-                src={c.src}
-                alt=""
-                draggable={false}
-                className="absolute max-w-none select-none"
-                style={{
-                  width: ancho / fw,
-                  height: alto / fh,
-                  left: -rec.izq * (ancho / fw),
-                  top: -rec.arr * (alto / fh),
-                }}
-              />
-              {seleccion && (
-                <div
-                  onMouseDown={(e) => iniciarRedimensionImagen(e, c)}
-                  className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-nwse-resize rounded-sm border-2 border-white bg-brand"
+              {/* el recorte se aplica en esta capa interior; si estuviera en el
+                  contenedor recortaría también los tiradores de la selección */}
+              <div className="absolute inset-0 overflow-hidden">
+                <img
+                  src={c.src}
+                  alt=""
+                  draggable={false}
+                  className="absolute max-w-none select-none"
+                  style={{
+                    width: ancho / fw,
+                    height: alto / fh,
+                    left: -rec.izq * (ancho / fw),
+                    top: -rec.arr * (alto / fh),
+                  }}
                 />
+              </div>
+              {seleccion && (
+                <Tiradores onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
               )}
             </div>
           )
@@ -362,6 +441,9 @@ export default function CapasOverlay() {
             style={estilo}
           >
             {c.texto}
+            {/* el texto solo escala por las esquinas: estirarlo por un lado lo
+                deformaría y dejaría de leerse bien */}
+            {seleccion && <Tiradores soloEsquinas onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />}
           </div>
         )
       })}

@@ -1,25 +1,63 @@
+/* las tipografías van empaquetadas con la aplicación y no enlazadas a Google:
+   así el sitio carga con su letra desde el primer momento, funciona sin
+   conexión y no hay una petición a un tercero en cada visita */
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/plus-jakarta-sans';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* tokens de color del tema. toda la interfaz se apoya en ellos para que el
-   salto entre claro y oscuro salga uniforme sin duplicar estilos */
+/* tokens de color del tema, tomados del azul del logo. toda la interfaz se
+   apoya en ellos para que el salto entre claro y oscuro salga uniforme sin
+   duplicar estilos. el claro es el modo por defecto */
 :root {
   color-scheme: light;
-  --bg: #f4f6fb;
+  --bg: #eef3fb;
   --surface: 255 255 255;
-  --text: #1f2733;
-  --muted: #6b7280;
-  --border: 0 0 0;
+  --surface-2: 247 250 255;
+  --text: #13233d;
+  --muted: #5c6e8c;
+  --border: 21 52 102;
+  --accent: 24 97 255;
+  /* el azul de los botones rellenos va aparte del de los enlaces: uno debe
+     leerse sobre el fondo y el otro tiene que dejar leer el blanco encima, y
+     esas dos exigencias tiran en direcciones contrarias */
+  --accent-boton: 24 97 255;
+  --accent-soft: 18 165 240;
+  /* superficies oscuras del sitio (pie y bloques de llamada). se derivan del
+     azul de la marca y no de un gris azulado cualquiera, que es lo que hacía
+     que el pie no pegara con la barra */
+  /* el rojo del aviso cambia con el tema: uno solo no puede leerse a la vez
+     sobre blanco y sobre una superficie oscura */
+  --alerta: 225 29 72;
+  --profundo: 8 22 58;
+  --profundo-2: 10 30 78;
+  --radius: 10px;
 }
 
 html.dark {
   color-scheme: dark;
-  --bg: #16161c;
-  --surface: 30 31 39;
-  --text: #e7e9ee;
-  --muted: #9aa0ad;
-  --border: 255 255 255;
+  --bg: #080f1c;
+  --surface: 15 25 43;
+  --surface-2: 20 33 56;
+  --text: #e5edfa;
+  --muted: #8ea3c4;
+  --border: 122 170 255;
+  --accent: 59 140 255;
+  --accent-boton: 26 86 210;
+  --accent-soft: 56 189 248;
+  --alerta: 244 63 94;
+  --profundo: 6 18 48;
+  --profundo-2: 10 30 78;
+}
+
+/* nada decorativo debe ensanchar la página: si un adorno sobresale por un
+   lado, el navegador cuenta ese ancho extra y todo lo centrado se corre unos
+   píxeles, con lo que la barra deja de alinearse con el contenido */
+html,
+body {
+  overflow-x: clip;
 }
 
 html,
@@ -36,14 +74,48 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* superficie de vidrio esmerilado: fondo semitransparente con desenfoque.
-   la usan las tarjetas, la barra superior y los avisos */
+/* el cambio de tema no salta de golpe, se funde */
+html.tema-en-transicion,
+html.tema-en-transicion * {
+  transition: background-color 0.35s ease, border-color 0.35s ease, color 0.35s ease;
+}
+
 @layer components {
+  /* superficie de vidrio esmerilado: fondo semitransparente con desenfoque.
+     la usan las tarjetas, la barra superior, los modales y los avisos */
   .glass {
     background: rgb(var(--surface) / 0.72);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgb(var(--border) / 0.1);
+  }
+
+  /* panel sólido, para las columnas laterales y la línea de tiempo */
+  .panel {
+    background: rgb(var(--surface) / 1);
+    border: 1px solid rgb(var(--border) / 0.1);
+  }
+
+  /* fondo suave que agrupa un bloque de controles dentro de un panel */
+  .bloque {
+    background: rgb(var(--surface-2) / 1);
     border: 1px solid rgb(var(--border) / 0.08);
+    border-radius: var(--radius);
+  }
+
+  /* todo lo pulsable comparte la misma reacción al pasar el cursor */
+  .interactivo {
+    transition: background-color 0.18s ease, color 0.18s ease,
+      border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .interactivo:hover {
+    background: rgb(var(--accent) / 0.09);
+    color: rgb(var(--accent));
+  }
+
+  .interactivo:active {
+    transform: scale(0.97);
   }
 }
 
@@ -59,12 +131,184 @@ body {
   }
 }
 
+/* el tooltip aparece creciendo apenas. no lleva desplazamiento propio porque
+   de colocarlo ya se encarga el posicionador de radix */
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* el modal entra creciendo apenas, y su fondo se funde */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fundido-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* las tres barras del cargador suben y bajan desfasadas, despacio */
+@keyframes barra-carga {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 ::-webkit-scrollbar-thumb {
-  background: rgb(var(--border) / 0.18);
+  background: rgb(var(--border) / 0.22);
   border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--accent) / 0.45);
+}
+
+/* muestras de la galería de transiciones. en reposo se ve solo el primer plano,
+   quieto; al pasar el cursor por la tarjeta arranca la transición en bucle sobre
+   dos fotos reales, que es lo que deja comparar unas con otras */
+.demo-capa {
+  opacity: 0;
+}
+.grupo-demo:hover .demo-ninguna {
+  animation: demo-ninguna 1.8s steps(1, end) infinite;
+}
+.grupo-demo:hover .demo-desvanecer {
+  animation: demo-desvanecer 1.8s ease-in-out infinite;
+}
+.grupo-demo:hover .demo-fundido {
+  animation: demo-fundido 1.8s ease-in-out infinite;
+}
+.grupo-demo:hover .demo-negro {
+  animation: demo-negro 1.8s ease-in-out infinite;
+}
+
+@keyframes demo-ninguna {
+  0%, 46% { opacity: 0; }
+  50%, 100% { opacity: 1; }
+}
+
+@keyframes demo-desvanecer {
+  0%, 30% { opacity: 0; }
+  70%, 100% { opacity: 1; }
+}
+
+/* en el fundido a negro el plano entrante ya está puesto desde la mitad, y lo
+   que se ve pasar por encima es el negro */
+@keyframes demo-fundido {
+  0%, 48% { opacity: 0; }
+  52%, 100% { opacity: 1; }
+}
+
+@keyframes demo-negro {
+  0%, 20% { opacity: 0; }
+  50% { opacity: 1; }
+  80%, 100% { opacity: 0; }
+}
+
+/* Entrada y salida de los avisos, que llegan desde la derecha y se van por el
+   mismo lado.
+
+   El intento anterior usaba una animación propia sobre la transformación del
+   aviso, y ahí estaba el error: sonner guarda en esa misma transformación el
+   desplazamiento vertical con el que apila unos avisos sobre otros, leyéndolo de
+   la variable --y. Al animarla se perdía el apilado, y como la animación
+   conservaba su último valor, los avisos se quedaban amontonados en el mismo
+   sitio.
+
+   La forma sana es no tocar la transformación y reescribir solo --y en los dos
+   estados que interesan, el previo a montarse y el de retirada. El apilado
+   mientras el aviso está en pantalla queda como estaba, y el suavizado lo pone
+   la transición de 400ms que sonner ya trae puesta.
+
+   Los selectores van precedidos del contenedor para ganar en especificidad,
+   porque sonner inyecta sus estilos en la cabecera al arrancar y no hay garantía
+   de que lleguen antes que esta hoja. */
+
+/* aún sin montar: espera fuera de la pantalla, a la derecha */
+[data-sonner-toaster] [data-sonner-toast][data-y-position='top'][data-mounted='false'] {
+  --y: translateX(110%);
+}
+
+/* el de delante se retira por la derecha */
+[data-sonner-toaster]
+  [data-sonner-toast][data-removed='true'][data-front='true'][data-swipe-out='false'] {
+  --y: translateX(110%);
+}
+
+/* los de atrás se van igual, pero conservando la altura que les toca en la pila
+   para que los que quedan no den un salto */
+[data-sonner-toaster]
+  [data-sonner-toast][data-removed='true'][data-front='false'][data-swipe-out='false'][data-expanded='true'] {
+  --y: translateY(calc(var(--lift) * var(--offset))) translateX(110%);
+}
+
+[data-sonner-toaster]
+  [data-sonner-toast][data-removed='true'][data-front='false'][data-swipe-out='false'][data-expanded='false'] {
+  --y: translateX(110%);
+}
+
+/* estas dos animaciones se aplican con estilo en línea y no mediante una clase,
+   así que tailwind las descartaba al compilar y nunca llegaban al css final.
+   declararlas aquí garantiza que existan */
+@keyframes estrella {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.6);
+  }
+  20% {
+    opacity: var(--brillo);
+    transform: translate(calc(var(--deriva) * 0.3), calc(var(--deriva) * -0.2)) scale(1);
+  }
+  55% {
+    opacity: var(--brillo);
+    transform: translate(calc(var(--deriva) * 0.7), calc(var(--deriva) * -0.5)) scale(1);
+  }
+  80% {
+    opacity: 0.12;
+    transform: translate(var(--deriva), calc(var(--deriva) * -0.8)) scale(0.85);
+  }
+}
+
+@keyframes flotar {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
 }

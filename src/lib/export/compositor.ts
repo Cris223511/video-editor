@@ -1,47 +1,24 @@
 import { Clip } from '../../types/timeline'
 import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto } from '../../types/layers'
 import { Marco } from '../../types/marco'
-import { clipEnTiempo } from '../timeline/timeline'
+import { clipEnTiempo } from '../timeline/clips'
 import { posicionCapa } from '../layers/motion'
 import { esTonoNeutro, filtroCss } from '../color/tono'
+import { anterior, pintarTransicion, progreso } from '../transiciones/pintar'
 
 export interface Escena {
   ancho: number
   alto: number
   colorFondo: string
+  // 'desenfoque' rellena las bandas con el propio video ampliado y borroso, en
+  // lugar de con un color plano
+  fondo?: 'color' | 'desenfoque'
+  desenfoqueFondo?: number
   clips: Clip[] // ya ordenados por inicio
   capas: Capa[]
   marco: Marco
 }
 
-// opacidad de un clip en un instante teniendo en cuenta las transiciones. copia
-// la misma lógica del visor para que la exportación se vea igual
-function opacidadClip(clip: Clip, clips: Clip[], activo: Clip | null, t: number): number {
-  if (activo && clip.id === activo.id) {
-    let op = 1
-    const tr = clip.transicion
-    if (tr.tipo !== 'ninguna') {
-      const e = t - clip.inicio
-      if (e < tr.duracion) op = Math.min(op, Math.max(0, e / tr.duracion))
-    }
-    const idx = clips.findIndex((c) => c.id === clip.id)
-    const sig = clips[idx + 1]
-    if (sig && sig.transicion.tipo === 'fundido') {
-      const rest = clip.inicio + clip.duracion - t
-      if (rest < sig.transicion.duracion) op = Math.min(op, Math.max(0, rest / sig.transicion.duracion))
-    }
-    return op
-  }
-  if (activo && activo.transicion.tipo === 'desvanecer') {
-    const idxAct = clips.findIndex((c) => c.id === activo.id)
-    const ant = idxAct > 0 ? clips[idxAct - 1] : null
-    if (ant && ant.id === clip.id) {
-      const e = t - activo.inicio
-      if (e < activo.transicion.duracion) return Math.max(0, 1 - e / activo.transicion.duracion)
-    }
-  }
-  return 0
-}
 
 function rectRedondeado(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   const rr = Math.min(r, w / 2, h / 2)
@@ -125,7 +102,9 @@ function dibujarImagen(
   const sw = Math.max(1, (1 - rec.izq - rec.der) * c.anchoNatural)
   const sh = Math.max(1, (1 - rec.arr - rec.aba) * c.altoNatural)
   const w = c.anchoRel * ancho
-  const h = w * (sh / sw)
+  // si la imagen se deformó a mano manda su alto guardado; si no, se respeta la
+  // proporción del trozo visible tras el recorte
+  const h = c.altoRel !== undefined ? c.altoRel * alto : w * (sh / sw)
   ctx.save()
   ctx.globalAlpha = c.opacidad / 100
   ctx.drawImage(
@@ -424,7 +403,7 @@ export function dibujarFotograma(
   imagenDe: (capaId: string) => HTMLImageElement | undefined,
   off: HTMLCanvasElement,
 ) {
-  const { ancho, alto, colorFondo, clips, capas, marco } = escena
+  const { ancho, alto, colorFondo, fondo, desenfoqueFondo = 45, clips, capas, marco } = escena
   const escala = alto / 1080
 
   ctx.setTransform(1, 0, 0, 1, 0, 0)
@@ -434,21 +413,43 @@ export function dibujarFotograma(
 
   const activo = clipEnTiempo(clips, t)
 
-  // clips (video) con tono y transiciones
-  for (const clip of clips) {
-    const op = opacidadClip(clip, clips, activo, t)
-    if (op <= 0) continue
-    const video = videoDe(clip.id)
-    if (!video || !video.videoWidth) continue
-    const escC = Math.min(ancho / video.videoWidth, alto / video.videoHeight)
-    const dw = video.videoWidth * escC
-    const dh = video.videoHeight * escC
-    ctx.save()
-    ctx.globalAlpha = op
-    if (!esTonoNeutro(clip.tono)) ctx.filter = filtroCss(clip.tono, `tonoexp-${clip.id}`)
-    ctx.drawImage(video, (ancho - dw) / 2, (alto - dh) / 2, dw, dh)
-    ctx.filter = 'none'
-    ctx.restore()
+  // el clip visible y, si está en plena transición de entrada, el que estaba
+  // antes en su misma pista. la coreografía la lleva el motor compartido, así
+  // que lo que se exporta es idéntico a lo que se vio al editar
+  if (activo) {
+    const p = progreso(activo, t)
+    const saliente = p < 1 ? anterior(activo, clips) : null
+
+    const pintar = (clip: Clip, alfa: number) => {
+      const video = videoDe(clip.id)
+      if (!video || !video.videoWidth) return
+      const escC = Math.min(ancho / video.videoWidth, alto / video.videoHeight)
+      const dw = video.videoWidth * escC
+      const dh = video.videoHeight * escC
+      ctx.save()
+      ctx.globalAlpha = alfa
+
+      // relleno con el propio video ampliado y borroso, para que una toma
+      // vertical en un lienzo cuadrado no deje dos franjas planas
+      if (fondo === 'desenfoque' && (dw < ancho - 1 || dh < alto - 1)) {
+        const escB = Math.max(ancho / video.videoWidth, alto / video.videoHeight) * 1.12
+        const bw = video.videoWidth * escB
+        const bh = video.videoHeight * escB
+        ctx.save()
+        // el ajuste va de 1 a 100 y se traduce a una fracción del alto, así el
+        // resultado se ve igual en cualquier resolución
+        ctx.filter = `blur(${Math.round(alto * 0.001 * desenfoqueFondo)}px) brightness(0.72)`
+        ctx.drawImage(video, (ancho - bw) / 2, (alto - bh) / 2, bw, bh)
+        ctx.restore()
+      }
+
+      if (!esTonoNeutro(clip.tono)) ctx.filter = filtroCss(clip.tono, `tonoexp-${clip.id}`)
+      ctx.drawImage(video, (ancho - dw) / 2, (alto - dh) / 2, dw, dh)
+      ctx.filter = 'none'
+      ctx.restore()
+    }
+
+    pintarTransicion(ctx, ancho, alto, activo, saliente, p, pintar)
   }
 
   const activoVideo = activo ? videoDe(activo.id) : null

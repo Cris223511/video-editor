@@ -1,6 +1,6 @@
 import { useEditorStore } from '../../../store/useEditorStore'
 import { TipoMarco } from '../../../types/marco'
-import { Campo, Deslizador, ColorCampo } from '../../../components/ui/controls'
+import { Campo, Deslizador, ColorCampo } from '../../../components/ui/Controls'
 
 const TIPOS: { tipo: TipoMarco; etiqueta: string }[] = [
   { tipo: 'ninguno', etiqueta: 'Ninguno' },

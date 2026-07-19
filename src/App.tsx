@@ -1,20 +1,17 @@
-import TopBar from './components/layout/TopBar'
-import ImportView from './features/import/ImportView'
-import EditorView from './features/editor/EditorView'
-import { ToastProvider } from './components/ui/toast/ToastProvider'
-import { useAppStore } from './store/useAppStore'
+import { RouterProvider } from 'react-router-dom'
+import { ToastProvider } from './components/ui/ToastProvider'
+import { TooltipProvider } from './components/ui/Tooltip'
+import { router } from './rutas'
 
-// raíz de la aplicación. según la vista activa muestra la pantalla de importar
-// o el editor completo
+// raíz de la aplicación. la navegación la lleva el enrutador, así que cada vista
+// tiene su propia dirección y se puede recargar, compartir o volver atrás con el
+// botón del navegador
 export default function App() {
-  const vista = useAppStore((s) => s.vista)
-
   return (
-    <ToastProvider>
-      <div className="flex min-h-full flex-col">
-        <TopBar />
-        <main className="flex-1">{vista === 'import' ? <ImportView /> : <EditorView />}</main>
-      </div>
-    </ToastProvider>
+    <TooltipProvider>
+      <ToastProvider>
+        <RouterProvider router={router} />
+      </ToastProvider>
+    </TooltipProvider>
   )
 }

@@ -1,30 +1,22 @@
-import Icon, { NombreIcono } from '../../components/ui/Icon'
+import GaleriaTransiciones from './GaleriaTransiciones'
+import SinSeleccion from '../../components/ui/SinSeleccion'
+import Icon from '../../components/ui/Icon'
+import Tooltip from '../../components/ui/Tooltip'
 import { useEditorStore, Herramienta } from '../../store/useEditorStore'
+import { herramientas } from './RielHerramientas'
 import { useProjectStore } from '../../store/useProjectStore'
-import { formatearDuracion } from '../../lib/format/bytes'
-import { Campo, Deslizador, Segmentado } from '../../components/ui/controls'
+import { formatearDuracion } from '../../lib/format/duracion'
+import { Campo, Deslizador } from '../../components/ui/Controls'
 import TextPanel from './panels/TextPanel'
 import ImagePanel from './panels/ImagePanel'
 import AudioPanel from './panels/AudioPanel'
 import SpeedPanel from './panels/SpeedPanel'
 import CensuraPanel from './panels/CensuraPanel'
 import TonePanel from './panels/TonePanel'
+import ProyectoPanel from './panels/ProyectoPanel'
 import LienzoPanel from './panels/LienzoPanel'
 import MarcoPanel from './panels/MarcoPanel'
 import FiguraPanel from './panels/FiguraPanel'
-
-const herramientas: { id: Herramienta; icono: NombreIcono; etiqueta: string }[] = [
-  { id: 'propiedades', icono: 'ajustes', etiqueta: 'Propiedades' },
-  { id: 'lienzo', icono: 'lienzo', etiqueta: 'Lienzo' },
-  { id: 'marco', icono: 'marco', etiqueta: 'Marco' },
-  { id: 'texto', icono: 'texto', etiqueta: 'Texto' },
-  { id: 'imagen', icono: 'imagen', etiqueta: 'Imagen' },
-  { id: 'figura', icono: 'figura', etiqueta: 'Figura' },
-  { id: 'audio', icono: 'audio', etiqueta: 'Audio' },
-  { id: 'censura', icono: 'censura', etiqueta: 'Censura' },
-  { id: 'velocidad', icono: 'velocidad', etiqueta: 'Velocidad' },
-  { id: 'tono', icono: 'tono', etiqueta: 'Tono' },
-]
 
 // propiedades del clip seleccionado, con su transición de entrada
 function Propiedades() {
@@ -39,9 +31,9 @@ function Propiedades() {
 
   if (!clip || !asset) {
     return (
-      <p className="text-sm leading-relaxed text-[color:var(--muted)]">
-        Selecciona un clip en la línea de tiempo para ver y ajustar sus propiedades.
-      </p>
+      <SinSeleccion icono="ajustes" titulo="Ningún clip seleccionado">
+        Pulsa un clip en la línea de tiempo para ver sus datos y elegir con qué transición entra.
+      </SinSeleccion>
     )
   }
 
@@ -67,14 +59,9 @@ function Propiedades() {
 
       <div className="flex flex-col gap-3 border-t border-black/10 pt-3 dark:border-white/10">
         <span className="text-sm font-medium">Transición de entrada</span>
-        <Segmentado
-          valor={clip.transicion.tipo}
-          opciones={[
-            { valor: 'ninguna', etiqueta: 'Ninguna' },
-            { valor: 'fundido', etiqueta: 'Fundido' },
-            { valor: 'desvanecer', etiqueta: 'Fundir' },
-          ]}
-          onChange={(v) => setTransicion(clip.id, { tipo: v })}
+        <GaleriaTransiciones
+          actual={clip.transicion.tipo}
+          onElegir={(t) => setTransicion(clip.id, { tipo: t })}
         />
         {clip.transicion.tipo !== 'ninguna' && (
           <Campo etiqueta={`Duración (${clip.transicion.duracion.toFixed(1)} s)`}>
@@ -101,11 +88,11 @@ function Propiedades() {
 
 // panel derecho contextual. la barra de herramientas cambia el contenido; todas
 // las herramientas ya tienen su panel funcionando
-export default function OptionsPanel() {
+export default function OptionsPanel({ onOcultar }: { onOcultar?: () => void }) {
   const herramienta = useEditorStore((s) => s.herramienta)
-  const setHerramienta = useEditorStore((s) => s.setHerramienta)
 
   const paneles: Record<Herramienta, JSX.Element> = {
+    proyecto: <ProyectoPanel />,
     propiedades: <Propiedades />,
     lienzo: <LienzoPanel />,
     marco: <MarcoPanel />,
@@ -118,31 +105,29 @@ export default function OptionsPanel() {
     tono: <TonePanel />,
   }
 
-  return (
-    <aside className="flex w-60 shrink-0 border-r border-black/10 md:w-72 dark:border-white/10">
-      <div className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-black/10 py-2 dark:border-white/10">
-        {herramientas.map((h) => (
-          <button
-            key={h.id}
-            onClick={() => setHerramienta(h.id)}
-            title={h.etiqueta}
-            className={[
-              'grid h-12 w-12 place-items-center rounded-lg transition-colors',
-              herramienta === h.id
-                ? 'bg-brand/10 text-brand'
-                : 'text-[color:var(--muted)] hover:text-[color:var(--text)]',
-            ].join(' ')}
-          >
-            <Icon name={h.icono} size={19} />
-          </button>
-        ))}
-      </div>
+  const actual = herramientas.find((h) => h.id === herramienta)
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        <h2 className="mb-3 text-sm font-semibold">
-          {herramientas.find((h) => h.id === herramienta)?.etiqueta}
-        </h2>
-        {paneles[herramienta]}
+  return (
+    <aside className="panel flex w-full min-w-0 overflow-hidden rounded-xl">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div
+          className="flex items-center gap-2 px-3 py-2.5"
+          style={{ borderBottom: '1px solid rgb(var(--border) / 0.1)' }}
+        >
+          {actual && <Icon name={actual.icono} size={14} className="text-brand" />}
+          <h2 className="font-display text-[13px] font-bold">{actual?.etiqueta}</h2>
+          {onOcultar && (
+            <Tooltip texto="Ocultar el panel" lado="abajo">
+              <button
+                onClick={onOcultar}
+                className="interactivo -mr-1 ml-auto grid h-7 w-7 place-items-center rounded-lg text-[color:var(--muted)]"
+              >
+                <Icon name="atras" size={14} />
+              </button>
+            </Tooltip>
+          )}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">{paneles[herramienta]}</div>
       </div>
     </aside>
   )
