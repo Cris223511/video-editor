@@ -29,6 +29,7 @@ import DemoTransiciones from '../../components/sitio/DemoTransiciones'
 import DemoCensura from '../../components/sitio/DemoCensura'
 import DemoLienzo from '../../components/sitio/DemoLienzo'
 import DemoMontaje from '../../components/sitio/DemoMontaje'
+import DemoCaracteristicas from '../../components/sitio/DemoCaracteristicas'
 import DemoVideo from '../../components/sitio/DemoVideo'
 import { MaquetaLineaTiempo } from '../../components/sitio/MaquetaEditor'
 import { Aviso, Chip, IconoCirculo, RejillaFondo, Tarjeta } from '../../components/sitio/Piezas'
@@ -41,10 +42,6 @@ const MEDIOS = {
     imagen:
       'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=1200&q=70',
     video: 'https://videos.pexels.com/video-files/3195394/3195394-hd_1920_1080_25fps.mp4',
-  },
-  color: {
-    imagen:
-      'https://images.unsplash.com/photo-1418065460487-3e41a6c84dc5?auto=format&fit=crop&w=900&q=70',
   },
   equipo: {
     imagen:
@@ -90,45 +87,50 @@ const CAPACIDADES = [
   },
 ]
 
+// las siete características que se recorren en la sección del editor. el `id`
+// decide qué demostración animada se dibuja al elegir cada una
 const HERRAMIENTAS = [
   {
+    id: 'recorte',
     icono: <Scissors size={17} />,
     titulo: 'Recorte y división',
     texto:
       'Corta un clip por el cabezal, ajusta sus bordes con el ratón y cierra los espacios vacíos que queden entre planos con un solo botón.',
   },
   {
+    id: 'censura',
     icono: <Wand2 size={17} />,
     titulo: 'Censura en movimiento',
     texto:
       'Pixela o desenfoca una cara y graba el recorrido que sigue. Luego retocas cada punto del trazo hasta que encaje con el movimiento real.',
   },
   {
+    id: 'texto',
     icono: <Sparkles size={17} />,
     titulo: 'Texto, figuras y marcas',
     texto:
       'Añade rótulos con contorno y sombra, figuras geométricas o tu logo. Todo se coloca sobre el lienzo con guías que lo alinean solo.',
   },
-]
-
-// cuatro piezas concretas de edición, en tarjetas pequeñas
-const PIEZAS = [
   {
+    id: 'velocidad',
     icono: <Gauge size={17} />,
     titulo: 'Velocidad',
     texto: 'Acelera o ralentiza un clip y la línea de tiempo se recalcula sola.',
   },
   {
+    id: 'lienzo',
     icono: <Crop size={17} />,
     titulo: 'Lienzo',
     texto: 'Cambia la proporción y rellena las bandas con el video desenfocado.',
   },
   {
+    id: 'audio',
     icono: <Volume2 size={17} />,
     titulo: 'Audio',
     texto: 'Ajusta el volumen general o por franjas de la línea de tiempo.',
   },
   {
+    id: 'atajos',
     icono: <Keyboard size={17} />,
     titulo: 'Atajos',
     texto: 'Dividir, mover el cabezal, guardar y exportar desde el teclado.',
@@ -348,71 +350,23 @@ export default function PortadaView() {
         </div>
       </section>
 
-      {/* herramientas, que se quedan fijas mientras se desplaza */}
+      {/* herramientas: se eligen de una lista y cada una enseña su propia
+          demostración en movimiento, en vez de la rejilla plana con foto fija */}
       <section className="relative py-20">
+        <Destello x="20%" y="35%" tamano={480} intensidad={0.14} />
         <div className={`mx-auto w-full ${ANCHO_CONTENIDO} ${RELLENO}`}>
           <Aparece>
             <Titulo>
               Lo que encuentras <Subrayado>dentro del editor</Subrayado>
             </Titulo>
+            <p className="mt-4 max-w-xl text-sm leading-relaxed text-[color:var(--muted)]">
+              Elige una herramienta de la lista y verás lo que hace. Van pasando solas hasta que
+              toques una.
+            </p>
           </Aparece>
-          <div className="mt-8 grid items-start gap-8 lg:grid-cols-2">
-            <div className="flex flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
-              {HERRAMIENTAS.map((h, i) => (
-                <Aparece key={h.titulo} retraso={i * 0.08}>
-                  <Tarjeta hover>
-                    <div className="flex gap-3.5">
-                      <span
-                        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white shadow-sm"
-                        style={{
-                          background:
-                            'linear-gradient(140deg, rgb(var(--accent-boton)), rgb(var(--accent-soft)))',
-                          animation: `flotar 5s ease-in-out ${i * 0.6}s infinite`,
-                        }}
-                      >
-                        {h.icono}
-                      </span>
-                      <div>
-                        <h3 className="text-sm font-semibold">{h.titulo}</h3>
-                        <p className="mt-1 text-sm leading-relaxed text-[color:var(--muted)]">
-                          {h.texto}
-                        </p>
-                      </div>
-                    </div>
-                  </Tarjeta>
-                </Aparece>
-              ))}
-            </div>
-            <Aparece retraso={0.1} className="flex flex-col gap-4">
-              <MedioHover
-                imagen={MEDIOS.color.imagen}
-                alt="Corrección de color sobre una toma"
-                proporcion="aspect-[16/10]"
-              />
-              <div className="grid gap-3 min-[420px]:grid-cols-2">
-                {PIEZAS.map((p) => (
-                  <Tarjeta key={p.titulo} hover className="!p-3.5">
-                    {/* icono en cuadrado redondeado que flota, con un desfase
-                        distinto por tarjeta para que no se muevan a la vez */}
-                    <span
-                      className="grid h-9 w-9 place-items-center rounded-xl text-white shadow-sm"
-                      style={{
-                        background:
-                          'linear-gradient(140deg, rgb(var(--accent-boton)), rgb(var(--accent-soft)))',
-                        animation: `flotar 5s ease-in-out ${PIEZAS.indexOf(p) * 0.5}s infinite`,
-                      }}
-                    >
-                      {p.icono}
-                    </span>
-                    <p className="mt-3 font-display text-sm font-bold">{p.titulo}</p>
-                    <p className="mt-1 text-xs leading-relaxed text-[color:var(--muted)]">
-                      {p.texto}
-                    </p>
-                  </Tarjeta>
-                ))}
-              </div>
-            </Aparece>
-          </div>
+          <Aparece retraso={0.1} className="mt-8">
+            <DemoCaracteristicas items={HERRAMIENTAS} />
+          </Aparece>
         </div>
       </section>
 
