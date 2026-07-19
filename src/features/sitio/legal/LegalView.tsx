@@ -187,9 +187,12 @@ export default function LegalView({ documento }: { documento: 'terminos' | 'priv
 
               {/* la caja intermedia repite el ancho y el relleno del sitio, de
                   modo que el panel arranca justo donde arranca el texto y no
-                  pegado al filo de la pantalla */}
+                  pegado al filo de la pantalla. con `items-start` el panel se
+                  queda del alto de su lista: sin eso el estirado propio de flex
+                  lo llevaba hasta el tope permitido y sobraba media pantalla de
+                  cristal vacío debajo del último apartado */}
               <div
-                className={`pointer-events-none relative mx-auto flex h-full w-full ${ANCHO_CONTENIDO} ${RELLENO}`}
+                className={`pointer-events-none relative mx-auto flex h-full w-full items-start ${ANCHO_CONTENIDO} ${RELLENO}`}
               >
                 <motion.div
                   initial={{ x: '-115%', opacity: 0 }}
