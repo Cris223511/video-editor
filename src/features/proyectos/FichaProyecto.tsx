@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { CalendarPlus, PencilLine } from 'lucide-react'
 import Modal from '../../components/ui/Modal'
 import Loader from '../../components/ui/Loader'
 import { leerProyecto } from '../../lib/proyecto/almacen'
@@ -28,14 +29,17 @@ function orientacion(ancho: number, alto: number): string {
   return ancho > alto ? 'Horizontal' : 'Vertical'
 }
 
+// fecha escrita en largo, con el mes en palabra y la hora en formato de doce
+// horas. queda más natural de leer que una cadena de números, y el mes con su
+// inicial en mayúscula sigue la forma que pidió el dueño del proyecto
 function fecha(ms: number): string {
-  return new Date(ms).toLocaleString('es', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const d = new Date(ms)
+  const mes = d.toLocaleDateString('es', { month: 'long' })
+  const conMayuscula = mes.charAt(0).toUpperCase() + mes.slice(1)
+  const hora = d
+    .toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', hour12: true })
+    .replace(/\s?([ap])\.?\s?m\.?/i, (_, l) => ` ${l.toLowerCase()}.m.`)
+  return `${d.getDate()} de ${conMayuscula} del ${d.getFullYear()}, a las ${hora}`
 }
 
 // una fila de la ficha. el nombre a la izquierda en gris y el valor a la derecha
@@ -46,8 +50,8 @@ function Dato({ nombre, valor }: { nombre: string; valor: string }) {
       className="flex items-baseline justify-between gap-4 py-1.5"
       style={{ borderBottom: '1px solid rgb(var(--border) / 0.08)' }}
     >
-      <dt className="shrink-0 text-[11px] text-[color:var(--muted)]">{nombre}</dt>
-      <dd className="min-w-0 truncate text-right text-[11px] font-medium">{valor}</dd>
+      <dt className="shrink-0 text-[13px] text-[color:var(--muted)]">{nombre}</dt>
+      <dd className="min-w-0 truncate text-right text-[13px] font-medium">{valor}</dd>
     </div>
   )
 }
@@ -125,7 +129,7 @@ export default function FichaProyecto({
       descripcion="Todo lo que se sabe de este proyecto y de sus archivos."
       abierto={id !== null}
       onCerrar={onCerrar}
-      ancho="max-w-2xl"
+      ancho="max-w-xl"
     >
       {!proyecto ? (
         <div className="py-10">
@@ -134,13 +138,25 @@ export default function FichaProyecto({
       ) : (
         <div className="flex max-h-[65vh] flex-col gap-5 overflow-y-auto pr-1">
           <section>
-            <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
+            <h3 className="mb-1 text-[12px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
               Proyecto
             </h3>
+            {/* las dos fechas van juntas y con su icono, separadas del resto de
+                datos: son lo primero que se busca al abrir la ficha */}
+            <div className="mb-3 flex flex-col gap-2">
+              <p className="flex items-center gap-2 text-[13px]">
+                <CalendarPlus size={15} className="shrink-0 text-brand" />
+                <span className="text-[color:var(--muted)]">Creado el</span>
+                <span className="font-medium">{fecha(proyecto.creado)}</span>
+              </p>
+              <p className="flex items-center gap-2 text-[13px]">
+                <PencilLine size={15} className="shrink-0 text-brand" />
+                <span className="text-[color:var(--muted)]">Última vez editado el</span>
+                <span className="font-medium">{fecha(proyecto.modificado)}</span>
+              </p>
+            </div>
             <dl>
               <Dato nombre="Título" valor={proyecto.titulo} />
-              <Dato nombre="Creado" valor={fecha(proyecto.creado)} />
-              <Dato nombre="Última modificación" valor={fecha(proyecto.modificado)} />
               <Dato nombre="Archivos" valor={String(proyecto.medios.length)} />
               <Dato nombre="Clips en la línea de tiempo" valor={String(proyecto.edicion.clips.length)} />
               <Dato nombre="Niveles de video" valor={String(proyecto.edicion.numPistas)} />
@@ -163,7 +179,7 @@ export default function FichaProyecto({
           </section>
 
           <section>
-            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
+            <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
               Archivos ({proyecto.medios.length})
             </h3>
             <div className="flex flex-col gap-2">

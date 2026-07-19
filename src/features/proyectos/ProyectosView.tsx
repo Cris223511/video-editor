@@ -301,15 +301,17 @@ export default function ProyectosView() {
               {/* al pasar el cursor la portada se oscurece y salen las dos
                   acciones, abrir el proyecto o mirar de qué está hecho */}
               <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/45 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                {/* los dos botones comparten ancho: uno más estrecho que el otro,
+                    apilados y centrados, dejaba un escalón que se veía enseguida */}
                 <button
                   onClick={() => abrir(p.id)}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3.5 py-1.5 text-xs font-semibold text-[#13233d] transition-transform duration-200 hover:scale-105"
+                  className="inline-flex w-40 items-center justify-center gap-1.5 rounded-full bg-white/95 px-3.5 py-1.5 text-xs font-semibold text-[#13233d] transition-transform duration-200 hover:scale-105"
                 >
                   <FolderOpen size={13} /> Abrir proyecto
                 </button>
                 <button
                   onClick={() => setDetalles(p.id)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/45 px-3.5 py-1.5 text-xs font-semibold text-white transition-all duration-200 hover:scale-105 hover:bg-white/15"
+                  className="inline-flex w-40 items-center justify-center gap-1.5 rounded-full border border-white/45 px-3.5 py-1.5 text-xs font-semibold text-white transition-all duration-200 hover:scale-105 hover:bg-white/15"
                 >
                   <SlidersHorizontal size={13} /> Ver detalles
                 </button>
@@ -389,9 +391,15 @@ export default function ProyectosView() {
       <Paginador actual={paginaSegura} total={totalPaginas} onCambiar={setPagina} />
 
       {uso && uso.total > 0 && lista && lista.length > 0 && (
-        <p className="mt-8 text-xs text-[color:var(--muted)]">
-          Ocupas {formatearBytes(uso.usado)} de los {formatearBytes(uso.total)} que este navegador
-          reserva para la aplicación.
+        // el texto anterior podía leerse como si la cuota fuera común a todo el
+        // mundo. no lo es: cada equipo tiene la suya, calculada por el navegador
+        // según el disco libre, y como no hay servidor no existe ningún sitio
+        // donde pudiera acumularse el material de nadie más
+        <p className="mt-8 max-w-2xl text-xs leading-relaxed text-[color:var(--muted)]">
+          Tus proyectos ocupan {formatearBytes(uso.usado)} de los{' '}
+          {formatearBytes(uso.total)} que tu navegador reserva en este equipo. Es un espacio
+          tuyo y de nadie más: cada persona que use la aplicación tiene el suyo propio, en su
+          propia máquina, porque nada se sube a ningún servidor.
         </p>
       )}
 
