@@ -3,6 +3,7 @@ import { Clip } from '../../../types/timeline'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useTira } from './useTira'
 import FrameStrip from './FrameStrip'
+import MedioNoDisponible from '../../../components/ui/MedioNoDisponible'
 import TransicionBlock from './TransicionBlock'
 
 interface Props {
@@ -127,6 +128,14 @@ export default function ClipBlock({
         backgroundColor: 'rgb(24 97 255 / 0.22)',
       }}
     >
+      {/* sin dirección de medio, el archivo se perdió: se avisa en el propio
+          clip en lugar de dejar un bloque vacío que no explica nada */}
+      {!url && (
+        <div className="absolute inset-0 z-10 p-1">
+          <MedioNoDisponible nombre={nombre} compacto />
+        </div>
+      )}
+
       {tira && (
         <FrameStrip
           tira={tira}

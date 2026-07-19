@@ -16,7 +16,7 @@ export function Tarjeta({
     <div
       className={[
         'rounded-2xl p-5 transition-all duration-300',
-        hover ? 'hover:-translate-y-1 hover:shadow-lg' : '',
+        hover ? 'hover:-translate-y-1 hover:shadow-[0_10px_28px_rgb(21_52_102_/_0.12)]' : '',
         className,
       ].join(' ')}
       style={{
@@ -34,16 +34,32 @@ export function Tarjeta({
 export function Aviso({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
     <div
-      className="flex gap-3 rounded-xl p-4"
+      className="relative flex gap-3.5 overflow-hidden rounded-2xl p-4 pl-5 sm:p-5 sm:pl-6"
       style={{
-        background: 'rgb(var(--accent) / 0.06)',
-        border: '1px solid rgb(var(--accent) / 0.16)',
+        background: 'rgb(var(--accent) / 0.05)',
+        border: '1px solid rgb(var(--accent) / 0.14)',
       }}
     >
-      <Info size={17} className="mt-0.5 shrink-0 text-brand" />
-      <div>
-        <p className="text-sm font-semibold">{titulo}</p>
-        <p className="mt-1 text-sm leading-relaxed text-[color:var(--muted)]">{children}</p>
+      {/* franja de color en el borde izquierdo, que es lo que distingue un aviso
+          de una tarjeta cualquiera sin recurrir a un fondo saturado */}
+      <span
+        aria-hidden
+        className="absolute inset-y-0 left-0 w-1"
+        style={{
+          background: 'linear-gradient(180deg, rgb(var(--accent)), rgb(var(--accent-soft)))',
+        }}
+      />
+      <span
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white shadow-sm"
+        style={{
+          background: 'linear-gradient(140deg, rgb(var(--accent-boton)), rgb(var(--accent-soft)))',
+        }}
+      >
+        <Info size={17} />
+      </span>
+      <div className="min-w-0">
+        <p className="font-display text-sm font-bold">{titulo}</p>
+        <p className="mt-1.5 text-sm leading-relaxed text-[color:var(--muted)]">{children}</p>
       </div>
     </div>
   )
@@ -59,8 +75,11 @@ export function Chip({ children, activo = false }: { children: ReactNode; activo
           ? { background: 'rgb(var(--accent-boton))', color: '#fff' }
           : {
               background: 'rgb(var(--surface))',
-              border: '1px solid rgb(var(--border) / 0.12)',
+              border: '1px solid rgb(var(--border) / 0.1)',
               color: 'var(--muted)',
+              // sombra apenas insinuada, para que la píldora se despegue del
+              // fondo sin parecer un botón
+              boxShadow: '0 1px 2px rgb(21 52 102 / 0.07), 0 2px 6px rgb(21 52 102 / 0.05)',
             }
       }
     >

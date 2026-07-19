@@ -78,3 +78,14 @@ export function valorCanal(r: Ruedas, indice: 0 | 1 | 2, x: number): number {
   const [ps, pm, pa] = pesos(x)
   return Math.max(0, Math.min(1, x + s * ps + m * pm + a * pa))
 }
+
+// tabla de transferencia de un canal, lista para feComponentTransfer. la usa la
+// demostración del sitio, que aplica las ruedas sobre una foto igual que el
+// editor las aplica sobre el video
+export function tablaCanal(r: Ruedas, indice: 0 | 1 | 2): string {
+  const valores: number[] = []
+  for (let i = 0; i < PASOS; i++) {
+    valores.push(Number(valorCanal(r, indice, i / (PASOS - 1)).toFixed(4)))
+  }
+  return valores.join(' ')
+}

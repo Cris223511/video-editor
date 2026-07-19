@@ -14,7 +14,9 @@ export interface AjusteTono {
   curvas?: import('../lib/color/curvas').Curvas
 }
 
-export type TipoTransicion = 'ninguna' | 'fundido' | 'desvanecer'
+// el identificador sale del catálogo de transiciones. es una cadena libre para
+// que ampliar el catálogo no obligue a tocar el modelo ni rompa lo ya guardado
+export type TipoTransicion = string
 
 // transición con la que entra un clip. fundido va a través de negro y
 // desvanecer mezcla con el clip anterior

@@ -60,7 +60,7 @@ export default function ProyectoPanel() {
           className="w-full rounded-lg px-2.5 py-2 text-sm outline-none transition-colors focus:ring-2 focus:ring-brand"
           style={{
             background: 'rgb(var(--border) / 0.07)',
-            border: '1px solid rgb(var(--border) / 0.12)',
+            border: '1px solid rgb(var(--border) / 0.1)',
           }}
         />
       </Campo>

@@ -25,6 +25,14 @@
      esas dos exigencias tiran en direcciones contrarias */
   --accent-boton: 24 97 255;
   --accent-soft: 18 165 240;
+  /* superficies oscuras del sitio (pie y bloques de llamada). se derivan del
+     azul de la marca y no de un gris azulado cualquiera, que es lo que hacía
+     que el pie no pegara con la barra */
+  /* el rojo del aviso cambia con el tema: uno solo no puede leerse a la vez
+     sobre blanco y sobre una superficie oscura */
+  --alerta: 225 29 72;
+  --profundo: 8 22 58;
+  --profundo-2: 10 30 78;
   --radius: 10px;
 }
 
@@ -39,6 +47,17 @@ html.dark {
   --accent: 59 140 255;
   --accent-boton: 26 86 210;
   --accent-soft: 56 189 248;
+  --alerta: 244 63 94;
+  --profundo: 6 18 48;
+  --profundo-2: 10 30 78;
+}
+
+/* nada decorativo debe ensanchar la página: si un adorno sobresale por un
+   lado, el navegador cuenta ese ancho extra y todo lo centrado se corre unos
+   píxeles, con lo que la barra deja de alinearse con el contenido */
+html,
+body {
+  overflow-x: clip;
 }
 
 html,
@@ -217,4 +236,69 @@ html.tema-en-transicion * {
   0%, 20% { opacity: 0; }
   50% { opacity: 1; }
   80%, 100% { opacity: 0; }
+}
+
+/* entrada y salida de los avisos: llegan deslizándose desde la derecha y se van
+   por el mismo lado. sonner publica su estado en atributos, así que basta con
+   engancharse a ellos en lugar de reimplementar la animación */
+[data-sonner-toast][data-mounted='true'] {
+  animation: aviso-entra 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+[data-sonner-toast][data-removed='true'] {
+  animation: aviso-sale 260ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes aviso-entra {
+  from {
+    opacity: 0;
+    transform: translateX(28px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes aviso-sale {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(32px) scale(0.96);
+  }
+}
+
+/* estas dos animaciones se aplican con estilo en línea y no mediante una clase,
+   así que tailwind las descartaba al compilar y nunca llegaban al css final.
+   declararlas aquí garantiza que existan */
+@keyframes estrella {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.6);
+  }
+  20% {
+    opacity: var(--brillo);
+    transform: translate(calc(var(--deriva) * 0.3), calc(var(--deriva) * -0.2)) scale(1);
+  }
+  55% {
+    opacity: var(--brillo);
+    transform: translate(calc(var(--deriva) * 0.7), calc(var(--deriva) * -0.5)) scale(1);
+  }
+  80% {
+    opacity: 0.12;
+    transform: translate(var(--deriva), calc(var(--deriva) * -0.8)) scale(0.85);
+  }
+}
+
+@keyframes flotar {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
 }

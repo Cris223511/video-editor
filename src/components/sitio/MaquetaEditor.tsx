@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 // recreaciones de la interfaz del editor para la portada. no son capturas sino
 // la interfaz dibujada con marcado real, así que se ven nítidas a cualquier
 // tamaño, siguen el tema claro u oscuro y no se quedan viejas cuando el editor
@@ -11,71 +12,81 @@ const CLIPS = [
   { pista: 1, izq: 48, ancho: 18, tono: 'linear-gradient(120deg,#c2456e,#f07a9c)' },
 ]
 
-// línea de tiempo con dos niveles, clips de distinta duración y el cabezal
+// línea de tiempo con dos niveles y el cabezal recorriéndola. sin etiquetas de
+// pista: en una pieza de portada solo estorban, y lo que se quiere enseñar es el
+// movimiento y cómo se reparten los clips
 export function MaquetaLineaTiempo() {
   return (
     <div
-      className="overflow-hidden rounded-2xl p-3 shadow-lg"
+      className="overflow-hidden rounded-2xl p-3 shadow-lg sm:p-4"
       style={{
         background: 'rgb(var(--surface))',
-        border: '1px solid rgb(var(--border) / 0.12)',
+        border: '1px solid rgb(var(--border) / 0.1)',
       }}
     >
       {/* regla */}
-      <div className="relative mb-2 flex h-5 items-end gap-px overflow-hidden">
-        {Array.from({ length: 40 }, (_, i) => (
+      <div className="mb-2.5 flex h-4 items-end gap-px overflow-hidden">
+        {Array.from({ length: 44 }, (_, i) => (
           <span
             key={i}
-            className="flex-1"
+            className="flex-1 rounded-full"
             style={{
-              height: i % 5 === 0 ? 9 : 4,
-              background: 'rgb(var(--border) / 0.22)',
+              height: i % 5 === 0 ? 8 : 3,
+              background: 'rgb(var(--border) / 0.2)',
             }}
           />
         ))}
       </div>
 
-      <div className="relative flex flex-col gap-1.5">
+      <div className="relative flex flex-col gap-2">
         {[1, 0].map((pista) => (
-          <div key={pista} className="flex items-stretch gap-2">
-            <span
-              className="grid w-14 shrink-0 place-items-center rounded-md text-[10px] font-medium"
-              style={{
-                background: 'rgb(var(--border) / 0.07)',
-                color: 'var(--muted)',
-                height: pista === 0 ? 44 : 34,
-              }}
-            >
-              Video {pista + 1}
-            </span>
-            <div className="relative flex-1" style={{ height: pista === 0 ? 44 : 34 }}>
-              {CLIPS.filter((c) => c.pista === pista).map((c, i) => (
-                <div
-                  key={i}
-                  className="absolute top-0 h-full overflow-hidden rounded-md"
-                  style={{ left: `${c.izq}%`, width: `${c.ancho}%`, background: c.tono }}
-                >
-                  {/* franjas que insinúan la tira de fotogramas del clip */}
-                  <div className="flex h-full">
-                    {Array.from({ length: 6 }, (_, k) => (
-                      <span
-                        key={k}
-                        className="h-full flex-1"
-                        style={{ background: k % 2 ? 'rgb(255 255 255 / 0.09)' : 'transparent' }}
-                      />
-                    ))}
-                  </div>
+          <div
+            key={pista}
+            className="relative rounded-lg"
+            style={{
+              height: pista === 0 ? 46 : 34,
+              background: 'rgb(var(--border) / 0.05)',
+            }}
+          >
+            {CLIPS.filter((c) => c.pista === pista).map((c, i) => (
+              <motion.div
+                key={i}
+                className="absolute top-0 h-full overflow-hidden rounded-lg"
+                style={{ left: `${c.izq}%`, width: `${c.ancho}%`, background: c.tono }}
+                initial={{ opacity: 0, scaleX: 0.7 }}
+                whileInView={{ opacity: 1, scaleX: 1 }}
+                viewport={{ once: true, amount: 0.4 }}
+                transition={{
+                  duration: 0.5,
+                  delay: 0.1 + i * 0.12 + (pista === 1 ? 0.25 : 0),
+                  ease: [0.16, 1, 0.3, 1],
+                }}
+              >
+                {/* franjas que insinúan la tira de fotogramas */}
+                <div className="flex h-full">
+                  {Array.from({ length: 7 }, (_, k) => (
+                    <span
+                      key={k}
+                      className="h-full flex-1"
+                      style={{ background: k % 2 ? 'rgb(255 255 255 / 0.1)' : 'transparent' }}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
+              </motion.div>
+            ))}
           </div>
         ))}
 
-        {/* cabezal */}
-        <div className="pointer-events-none absolute bottom-0 top-0 w-px" style={{ left: '46%' }}>
+        {/* el cabezal recorre la línea sin parar, que es lo que da vida a la
+            pieza sin necesidad de etiquetas ni texto */}
+        <motion.div
+          className="pointer-events-none absolute bottom-0 top-0 z-10 w-px"
+          animate={{ left: ['2%', '96%'] }}
+          transition={{ duration: 7, repeat: Infinity, repeatType: 'reverse', ease: 'linear' }}
+        >
           <span className="absolute inset-y-0 w-px bg-brand" />
-          <span className="absolute -left-1 -top-1 h-2.5 w-2.5 rounded-sm bg-brand" />
-        </div>
+          <span className="absolute -left-[5px] -top-1 h-2.5 w-2.5 rounded-sm bg-brand shadow" />
+        </motion.div>
       </div>
     </div>
   )
@@ -94,7 +105,7 @@ export function MaquetaColor() {
       className="rounded-2xl p-4 shadow-lg"
       style={{
         background: 'rgb(var(--surface))',
-        border: '1px solid rgb(var(--border) / 0.12)',
+        border: '1px solid rgb(var(--border) / 0.1)',
       }}
     >
       <p className="mb-3 text-xs font-semibold text-[color:var(--muted)]">Ruedas de color</p>

@@ -14,15 +14,29 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <>
       {children}
       <Toaster
-        position="bottom-right"
+        // arriba a la derecha, que es donde no tapa el trabajo ni los controles
+        // de la línea de tiempo
+        position="top-right"
         theme={tema}
         richColors
         closeButton
         duration={4000}
+        // hasta cinco a la vez. los que lleguen de más esperan su turno y
+        // aparecen conforme se cierran los anteriores, que es lo que hace Sonner
+        // por su cuenta con este límite
+        visibleToasts={5}
+        // se apilan desplegados en lugar de superpuestos, así se leen todos
+        expand
         toastOptions={{
           style: {
-            borderRadius: '12px',
+            borderRadius: '14px',
             fontSize: '13px',
+          },
+          classNames: {
+            // el mensaje no pasa de dos líneas: uno largo estiraba el aviso
+            // hasta ocupar media pantalla
+            title: 'line-clamp-2',
+            description: 'line-clamp-2',
           },
         }}
       />

@@ -5,7 +5,7 @@ import Tooltip from '../ui/Tooltip'
 import { useToast } from '../ui/ToastProvider'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
-import { RUTAS } from '../../rutas'
+import { RUTAS } from '../../rutasDef'
 import { useProjectStore } from '../../store/useProjectStore'
 import { useThemeStore } from '../../store/useThemeStore'
 import { guardarSesion } from '../../lib/proyecto/sesion'
@@ -60,13 +60,23 @@ export default function TopBar() {
   })
 
   return (
-    <header className="glass sticky top-0 z-40 flex h-14 items-center justify-between gap-3 px-4 sm:px-6">
+    <header
+      className="sticky top-0 z-40 flex h-14 items-center justify-between gap-3 px-4 sm:px-6"
+      style={{
+        // mismo cristal que la barra del sitio, para que pasar de una a otra no
+        // se sienta como entrar en otra aplicación
+        background: 'rgb(var(--surface) / 0.72)',
+        backdropFilter: 'blur(20px) saturate(1.6)',
+        WebkitBackdropFilter: 'blur(20px) saturate(1.6)',
+        borderBottom: '1px solid rgb(var(--border) / 0.1)',
+      }}
+    >
       <div className="flex min-w-0 items-center gap-3">
         {enEditor && (
           <Tooltip texto="Volver a los medios" lado="abajo">
             <button
               onClick={() => navegar(RUTAS.medios)}
-              className="interactivo grid h-9 w-9 place-items-center rounded-lg text-[color:var(--muted)]"
+              className="interactivo grid h-9 w-9 place-items-center rounded-full text-[color:var(--muted)]"
             >
               <Icon name="atras" size={18} />
             </button>
@@ -95,9 +105,7 @@ export default function TopBar() {
               <Link to={RUTAS.portada} className="font-display text-[15px] font-extrabold tracking-tight">
                 Video <span className="text-brand">Editor</span>
               </Link>
-              <span className="hidden text-[11px] text-[color:var(--muted)] sm:inline">
-                Edición en tu navegador
-              </span>
+
             </div>
           )}
         </div>
@@ -122,7 +130,7 @@ export default function TopBar() {
           <button
             onClick={alternar}
             aria-label="Cambiar tema"
-            className="interactivo grid h-9 w-9 place-items-center rounded-lg text-[color:var(--muted)]"
+            className="interactivo grid h-9 w-9 place-items-center rounded-full text-[color:var(--muted)]"
           >
             {tema === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
@@ -147,7 +155,7 @@ export default function TopBar() {
               <button
                 onClick={guardar}
                 disabled={guardando}
-                className="interactivo inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[color:var(--muted)] disabled:opacity-50"
+                className="interactivo inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium text-[color:var(--muted)] disabled:opacity-50"
               >
                 <Save size={16} />
                 <span className="hidden sm:inline">
@@ -164,7 +172,7 @@ export default function TopBar() {
             <Tooltip texto="Exportar el video" lado="abajo">
               <button
                 onClick={abrirExport}
-                className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-brand-dark active:scale-95"
+                className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95"
               >
                 <Icon name="exportar" size={17} />
                 Exportar

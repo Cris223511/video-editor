@@ -143,7 +143,7 @@ export default function ExportDialog() {
             <button
               onClick={iniciar}
               disabled={total <= 0}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-medium text-white transition-colors hover:bg-brand-dark disabled:opacity-50"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95 disabled:opacity-50"
             >
               <Icon name="exportar" size={18} /> Exportar
             </button>
@@ -177,7 +177,7 @@ export default function ExportDialog() {
             <a
               href={urlSalida}
               download={`video-editor.${extension}`}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-medium text-white transition-colors hover:bg-brand-dark"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95"
             >
               <Icon name="exportar" size={18} /> Descargar de nuevo
             </a>
@@ -195,7 +195,7 @@ export default function ExportDialog() {
             <p className="text-sm">{error}</p>
             <button
               onClick={() => setFase('inicio')}
-              className="inline-flex w-full items-center justify-center rounded-xl bg-brand py-2.5 text-sm font-medium text-white hover:bg-brand-dark"
+              className="inline-flex w-full items-center justify-center rounded-xl bg-brand py-2.5 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95"
             >
               Reintentar
             </button>

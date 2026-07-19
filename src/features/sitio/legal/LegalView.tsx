@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { ChevronRight, Menu, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { RUTAS } from '../../../rutas'
+import { RUTAS } from '../../../rutasDef'
+import { irA as irASeccion } from '../../../lib/scroll/useScrollSuave'
 import { Documento, PRIVACIDAD, TERMINOS } from './contenido'
+import { ANCHO_CONTENIDO, RELLENO } from '../../../components/sitio/Contenedor'
 
 // índice lateral. en pantalla ancha queda fijo a la izquierda y en móvil se abre
 // como panel, igual que en la referencia
@@ -71,11 +73,13 @@ export default function LegalView({ documento }: { documento: 'terminos' | 'priv
 
   function ir(id: string) {
     setPanel(false)
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // el salto lo lleva el desplazamiento suave, que además descuenta el alto de
+    // la barra para que el título no quede escondido debajo
+    irASeccion(id)
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-5 py-10">
+    <div className={`mx-auto w-full ${ANCHO_CONTENIDO} ${RELLENO} py-10`}>
       <div className="mb-6 flex items-center gap-2 text-sm">
         <Link to={RUTAS.portada} className="text-brand hover:underline">
           Inicio
@@ -92,7 +96,7 @@ export default function LegalView({ documento }: { documento: 'terminos' | 'priv
       </div>
 
       <div className="grid gap-10 lg:grid-cols-[240px_1fr]">
-        <aside className="hidden lg:block">
+        <aside className="hidden lg:block lg:border-r lg:border-[rgb(var(--border)/0.12)] lg:pr-6">
           <div className="sticky top-20">
             <Indice doc={doc} activo={activo} onIr={ir} />
             <Link

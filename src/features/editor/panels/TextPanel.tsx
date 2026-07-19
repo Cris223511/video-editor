@@ -3,6 +3,7 @@ import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { CapaTexto } from '../../../types/layers'
 import { Campo, Deslizador, ColorCampo, Interruptor, Segmentado } from '../../../components/ui/Controls'
+import Selector from '../../../components/ui/Selector'
 import MotionControls from './MotionControls'
 
 const FUENTES = [
@@ -71,7 +72,7 @@ export default function TextPanel() {
     <div className="flex flex-col gap-4">
       <button
         onClick={agregarTexto}
-        className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand py-2 text-sm font-medium text-white transition-colors hover:bg-brand-dark"
+        className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand py-2 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95"
       >
         <Icon name="mas" size={16} /> Agregar texto
       </button>
@@ -93,17 +94,13 @@ export default function TextPanel() {
           </Campo>
 
           <Campo etiqueta="Fuente">
-            <select
-              value={capa.fuente}
-              onChange={(e) => editar('fuente', e.target.value)}
-              className="w-full rounded-lg border border-black/10 bg-transparent px-2 py-2 text-sm outline-none focus:border-brand dark:border-white/10"
-            >
-              {FUENTES.map((f) => (
-                <option key={f} value={f} style={{ fontFamily: f }}>
-                  {f}
-                </option>
-              ))}
-            </select>
+            {/* cada tipografía se ve escrita con su propia letra, algo que el
+                desplegable nativo del sistema no permite */}
+            <Selector
+              valor={capa.fuente}
+              opciones={FUENTES.map((f) => ({ valor: f, etiqueta: f, estilo: { fontFamily: f } }))}
+              onChange={(v) => editar('fuente', v)}
+            />
           </Campo>
 
           <Campo etiqueta={`Tamaño (${capa.tamano} px)`}>

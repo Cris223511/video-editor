@@ -6,19 +6,10 @@ import ImportView from './features/import/ImportView'
 import EditorView from './features/editor/EditorView'
 import ProyectosView from './features/proyectos/ProyectosView'
 import NoEncontrada from './features/sitio/NoEncontrada'
+import InstruccionesView from './features/sitio/InstruccionesView'
 
-// direcciones de la aplicación en un solo sitio. tenerlas aquí en lugar de
-// escritas a mano por los componentes evita que un enlace apunte a una ruta que
-// ya no existe
-export const RUTAS = {
-  portada: '/',
-  editor: '/editor',
-  medios: '/medios',
-  proyectos: '/proyectos',
-  proyecto: (id: string) => `/proyectos/${id}`,
-  terminos: '/terminos',
-  privacidad: '/privacidad',
-} as const
+export { RUTAS } from './rutasDef'
+import { RUTAS } from './rutasDef'
 
 export const router = createBrowserRouter([
   {
@@ -31,6 +22,7 @@ export const router = createBrowserRouter([
       // abrir un proyecto concreto por su identificador, para poder guardar el
       // enlace o recargar sin perder en cuál se estaba trabajando
       { path: '/proyectos/:id', element: <ProyectosView /> },
+      { path: RUTAS.instrucciones, element: <InstruccionesView /> },
       { path: RUTAS.terminos, element: <LegalView documento="terminos" /> },
       { path: RUTAS.privacidad, element: <LegalView documento="privacidad" /> },
       // la dirección antigua de importar sigue funcionando y lleva a la nueva

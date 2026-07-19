@@ -51,7 +51,7 @@ export default function Modal({
                 className={`fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] ${ancho} rounded-2xl p-5 shadow-2xl`}
                 style={{
                   background: 'rgb(var(--surface))',
-                  border: '1px solid rgb(var(--border) / 0.12)',
+                  border: '1px solid rgb(var(--border) / 0.1)',
                 }}
               >
                 <div className="mb-4 flex items-start justify-between gap-3">

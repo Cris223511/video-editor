@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react'
-import { Play } from 'lucide-react'
 
 // pieza visual del sitio. en reposo se ve en blanco y negro y quieta; al pasar
 // el cursor recupera el color y, si tiene video, arranca. la imagen de fondo
@@ -80,16 +79,7 @@ export default function MedioHover({
         />
       )}
 
-      {/* el distintivo avisa de que ahí hay algo que se mueve, y se retira en
-          cuanto el video arranca para no taparlo */}
-      {video && (
-        <span
-          className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/65 px-2.5 py-1 text-[11px] font-medium text-white transition-opacity duration-300"
-          style={{ opacity: encima ? 0 : 1 }}
-        >
-          <Play size={11} /> Pasa el cursor
-        </span>
-      )}
+
     </div>
   )
 }

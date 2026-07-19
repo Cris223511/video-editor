@@ -1,6 +1,6 @@
-import { Code2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { RUTAS } from '../../rutas'
+import { RUTAS } from '../../rutasDef'
+import { ANCHO_BARRA, RELLENO } from '../sitio/Contenedor'
 import { VERSION } from '../../config/constants'
 
 const REPO = 'https://github.com/Cris223511/video-editor'
@@ -20,6 +20,7 @@ export default function PieSitio() {
     {
       titulo: 'Información',
       enlaces: [
+        { texto: 'Cómo funciona', a: RUTAS.instrucciones },
         { texto: 'Términos y condiciones', a: RUTAS.terminos },
         { texto: 'Política de privacidad', a: RUTAS.privacidad },
       ],
@@ -27,11 +28,19 @@ export default function PieSitio() {
   ]
 
   return (
-    <footer className="mt-8 px-5 py-12" style={{ background: '#0d1a33' }}>
-      <div className="mx-auto grid w-full max-w-5xl gap-10 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
+    <footer className="relative z-10 mt-8 py-12" style={{
+        // opaco de arriba abajo: con transparencia al final se mezclaba con el
+        // fondo de la página y en tema claro quedaba un gris lavado
+        background:
+          'linear-gradient(180deg, rgb(var(--profundo-2)) 0%, rgb(var(--profundo)) 100%)',
+      }}>
+      <div className={`mx-auto grid w-full ${ANCHO_BARRA} ${RELLENO} gap-10 sm:grid-cols-[1.4fr_1fr_1fr_1fr]`}>
         <div>
-          <Link to={RUTAS.portada} className="font-display text-lg font-extrabold text-white">
-            Video <span style={{ color: '#6ea8ff' }}>Editor</span>
+          <Link to={RUTAS.portada} className="inline-flex items-center gap-2.5">
+            <img src="/logo-circle.png" alt="" className="h-8 w-8 object-contain" />
+            <span className="font-display text-lg font-extrabold text-white">
+              Video <span className="text-brand-soft">Editor</span>
+            </span>
           </Link>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/55">
             Editor de video que funciona dentro del navegador. Los archivos se quedan en tu equipo
@@ -69,9 +78,9 @@ export default function PieSitio() {
                 href={REPO}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 text-sm text-white/55 transition-colors duration-200 hover:text-white"
+                className="text-sm text-white/55 transition-colors duration-200 hover:text-white"
               >
-                <Code2 size={15} /> Repositorio
+                Repositorio
               </a>
             </li>
             <li>

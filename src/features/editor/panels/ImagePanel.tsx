@@ -48,7 +48,7 @@ export default function ImagePanel() {
     <div className="flex flex-col gap-4">
       <button
         onClick={() => input.current?.click()}
-        className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand py-2 text-sm font-medium text-white transition-colors hover:bg-brand-dark"
+        className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand py-2 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95"
       >
         <Icon name="mas" size={16} /> Agregar imagen
       </button>

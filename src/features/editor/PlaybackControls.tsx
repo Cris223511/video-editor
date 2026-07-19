@@ -28,7 +28,7 @@ export default function PlaybackControls() {
         onClick={alternar}
         title={reproduciendo ? 'Pausar' : 'Reproducir'}
         disabled={vacio}
-        className="grid h-11 w-11 place-items-center rounded-full bg-brand text-white transition-colors hover:bg-brand-dark disabled:opacity-40"
+        className="grid h-11 w-11 place-items-center rounded-full bg-brand text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95 disabled:opacity-40"
       >
         <Icon name={reproduciendo ? 'pausa' : 'play'} size={20} />
       </button>
