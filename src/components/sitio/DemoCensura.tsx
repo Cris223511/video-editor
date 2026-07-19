@@ -95,7 +95,11 @@ export default function DemoCensura() {
       off.width = pw
       off.height = ph
       octx.imageSmoothingEnabled = false
-      octx.drawImage(c, x, y, w, h, 0, 0, pw, ph)
+      // la zona se toma del propio fotograma, no del lienzo ya pintado: hay que
+      // deshacer el recorte de cobertura para saber qué trozo del video cae bajo
+      // el recuadro. de paso nadie tiene que releer píxeles de un lienzo que un
+      // clip de otro dominio podría haber marcado como contaminado
+      octx.drawImage(img, (x - ix) / e, (y - iy) / e, w / e, h / e, 0, 0, pw, ph)
       ctx.save()
       recortar(ctx, x, y, w, h)
       ctx.clip()
@@ -270,7 +274,7 @@ export default function DemoCensura() {
           muted
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
           // COOP y COEP dejan fuera cualquier recurso ajeno que no venga por CORS,
           // y de paso el modo anónimo evita que el clip contamine el lienzo, cosa
           // que rompería el pixelado al releer la zona ampliada

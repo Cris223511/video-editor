@@ -95,7 +95,7 @@ export default function DemoColor() {
           muted
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
           // el sitio va aislado con COOP y COEP, y bajo esa política un recurso de
           // otro dominio se descarta si no se pide en modo anónimo. sin este
           // atributo el marco se quedaría en negro, igual que pasaba en MedioHover

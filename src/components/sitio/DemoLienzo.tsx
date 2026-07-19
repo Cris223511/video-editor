@@ -213,7 +213,7 @@ export default function DemoLienzo() {
             muted
             loop
             playsInline
-            preload="auto"
+            preload="metadata"
             // con COOP y COEP puestas, un video de otro dominio sin petición
             // anónima se rechaza y el lienzo quedaría vacío
             crossOrigin="anonymous"
