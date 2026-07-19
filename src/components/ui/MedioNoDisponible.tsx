@@ -38,7 +38,7 @@ export default function MedioNoDisponible({
           Video no encontrado
         </span>
         {!compacto && (
-          <span className="mt-0.5 block truncate text-[11px] text-[color:var(--muted)]">
+          <span className="mt-0.5 block truncate text-[13px] text-[color:var(--muted)]">
             {nombre}
           </span>
         )}

@@ -461,7 +461,7 @@ export default function PortadaView() {
                     {p.n}
                   </span>
 
-                  <span className="font-display text-[11px] font-extrabold tracking-wider text-brand">
+                  <span className="font-display text-[13px] font-extrabold tracking-wider text-brand">
                     PASO {p.n}
                   </span>
                   <h3 className="mt-1.5 font-display text-base font-bold leading-snug">

@@ -182,7 +182,7 @@ export default function GaleriaTransiciones({
                   <Demo t={t} imagenes={imagenes} />
                   <span
                     className={[
-                      'truncate px-0.5 text-[11px] font-medium',
+                      'truncate px-0.5 text-[13px] font-medium',
                       elegida ? 'text-brand' : '',
                     ].join(' ')}
                   >
@@ -195,7 +195,7 @@ export default function GaleriaTransiciones({
         </div>
       ))}
 
-      <p className="text-[11px] text-[color:var(--muted)]">
+      <p className="text-[13px] text-[color:var(--muted)]">
         {CATALOGO.length} transiciones disponibles. Pasa el cursor por una muestra para verla en
         movimiento.
       </p>

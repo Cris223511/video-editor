@@ -213,7 +213,7 @@ export default function InstruccionesView() {
                 style={{ background: 'rgb(var(--border) / 0.06)' }}
               >
                 <kbd
-                  className="shrink-0 rounded-md px-2 py-1 font-mono text-[11px] font-semibold"
+                  className="shrink-0 rounded-md px-2 py-1 font-mono text-[13px] font-semibold"
                   style={{
                     background: 'rgb(var(--surface))',
                     border: '1px solid rgb(var(--border) / 0.16)',

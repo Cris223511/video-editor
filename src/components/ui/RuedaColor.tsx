@@ -115,7 +115,7 @@ export default function RuedaColor({
           }}
         />
       </div>
-      <span className="text-[11px] font-medium text-[color:var(--muted)]">{etiqueta}</span>
+      <span className="text-[13px] font-medium text-[color:var(--muted)]">{etiqueta}</span>
     </div>
   )
 }

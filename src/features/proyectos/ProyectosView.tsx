@@ -315,7 +315,7 @@ export default function ProyectosView() {
                   <Icon name="pelicula" size={26} />
                 </span>
               )}
-              <span className="absolute bottom-2 right-2 rounded-md bg-black/75 px-1.5 py-0.5 text-[11px] font-medium text-white">
+              <span className="absolute bottom-2 right-2 rounded-md bg-black/75 px-1.5 py-0.5 text-[13px] font-medium text-white">
                 {formatearDuracion(p.duracion)}
               </span>
               {/* al pasar el cursor la portada se oscurece y salen las dos
@@ -344,18 +344,18 @@ export default function ProyectosView() {
               <h2 className="line-clamp-2 font-display text-[15px] font-bold leading-snug">
                 {p.titulo}
               </h2>
-              <p className="text-[11px] text-[color:var(--muted)]">
+              <p className="text-[13px] text-[color:var(--muted)]">
                 {p.numMedios} {p.numMedios === 1 ? 'medio' : 'medios'}
               </p>
 
               {/* las dos fechas se ven aquí, sin tener que abrir la ficha, que es
                   lo que uno mira al buscar un proyecto entre varios */}
               <div className="mt-2 flex flex-col gap-1">
-                <p className="flex items-center gap-1.5 text-[11px] text-[color:var(--muted)]">
+                <p className="flex items-center gap-1.5 text-[13px] text-[color:var(--muted)]">
                   <CalendarPlus size={13} className="shrink-0 text-brand" />
                   <span className="truncate">Creado el {fechaLarga(p.creado)}</span>
                 </p>
-                <p className="flex items-center gap-1.5 text-[11px] text-[color:var(--muted)]">
+                <p className="flex items-center gap-1.5 text-[13px] text-[color:var(--muted)]">
                   <PencilLine size={13} className="shrink-0 text-brand" />
                   <span className="truncate">Editado el {fechaLarga(p.modificado)}</span>
                 </p>
@@ -405,11 +405,16 @@ export default function ProyectosView() {
         // mundo. no lo es: cada equipo tiene la suya, calculada por el navegador
         // según el disco libre, y como no hay servidor no existe ningún sitio
         // donde pudiera acumularse el material de nadie más
-        <p className="mt-8 max-w-2xl text-xs leading-relaxed text-[color:var(--muted)]">
-          Tus proyectos ocupan {formatearBytes(uso.usado)} de los{' '}
-          {formatearBytes(uso.total)} que tu navegador reserva en este equipo. Es un espacio
-          tuyo y de nadie más: cada persona que use la aplicación tiene el suyo propio, en su
-          propia máquina, porque nada se sube a ningún servidor.
+        // sin ancho máximo, el aviso ocupa todo el ancho y cabe en una línea en
+        // lugar de partirse. la cifra de espacio va resaltada, que es el dato
+        <p className="mt-8 text-[13px] leading-relaxed text-[color:var(--muted)]">
+          Tus proyectos ocupan{' '}
+          <b className="font-semibold text-[color:var(--text)]">
+            {formatearBytes(uso.usado)} de los {formatearBytes(uso.total)}
+          </b>{' '}
+          que tu navegador reserva en este equipo. Es un espacio tuyo y de nadie más: cada persona
+          que use la aplicación tiene el suyo propio, en su propia máquina, porque nada se sube a
+          ningún servidor.
         </p>
       )}
 

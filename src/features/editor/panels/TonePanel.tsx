@@ -81,7 +81,7 @@ export default function TonePanel() {
             />
           ))}
         </div>
-        <p className="mt-2 text-[11px] italic leading-relaxed text-[color:var(--muted)]">
+        <p className="mt-2 text-[13px] italic leading-relaxed text-[color:var(--muted)]">
           Arrastra hacia el color que quieras dar a cada zona. Con <b>Shift</b> el movimiento se
           afina, y con <b>doble clic</b> la rueda vuelve al centro.
         </p>
@@ -98,7 +98,7 @@ export default function TonePanel() {
                 key={c.campo}
                 onClick={() => setCanal(c.campo)}
                 className={[
-                  'rounded-md px-2 py-1 text-[11px] font-medium transition-colors duration-200',
+                  'rounded-md px-2 py-1 text-[13px] font-medium transition-colors duration-200',
                   canal === c.campo ? 'text-white' : 'interactivo text-[color:var(--muted)]',
                 ].join(' ')}
                 style={canal === c.campo ? { background: c.color } : undefined}
@@ -113,7 +113,7 @@ export default function TonePanel() {
           color={CANALES.find((c) => c.campo === canal)!.color}
           onChange={(p) => cambiarCurva(canal, p)}
         />
-        <p className="mt-2 text-[11px] italic leading-relaxed text-[color:var(--muted)]">
+        <p className="mt-2 text-[13px] italic leading-relaxed text-[color:var(--muted)]">
           Haz clic para añadir un punto, arrástralo para doblar la curva y dale{' '}
           <b>doble clic</b> para quitarlo.
         </p>

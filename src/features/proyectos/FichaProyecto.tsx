@@ -138,7 +138,7 @@ export default function FichaProyecto({
       ) : (
         <div className="flex max-h-[65vh] flex-col gap-5 overflow-y-auto pr-1">
           <section>
-            <h3 className="mb-1 text-[12px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
+            <h3 className="mb-1 text-[14px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
               Proyecto
             </h3>
             {/* las dos fechas van juntas y con su icono, separadas del resto de
@@ -171,7 +171,7 @@ export default function FichaProyecto({
               />
               <Dato nombre="Espacio ocupado" valor={formatearBytes(pesoTotal)} />
             </dl>
-            <p className="mt-2 text-[11px] leading-relaxed text-[color:var(--muted)]">
+            <p className="mt-2 text-[13px] leading-relaxed text-[color:var(--muted)]">
               Los archivos viven dentro del navegador de este equipo, no en una carpeta que puedas
               abrir. Por eso no hay una ruta que mostrar: descarga el proyecto si quieres una copia
               en disco.
@@ -179,7 +179,7 @@ export default function FichaProyecto({
           </section>
 
           <section>
-            <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
+            <h3 className="mb-2 text-[14px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
               Archivos ({proyecto.medios.length})
             </h3>
             <div className="flex flex-col gap-2">

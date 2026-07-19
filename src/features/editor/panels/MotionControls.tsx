@@ -150,7 +150,7 @@ export default function MotionControls({ capa }: { capa: CapaBase }) {
               key={v}
               onClick={() => setVelocidadGrabacion(v)}
               className={[
-                'rounded-md px-2 py-1 text-[11px] font-medium transition-colors duration-200',
+                'rounded-md px-2 py-1 text-[13px] font-medium transition-colors duration-200',
                 velocidadGrabacion === v
                   ? 'bg-brand text-white'
                   : 'interactivo text-[color:var(--muted)]',

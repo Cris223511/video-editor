@@ -39,7 +39,7 @@ export default function PistaHeader({ indice, alto }: { indice: number; alto: nu
         borderRight: '1px solid rgb(var(--border) / 0.14)',
       }}
     >
-      <span className="truncate text-[11px] font-medium text-[color:var(--muted)]">
+      <span className="truncate text-[13px] font-medium text-[color:var(--muted)]">
         Video {indice + 1}
       </span>
       {numPistas > 1 && (

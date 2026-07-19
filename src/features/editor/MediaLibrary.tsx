@@ -28,7 +28,7 @@ export default function MediaLibrary() {
       <div className="flex items-center gap-2 px-3 py-2.5">
         <Icon name="pelicula" size={15} className="text-[color:var(--muted)]" />
         <span className="text-[13px] font-semibold">Medios</span>
-        <span className="ml-auto text-[11px] text-[color:var(--muted)]">{medios.length}</span>
+        <span className="ml-auto text-[13px] text-[color:var(--muted)]">{medios.length}</span>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-2.5">
@@ -91,7 +91,7 @@ export default function MediaLibrary() {
             size={medios.length ? 16 : 22}
             className={encima ? 'text-brand' : 'text-[color:var(--muted)]'}
           />
-          <span className="text-[11px] font-medium leading-tight text-[color:var(--muted)]">
+          <span className="text-[13px] font-medium leading-tight text-[color:var(--muted)]">
             {encima ? 'Suelta para importar' : 'Arrastra tus videos aquí'}
           </span>
           {!medios.length && (

@@ -112,7 +112,7 @@ export default function TopBar() {
 
         {enEditor && medios.length > 0 && (
           <span
-            className="hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium text-[color:var(--muted)] md:inline-flex"
+            className="hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-medium text-[color:var(--muted)] md:inline-flex"
             style={{ background: 'rgb(var(--border) / 0.07)' }}
           >
             <Icon name="pelicula" size={12} />
@@ -122,7 +122,7 @@ export default function TopBar() {
       </div>
 
       <div className="flex items-center gap-2">
-        <span className="hidden text-[11px] font-medium text-[color:var(--muted)] sm:inline">
+        <span className="hidden text-[13px] font-medium text-[color:var(--muted)] sm:inline">
           v{VERSION}
         </span>
 
