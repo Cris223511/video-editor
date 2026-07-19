@@ -9,20 +9,19 @@ export interface Caracteristica {
   texto: string
 }
 
-// cada escena se dibuja con el mismo reloj, que da vueltas cada cuatro segundos.
+// cada escena se dibuja con el mismo reloj, que da vueltas cada siete segundos.
 // así ninguna escena necesita su propio requestAnimationFrame y todas quedan
-// sincronizadas con el resto de la pieza
-const CICLO = 4
+// sincronizadas con el resto de la pieza.
+//
+// el ritmo es pausado a propósito. con vueltas cortas los gestos del cursor se
+// atropellaban y no daba tiempo a leer lo que hacía en cada escena
+const CICLO = 7
 
 // el bucle no salta: los últimos instantes de una vuelta se funden con los
 // primeros de la siguiente. para que el enlace no pierda tiempo, la vuelta
 // vuelve a empezar antes de que la anterior termine, y ese solape es el fundido
 const FUNDIDO = 0.5
 const PERIODO = CICLO - FUNDIDO
-
-// mientras nadie toque la lista, la selección va sola de una característica a la
-// siguiente. al primer clic se detiene y manda la persona
-const ROTACION = 5200
 
 const AZUL = 'linear-gradient(120deg, rgb(var(--accent-boton)), rgb(var(--accent-soft)))'
 const PANEL = 'rgb(var(--border) / 0.09)'
@@ -872,32 +871,48 @@ export default function DemoCaracteristicas({ items }: { items: Caracteristica[]
     setT(0)
   }, [activo])
 
-  // el reloj solo corre con la pieza a la vista. da vueltas cada PERIODO, que es
-  // el ciclo menos el solape con el que se enlaza la vuelta siguiente
+  // el estado del pase se lee desde una referencia porque el bucle de dibujo lo
+  // consulta en cada fotograma. teniéndolo como dependencia habría que rehacer el
+  // bucle entero cada vez que se pausa, y el reloj daría un tirón
+  const pasando = useRef(auto)
+  useEffect(() => {
+    pasando.current = auto
+  }, [auto])
+
+  // el reloj solo corre con la pieza a la vista. antes había dos tiempos por su
+  // cuenta, el de la animación y un temporizador aparte que cambiaba de pestaña,
+  // así que el salto caía en cualquier punto de la escena, casi nunca al final.
+  // ahora manda uno solo: cuando la vuelta se completa, o se pasa a la siguiente
+  // característica o se repite esta misma si el pase está detenido
   useEffect(() => {
     if (!visible) return
     let raf = 0
     let anterior = performance.now()
     const paso = (ahora: number) => {
-      reloj.current = (reloj.current + (ahora - anterior) / 1000) % PERIODO
+      const avance = reloj.current + (ahora - anterior) / 1000
       anterior = ahora
-      setT(reloj.current)
+
+      if (avance >= PERIODO) {
+        // el reloj se pone a cero aquí mismo y no se espera al efecto del cambio
+        // de característica: si no, los fotogramas de en medio volverían a ver la
+        // vuelta cumplida y adelantarían varias pestañas de golpe
+        reloj.current = 0
+        setT(0)
+        if (pasando.current) {
+          setActivo((a) => {
+            const i = items.findIndex((x) => x.id === a)
+            return items[(i + 1) % items.length].id
+          })
+        }
+      } else {
+        reloj.current = avance
+        setT(avance)
+      }
       raf = requestAnimationFrame(paso)
     }
     raf = requestAnimationFrame(paso)
     return () => cancelAnimationFrame(raf)
-  }, [visible])
-
-  useEffect(() => {
-    if (!visible || !auto) return
-    const id = setInterval(() => {
-      setActivo((a) => {
-        const i = items.findIndex((x) => x.id === a)
-        return items[(i + 1) % items.length].id
-      })
-    }, ROTACION)
-    return () => clearInterval(id)
-  }, [visible, auto, items])
+  }, [visible, items])
 
   const actual = items.find((x) => x.id === activo) ?? items[0]
 
