@@ -8,15 +8,11 @@ import { irA as irASeccion } from '../../../lib/scroll/useScrollSuave'
 import { Documento, PRIVACIDAD, TERMINOS } from './contenido'
 import Enriquecido from './Enriquecido'
 import { ANCHO_CONTENIDO, RELLENO } from '../../../components/sitio/Contenedor'
+import { cristal } from '../../../components/sitio/cristal'
 
-// mismo cristal que la barra de navegación. lo comparten todos los paneles
-// propios del sitio para que se reconozcan como una misma familia
-const CRISTAL = {
-  background: 'rgb(var(--surface) / 0.94)',
-  backdropFilter: 'blur(20px) saturate(1.6)',
-  WebkitBackdropFilter: 'blur(20px) saturate(1.6)',
-  border: '1px solid rgb(var(--border) / 0.1)',
-} as const
+// mismo cristal que la barra de navegación y su menú, que ahora sale de un
+// único sitio en vez de estar copiado en cada componente
+const CRISTAL = cristal()
 
 // índice lateral. en pantalla ancha queda fijo a la izquierda y en móvil se abre
 // como panel, igual que en la referencia

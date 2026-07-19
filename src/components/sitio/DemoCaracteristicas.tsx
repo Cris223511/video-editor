@@ -90,6 +90,11 @@ function opacidadCursor(t: number) {
   return 1
 }
 
+// la punta de la flecha no cae en la esquina del icono: en el trazado de
+// MousePointer2 arranca sobre el 3 de un lienzo de 24, que a tamaño 17 son unos
+// dos píxeles y medio. de ahí cuelgan el halo y el pivote del clic
+const PUNTA = 2.5
+
 function Cursor({
   t,
   x,
@@ -111,12 +116,16 @@ function Cursor({
         top: `${y}%`,
         opacity: opacidadCursor(t),
         transform: `scale(${pulsando ? 0.86 : 1})`,
+        // el encogido del clic pivota sobre la punta. con el origen en el centro
+        // de la caja, y esa caja creciendo cuando hay etiqueta, el puntero se
+        // desplazaba al pulsar y parecía que apuntaba a otro sitio
+        transformOrigin: `${PUNTA}px ${PUNTA}px`,
       }}
     >
       {pulsando && (
         <span
-          className="absolute -left-2 -top-2 h-7 w-7 rounded-full"
-          style={{ background: 'rgb(var(--accent) / 0.22)' }}
+          className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{ left: PUNTA, top: PUNTA, background: 'rgb(var(--accent) / 0.22)' }}
         />
       )}
       <MousePointer2

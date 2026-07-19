@@ -34,6 +34,10 @@
   --profundo: 8 22 58;
   --profundo-2: 10 30 78;
   --radius: 10px;
+  /* el desenfoque del cristal está aquí y no repartido por los componentes:
+     la clase .glass y los paneles que lo aplican en línea leen esta variable,
+     con lo que retocarla cambia el aspecto de todos a la vez */
+  --cristal-desenfoque: blur(20px) saturate(1.6);
 }
 
 html.dark {
@@ -85,8 +89,8 @@ html.tema-en-transicion * {
      la usan las tarjetas, la barra superior, los modales y los avisos */
   .glass {
     background: rgb(var(--surface) / 0.72);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: var(--cristal-desenfoque);
+    -webkit-backdrop-filter: var(--cristal-desenfoque);
     border: 1px solid rgb(var(--border) / 0.1);
   }
 

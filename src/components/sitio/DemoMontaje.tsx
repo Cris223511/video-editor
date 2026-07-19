@@ -48,9 +48,12 @@ const HERRAMIENTAS = [MousePointer2, Scissors, Type, Sparkles, Wand2, Palette, V
 const HERRAMIENTA_TEXTO = { indice: 2, x: 4, y: 24 }
 
 // los ajustes de arriba del panel no hacen nada, están para que la mitad
-// superior tenga contenido y los medios puedan bajar a ocupar el resto
+// superior tenga contenido y los medios puedan bajar a ocupar el resto. son
+// tres y no dos porque con dos barras quedaba un vacío entre el rótulo de
+// arriba y el de Medios que se notaba desde lejos
 const AJUSTES = [
   { nombre: 'Brillo', valor: 62 },
+  { nombre: 'Contraste', valor: 54 },
   { nombre: 'Volumen', valor: 38 },
 ]
 
@@ -232,7 +235,9 @@ export default function DemoMontaje() {
             <span
               key={a.nombre}
               className="absolute inset-x-[10%] flex items-center gap-1.5"
-              style={{ top: `${18 + i * 13}%` }}
+              // el reparto va desde justo debajo del rótulo hasta poco antes de
+              // Medios, así las tres barras se ven a la misma distancia entre sí
+              style={{ top: `${17 + i * 10}%` }}
             >
               <span
                 className="w-[42%] shrink-0 truncate text-[6px] sm:text-[7px]"

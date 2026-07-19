@@ -39,10 +39,11 @@ import { ANCHO_CONTENIDO, RELLENO } from '../../components/sitio/Contenedor'
 // piezas de Unsplash y Pexels, verificadas una a una. van con parámetros de
 // tamaño para no descargar originales de varios megas en una presentación
 const MEDIOS = {
+  // el banner solo lleva foto: no hay campo de video a propósito, para que no
+  // vuelva a colarse un plano que no pinta nada en una pieza sobre montaje
   montaje: {
     imagen:
       'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=1200&q=70',
-    video: 'https://videos.pexels.com/video-files/3195394/3195394-hd_1920_1080_25fps.mp4',
   },
   equipo: {
     imagen:
@@ -217,13 +218,13 @@ export default function PortadaView() {
               className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-black"
               style={{ border: '1px solid rgb(var(--border) / 0.1)' }}
             >
-              <video
-                src={MEDIOS.montaje.video}
-                poster={MEDIOS.montaje.imagen}
-                autoPlay
-                muted
-                loop
-                playsInline
+              {/* aquí va una fotografía y nada más. cuando esto era un <video>
+                  con la foto de cartel, en local se veía la imagen y en
+                  producción entraba el video, que enseñaba una escena ajena al
+                  editor */}
+              <img
+                src={MEDIOS.montaje.imagen}
+                alt="Línea de tiempo de un montaje en marcha"
                 className="absolute inset-0 h-full w-full object-cover"
                 style={{ filter: 'grayscale(0.55) brightness(0.8)' }}
               />

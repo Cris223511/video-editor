@@ -31,6 +31,7 @@ import { formatearDuracion } from '../../lib/format/duracion'
 import { formatearBytes } from '../../lib/format/bytes'
 import { ANCHO_CONTENIDO, RELLENO } from '../../components/sitio/Contenedor'
 import FichaProyecto from './FichaProyecto'
+import Confirmar from '../../components/ui/Confirmar'
 
 // fecha escrita en largo, la misma forma que usa la ficha de detalles. antes la
 // tarjeta decía cosas como "hoy a las 2:22", que se lee rápido pero no sirve para
@@ -392,29 +393,6 @@ export default function ProyectosView() {
                 </Tooltip>
               </div>
 
-              {/* la confirmación se abre dentro de la propia tarjeta: para un
-                  borrado de una sola cosa, una ventana aparte sobra */}
-              {confirmar === p.id && (
-                <div className="mt-2 rounded-lg border border-rose-500/40 bg-rose-500/5 p-2">
-                  <p className="text-[11px] leading-snug">
-                    Se borrarán también los videos guardados con él. No se puede deshacer.
-                  </p>
-                  <div className="mt-2 flex gap-1">
-                    <button
-                      onClick={() => borrar(p.id)}
-                      className="flex-1 rounded-md bg-rose-500 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-rose-600"
-                    >
-                      Eliminar
-                    </button>
-                    <button
-                      onClick={() => setConfirmar(null)}
-                      className="interactivo flex-1 rounded-md py-1.5 text-[11px] font-medium"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </article>
         ))}
@@ -436,6 +414,18 @@ export default function ProyectosView() {
       )}
 
       <FichaProyecto id={detalles} onCerrar={() => setDetalles(null)} />
+
+      {/* borrar un proyecto se lleva también sus videos y no tiene vuelta atrás,
+          así que la pregunta se hace en una ventana y no de lado en la tarjeta */}
+      <Confirmar
+        abierto={confirmar !== null}
+        titulo="¿Eliminar este proyecto?"
+        mensaje="Se borrarán también los videos guardados con él. Esta acción no se puede deshacer."
+        aceptar="Eliminar"
+        peligro
+        onAceptar={() => confirmar && borrar(confirmar)}
+        onCancelar={() => setConfirmar(null)}
+      />
     </div>
   )
 }

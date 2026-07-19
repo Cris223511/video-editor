@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Menu, Moon, Sun, X } from 'lucide-react'
 import { RUTAS } from '../../rutasDef'
 import { ANCHO_BARRA, RELLENO } from '../sitio/Contenedor'
+import { cristal } from '../sitio/cristal'
 import { useThemeStore } from '../../store/useThemeStore'
 import Desplegable from '../ui/Desplegable'
+
+// cuánto se mete la píldora de la barra respecto al borde de su contenedor. el
+// menú desplegable copia este mismo valor: RELLENO marca dónde empieza el texto
+// del sitio, pero el cristal de la barra vuela un poco más ancho que eso, y lo
+// que tiene que cuadrar con el menú son los bordes que se ven, no los del texto
+const SANGRADO_BARRA = 8
 
 const ENLACES = [
   { texto: 'Inicio', a: RUTAS.portada },
@@ -62,16 +70,13 @@ export default function NavSitio() {
           aria-hidden
           className="absolute inset-y-0 -z-10"
           style={{
-            left: flotante ? 8 : 'calc(50% - 50vw)',
-            right: flotante ? 8 : 'calc(50% - 50vw)',
+            left: flotante ? SANGRADO_BARRA : 'calc(50% - 50vw)',
+            right: flotante ? SANGRADO_BARRA : 'calc(50% - 50vw)',
             borderRadius: flotante ? 999 : 0,
             // translúcida pero con el MISMO valor arriba y flotando: así se ve
             // el desenfoque de lo que pasa por detrás y el tono no cambia al
             // desplazar, que era lo que se notaba raro
-            background: 'rgb(var(--surface) / 0.72)',
-            backdropFilter: 'blur(20px) saturate(1.6)',
-            WebkitBackdropFilter: 'blur(20px) saturate(1.6)',
-            border: `1px solid rgb(var(--border) / ${flotante ? 0.13 : 0.06})`,
+            ...cristal(0.72, flotante ? 0.13 : 0.06),
             boxShadow: flotante ? '0 12px 34px rgb(6 12 24 / 0.16)' : '0 0 0 rgb(6 12 24 / 0)',
             transition:
               'left 560ms cubic-bezier(0.22,1,0.36,1), right 560ms cubic-bezier(0.22,1,0.36,1), border-radius 460ms ease-out, box-shadow 460ms ease-out, border-color 340ms ease-out',
