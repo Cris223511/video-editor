@@ -176,11 +176,23 @@ export default function DemoColor() {
               ))}
             </div>
           </div>
-          <EditorCurva
-            puntos={curvas[canal]}
-            color={CANALES.find((c) => c.campo === canal)!.color}
-            onChange={(p: PuntoCurva[]) => setCurvas((c) => ({ ...c, [canal]: p }))}
-          />
+          <div className="mx-auto w-full max-w-[15rem]">
+            <EditorCurva
+              puntos={curvas[canal]}
+              color={CANALES.find((c) => c.campo === canal)!.color}
+              onChange={(p: PuntoCurva[]) => setCurvas((c) => ({ ...c, [canal]: p }))}
+            />
+            {/* los extremos de la curva dicen qué se está tocando en cada lado */}
+            <div className="mt-1.5 flex justify-between text-[10px] text-[color:var(--muted)]">
+              <span>Sombras</span>
+              <span>Medios</span>
+              <span>Luces</span>
+            </div>
+            <p className="mt-2 text-[11px] leading-relaxed text-[color:var(--muted)]">
+              Pulsa para añadir un punto, arrástralo para doblar la curva y dale doble clic para
+              quitarlo.
+            </p>
+          </div>
         </div>
       </div>
 
