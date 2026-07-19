@@ -85,12 +85,16 @@ export default function DemoColor() {
         border: '1px solid rgb(var(--border) / 0.1)',
       }}
     >
+      <div className="grid gap-5 lg:grid-cols-[1.1fr_1fr]">
       <div className="relative overflow-hidden rounded-xl bg-black">
         <img
           src={FOTO}
           alt="Toma de ejemplo para corregir el color"
-          className="aspect-[16/8] w-full object-cover"
-          style={{ filter: tocada ? `url(#demo-color) ${filtroNumerico}` : undefined }}
+          className="h-full w-full object-cover"
+          style={{
+            minHeight: 300,
+            filter: tocada ? `url(#demo-color) ${filtroNumerico}` : undefined,
+          }}
         />
         {!tocada && (
           <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-3 text-xs font-medium text-white">
@@ -111,7 +115,7 @@ export default function DemoColor() {
         </defs>
       </svg>
 
-      <div className="mt-4 grid gap-5 lg:grid-cols-2">
+      <div className="flex flex-col gap-5">
         <div>
           <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
             Ruedas:
@@ -194,6 +198,7 @@ export default function DemoColor() {
             </p>
           </div>
         </div>
+      </div>
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-2">

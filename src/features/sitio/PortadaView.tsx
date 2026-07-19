@@ -328,10 +328,10 @@ export default function PortadaView() {
                 },
                 {
                   id: 'video',
-                  nombre: 'Reproducción',
+                  nombre: 'Visor',
                   icono: <PlayCircle size={15} />,
                   descripcion:
-                    'Los mismos controles del visor: reproducir, buscar por la barra, silenciar y cambiar la velocidad, incluida la cámara lenta que se usa al grabar recorridos.',
+                    'Los mismos controles con los que se revisa el montaje: reproducir, buscar por la barra, silenciar y cambiar el ritmo, incluida la cámara lenta que se usa al grabar recorridos.',
                   contenido: <DemoVideo />,
                 },
                 {

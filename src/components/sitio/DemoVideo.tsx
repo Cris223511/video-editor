@@ -124,8 +124,13 @@ export default function DemoVideo() {
           onLoadedMetadata={(e) => setTotal(e.currentTarget.duration || 0)}
           onTimeUpdate={(e) => setT(e.currentTarget.currentTime)}
           onClick={alternar}
-          className="block w-full cursor-pointer"
-          style={{ aspectRatio: '16 / 8' }}
+          className="block w-full cursor-pointer transition-all duration-700 ease-out"
+          style={{
+            aspectRatio: '16 / 8',
+            // en pausa se ve en blanco y negro y recupera el color al reproducir,
+            // igual que las piezas del resto del sitio
+            filter: sonando ? 'grayscale(0)' : 'grayscale(1) brightness(0.85)',
+          }}
         />
 
         {/* controles sobre el video, como en el visor del editor */}
