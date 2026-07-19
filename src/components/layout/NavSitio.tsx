@@ -141,42 +141,54 @@ export default function NavSitio() {
         </div>
       </header>
 
-      {/* menú desplegado en pantallas estrechas */}
+      {/* menú desplegado en pantallas estrechas. la caja de fuera reproduce el
+          ancho de la barra y su sangrado, que antes faltaba: el menú se iba de
+          lado a lado de la pantalla mientras la barra se quedaba dentro */}
       <div
-        className={[
-          'mx-auto overflow-hidden transition-all duration-300 ease-out lg:hidden',
-          ANCHO_BARRA,
-          abierto ? 'mt-2 max-h-[26rem] opacity-100' : 'max-h-0 opacity-0',
-        ].join(' ')}
+        className={`mx-auto w-full lg:hidden ${ANCHO_BARRA}`}
+        style={{ paddingLeft: SANGRADO_BARRA, paddingRight: SANGRADO_BARRA }}
       >
-        <nav
-          className="flex flex-col gap-1 rounded-3xl p-3 shadow-lg"
-          style={{
-            background: 'rgb(var(--surface) / 0.94)',
-            backdropFilter: 'blur(20px) saturate(1.6)',
-            WebkitBackdropFilter: 'blur(20px) saturate(1.6)',
-            border: '1px solid rgb(var(--border) / 0.1)',
-          }}
-        >
-          {[...ENLACES, ...INFORMACION].map((e) => (
-            <Link
-              key={e.a}
-              to={e.a}
-              className={[
-                'rounded-full px-4 py-2.5 text-sm font-medium transition-colors duration-200',
-                activo(e.a) ? 'text-brand' : 'text-[color:var(--muted)]',
-              ].join(' ')}
+        <AnimatePresence initial={false}>
+          {abierto && (
+            // el alto se anima a 'auto' con framer en lugar de saltar entre dos
+            // max-height a ojo, así el cierre baja al mismo ritmo que la apertura
+            <motion.div
+              key="menu"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{
+                height: { duration: 0.34, ease: [0.22, 1, 0.36, 1] },
+                opacity: { duration: 0.2, ease: 'easeOut' },
+              }}
+              className="overflow-hidden"
             >
-              {e.texto}
-            </Link>
-          ))}
-          <Link
-            to={RUTAS.medios}
-            className="mt-1 rounded-full bg-brand px-4 py-2.5 text-center text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95 sm:hidden"
-          >
-            Abrir el editor
-          </Link>
-        </nav>
+              <nav
+                className="mt-2 flex flex-col gap-1 rounded-3xl p-3 shadow-lg"
+                style={cristal()}
+              >
+                {[...ENLACES, ...INFORMACION].map((e) => (
+                  <Link
+                    key={e.a}
+                    to={e.a}
+                    className={[
+                      'rounded-full px-4 py-2.5 text-sm font-medium transition-colors duration-200',
+                      activo(e.a) ? 'text-brand' : 'text-[color:var(--muted)]',
+                    ].join(' ')}
+                  >
+                    {e.texto}
+                  </Link>
+                ))}
+                <Link
+                  to={RUTAS.medios}
+                  className="mt-1 rounded-full bg-brand px-4 py-2.5 text-center text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95 sm:hidden"
+                >
+                  Abrir el editor
+                </Link>
+              </nav>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )
