@@ -4,7 +4,7 @@ import { Deslizador } from '../ui/Controls'
 
 // una toma vertical, que es justo el caso donde el relleno del lienzo importa
 const FOTO =
-  'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=700&q=70'
+  'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=800&q=70'
 
 const PROPORCIONES = [
   { id: '16-9', nombre: '16:9', ancho: 16, alto: 9, pie: 'YouTube y televisión' },

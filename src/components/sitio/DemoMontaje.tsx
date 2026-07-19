@@ -20,15 +20,20 @@ const CLIPS = [
 ]
 
 // recorrido del cursor: de la carpeta a la pista, y luego hacia los controles
+// el recorrido pasa por encima de cada caja de la carpeta antes de llevársela.
+// las tres están en la esquina superior izquierda, así que el cursor las visita
+// una a una en lugar de salir del centro con el clip ya cogido
 const RUTA = [
-  { t: 0, x: 12, y: 24 },
-  { t: 1.6, x: 18, y: 72 },
-  { t: 2.4, x: 30, y: 30 },
-  { t: 3.2, x: 40, y: 72 },
-  { t: 4.4, x: 62, y: 72 },
-  { t: 5.4, x: 84, y: 34 },
+  { t: 0, x: 50, y: 50 },
+  { t: 0.5, x: 8, y: 16 },
+  { t: 1.6, x: 16, y: 70 },
+  { t: 2.1, x: 14, y: 16 },
+  { t: 3.2, x: 40, y: 70 },
+  { t: 3.7, x: 20, y: 16 },
+  { t: 4.6, x: 66, y: 70 },
+  { t: 5.6, x: 84, y: 32 },
   { t: 6.4, x: 88, y: 40 },
-  { t: 8.4, x: 50, y: 88 },
+  { t: 8.4, x: 50, y: 86 },
 ]
 
 function posicion(t: number) {
@@ -67,7 +72,10 @@ export default function DemoMontaje() {
 
   const cursor = posicion(t)
   const pasoActual = GUION.find((g) => t < g.hasta) ?? GUION[GUION.length - 1]
-  const arrastrando = t < 1.6 || (t > 2.4 && t < 3.2)
+  // se arrastra en los tres tramos que van de la carpeta a la pista, no en los
+  // de vuelta a por el siguiente
+  const arrastrando =
+    (t > 0.5 && t < 1.6) || (t > 2.1 && t < 3.2) || (t > 3.7 && t < 4.6)
 
   return (
     <div
@@ -161,7 +169,7 @@ export default function DemoMontaje() {
           {arrastrando && (
             <span
               className="absolute left-4 top-3 h-5 w-8 rounded"
-              style={{ background: CLIPS[t < 1.6 ? 0 : 1].tono, opacity: 0.75 }}
+              style={{ background: CLIPS[t < 1.6 ? 0 : t < 3.2 ? 1 : 2].tono, opacity: 0.75 }}
             />
           )}
         </span>

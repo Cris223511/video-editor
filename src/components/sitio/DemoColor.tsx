@@ -4,7 +4,7 @@ import RuedaColor from '../ui/RuedaColor'
 import { PuntoRueda, RUEDAS_NEUTRAS, Ruedas, tablaCanal } from '../../lib/color/ruedas'
 
 const FOTO =
-  'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=1000&q=70'
+  'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1200&q=70'
 
 const ZONAS: { campo: keyof Ruedas; etiqueta: string }[] = [
   { campo: 'sombras', etiqueta: 'Sombras' },

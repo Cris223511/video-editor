@@ -3,7 +3,7 @@ import { Circle, Droplet, EyeOff, Grid2x2, Move, Square } from 'lucide-react'
 import { Deslizador } from '../ui/Controls'
 
 const FOTO =
-  'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=1000&q=70'
+  'https://images.unsplash.com/photo-1533709752211-118fcaf03312?auto=format&fit=crop&w=1200&q=70'
 
 // más bajo que antes: a 500 de alto la pieza dominaba la sección entera
 const ANCHO = 880

@@ -42,11 +42,11 @@ const MEDIOS = {
   },
   color: {
     imagen:
-      'https://images.unsplash.com/photo-1512790182412-b19e6d62bc39?auto=format&fit=crop&w=900&q=70',
+      'https://images.unsplash.com/photo-1418065460487-3e41a6c84dc5?auto=format&fit=crop&w=900&q=70',
   },
   equipo: {
     imagen:
-      'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=900&q=70',
+      'https://images.unsplash.com/photo-1439066615861-d1af74d74000?auto=format&fit=crop&w=900&q=70',
     // comprobado que responde: Pexels bloquea el enlace directo de la mayoría de
     // sus videos, así que solo se usan los que devuelven contenido de verdad
     video: 'https://videos.pexels.com/video-files/3571264/3571264-uhd_3840_2160_30fps.mp4',
