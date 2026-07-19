@@ -3,7 +3,9 @@ import Icon from '../../components/ui/Icon'
 import { useImportarMedios } from './useImportarMedios'
 import { useProjectStore } from '../../store/useProjectStore'
 import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { FolderOpen } from 'lucide-react'
+import Loader from '../../components/ui/Loader'
 import { VIDEO_EXTENSIONS } from '../../config/constants'
 import { Aviso, Chip } from '../../components/sitio/Piezas'
 import { RUTAS } from '../../rutasDef'
@@ -17,9 +19,17 @@ export default function ImportView() {
   const { procesar, ocupado } = useImportarMedios()
   const { medios, quitar } = useProjectStore()
   const navegar = useNavigate()
-  const irAEditor = () => navegar(RUTAS.editor)
+  const [preparando, setPreparando] = useState(false)
+  // el cargador da un momento de respiro entre elegir los medios y entrar al
+  // editor, que si no aparece de golpe y desorienta
+  const irAEditor = () => {
+    setPreparando(true)
+    window.setTimeout(() => navegar(RUTAS.editor), 1400)
+  }
 
   return (
+    <>
+    {preparando && <Loader texto="Preparando tu proyecto..." />}
     <div className={`mx-auto w-full ${ANCHO_CONTENIDO} ${RELLENO} py-10 sm:py-14`}>
       <div className="mb-8">
         <h1 className="font-display text-titulo-lg">Empieza tu proyecto</h1>
@@ -106,5 +116,6 @@ export default function ImportView() {
         </Aviso>
       </div>
     </div>
+    </>
   )
 }

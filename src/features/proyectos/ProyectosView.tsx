@@ -142,7 +142,7 @@ export default function ProyectosView() {
     return b.modificado - a.modificado
   })
 
-  const POR_PAGINA = 9
+  const POR_PAGINA = 6
   const totalPaginas = Math.max(1, Math.ceil(ordenados.length / POR_PAGINA))
   // al filtrar, la página actual puede quedar fuera de rango
   const paginaSegura = Math.min(pagina, totalPaginas)
@@ -268,7 +268,7 @@ export default function ProyectosView() {
         </Vacio>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-2">
         {visibles.map((p) => (
           <article
             key={p.id}

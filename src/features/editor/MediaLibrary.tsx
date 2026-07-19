@@ -24,7 +24,7 @@ export default function MediaLibrary() {
   }
 
   return (
-    <aside className="panel flex w-56 shrink-0 flex-col rounded-xl md:w-64">
+    <aside className="panel flex min-w-0 flex-1 flex-col rounded-xl">
       <div className="flex items-center gap-2 px-3 py-2.5">
         <Icon name="pelicula" size={15} className="text-[color:var(--muted)]" />
         <span className="text-[13px] font-semibold">Medios</span>
