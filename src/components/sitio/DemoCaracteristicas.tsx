@@ -63,12 +63,29 @@ function Marco({ children }: { children: ReactNode }) {
 
 // el puntero que hace el trabajo en todas las escenas. al pulsar se encoge y
 // suelta un halo, que es lo que se lee como clic
+// tramos en los que el puntero se va y vuelve. cada escena termina su ruta en el
+// punto donde la empezó, para que la vuelta cierre, y ese regreso quedaba muy
+// justo de tiempo: el cursor cruzaba la escena de un tirón y se leía como un
+// salto. midiendo los fotogramas, ese tirón era el mayor cambio de imagen de todo
+// el ciclo, cinco veces por encima de la media. desapareciendo antes de emprender
+// la vuelta, el regreso deja de verse y el enlace se iguala con el resto
+const RETIRO = 5.6
+const REGRESO = 0.6
+
+function opacidadCursor(t: number) {
+  if (t >= RETIRO) return Math.max(0, 1 - (t - RETIRO) / 0.45)
+  if (t < REGRESO) return t / REGRESO
+  return 1
+}
+
 function Cursor({
+  t,
   x,
   y,
   pulsando = false,
   etiqueta,
 }: {
+  t: number
   x: number
   y: number
   pulsando?: boolean
@@ -77,7 +94,12 @@ function Cursor({
   return (
     <span
       className="pointer-events-none absolute z-30"
-      style={{ left: `${x}%`, top: `${y}%`, transform: `scale(${pulsando ? 0.86 : 1})` }}
+      style={{
+        left: `${x}%`,
+        top: `${y}%`,
+        opacity: opacidadCursor(t),
+        transform: `scale(${pulsando ? 0.86 : 1})`,
+      }}
     >
       {pulsando && (
         <span
@@ -322,7 +344,7 @@ function EscenaRecorte({ t }: { t: number }) {
         <span className="absolute -left-[5px] -top-1 h-2.5 w-3 rounded-sm bg-brand" />
       </span>
 
-      <Cursor {...cursor} pulsando={pulsando} etiqueta={etiqueta} />
+      <Cursor t={t} {...cursor} pulsando={pulsando} etiqueta={etiqueta} />
       <Pie>{dividido ? 'apartas el trozo y el hueco se cierra solo' : 'llevas el cabezal al punto de corte'}</Pie>
     </Marco>
   )
@@ -406,7 +428,7 @@ function EscenaCensura({ t }: { t: number }) {
         ))}
       </div>
 
-      <Cursor x={x + 5} y={y + 9} pulsando etiqueta="Grabando" />
+      <Cursor t={t} x={x + 5} y={y + 9} pulsando etiqueta="Grabando" />
       <Pie>el recuadro va donde lo llevas y el trazo se guarda</Pie>
     </Marco>
   )
@@ -546,7 +568,7 @@ function EscenaTexto({ t }: { t: number }) {
         </span>
       )}
 
-      <Cursor {...cursor} pulsando={pulsando} etiqueta={dibujando ? 'Figura' : undefined} />
+      <Cursor t={t} {...cursor} pulsando={pulsando} etiqueta={dibujando ? 'Figura' : undefined} />
       <Pie>colocas el elemento y lo ajustas por sus nodos</Pie>
     </Marco>
   )
@@ -603,7 +625,7 @@ function EscenaVelocidad({ t }: { t: number }) {
         ))}
       </div>
 
-      <Cursor x={mando} y={71} pulsando etiqueta={`${ritmo.toFixed(1).replace('.', ',')}x`} />
+      <Cursor t={t} x={mando} y={71} pulsando etiqueta={`${ritmo.toFixed(1).replace('.', ',')}x`} />
       <Pie>la duración se recalcula mientras arrastras</Pie>
     </Marco>
   )
@@ -685,7 +707,7 @@ function EscenaLienzo({ t }: { t: number }) {
         )
       })}
 
-      <Cursor {...cursor} pulsando={pulsando} />
+      <Cursor t={t} {...cursor} pulsando={pulsando} />
       <Pie>cambias la proporción y las bandas se rellenan solas</Pie>
     </Marco>
   )
@@ -758,7 +780,7 @@ function EscenaAudio({ t }: { t: number }) {
         ))}
       </div>
 
-      <Cursor x={mando} y={69} pulsando />
+      <Cursor t={t} x={mando} y={69} pulsando />
       <Pie>subes el volumen general o el de una franja suelta</Pie>
     </Marco>
   )
@@ -838,7 +860,7 @@ function EscenaAtajos({ t }: { t: number }) {
         })}
       </div>
 
-      <Cursor {...cursor} pulsando={pulsando} />
+      <Cursor t={t} {...cursor} pulsando={pulsando} />
       <Pie>cada tecla dispara la acción que tiene al lado</Pie>
     </Marco>
   )
