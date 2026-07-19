@@ -1,8 +1,25 @@
+# dependencias y resultados del build
 node_modules
 dist
 dist-ssr
 *.local
 .vercel
-.DS_Store
+
+# variables de entorno, nunca al repositorio
 .env
 .env.*
+!.env.example
+
+# registros de npm cuando algo falla
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# basura que dejan el sistema y los editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea
+.vscode/*
+!.vscode/extensions.json

@@ -2,6 +2,35 @@
   "name": "video-editor",
   "private": true,
   "version": "2.0.0",
+  "description": "Editor de video que funciona por completo en el navegador: línea de tiempo con varios niveles, corrección de color, censura en movimiento, capas y exportación, sin que los archivos salgan del equipo.",
+  "keywords": [
+    "video-editor",
+    "editor-de-video",
+    "browser",
+    "client-side",
+    "timeline",
+    "color-grading",
+    "transitions",
+    "censura",
+    "privacy",
+    "react",
+    "typescript",
+    "vite",
+    "canvas",
+    "mediarecorder",
+    "web-audio",
+    "indexeddb"
+  ],
+  "author": "Cris223511 (https://github.com/Cris223511)",
+  "license": "MIT",
+  "homepage": "https://video-editor-plus.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cris223511/video-editor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Cris223511/video-editor/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

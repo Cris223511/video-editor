@@ -121,6 +121,11 @@ export default function DemoVideo() {
           loop
           playsInline
           preload="metadata"
+          // Pexels no manda cabecera CORP, y con el sitio aislado por COEP un
+          // recurso ajeno sin ella se descarta antes de empezar a descargarse.
+          // pidiéndolo en modo anónimo entra por CORS, que sí satisface la
+          // política. lo mismo que ya hacía MedioHover con su clip
+          crossOrigin="anonymous"
           onLoadedMetadata={(e) => setTotal(e.currentTarget.duration || 0)}
           onTimeUpdate={(e) => setT(e.currentTarget.currentTime)}
           onClick={alternar}

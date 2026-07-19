@@ -219,6 +219,7 @@ video-editor/
     ├── main.tsx              punto de entrada
     ├── App.tsx               raíz de la aplicación
     ├── rutas.tsx             enrutador y direcciones de cada vista
+    ├── rutasDef.ts           las direcciones en un solo sitio
     ├── index.css             tokens del tema y estilos base
     ├── config/               versión, límites y formatos aceptados
     ├── types/                tipos del dominio (medios, capas, audio, marco, tiempo)
@@ -259,5 +260,3 @@ Los reportes de errores y las ideas son bienvenidos en los [issues](https://gith
 **MIT** © [Cris223511](https://github.com/Cris223511). Puedes usarlo, modificarlo y compartirlo con libertad. El texto completo está en el archivo [LICENSE](LICENSE).
 
 *Si el proyecto te resulta útil, una estrella en el repositorio ayuda a que más personas lo encuentren.*
-</content>
-</invoke>

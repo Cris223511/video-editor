@@ -6,31 +6,31 @@ El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com
 
 ## 2.0.0 (2026-07-19)
 
-Segunda version. La anterior permitia importar, editar y exportar; esta convierte la
+Segunda versión. La anterior permitía importar, editar y exportar; esta convierte la
 herramienta en un editor con el que se puede montar un video de principio a fin, y
-suma el sitio de presentacion, que antes no existia.
+suma el sitio de presentación, que antes no existía.
 
-### Linea de tiempo
+### Línea de tiempo
 
 - Varios niveles de video apilados, hasta seis, con altura ajustable. Un clip
   colocado arriba tapa a los de abajo, y se arrastra de un nivel a otro sin perder su
-  posicion en el tiempo.
-- Veintiuna transiciones repartidas en cinco familias, con buscador y duracion
+  posición en el tiempo.
+- Veintiuna transiciones repartidas en cinco familias, con buscador y duración
   editable desde la propia pista.
-- Guias de alineacion que aparecen al arrastrar y encajan el clip con el borde o el
-  centro de los que ya estan puestos. Se desactivan manteniendo Alt.
-- Los espacios vacios entre planos se cierran con un boton.
-- Zoom con la rueda manteniendo Ctrl, anclado al punto donde esta el cursor, y tira
+- Guías de alineación que aparecen al arrastrar y encajan el clip con el borde o el
+  centro de los que ya están puestos. Se desactivan manteniendo Alt.
+- Los espacios vacíos entre planos se cierran con un botón.
+- Zoom con la rueda manteniendo Ctrl, anclado al punto donde está el cursor, y tira
   de fotogramas dentro de cada clip.
 - Velocidad del clip regulable entre 0,25x y 4x.
 
 ### Color
 
-- Correccion por zonas tonales con tres ruedas para sombras, medios y luces.
+- Corrección por zonas tonales con tres ruedas para sombras, medios y luces.
 - Cuatro curvas editables, una maestra y una por canal.
-- Exposicion, contraste, saturacion, temperatura y tinte.
+- Exposición, contraste, saturación, temperatura y tinte.
 - Lo que se ve al corregir es lo que sale en el archivo, porque el visor y la
-  exportacion comparten el mismo camino de filtros.
+  exportación comparten el mismo camino de filtros.
 
 ### Proyectos
 
@@ -38,27 +38,27 @@ suma el sitio de presentacion, que antes no existia.
   referencias al disco. Mover o borrar el archivo original no rompe el proyecto.
 - Se descargan como archivo propio para llevarlos a otro equipo y volver a
   importarlos.
-- Ficha de detalles con fechas, numero de archivos, clips, niveles, resolucion y
-  espacio ocupado, y de cada archivo sus dimensiones, proporcion, orientacion,
-  duracion, peso, formato y megapixeles.
-- Buscador, ordenacion, paginado y guardado automatico.
+- Ficha de detalles con fechas, número de archivos, clips, niveles, resolución y
+  espacio ocupado, y de cada archivo sus dimensiones, proporción, orientación,
+  duración, peso, formato y megapíxeles.
+- Buscador, ordenación, paginado y guardado automático.
 
-### Sitio de presentacion
+### Sitio de presentación
 
 - Portada con piezas interactivas que funcionan con el motor real del editor: las
-  transiciones que se ven ahi son las mismas que se aplican al video.
-- Una demostracion animada por cada herramienta, que va pasando sola y se puede
+  transiciones que se ven ahí son las mismas que se aplican al video.
+- Una demostración animada por cada herramienta, que va pasando sola y se puede
   detener.
-- Terminos y condiciones y politica de privacidad, con indice lateral y
+- Términos y condiciones y política de privacidad, con índice lateral y
   desplazamiento suave.
 
 ### Otros
 
-- Exportacion a 24, 30 o 60 imagenes por segundo, negociando MP4 o WebM segun lo que
+- Exportación a 24, 30 o 60 imágenes por segundo, negociando MP4 o WebM según lo que
   admita el navegador.
-- Censura en movimiento con grabacion del recorrido, camara lenta y pincel libre.
+- Censura en movimiento con grabación del recorrido, cámara lenta y pincel libre.
 - Nueve atajos de teclado.
-- Paneles redimensionables y plegables, con los tamanos recordados entre sesiones.
+- Paneles redimensionables y plegables, con los tamaños recordados entre sesiones.
 - Avisos apilados arriba a la derecha, hasta cinco a la vez y el resto en cola.
 - Tema claro por defecto, con oscuro disponible en todo el sitio y el editor.
 
