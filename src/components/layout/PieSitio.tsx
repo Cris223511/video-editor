@@ -46,10 +46,6 @@ export default function PieSitio() {
             Editor de video que funciona dentro del navegador. Los archivos se quedan en tu equipo
             de principio a fin.
           </p>
-          <p className="mt-4 text-xs text-white/40">
-            © {new Date().getFullYear()}. Publicado con licencia MIT.
-          </p>
-          <p className="mt-1 text-xs text-white/40">Versión {VERSION}</p>
         </div>
 
         {columnas.map((c) => (
@@ -94,6 +90,22 @@ export default function PieSitio() {
               </a>
             </li>
           </ul>
+        </div>
+      </div>
+
+      {/* franja de cierre: una línea que cruza todo el pie y, debajo, los créditos
+          a un lado y la versión al otro. separarla de la columna del logo deja
+          claro que es el remate del pie entero y no un dato más de esa columna */}
+      <div className={`mx-auto mt-10 w-full ${ANCHO_BARRA} ${RELLENO}`}>
+        <div className="border-t border-white/10 pt-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-white/45">
+              © {new Date().getFullYear()} Video Editor. Publicado con licencia MIT.
+            </p>
+            {/* la versión va en monoespaciada porque es un dato técnico y así no
+                se confunde con el texto corriente que tiene al lado */}
+            <p className="font-mono text-xs text-white/45">v{VERSION}</p>
+          </div>
         </div>
       </div>
     </footer>

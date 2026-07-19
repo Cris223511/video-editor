@@ -12,16 +12,23 @@ import {
 } from 'lucide-react'
 
 // el guion completo, con lo que ocurre en cada tramo. cada paso arranca donde
-// acaba el anterior, así que cambiar una duración no descuadra el resto
+// acaba el anterior, así que cambiar una duración no descuadra el resto.
+// ojo con estos cortes: no van en el instante en que el clip toca la pista sino
+// un poco después, cuando su animación de entrada ya terminó. si se ponen justo
+// en el impacto, el pie de foto anuncia el clip siguiente mientras el anterior
+// todavía se está dibujando y la pieza se contradice sola
 const GUION = [
-  { hasta: 1.6, texto: 'Traes un archivo desde tu carpeta' },
-  { hasta: 3.2, texto: 'Colocas el siguiente al lado' },
-  { hasta: 4.6, texto: 'Y el tercero en otro nivel' },
-  { hasta: 5.8, texto: 'Estiras un clip para ajustar su duración' },
-  { hasta: 7.2, texto: 'Añades un rótulo sobre la imagen' },
+  { hasta: 2.05, texto: 'Traes un archivo desde tu carpeta' },
+  { hasta: 3.65, texto: 'Colocas el siguiente al lado' },
+  { hasta: 5.05, texto: 'Y el tercero en otro nivel' },
+  { hasta: 6.25, texto: 'Estiras un clip para ajustar su duración' },
+  { hasta: 7.6, texto: 'Añades un rótulo sobre la imagen' },
   { hasta: 10, texto: 'Reproduces el montaje terminado' },
 ]
 const TOTAL = 10
+// margen de cortesía al final y al principio del ciclo: en esos segundos la
+// escena se atenúa y vuelve, así el salto del reloj de 10 a 0 queda tapado
+const RETORNO = 0.75
 
 // los clips ocupan la línea de tiempo casi entera: si se quedaban cortos, la
 // mitad derecha de la pista se veía como un hueco muerto
@@ -35,21 +42,50 @@ const CLIPS = [
 // verdad. la que está encendida cambia según lo que se esté haciendo
 const HERRAMIENTAS = [MousePointer2, Scissors, Type, Sparkles, Wand2, Palette, Volume2, Crop]
 
-// el cursor recorre el panel de medios, suelta cada archivo en su pista, tira
-// del borde de un clip y termina colocando el rótulo sobre el visor
+// dónde cae el botón de texto dentro de la columna, calculado a partir del
+// ancho de la barra y de la altura de los iconos que lleva encima. el cursor lo
+// necesita para poder ir a pulsarlo, que es de donde sale el rótulo
+const HERRAMIENTA_TEXTO = { indice: 2, x: 4, y: 24 }
+
+// los ajustes de arriba del panel no hacen nada, están para que la mitad
+// superior tenga contenido y los medios puedan bajar a ocupar el resto
+const AJUSTES = [
+  { nombre: 'Brillo', valor: 62 },
+  { nombre: 'Volumen', valor: 38 },
+]
+
+// centros aproximados de cada cajita del panel de medios, en porcentaje del
+// lienzo. las dos primeras comparten fila y la tercera ocupa el ancho entero,
+// por eso su x cae justo en medio del panel
+const MEDIOS = [
+  { x: 13, y: 30 },
+  { x: 22, y: 30 },
+  { x: 17.5, y: 52 },
+]
+
+// el recorrido del cursor. la gracia está en que cada archivo se recoge de su
+// cajita: primero el puntero viaja hasta ella, se queda quieto un instante
+// (ese reposo es el "clic") y solo después baja arrastrando hasta la pista.
+// luego tira del borde de un clip y acaba volviendo al punto de partida, que es
+// lo que permite encadenar el bucle sin que se note el corte
 const RUTA = [
   { t: 0, x: 50, y: 40 },
-  { t: 0.5, x: 17, y: 18 },
-  { t: 1.6, x: 6, y: 74 },
-  { t: 2.1, x: 17, y: 33 },
-  { t: 3.2, x: 47, y: 74 },
-  { t: 3.7, x: 17, y: 48 },
-  { t: 4.6, x: 28, y: 84 },
-  { t: 5.0, x: 35, y: 74 },
-  { t: 5.8, x: 43, y: 74 },
-  { t: 6.4, x: 58, y: 40 },
-  { t: 7.2, x: 63, y: 48 },
-  { t: 10, x: 55, y: 55 },
+  { t: 0.45, x: MEDIOS[0].x, y: MEDIOS[0].y },
+  { t: 0.75, x: MEDIOS[0].x, y: MEDIOS[0].y },
+  { t: 1.6, x: 20, y: 74 },
+  { t: 2.05, x: MEDIOS[1].x, y: MEDIOS[1].y },
+  { t: 2.35, x: MEDIOS[1].x, y: MEDIOS[1].y },
+  { t: 3.2, x: 63, y: 74 },
+  { t: 3.65, x: MEDIOS[2].x, y: MEDIOS[2].y },
+  { t: 3.95, x: MEDIOS[2].x, y: MEDIOS[2].y },
+  { t: 4.6, x: 43, y: 84 },
+  { t: 5.0, x: 36, y: 74 },
+  { t: 5.8, x: 44, y: 74 },
+  { t: 6.25, x: HERRAMIENTA_TEXTO.x, y: HERRAMIENTA_TEXTO.y },
+  { t: 6.55, x: HERRAMIENTA_TEXTO.x, y: HERRAMIENTA_TEXTO.y },
+  { t: 7.2, x: 62, y: 46 },
+  { t: 8.6, x: 46, y: 56 },
+  { t: TOTAL, x: 50, y: 40 },
 ]
 
 function posicion(t: number) {
@@ -88,8 +124,16 @@ export default function DemoMontaje() {
 
   const cursor = posicion(t)
   const pasoActual = GUION.find((g) => t < g.hasta) ?? GUION[GUION.length - 1]
-  const arrastrando = (t > 0.5 && t < 1.6) || (t > 2.1 && t < 3.2) || (t > 3.7 && t < 4.6)
+  const arrastrando = (t > 0.75 && t < 1.6) || (t > 2.35 && t < 3.2) || (t > 3.95 && t < 4.6)
+  // mientras el puntero está posado sobre una cajita se marca cuál, para que el
+  // medio se ilumine y se entienda que lo acaba de coger
+  const medioTocado = t > 0.4 && t < 0.8 ? 0 : t > 2.0 && t < 2.4 ? 1 : t > 3.6 && t < 4.0 ? 2 : -1
   const estirando = t > 5.0 && t < 5.8
+  // el rótulo ya no se materializa solo: el cursor va a la columna, se posa
+  // sobre el botón de texto igual que se posa sobre un medio, y lo que sale de
+  // ese clic viaja colgado del puntero hasta soltarse encima del plano
+  const pulsandoTexto = t > 6.2 && t < 6.6
+  const llevandoRotulo = t > 6.55 && t < 7.2
   const conRotulo = t > 7.2
   const reproduciendo = t > 7.2
 
@@ -103,9 +147,22 @@ export default function DemoMontaje() {
   const clip = CLIPS[enPantalla]
   const cogido = CLIPS[t < 1.6 ? 0 : t < 3.2 ? 1 : 2]
 
-  // la herramienta encendida acompaña al paso: puntero al mover, tirador al
-  // estirar y texto al rotular
-  const herramientaActiva = estirando ? 1 : t > 6.4 && t < 7.6 ? 2 : 0
+  // la herramienta encendida acompaña al paso: puntero al mover y tirador al
+  // estirar. la de texto se prende en cuanto el cursor llega a su botón y
+  // sigue encendida mientras el rótulo está en el aire, como haría el editor
+  const herramientaActiva = estirando
+    ? 1
+    : t > 6.2 && t < 7.9
+      ? HERRAMIENTA_TEXTO.indice
+      : 0
+
+  // el enlace entre la última vuelta y la siguiente. en lugar de cortar en seco
+  // cuando el reloj vuelve a cero, los últimos y los primeros instantes se
+  // atenúan con una curva suave: el ojo lee un fundido y no un salto. como el
+  // cursor termina donde empezó, al reaparecer ya está en su sitio
+  const margen = Math.min(t, TOTAL - t) / RETORNO
+  const f = Math.min(1, Math.max(0, margen))
+  const opacidadEscena = 0.1 + 0.9 * (f * f * (3 - 2 * f))
 
   return (
     <div
@@ -120,6 +177,9 @@ export default function DemoMontaje() {
         className="relative aspect-[16/10] w-full overflow-hidden rounded-2xl sm:aspect-[16/9]"
         style={{ background: 'rgb(var(--border) / 0.05)' }}
       >
+        {/* todo el montaje vive dentro de esta capa, que es la que se funde al
+            cerrar el bucle sin arrastrar consigo el fondo del recuadro */}
+        <div className="absolute inset-0" style={{ opacity: opacidadEscena }}>
         {/* columna de herramientas, pegada al borde como en la aplicación */}
         <div
           className="absolute bottom-[35%] left-[1.5%] top-[2%] flex w-[5%] flex-col items-center justify-start gap-[3%] rounded-lg py-[3%]"
@@ -128,10 +188,19 @@ export default function DemoMontaje() {
           {HERRAMIENTAS.map((Icono, i) => (
             <span
               key={i}
-              className="grid aspect-square w-[62%] place-items-center rounded-md transition-colors duration-300"
+              className="grid aspect-square w-[62%] place-items-center rounded-md transition-all duration-300"
               style={{
                 background: i === herramientaActiva ? 'rgb(var(--accent-boton))' : 'transparent',
                 color: i === herramientaActiva ? '#fff' : 'rgb(var(--border) / 0.55)',
+                // el instante del clic se marca con un anillo, el mismo recurso
+                // que avisa de qué medio acaba de coger el cursor
+                outline:
+                  pulsandoTexto && i === HERRAMIENTA_TEXTO.indice
+                    ? '2px solid rgb(var(--accent))'
+                    : 'none',
+                outlineOffset: '1px',
+                transform:
+                  pulsandoTexto && i === HERRAMIENTA_TEXTO.indice ? 'scale(1.15)' : 'scale(1)',
               }}
             >
               <Icono size={11} />
@@ -139,30 +208,70 @@ export default function DemoMontaje() {
           ))}
         </div>
 
-        {/* panel de medios: los archivos de origen se apagan al usarse */}
+        {/* panel de medios, repartido en dos mitades: los ajustes arriba y los
+            archivos de origen abajo en dos columnas. antes iban apilados en una
+            sola tira y quedaban apretados contra el borde superior con medio
+            panel vacío por debajo. así las cajitas crecen hasta llenar el hueco
+            y el cursor tiene dónde posarse */}
         <div
-          className="absolute bottom-[35%] left-[8%] top-[2%] w-[19%] overflow-hidden rounded-lg p-[4%]"
+          className="absolute bottom-[35%] left-[8%] top-[2%] flex w-[19%] flex-col overflow-hidden rounded-lg p-[5%]"
           style={{ background: 'rgb(var(--border) / 0.09)' }}
         >
           <p
-            className="mb-[6%] text-[8px] font-bold uppercase tracking-wider sm:text-[9px]"
+            className="text-[7px] font-bold uppercase tracking-wider sm:text-[8px]"
+            style={{ color: 'var(--muted)' }}
+          >
+            Ajustes
+          </p>
+          <div className="mt-1 flex shrink-0 flex-col gap-1 sm:gap-1.5">
+            {AJUSTES.map((a) => (
+              <span key={a.nombre} className="flex items-center gap-1">
+                <span
+                  className="w-[42%] shrink-0 truncate text-[6px] sm:text-[7px]"
+                  style={{ color: 'var(--muted)' }}
+                >
+                  {a.nombre}
+                </span>
+                <span
+                  className="relative h-[3px] flex-1 rounded-full"
+                  style={{ background: 'rgb(var(--border) / 0.22)' }}
+                >
+                  <span
+                    className="absolute inset-y-0 left-0 rounded-full"
+                    style={{ width: `${a.valor}%`, background: 'rgb(var(--accent) / 0.7)' }}
+                  />
+                </span>
+              </span>
+            ))}
+          </div>
+
+          <p
+            className="mt-2 text-[7px] font-bold uppercase tracking-wider sm:mt-3 sm:text-[8px]"
             style={{ color: 'var(--muted)' }}
           >
             Medios
           </p>
-          <div className="flex flex-col gap-[7%]">
+          <div className="mt-1 grid flex-1 grid-cols-2 grid-rows-2 gap-1 sm:gap-1.5">
             {CLIPS.map((c, i) => (
               <span
                 key={i}
-                className="flex items-center gap-1.5 rounded transition-opacity duration-500"
-                style={{ opacity: t > c.entra ? 0.25 : 1 }}
+                className="flex min-h-0 flex-col gap-0.5 rounded-md p-1 transition-all duration-300"
+                style={{
+                  // el tercero se lleva la fila entera, que es lo que evita el
+                  // hueco suelto de la esquina
+                  gridColumn: i === 2 ? 'span 2' : undefined,
+                  background:
+                    medioTocado === i ? 'rgb(var(--accent) / 0.18)' : 'rgb(var(--border) / 0.12)',
+                  outline: medioTocado === i ? '1px solid rgb(var(--accent))' : 'none',
+                  opacity: t > c.entra ? 0.3 : 1,
+                }}
               >
                 <span
-                  className="h-5 w-8 shrink-0 rounded sm:h-6 sm:w-10"
+                  className="w-full flex-1 rounded"
                   style={{ background: `linear-gradient(120deg, ${c.de}, ${c.a})` }}
                 />
                 <span
-                  className="truncate text-[7px] sm:text-[8px]"
+                  className="truncate text-[6px] leading-tight sm:text-[7px]"
                   style={{ color: 'var(--muted)' }}
                 >
                   {c.nombre}
@@ -214,8 +323,11 @@ export default function DemoMontaje() {
 
               {conRotulo && (
                 <motion.span
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  // cae desde arriba, que es por donde venía colgando del
+                  // cursor, en vez de aparecer sin más
+                  initial={{ opacity: 0, y: -10, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
                   className="absolute inset-x-4 bottom-3 rounded px-2 py-1 text-center text-[11px] font-bold text-white sm:text-sm"
                   style={{ background: 'rgb(6 12 24 / 0.6)' }}
                 >
@@ -327,7 +439,7 @@ export default function DemoMontaje() {
           style={{
             left: `${cursor.x}%`,
             top: `${cursor.y}%`,
-            transform: `translate(-4px, -2px) scale(${arrastrando || estirando ? 0.92 : 1})`,
+            transform: `translate(-4px, -2px) scale(${arrastrando || estirando || llevandoRotulo ? 0.92 : 1})`,
           }}
         >
           <MousePointer2
@@ -348,7 +460,19 @@ export default function DemoMontaje() {
           {estirando && (
             <span className="absolute -left-1 top-4 text-[10px] font-bold text-brand">↔</span>
           )}
-        </span>
+          {llevandoRotulo && (
+            <motion.span
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 0.9, scale: 1 }}
+              className="absolute left-4 top-3 flex items-center gap-1 rounded px-1 py-0.5"
+              style={{ background: 'rgb(var(--accent) / 0.85)' }}
+            >
+              <Type size={8} className="shrink-0 text-white" />
+              <span className="whitespace-nowrap text-[7px] font-medium text-white">Rótulo</span>
+            </motion.span>
+          )}
+          </span>
+        </div>
       </div>
 
       <div className="mt-4 flex items-center gap-3">

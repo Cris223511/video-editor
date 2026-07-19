@@ -32,6 +32,7 @@ import DemoMontaje from '../../components/sitio/DemoMontaje'
 import DemoCaracteristicas from '../../components/sitio/DemoCaracteristicas'
 import DemoVideo from '../../components/sitio/DemoVideo'
 import { MaquetaLineaTiempo } from '../../components/sitio/MaquetaEditor'
+import MaquetaExporta from '../../components/sitio/MaquetaExporta'
 import { Aviso, Chip, IconoCirculo, RejillaFondo, Tarjeta } from '../../components/sitio/Piezas'
 import { ANCHO_CONTENIDO, RELLENO } from '../../components/sitio/Contenedor'
 
@@ -251,8 +252,13 @@ export default function PortadaView() {
                 </div>
               </div>
             </div>
-            <Parallax fuerza={26}>
+            {/* la columna derecha lleva dos piezas apiladas. antes solo estaba la
+                línea de tiempo, más baja que el video de al lado, y debajo quedaba
+                un vacío que se veía desde lejos. la de exportar cierra el relato:
+                el montaje se arma arriba y el archivo sale abajo */}
+            <Parallax fuerza={26} className="flex flex-col gap-4">
               <MaquetaLineaTiempo />
+              <MaquetaExporta />
             </Parallax>
           </Aparece>
         </div>
@@ -417,7 +423,7 @@ export default function PortadaView() {
         <div className={`mx-auto w-full ${ANCHO_CONTENIDO} ${RELLENO}`}>
           <Aparece>
             <Titulo centrado>
-              De la carpeta al video <Subrayado>terminado</Subrayado>
+              Así se monta un video <Subrayado>de principio a fin</Subrayado>
             </Titulo>
           </Aparece>
           <div className="mx-auto mt-16 grid max-w-3xl gap-x-6 gap-y-12 sm:grid-cols-2">
@@ -430,14 +436,14 @@ export default function PortadaView() {
                     border: '1px solid rgb(var(--border) / 0.1)',
                   }}
                 >
-                  {/* el icono sobresale por arriba y flota despacio, cada uno
-                      con su desfase para que no se muevan como un bloque */}
+                  {/* el icono sobresale por arriba de la tarjeta. va quieto: la
+                      flotación que tenía antes distraía de lo que cuenta el paso,
+                      y con cuatro tarjetas seguidas el conjunto no paraba nunca */}
                   <span
-                    className="absolute -top-6 left-5 grid h-12 w-12 place-items-center rounded-2xl text-white shadow-lg transition-transform duration-300 group-hover:scale-110"
+                    className="absolute -top-6 left-5 grid h-12 w-12 place-items-center rounded-2xl text-white shadow-lg"
                     style={{
                       background:
                         'linear-gradient(140deg, rgb(var(--accent-boton)), rgb(var(--accent-soft)))',
-                      animation: `flotar 4.5s ease-in-out ${i * 0.45}s infinite`,
                     }}
                   >
                     {p.icono}

@@ -1,8 +1,12 @@
-import { motion } from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
+import { motion, useInView } from 'framer-motion'
 // recreaciones de la interfaz del editor para la portada. no son capturas sino
 // la interfaz dibujada con marcado real, así que se ven nítidas a cualquier
 // tamaño, siguen el tema claro u oscuro y no se quedan viejas cuando el editor
 // cambia
+
+// cuánto tarda el cabezal en cruzar la línea de un extremo al otro
+const RECORRIDO = 7
 
 const CLIPS = [
   { pista: 0, izq: 0, ancho: 34, tono: 'linear-gradient(120deg,#2f6bd6,#5aa9ff)' },
@@ -16,8 +20,33 @@ const CLIPS = [
 // pista: en una pieza de portada solo estorban, y lo que se quiere enseñar es el
 // movimiento y cómo se reparten los clips
 export function MaquetaLineaTiempo() {
+  const caja = useRef<HTMLDivElement>(null)
+  const visible = useInView(caja, { amount: 0.2 })
+  // posición del cabezal, de 2 a 96 por ciento. antes la llevaba framer con una
+  // animación de ida y vuelta, pero al ser la única cosa que se movía la pieza
+  // parecía congelada: una raya fina cruzando y nada más. calculándola aquí se
+  // sabe en todo momento qué clip está debajo, y eso permite encenderlo al paso
+  const [x, setX] = useState(2)
+
+  useEffect(() => {
+    if (!visible) return
+    let raf = 0
+    const inicio = performance.now()
+    const paso = () => {
+      const t = ((performance.now() - inicio) / 1000) % (RECORRIDO * 2)
+      // el tramo de vuelta se calcula reflejando el de ida, así el cabezal no da
+      // el salto seco del final al principio que tenía antes
+      const avance = t < RECORRIDO ? t / RECORRIDO : 2 - t / RECORRIDO
+      setX(2 + avance * 94)
+      raf = requestAnimationFrame(paso)
+    }
+    raf = requestAnimationFrame(paso)
+    return () => cancelAnimationFrame(raf)
+  }, [visible])
+
   return (
     <div
+      ref={caja}
       className="overflow-hidden rounded-2xl p-3 shadow-lg sm:p-4"
       style={{
         background: 'rgb(var(--surface))',
@@ -48,14 +77,27 @@ export function MaquetaLineaTiempo() {
               background: 'rgb(var(--border) / 0.05)',
             }}
           >
-            {CLIPS.filter((c) => c.pista === pista).map((c, i) => (
+            {CLIPS.filter((c) => c.pista === pista).map((c, i) => {
+              // el clip por el que va pasando el cabezal se marca con el color de
+              // la marca y se levanta un poco. es lo que convierte el recorrido en
+              // algo que se lee: se ve qué plano suena en cada momento
+              const cruzando = x >= c.izq && x <= c.izq + c.ancho
+              return (
               <motion.div
                 key={i}
-                className="absolute top-0 h-full overflow-hidden rounded-lg"
-                style={{ left: `${c.izq}%`, width: `${c.ancho}%`, background: c.tono }}
+                className="absolute top-0 h-full overflow-hidden rounded-lg transition-shadow duration-300"
+                style={{
+                  left: `${c.izq}%`,
+                  width: `${c.ancho}%`,
+                  background: c.tono,
+                  outline: cruzando ? '2px solid rgb(var(--accent))' : '2px solid transparent',
+                  outlineOffset: 1,
+                  boxShadow: cruzando ? '0 6px 18px rgb(var(--accent) / 0.35)' : 'none',
+                }}
                 initial={{ opacity: 0, scaleX: 0.7 }}
                 whileInView={{ opacity: 1, scaleX: 1 }}
                 viewport={{ once: true, amount: 0.4 }}
+                animate={{ y: cruzando ? -2 : 0 }}
                 transition={{
                   duration: 0.5,
                   delay: 0.1 + i * 0.12 + (pista === 1 ? 0.25 : 0),
@@ -73,20 +115,20 @@ export function MaquetaLineaTiempo() {
                   ))}
                 </div>
               </motion.div>
-            ))}
+              )
+            })}
           </div>
         ))}
 
         {/* el cabezal recorre la línea sin parar, que es lo que da vida a la
             pieza sin necesidad de etiquetas ni texto */}
-        <motion.div
+        <div
           className="pointer-events-none absolute bottom-0 top-0 z-10 w-px"
-          animate={{ left: ['2%', '96%'] }}
-          transition={{ duration: 7, repeat: Infinity, repeatType: 'reverse', ease: 'linear' }}
+          style={{ left: `${x}%` }}
         >
           <span className="absolute inset-y-0 w-px bg-brand" />
           <span className="absolute -left-[5px] -top-1 h-2.5 w-2.5 rounded-sm bg-brand shadow" />
-        </motion.div>
+        </div>
       </div>
     </div>
   )
