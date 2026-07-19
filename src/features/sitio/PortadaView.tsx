@@ -351,8 +351,17 @@ export default function PortadaView() {
               {HERRAMIENTAS.map((h, i) => (
                 <Aparece key={h.titulo} retraso={i * 0.08}>
                   <Tarjeta hover>
-                    <div className="flex gap-3">
-                      <span className="mt-0.5 text-brand">{h.icono}</span>
+                    <div className="flex gap-3.5">
+                      <span
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white shadow-sm"
+                        style={{
+                          background:
+                            'linear-gradient(140deg, rgb(var(--accent-boton)), rgb(var(--accent-soft)))',
+                          animation: `flotar 5s ease-in-out ${i * 0.6}s infinite`,
+                        }}
+                      >
+                        {h.icono}
+                      </span>
                       <div>
                         <h3 className="text-sm font-semibold">{h.titulo}</h3>
                         <p className="mt-1 text-sm leading-relaxed text-[color:var(--muted)]">
@@ -373,8 +382,19 @@ export default function PortadaView() {
               <div className="grid gap-3 min-[420px]:grid-cols-2">
                 {PIEZAS.map((p) => (
                   <Tarjeta key={p.titulo} hover className="!p-3.5">
-                    <span className="text-brand">{p.icono}</span>
-                    <p className="mt-2 font-display text-sm font-bold">{p.titulo}</p>
+                    {/* icono en cuadrado redondeado que flota, con un desfase
+                        distinto por tarjeta para que no se muevan a la vez */}
+                    <span
+                      className="grid h-9 w-9 place-items-center rounded-xl text-white shadow-sm"
+                      style={{
+                        background:
+                          'linear-gradient(140deg, rgb(var(--accent-boton)), rgb(var(--accent-soft)))',
+                        animation: `flotar 5s ease-in-out ${PIEZAS.indexOf(p) * 0.5}s infinite`,
+                      }}
+                    >
+                      {p.icono}
+                    </span>
+                    <p className="mt-3 font-display text-sm font-bold">{p.titulo}</p>
                     <p className="mt-1 text-xs leading-relaxed text-[color:var(--muted)]">
                       {p.texto}
                     </p>
