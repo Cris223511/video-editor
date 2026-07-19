@@ -256,7 +256,7 @@ export default function PortadaView() {
                 línea de tiempo, más baja que el video de al lado, y debajo quedaba
                 un vacío que se veía desde lejos. la de exportar cierra el relato:
                 el montaje se arma arriba y el archivo sale abajo */}
-            <Parallax fuerza={26} className="flex flex-col gap-4">
+            <Parallax fuerza={26} className="flex flex-col gap-7">
               <MaquetaLineaTiempo />
               <MaquetaExporta />
             </Parallax>

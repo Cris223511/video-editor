@@ -17,11 +17,19 @@ export interface Caracteristica {
 // atropellaban y no daba tiempo a leer lo que hacía en cada escena
 const CICLO = 7
 
-// el bucle no salta: los últimos instantes de una vuelta se funden con los
-// primeros de la siguiente. para que el enlace no pierda tiempo, la vuelta
-// vuelve a empezar antes de que la anterior termine, y ese solape es el fundido
-const FUNDIDO = 0.5
-const PERIODO = CICLO - FUNDIDO
+// El bucle no lleva fundido, y es una decisión tomada con las capturas delante.
+//
+// Antes la vuelta empezaba medio segundo antes de que acabara la anterior y se
+// mezclaban las dos con opacidad. Sobre el papel sonaba a enlace suave; en pantalla
+// era una imagen doble. Al ser dos copias completas de la misma escena en momentos
+// distintos, se veían las barras fantasmeadas, dos cabezales y el porcentaje del
+// volumen con dos cifras superpuestas. Un texto duplicado se lee peor que un corte.
+//
+// Lo que de verdad cierra el bucle es que cada escena termine donde empieza, y así
+// están escritas: los vaivenes y los senos tienen periodo CICLO, y lo que no puede
+// cerrar por su forma, como el cursor o el cabezal, se apaga antes del final y
+// vuelve a encenderse ya colocado. Sin solape no hay nada que mezclar.
+const PERIODO = CICLO
 
 const AZUL = 'linear-gradient(120deg, rgb(var(--accent-boton)), rgb(var(--accent-soft)))'
 const PANEL = 'rgb(var(--border) / 0.09)'
@@ -747,9 +755,15 @@ function EscenaAudio({ t }: { t: number }) {
         })}
       </div>
 
+      {/* el cabezal se apaga antes de llegar al final y vuelve a encenderse ya
+          situado al principio. barría de lado a lado sin apagarse, así que al
+          empezar la vuelta reaparecía de golpe en el extremo contrario: medido
+          entre fotogramas, ese salto era el mayor cambio de imagen de todo el
+          ciclo. un cabezal que se apaga al terminar la pasada es además lo que
+          hace cualquier reproductor */}
       <span
         className="absolute top-[19%] h-[40%] w-[2px] rounded-full bg-brand"
-        style={{ left: `${3 + avance * 94}%` }}
+        style={{ left: `${3 + avance * 94}%`, opacity: opacidadCursor(t) }}
       >
         <span className="absolute -left-[5px] -top-1 h-2.5 w-3 rounded-sm bg-brand" />
       </span>
@@ -943,10 +957,7 @@ export default function DemoCaracteristicas({ items }: { items: Caracteristica[]
     setActivo(id)
   }
 
-  // mientras dura el solape conviven la cola de la vuelta anterior y la cabeza
-  // de la nueva, una desvaneciéndose sobre la otra
-  const solape = t < FUNDIDO
-  const mezcla = solape ? t / FUNDIDO : 1
+  // el solape desapareció: producía imagen doble en lugar de un enlace suave
 
   return (
     <div ref={caja}>
@@ -1038,12 +1049,7 @@ export default function DemoCaracteristicas({ items }: { items: Caracteristica[]
                 className="absolute inset-3 overflow-hidden rounded-xl sm:inset-4"
                 style={{ background: 'rgb(var(--border) / 0.06)' }}
               >
-                {solape && (
-                  <div className="absolute inset-0" style={{ opacity: 1 - mezcla }}>
-                    <Escena id={actual.id} t={t + PERIODO} />
-                  </div>
-                )}
-                <div className="absolute inset-0" style={{ opacity: mezcla }}>
+                <div className="absolute inset-0">
                   <Escena id={actual.id} t={t} />
                 </div>
               </motion.div>
