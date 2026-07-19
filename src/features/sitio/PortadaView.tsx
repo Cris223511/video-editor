@@ -256,9 +256,18 @@ export default function PortadaView() {
                 línea de tiempo, más baja que el video de al lado, y debajo quedaba
                 un vacío que se veía desde lejos. la de exportar cierra el relato:
                 el montaje se arma arriba y el archivo sale abajo */}
-            <Parallax fuerza={26} className="flex flex-col gap-7">
-              <MaquetaLineaTiempo />
-              <MaquetaExporta />
+            {/* la separación va en un contenedor propio y no en la clase de
+                Parallax: aquella se aplica al elemento de fuera, que envuelve a
+                los hijos en otro más, así que el hueco entre las dos piezas nunca
+                llegaba a aplicarse por mucho que se subiera */}
+            <Parallax fuerza={26}>
+              {/* la separación entre las dos piezas es la misma que la de la
+                  rejilla que las contiene, para que el hueco horizontal y el
+                  vertical se vean iguales */}
+              <div className="flex flex-col gap-4">
+                <MaquetaLineaTiempo />
+                <MaquetaExporta />
+              </div>
             </Parallax>
           </Aparece>
         </div>

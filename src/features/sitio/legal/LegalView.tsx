@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronRight, Menu, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { RUTAS } from '../../../rutasDef'
@@ -6,6 +8,15 @@ import { irA as irASeccion } from '../../../lib/scroll/useScrollSuave'
 import { Documento, PRIVACIDAD, TERMINOS } from './contenido'
 import Enriquecido from './Enriquecido'
 import { ANCHO_CONTENIDO, RELLENO } from '../../../components/sitio/Contenedor'
+
+// mismo cristal que la barra de navegación. lo comparten todos los paneles
+// propios del sitio para que se reconozcan como una misma familia
+const CRISTAL = {
+  background: 'rgb(var(--surface) / 0.94)',
+  backdropFilter: 'blur(20px) saturate(1.6)',
+  WebkitBackdropFilter: 'blur(20px) saturate(1.6)',
+  border: '1px solid rgb(var(--border) / 0.1)',
+} as const
 
 // índice lateral. en pantalla ancha queda fijo a la izquierda y en móvil se abre
 // como panel, igual que en la referencia
@@ -87,12 +98,20 @@ export default function LegalView({ documento }: { documento: 'terminos' | 'priv
         </Link>
         <ChevronRight size={14} className="text-[color:var(--muted)]" />
         <span className="text-[color:var(--muted)]">{doc.titulo}</span>
+        {/* el disparador del índice cierra la propia miga de pan, así queda a
+            mano y no perdido en un rincón de la pantalla */}
         <button
           onClick={() => setPanel(true)}
           aria-label="Abrir el índice"
-          className="interactivo ml-auto grid h-9 w-9 place-items-center rounded-lg lg:hidden"
+          className="interactivo ml-auto inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-[color:var(--muted)] lg:hidden"
+          style={{
+            background: 'rgb(var(--surface))',
+            border: '1px solid rgb(var(--border) / 0.14)',
+            boxShadow: '0 1px 2px rgb(21 52 102 / 0.07), 0 2px 6px rgb(21 52 102 / 0.05)',
+          }}
         >
-          <Menu size={17} />
+          <Menu size={16} />
+          Contenido
         </button>
       </div>
 
@@ -145,28 +164,59 @@ export default function LegalView({ documento }: { documento: 'terminos' | 'priv
         </article>
       </div>
 
-      {/* panel del índice en móvil */}
-      {panel && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-black/45"
-            onClick={() => setPanel(false)}
-            aria-hidden
-          />
-          <div
-            className="absolute inset-y-0 left-0 w-72 overflow-y-auto p-5 shadow-2xl"
-            style={{ background: 'rgb(var(--surface))' }}
-          >
-            <button
-              onClick={() => setPanel(false)}
-              aria-label="Cerrar"
-              className="interactivo mb-4 ml-auto grid h-8 w-8 place-items-center rounded-lg"
-            >
-              <X size={16} />
-            </button>
-            <Indice doc={doc} activo={activo} onIr={ir} />
-          </div>
-        </div>
+      {/* panel del índice en móvil. va a `body` mediante portal porque el marco
+          de la aplicación anima cada vista con framer y ese transform convertía
+          al contenedor en referencia de posición: el panel dejaba de ser fijo
+          respecto a la ventana y terminaba corriendo el texto de la página */}
+      {createPortal(
+        <AnimatePresence>
+          {panel && (
+            <div className="fixed inset-0 z-[60] lg:hidden">
+              {/* detrás no hay velo negro sino desenfoque, el mismo recurso que
+                  usa la barra de navegación */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.24, ease: 'easeOut' }}
+                className="absolute inset-0"
+                style={{
+                  background: 'rgb(var(--surface) / 0.35)',
+                  backdropFilter: 'blur(14px) saturate(1.4)',
+                  WebkitBackdropFilter: 'blur(14px) saturate(1.4)',
+                }}
+                onClick={() => setPanel(false)}
+                aria-hidden
+              />
+
+              {/* la caja intermedia repite el ancho y el relleno del sitio, de
+                  modo que el panel arranca justo donde arranca el texto y no
+                  pegado al filo de la pantalla */}
+              <div
+                className={`pointer-events-none relative mx-auto flex h-full w-full ${ANCHO_CONTENIDO} ${RELLENO}`}
+              >
+                <motion.div
+                  initial={{ x: '-115%', opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  exit={{ x: '-115%', opacity: 0 }}
+                  transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
+                  className="pointer-events-auto mt-20 max-h-[calc(100%-6rem)] w-72 max-w-full overflow-y-auto rounded-2xl p-5 shadow-2xl"
+                  style={CRISTAL}
+                >
+                  <button
+                    onClick={() => setPanel(false)}
+                    aria-label="Cerrar"
+                    className="interactivo mb-4 ml-auto grid h-8 w-8 place-items-center rounded-lg text-[color:var(--muted)]"
+                  >
+                    <X size={16} />
+                  </button>
+                  <Indice doc={doc} activo={activo} onIr={ir} />
+                </motion.div>
+              </div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body,
       )}
     </div>
   )

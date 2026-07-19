@@ -1,10 +1,13 @@
-import { CSSProperties, useEffect, useRef, useState } from 'react'
+import { CSSProperties, ReactNode, useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 
 interface Opcion {
   valor: string
   etiqueta: string
   estilo?: CSSProperties
+  // icono opcional delante del texto. quien no lo pase sigue viendo la línea
+  // igual que siempre, sin hueco reservado ni sangría de más
+  icono?: ReactNode
 }
 
 // selector propio para el editor. sustituye al desplegable nativo, que en cada
@@ -52,6 +55,11 @@ export default function Selector({
           border: `1px solid rgb(var(--border) / ${abierto ? 0.28 : 0.12})`,
         }}
       >
+        {actual?.icono && (
+          <span className="grid shrink-0 place-items-center text-[color:var(--muted)]">
+            {actual.icono}
+          </span>
+        )}
         <span className="min-w-0 flex-1 truncate" style={actual?.estilo}>
           {actual?.etiqueta ?? valor}
         </span>
@@ -94,7 +102,11 @@ export default function Selector({
                 abierto ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0',
               ].join(' ')}
             >
-              <span className="min-w-0 flex-1 truncate">{o.etiqueta}</span>
+              {o.icono && <span className="grid shrink-0 place-items-center">{o.icono}</span>}
+              {/* el texto solo ocupa lo suyo. antes llevaba flex-1 y se comía todo
+                  el ancho libre, con lo que la marca de elegido acababa pegada al
+                  borde contrario y cada línea parecía partida en dos mitades */}
+              <span className="min-w-0 truncate">{o.etiqueta}</span>
               {o.valor === valor && <Check size={13} className="shrink-0" />}
             </button>
           ))}

@@ -126,7 +126,7 @@ export const PRIVACIDAD: Documento = {
   secciones: [
     {
       id: 'resumen',
-      titulo: 'En pocas palabras',
+      titulo: 'Resumen',
       parrafos: [
         'Esta aplicación **no recoge datos personales**. No hay servidor propio que reciba información, no hay cuentas de usuario, no se instalan cookies de seguimiento y no se emplean herramientas de medición, estadística ni publicidad de ningún tipo.',
         'Conviene entender por qué, porque no es una decisión que se pueda revertir sin reescribir la aplicación entera: todo el procesamiento ocurre en tu navegador y no existe ningún punto donde los datos pudieran recogerse aunque se quisiera.',

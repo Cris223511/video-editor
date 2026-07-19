@@ -34,21 +34,14 @@ export function Tarjeta({
 export function Aviso({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
     <div
-      className="relative flex gap-3.5 overflow-hidden rounded-2xl p-4 pl-5 sm:p-5 sm:pl-6"
+      className="flex gap-3.5 rounded-2xl p-4 sm:p-5"
       style={{
         background: 'rgb(var(--accent) / 0.05)',
         border: '1px solid rgb(var(--accent) / 0.14)',
       }}
     >
-      {/* franja de color en el borde izquierdo, que es lo que distingue un aviso
-          de una tarjeta cualquiera sin recurrir a un fondo saturado */}
-      <span
-        aria-hidden
-        className="absolute inset-y-0 left-0 w-1"
-        style={{
-          background: 'linear-gradient(180deg, rgb(var(--accent)), rgb(var(--accent-soft)))',
-        }}
-      />
+      {/* el icono y el fondo tenue bastan para que se lea como aviso; la franja
+          lateral que había antes ensuciaba el borde */}
       <span
         className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white shadow-sm"
         style={{

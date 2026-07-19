@@ -1,5 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import { Copy, Download, FolderOpen, Search, SlidersHorizontal, Trash2, Upload } from 'lucide-react'
+import {
+  ArrowDownAZ,
+  ArrowDownWideNarrow,
+  ArrowUpNarrowWide,
+  ArrowUpZA,
+  Copy,
+  Download,
+  FolderOpen,
+  Search,
+  SlidersHorizontal,
+  Trash2,
+  Upload,
+} from 'lucide-react'
 import Vacio from '../../components/ui/Vacio'
 import Paginador from '../../components/ui/Paginador'
 import Selector from '../../components/ui/Selector'
@@ -161,7 +173,7 @@ export default function ProyectosView() {
           size={15}
           className="transition-transform duration-200 group-hover:-translate-x-1"
         />{' '}
-        Volver a subir un video
+        Volver a medios
       </Link>
 
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
@@ -227,10 +239,12 @@ export default function ProyectosView() {
               <Selector
                 valor={orden}
                 opciones={[
-                  { valor: 'reciente', etiqueta: 'Modificado hace poco' },
-                  { valor: 'antiguo', etiqueta: 'Creado hace más tiempo' },
-                  { valor: 'az', etiqueta: 'Nombre de la A a la Z' },
-                  { valor: 'za', etiqueta: 'Nombre de la Z a la A' },
+                  // el icono adelanta hacia dónde ordena cada opción, que con
+                  // dos criterios de fecha y dos de nombre se agradece
+                  { valor: 'reciente', etiqueta: 'Más reciente', icono: <ArrowDownWideNarrow size={14} /> },
+                  { valor: 'antiguo', etiqueta: 'Más antiguo', icono: <ArrowUpNarrowWide size={14} /> },
+                  { valor: 'az', etiqueta: 'Nombre de la A a la Z', icono: <ArrowDownAZ size={14} /> },
+                  { valor: 'za', etiqueta: 'Nombre de la Z a la A', icono: <ArrowUpZA size={14} /> },
                 ]}
                 onChange={(v) => {
                   setOrden(v)

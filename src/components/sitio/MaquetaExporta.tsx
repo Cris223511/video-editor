@@ -34,16 +34,22 @@ export default function MaquetaExporta() {
     return () => cancelAnimationFrame(raf)
   }, [visible])
 
-  // la exportación ocupa los primeros seis segundos y el resto se queda en el
-  // archivo terminado, para que dé tiempo a leerlo
-  const avance = Math.min(1, t / 6)
+  // la exportación ocupa los primeros seis segundos, el archivo terminado se
+  // queda un rato en pantalla para que dé tiempo a leerlo, y en el último tramo
+  // la barra se vacía con la misma suavidad con la que se llenó. así la vuelta
+  // enlaza sin que nada tenga que desaparecer
+  const VACIADO = 1.2
+  const avance =
+    t < CICLO - VACIADO
+      ? Math.min(1, t / 6)
+      : 1 - (t - (CICLO - VACIADO)) / VACIADO
   const porcentaje = Math.round(suave(avance) * 100)
-  const listo = avance >= 1
+  const listo = avance >= 1 && t < CICLO - 1.2
 
-  // el último medio segundo del ciclo se desvanece hacia el estado inicial, así
-  // el regreso al principio no da el corte seco de saltar al primer fotograma
-  const restante = CICLO - t
-  const opacidad = restante < 0.6 ? Math.max(0.15, restante / 0.6) : 1
+  // el regreso al principio no se desvanece. antes la pieza entera bajaba de
+  // opacidad al final de la vuelta, y desaparecer para volver a aparecer llamaba
+  // más la atención que el propio salto. lo que enlaza la vuelta es que la barra
+  // y el porcentaje vuelvan a cero con la misma curva con la que crecieron
 
   const formatoActivo = Math.floor(t / 3) % FORMATOS.length
 
@@ -56,7 +62,7 @@ export default function MaquetaExporta() {
         border: '1px solid rgb(var(--border) / 0.1)',
       }}
     >
-      <div style={{ opacity: opacidad, transition: 'opacity 120ms linear' }}>
+      <div>
         <div className="mb-3 flex items-baseline justify-between gap-3">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
             {listo ? 'Archivo terminado' : 'Exportando'}

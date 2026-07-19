@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useInView } from 'framer-motion'
 import { Circle, Image as IconoImagen, MousePointer2, Pause, Play, Square, Type } from 'lucide-react'
+import Tooltip from '../ui/Tooltip'
 
 export interface Caracteristica {
   id: string
@@ -9,13 +10,14 @@ export interface Caracteristica {
   texto: string
 }
 
-// cada escena se dibuja con el mismo reloj, que da vueltas cada siete segundos.
+// cada escena se dibuja con el mismo reloj, que da vueltas cada ocho segundos y
+// medio.
 // así ninguna escena necesita su propio requestAnimationFrame y todas quedan
 // sincronizadas con el resto de la pieza.
 //
 // el ritmo es pausado a propósito. con vueltas cortas los gestos del cursor se
 // atropellaban y no daba tiempo a leer lo que hacía en cada escena
-const CICLO = 7
+const CICLO = 8.5
 
 // El bucle no lleva fundido, y es una decisión tomada con las capturas delante.
 //
@@ -77,7 +79,9 @@ function Marco({ children }: { children: ReactNode }) {
 // salto. midiendo los fotogramas, ese tirón era el mayor cambio de imagen de todo
 // el ciclo, cinco veces por encima de la media. desapareciendo antes de emprender
 // la vuelta, el regreso deja de verse y el enlace se iguala con el resto
-const RETIRO = 5.6
+// el retiro va atado a la vuelta y no a un número suelto: al alargar el ciclo,
+// un valor fijo dejaba al cursor apagado casi tres segundos al final
+const RETIRO = CICLO - 1.4
 const REGRESO = 0.6
 
 function opacidadCursor(t: number) {
@@ -952,6 +956,8 @@ export default function DemoCaracteristicas({ items }: { items: Caracteristica[]
 
   const actual = items.find((x) => x.id === activo) ?? items[0]
 
+  const etiquetaPase = auto ? 'Pausar el pase automático' : 'Reanudar el pase automático'
+
   const elegir = (id: string) => {
     setAuto(false)
     setActivo(id)
@@ -1062,19 +1068,24 @@ export default function DemoCaracteristicas({ items }: { items: Caracteristica[]
           </p>
 
           <div className="mt-3 flex justify-end">
-            <button
-              type="button"
-              onClick={() => setAuto((a) => !a)}
-              className="interactivo flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold"
-              style={{
-                background: 'rgb(var(--surface))',
-                border: '1px solid rgb(var(--border) / 0.14)',
-                color: 'var(--muted)',
-              }}
-            >
-              {auto ? <Pause size={13} /> : <Play size={13} />}
-              {auto ? 'Pausar el pase automático' : 'Reanudar el pase automático'}
-            </button>
+            {/* el texto sobraba: el icono ya dice si se detiene o se reanuda, y
+                lo que decía sigue estando para quien navega con lector o deja el
+                cursor encima */}
+            <Tooltip texto={etiquetaPase}>
+              <button
+                type="button"
+                onClick={() => setAuto((a) => !a)}
+                aria-label={etiquetaPase}
+                className="interactivo grid h-9 w-9 place-items-center rounded-full"
+                style={{
+                  background: 'rgb(var(--surface))',
+                  border: '1px solid rgb(var(--border) / 0.14)',
+                  color: 'var(--muted)',
+                }}
+              >
+                {auto ? <Pause size={16} /> : <Play size={16} />}
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>
