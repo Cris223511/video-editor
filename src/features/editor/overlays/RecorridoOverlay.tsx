@@ -1,6 +1,7 @@
 import { MouseEvent as ReactMouseEvent } from 'react'
 import { Capa } from '../../../types/layers'
 import { useEditorStore } from '../../../store/useEditorStore'
+import { trazarRecorrido } from '../../../lib/layers/motion'
 
 interface Rect {
   ox: number
@@ -48,7 +49,11 @@ export default function RecorridoOverlay({
     cy: rect.oy + p.y * rect.h,
   })
 
-  const trazo = k.map((p) => `${aPantalla(p).cx},${aPantalla(p).cy}`).join(' ')
+  // el trazo sigue la curva suave, no las rectas entre nodos, así que lo que se
+  // ve dibujado coincide con el recorrido real del elemento
+  const trazo = trazarRecorrido(capa)
+    .map((p) => `${aPantalla(p).cx},${aPantalla(p).cy}`)
+    .join(' ')
   // instante del recorrido en el que está el cabezal, para saber qué tramo se
   // está viendo mientras se retoca
   const tRel = playhead - capa.inicio

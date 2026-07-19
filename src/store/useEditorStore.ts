@@ -11,6 +11,7 @@ import {
   crearCapaImagen,
   crearCapaTexto,
 } from '../lib/layers/defaults'
+import { simplificarRecorrido } from '../lib/layers/motion'
 import { duracionTotal } from '../lib/timeline/clips'
 
 const PX_POR_SEGUNDO_DEFECTO = 60
@@ -101,9 +102,22 @@ interface EstadoEditor {
   // el recorrido grabado se puede retocar después: mover un nodo o borrarlo
   moverKeyframe: (id: string, indice: number, x: number, y: number) => void
   quitarKeyframe: (id: string, indice: number) => void
+  // reduce los cientos de puntos de una grabación a los que definen la forma
+  simplificarCapa: (id: string) => void
   // a qué ritmo corre el video mientras se graba un recorrido
   velocidadGrabacion: number
   setVelocidadGrabacion: (v: number) => void
+  // cuenta regresiva antes de empezar a grabar, para dar tiempo a colocar el
+  // cursor. se puede apagar y elegir cuántos segundos dura
+  cuentaActiva: boolean
+  setCuentaActiva: (v: boolean) => void
+  segundosCuenta: number
+  setSegundosCuenta: (n: number) => void
+  // segundos que restan de la cuenta en curso, o null si no hay ninguna corriendo
+  cuentaEnCurso: number | null
+  setCuentaEnCurso: (n: number | null) => void
+  // momento en el que arrancó la grabación, para mostrar el tiempo transcurrido
+  inicioGrabacion: number | null
 
   dibujandoMascara: boolean
   setDibujandoMascara: (v: boolean) => void
@@ -482,7 +496,45 @@ export const useEditorStore = create<EstadoEditor>((set, get) => ({
       }),
     })),
 
-  setGrabandoMovimiento: (v) => set({ grabandoMovimiento: v }),
+  setGrabandoMovimiento: (v) =>
+    set((s) => {
+      // al parar de grabar, el recorrido recién capturado se simplifica solo: se
+      // graba a pulso y quedan cientos de puntos que hay que reducir para poder
+      // editarlos. al arrancar se guarda el instante, para el cronómetro
+      if (!v && s.grabandoMovimiento) {
+        const id = s.capaSeleccionada
+        return {
+          grabandoMovimiento: false,
+          inicioGrabacion: null,
+          capas: s.capas.map((c) =>
+            c.id === id && c.keyframes.length > 2
+              ? { ...c, keyframes: simplificarRecorrido(c.keyframes) }
+              : c,
+          ),
+        }
+      }
+      return {
+        grabandoMovimiento: v,
+        inicioGrabacion: v ? performance.now() : null,
+      }
+    }),
+
+  simplificarCapa: (id) =>
+    set((s) => ({
+      capas: s.capas.map((c) =>
+        c.id === id && c.keyframes.length > 2
+          ? { ...c, keyframes: simplificarRecorrido(c.keyframes) }
+          : c,
+      ),
+    })),
+
+  cuentaActiva: true,
+  setCuentaActiva: (v) => set({ cuentaActiva: v }),
+  segundosCuenta: 3,
+  setSegundosCuenta: (n) => set({ segundosCuenta: Math.max(1, Math.min(10, Math.round(n))) }),
+  cuentaEnCurso: null,
+  setCuentaEnCurso: (n) => set({ cuentaEnCurso: n }),
+  inicioGrabacion: null,
 
   // desplaza una capa completa: mueve su posición fija y, si tiene recorrido,
   // arrastra todos sus puntos a la vez para conservar la forma del movimiento

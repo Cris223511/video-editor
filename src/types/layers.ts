@@ -4,6 +4,11 @@ export interface KeyframePos {
   t: number
   x: number
   y: number
+  // tiradores de curvatura opcionales: desvían la tangente de la curva a su paso
+  // por este nodo. sin definir, la curva calcula la tangente sola a partir de los
+  // nodos vecinos, que da el trazo redondeado por defecto
+  hx?: number
+  hy?: number
 }
 
 // capas que se dibujan encima del video. todas comparten una franja de tiempo
