@@ -58,13 +58,36 @@ export function Aviso({ titulo, children }: { titulo: string; children: ReactNod
   )
 }
 
-// píldora para etiquetas y nombres de tecnología
-export function Chip({ children, activo = false }: { children: ReactNode; activo?: boolean }) {
+// píldora para etiquetas y nombres de tecnología. `destacado` la pinta con el
+// azul de la marca sobre un celeste suave, que es lo que lleva la etiqueta de
+// encima del título de la portada: ahí la píldora gris se perdía contra el fondo
+export function Chip({
+  children,
+  activo = false,
+  destacado = false,
+}: {
+  children: ReactNode
+  activo?: boolean
+  destacado?: boolean
+}) {
+  const resaltada = {
+    background: 'rgb(var(--accent) / 0.14)',
+    border: '1px solid rgb(var(--accent) / 0.28)',
+    // el texto no usa el azul del enlace sino su versión pensada para leerse
+    // sobre fondo, así el contraste aguanta en claro y en oscuro
+    color: 'rgb(var(--accent-texto))',
+  }
+
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors duration-200"
+      className={[
+        'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors duration-200',
+        destacado ? 'font-semibold' : 'font-medium',
+      ].join(' ')}
       style={
-        activo
+        destacado
+          ? resaltada
+          : activo
           ? { background: 'rgb(var(--accent-boton))', color: '#fff' }
           : {
               background: 'rgb(var(--surface))',

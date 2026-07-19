@@ -18,24 +18,29 @@ import {
 // en el impacto, el pie de foto anuncia el clip siguiente mientras el anterior
 // todavía se está dibujando y la pieza se contradice sola
 const GUION = [
-  { hasta: 2.05, texto: 'Traes un archivo desde tu carpeta' },
-  { hasta: 3.65, texto: 'Colocas el siguiente al lado' },
-  { hasta: 5.05, texto: 'Y el tercero en otro nivel' },
-  { hasta: 6.25, texto: 'Estiras un clip para ajustar su duración' },
-  { hasta: 7.6, texto: 'Añades un rótulo sobre la imagen' },
-  { hasta: 10, texto: 'Reproduces el montaje terminado' },
+  { hasta: 2.31, texto: 'Traes un archivo desde tu carpeta' },
+  { hasta: 4.1, texto: 'Colocas el siguiente al lado' },
+  { hasta: 6.1, texto: 'Y el tercero en otro nivel' },
+  { hasta: 8.35, texto: 'Estiras un clip para ajustar su duración' },
+  { hasta: 10.1, texto: 'Añades un rótulo sobre la imagen' },
+  { hasta: 12.8, texto: 'Reproduces el montaje terminado' },
 ]
-const TOTAL = 10
+const TOTAL = 12.8
+// el montaje se arma durante los primeros once segundos y medio; lo que queda
+// hasta el final de la vuelta es un descanso con el resultado a la vista. sin
+// ese alto la pieza encadenaba una vuelta con la siguiente y el ojo no llegaba
+// a quedarse con el montaje terminado
+const ACCION = 11.5
 // margen de cortesía al final y al principio del ciclo: en esos segundos la
-// escena se atenúa y vuelve, así el salto del reloj de 10 a 0 queda tapado
+// escena se atenúa y vuelve, así el salto del reloj queda tapado
 const RETORNO = 0.75
 
 // los clips ocupan la línea de tiempo casi entera: si se quedaban cortos, la
 // mitad derecha de la pista se veía como un hueco muerto
 const CLIPS = [
-  { izq: 1, ancho: 34, pista: 0, entra: 1.6, de: '#2f6bd6', a: '#5aa9ff', nombre: 'sierra_01' },
-  { izq: 44, ancho: 40, pista: 0, entra: 3.2, de: '#8a5ad6', a: '#c07af0', nombre: 'sierra_02' },
-  { izq: 24, ancho: 38, pista: 1, entra: 4.6, de: '#1f8a7a', a: '#4fd0b5', nombre: 'detalle_01' },
+  { izq: 1, ancho: 34, pista: 0, entra: 1.86, de: '#2f6bd6', a: '#5aa9ff', nombre: 'sierra_01' },
+  { izq: 44, ancho: 40, pista: 0, entra: 3.66, de: '#8a5ad6', a: '#c07af0', nombre: 'sierra_02' },
+  { izq: 24, ancho: 38, pista: 1, entra: 5.68, de: '#1f8a7a', a: '#4fd0b5', nombre: 'detalle_01' },
 ]
 
 // las herramientas de la columna izquierda, las mismas que tiene el editor de
@@ -48,13 +53,23 @@ const HERRAMIENTAS = [MousePointer2, Scissors, Type, Sparkles, Wand2, Palette, V
 const HERRAMIENTA_TEXTO = { indice: 2, x: 4, y: 24 }
 
 // los ajustes de arriba del panel no hacen nada, están para que la mitad
-// superior tenga contenido y los medios puedan bajar a ocupar el resto. son
-// tres y no dos porque con dos barras quedaba un vacío entre el rótulo de
-// arriba y el de Medios que se notaba desde lejos
+// superior tenga contenido y los medios puedan bajar a ocupar el resto. con tres
+// barras seguía sobrando sitio entre la última y el rótulo de Medios, así que
+// ahora son cinco, las que de verdad se tocan en un retoque de imagen y sonido
 const AJUSTES = [
   { nombre: 'Brillo', valor: 62 },
   { nombre: 'Contraste', valor: 54 },
+  { nombre: 'Saturación', valor: 48 },
+  { nombre: 'Temperatura', valor: 41 },
   { nombre: 'Volumen', valor: 38 },
+]
+
+// debajo de las barras van dos atajos de los que suele haber en un panel así:
+// uno que corrige la imagen solo y otro que devuelve todo a cero. rellenan la
+// franja que quedaba entre la última barra y los medios
+const ATAJOS_AJUSTE = [
+  { nombre: 'Auto', activo: true },
+  { nombre: 'Restablecer', activo: false },
 ]
 
 // centros de cada cajita del panel de medios, en porcentaje del lienzo
@@ -74,24 +89,29 @@ const MEDIOS = [
 // (ese reposo es el "clic") y solo después baja arrastrando hasta la pista.
 // luego tira del borde de un clip y acaba volviendo al punto de partida, que es
 // lo que permite encadenar el bucle sin que se note el corte
+// el tiempo de cada tramo sale de lo que mide el tramo, no de repartir la vuelta
+// a partes iguales. midiendo el recorrido se veía que los regresos al panel, que
+// cruzan la escena entera, iban al doble de velocidad que el resto y eran los
+// que daban la sensación de prisa; ahora los viajes largos duran más de un
+// segundo y ninguno pasa de unos ciento veinte por ciento de escena por segundo
 const RUTA = [
   { t: 0, x: 50, y: 40 },
-  { t: 0.45, x: MEDIOS[0].x, y: MEDIOS[0].y },
-  { t: 0.75, x: MEDIOS[0].x, y: MEDIOS[0].y },
-  { t: 1.6, x: 20, y: 74 },
-  { t: 2.05, x: MEDIOS[1].x, y: MEDIOS[1].y },
-  { t: 2.35, x: MEDIOS[1].x, y: MEDIOS[1].y },
-  { t: 3.2, x: 63, y: 74 },
-  { t: 3.65, x: MEDIOS[2].x, y: MEDIOS[2].y },
-  { t: 3.95, x: MEDIOS[2].x, y: MEDIOS[2].y },
-  { t: 4.6, x: 43, y: 84 },
-  { t: 5.0, x: 36, y: 74 },
-  { t: 5.8, x: 44, y: 74 },
-  { t: 6.25, x: HERRAMIENTA_TEXTO.x, y: HERRAMIENTA_TEXTO.y },
-  { t: 6.55, x: HERRAMIENTA_TEXTO.x, y: HERRAMIENTA_TEXTO.y },
-  { t: 7.2, x: 62, y: 46 },
-  { t: 8.6, x: 46, y: 56 },
-  { t: TOTAL, x: 50, y: 40 },
+  { t: 0.56, x: MEDIOS[0].x, y: MEDIOS[0].y },
+  { t: 0.96, x: MEDIOS[0].x, y: MEDIOS[0].y },
+  { t: 1.86, x: 20, y: 74 },
+  { t: 2.31, x: MEDIOS[1].x, y: MEDIOS[1].y },
+  { t: 2.66, x: MEDIOS[1].x, y: MEDIOS[1].y },
+  { t: 3.66, x: 63, y: 74 },
+  { t: 4.48, x: MEDIOS[2].x, y: MEDIOS[2].y },
+  { t: 4.83, x: MEDIOS[2].x, y: MEDIOS[2].y },
+  { t: 5.68, x: 43, y: 84 },
+  { t: 6.13, x: 36, y: 74 },
+  { t: 7.03, x: 44, y: 74 },
+  { t: 7.23, x: 44, y: 74 },
+  { t: 8.33, x: HERRAMIENTA_TEXTO.x, y: HERRAMIENTA_TEXTO.y },
+  { t: 8.73, x: HERRAMIENTA_TEXTO.x, y: HERRAMIENTA_TEXTO.y },
+  { t: 9.88, x: 62, y: 46 },
+  { t: ACCION, x: 46, y: 56 },
 ]
 
 function posicion(t: number) {
@@ -114,59 +134,67 @@ function posicion(t: number) {
 export default function DemoMontaje() {
   const caja = useRef<HTMLDivElement>(null)
   const visible = useInView(caja, { amount: 0.3 })
-  const [t, setT] = useState(0)
+  const [bruto, setBruto] = useState(0)
 
   useEffect(() => {
     if (!visible) return
     let raf = 0
     const inicio = performance.now()
     const paso = () => {
-      setT(((performance.now() - inicio) / 1000) % TOTAL)
+      setBruto(((performance.now() - inicio) / 1000) % TOTAL)
       raf = requestAnimationFrame(paso)
     }
     raf = requestAnimationFrame(paso)
     return () => cancelAnimationFrame(raf)
   }, [visible])
 
+  // pasada ACCION el reloj de la escena se planta en su fotograma final: el
+  // montaje se queda quieto, terminado y a la vista, hasta que la vuelta empieza
+  const t = Math.min(bruto, ACCION)
+
   const cursor = posicion(t)
-  const pasoActual = GUION.find((g) => t < g.hasta) ?? GUION[GUION.length - 1]
-  const arrastrando = (t > 0.75 && t < 1.6) || (t > 2.35 && t < 3.2) || (t > 3.95 && t < 4.6)
+  const pasoActual = GUION.find((g) => bruto < g.hasta) ?? GUION[GUION.length - 1]
+  const arrastrando = (t > 0.96 && t < 1.86) || (t > 2.66 && t < 3.66) || (t > 4.83 && t < 5.68)
   // mientras el puntero está posado sobre una cajita se marca cuál, para que el
   // medio se ilumine y se entienda que lo acaba de coger
-  const medioTocado = t > 0.4 && t < 0.8 ? 0 : t > 2.0 && t < 2.4 ? 1 : t > 3.6 && t < 4.0 ? 2 : -1
-  const estirando = t > 5.0 && t < 5.8
+  const medioTocado = t > 0.5 && t < 1.0 ? 0 : t > 2.26 && t < 2.7 ? 1 : t > 4.43 && t < 4.88 ? 2 : -1
+  const estirando = t > 6.13 && t < 7.03
   // el rótulo ya no se materializa solo: el cursor va a la columna, se posa
   // sobre el botón de texto igual que se posa sobre un medio, y lo que sale de
   // ese clic viaja colgado del puntero hasta soltarse encima del plano
-  const pulsandoTexto = t > 6.2 && t < 6.6
-  const llevandoRotulo = t > 6.55 && t < 7.2
-  const conRotulo = t > 7.2
-  const reproduciendo = t > 7.2
+  const pulsandoTexto = t > 8.28 && t < 8.78
+  const llevandoRotulo = t > 8.73 && t < 9.88
+  const conRotulo = t > 9.88
+  const reproduciendo = t > 9.88
 
   // el primer clip se alarga mientras el cursor tira de su borde derecho
-  const estirado = t < 5.0 ? 0 : t > 5.8 ? 1 : (t - 5.0) / 0.8
+  const estirado = t < 6.13 ? 0 : t > 7.03 ? 1 : (t - 6.13) / 0.9
   const anchoPrimero = CLIPS[0].ancho + estirado * 8
 
-  const avance = reproduciendo ? (t - 7.2) / (TOTAL - 7.2) : 0
+  const avance = reproduciendo ? (t - 9.88) / (ACCION - 9.88) : 0
   // qué clip se ve según dónde esté el cabezal
   const enPantalla = avance < 0.45 ? 0 : avance < 0.75 ? 1 : 2
   const clip = CLIPS[enPantalla]
-  const cogido = CLIPS[t < 1.6 ? 0 : t < 3.2 ? 1 : 2]
+  // de qué medio va colgado el puntero. los cortes son los mismos instantes en
+  // los que cada clip aterriza en la pista, si no el color que se lleva en la
+  // mano deja de coincidir con el que acaba de coger
+  const cogido = CLIPS[t < CLIPS[0].entra ? 0 : t < CLIPS[1].entra ? 1 : 2]
 
   // la herramienta encendida acompaña al paso: puntero al mover y tirador al
   // estirar. la de texto se prende en cuanto el cursor llega a su botón y
   // sigue encendida mientras el rótulo está en el aire, como haría el editor
   const herramientaActiva = estirando
     ? 1
-    : t > 6.2 && t < 7.9
+    : t > 8.28 && t < 10.6
       ? HERRAMIENTA_TEXTO.indice
       : 0
 
   // el enlace entre la última vuelta y la siguiente. en lugar de cortar en seco
   // cuando el reloj vuelve a cero, los últimos y los primeros instantes se
-  // atenúan con una curva suave: el ojo lee un fundido y no un salto. como el
-  // cursor termina donde empezó, al reaparecer ya está en su sitio
-  const margen = Math.min(t, TOTAL - t) / RETORNO
+  // atenúan con una curva suave: el ojo lee un fundido y no un salto. el cursor
+  // acaba a un palmo de donde arrancó, y ese trecho lo recorre con la capa casi
+  // apagada, así que no se ve saltar
+  const margen = Math.min(bruto, TOTAL - bruto) / RETORNO
   const f = Math.min(1, Math.max(0, margen))
   const opacidadEscena = 0.1 + 0.9 * (f * f * (3 - 2 * f))
 
@@ -236,8 +264,8 @@ export default function DemoMontaje() {
               key={a.nombre}
               className="absolute inset-x-[10%] flex items-center gap-1.5"
               // el reparto va desde justo debajo del rótulo hasta poco antes de
-              // Medios, así las tres barras se ven a la misma distancia entre sí
-              style={{ top: `${17 + i * 10}%` }}
+              // los atajos, con la misma distancia entre una barra y la siguiente
+              style={{ top: `${12 + i * 6.2}%` }}
             >
               <span
                 className="w-[42%] shrink-0 truncate text-[6px] sm:text-[7px]"
@@ -257,9 +285,24 @@ export default function DemoMontaje() {
             </span>
           ))}
 
+          <span className="absolute inset-x-[10%] flex gap-1" style={{ top: '43%' }}>
+            {ATAJOS_AJUSTE.map((a) => (
+              <span
+                key={a.nombre}
+                className="flex-1 truncate rounded px-1 py-[2px] text-center text-[5px] font-semibold sm:text-[6px]"
+                style={{
+                  background: a.activo ? 'rgb(var(--accent) / 0.18)' : 'rgb(var(--border) / 0.12)',
+                  color: a.activo ? 'rgb(var(--accent))' : 'var(--muted)',
+                }}
+              >
+                {a.nombre}
+              </span>
+            ))}
+          </span>
+
           <p
             className="absolute inset-x-[10%] text-[7px] font-bold uppercase tracking-wider sm:text-[8px]"
-            style={{ top: '46%', color: 'var(--muted)' }}
+            style={{ top: '50%', color: 'var(--muted)' }}
           >
             Medios
           </p>
