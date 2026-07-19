@@ -69,6 +69,8 @@ export default function DemoTransiciones() {
     const c = lienzo.current
     const ctx = c?.getContext('2d')
     if (!c || !ctx || imagenes.current.length < 2) return
+    if (c.width !== ANCHO) c.width = ANCHO
+    if (c.height !== ALTO) c.height = ALTO
     ctx.clearRect(0, 0, ANCHO, ALTO)
     const pintar = (clip: Clip, alfa: number) => {
       const img = clip.id === 'b' ? imagenes.current[1] : imagenes.current[0]
@@ -134,13 +136,7 @@ export default function DemoTransiciones() {
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
       <div className="relative overflow-hidden rounded-xl bg-black">
         <canvas
-          ref={(el) => {
-            if (el) {
-              el.width = ANCHO
-              el.height = ALTO
-            }
-            lienzo.current = el
-          }}
+          ref={lienzo}
           className="block w-full"
           style={{ aspectRatio: `${ANCHO} / ${ALTO}` }}
         />

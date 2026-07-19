@@ -1,5 +1,5 @@
 import { MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react'
-import { Circle, Droplet, EyeOff, Grid2x2, Move, Square } from 'lucide-react'
+import { Circle, Droplet, Grid2x2, Move, Square } from 'lucide-react'
 import { Deslizador } from '../ui/Controls'
 
 const FOTO =
@@ -9,13 +9,12 @@ const FOTO =
 const ANCHO = 880
 const ALTO = 400
 
-type Efecto = 'pixelar' | 'difuminar' | 'transparente'
+type Efecto = 'pixelar' | 'difuminar'
 type Forma = 'rectangulo' | 'circulo'
 
 const EFECTOS: { id: Efecto; nombre: string; icono: JSX.Element }[] = [
   { id: 'pixelar', nombre: 'Pixelar', icono: <Grid2x2 size={13} /> },
   { id: 'difuminar', nombre: 'Difuminar', icono: <Droplet size={13} /> },
-  { id: 'transparente', nombre: 'Tapar', icono: <EyeOff size={13} /> },
 ]
 
 const FORMAS: { id: Forma; nombre: string; icono: JSX.Element }[] = [
@@ -57,6 +56,8 @@ export default function DemoCensura() {
     const img = foto.current
     if (!c || !ctx || !img) return
 
+    if (c.width !== ANCHO) c.width = ANCHO
+    if (c.height !== ALTO) c.height = ALTO
     ctx.clearRect(0, 0, ANCHO, ALTO)
     // recorte que cubre, para no deformar la fotografía
     const e = Math.max(ANCHO / img.naturalWidth, ALTO / img.naturalHeight)
@@ -71,14 +72,7 @@ export default function DemoCensura() {
     const w = caja.w * ANCHO
     const h = caja.h * ALTO
 
-    if (efecto === 'transparente') {
-      ctx.save()
-      recortar(ctx, x, y, w, h)
-      ctx.clip()
-      ctx.fillStyle = '#000'
-      ctx.fillRect(x, y, w, h)
-      ctx.restore()
-    } else if (efecto === 'difuminar') {
+    if (efecto === 'difuminar') {
       ctx.save()
       recortar(ctx, x, y, w, h)
       ctx.clip()
@@ -245,9 +239,7 @@ export default function DemoCensura() {
           ))}
         </div>
 
-        {/* la intensidad solo tiene sentido en pixelado y desenfoque */}
-        {efecto !== 'transparente' && (
-          <div className="flex min-w-[12rem] flex-1 items-center gap-3">
+        <div className="flex min-w-[12rem] flex-1 items-center gap-3">
             <span className="shrink-0 text-xs font-semibold text-[color:var(--muted)]">
               Intensidad
             </span>
@@ -257,19 +249,12 @@ export default function DemoCensura() {
             <span className="w-6 shrink-0 text-right text-xs font-semibold text-brand">
               {intensidad}
             </span>
-          </div>
-        )}
+        </div>
       </div>
 
       <div className="relative overflow-hidden rounded-xl bg-black">
         <canvas
-          ref={(el) => {
-            if (el) {
-              el.width = ANCHO
-              el.height = ALTO
-            }
-            lienzo.current = el
-          }}
+          ref={lienzo}
           className="block w-full"
           style={{ aspectRatio: `${ANCHO} / ${ALTO}` }}
         />
