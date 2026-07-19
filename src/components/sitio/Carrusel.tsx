@@ -34,7 +34,14 @@ export default function Carrusel({ children }: { children: ReactNode[] }) {
     <div>
       {/* el recorte necesita aire arriba y abajo: sin él, la sombra que asoma al
           pasar el cursor se corta justo en el borde y se ve sucia */}
-      <div ref={ref} className="-my-3 overflow-hidden py-3">
+      {/* el carrusel se arrastra con el ratón, así que el puntero pasa a ser una
+          mano y se cierra mientras se tira. y no se puede seleccionar el texto:
+          al arrastrar por encima de una tarjeta se quedaba todo el párrafo en
+          azul de selección, que es justo lo contrario de lo que se pretendía */}
+      <div
+        ref={ref}
+        className="-my-3 cursor-grab select-none overflow-hidden py-3 active:cursor-grabbing"
+      >
         {/* la separación va como relleno de cada tarjeta y se compensa con un
             margen negativo en el contenedor. si se usara `gap`, tres tarjetas de
             un tercio más dos separaciones sumarían más del ancho y la última
