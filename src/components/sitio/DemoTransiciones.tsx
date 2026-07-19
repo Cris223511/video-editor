@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { RotateCw } from 'lucide-react'
 import { CATALOGO, NOMBRES_GRUPO, Grupo, Transicion } from '../../lib/transiciones/catalogo'
-import Tooltip from '../ui/Tooltip'
 import { pintarTransicion } from '../../lib/transiciones/pintar'
 import { Clip } from '../../types/timeline'
 
@@ -73,9 +72,14 @@ export default function DemoTransiciones() {
     ctx.clearRect(0, 0, ANCHO, ALTO)
     const pintar = (clip: Clip, alfa: number) => {
       const img = clip.id === 'b' ? imagenes.current[1] : imagenes.current[0]
+      // se recorta para cubrir el lienzo entero conservando la proporción. con
+      // un dibujado a lo ancho y alto la foto se deformaba y podía dejar banda
+      const e = Math.max(ANCHO / img.naturalWidth, ALTO / img.naturalHeight)
+      const w = img.naturalWidth * e
+      const h = img.naturalHeight * e
       ctx.save()
       ctx.globalAlpha = alfa
-      ctx.drawImage(img, 0, 0, ANCHO, ALTO)
+      ctx.drawImage(img, (ANCHO - w) / 2, (ALTO - h) / 2, w, h)
       ctx.restore()
     }
     pintarTransicion(ctx, ANCHO, ALTO, clipFalso('b', t.id, 1), clipFalso('a', 'ninguna', 0), p, pintar)
@@ -169,8 +173,8 @@ export default function DemoTransiciones() {
             </p>
             <div className="flex flex-wrap gap-1.5">
               {opciones.map((t) => (
-                <Tooltip key={t.id} texto={t.descripcion} lado="arriba">
-                  <button
+                <button
+                    key={t.id}
                     onClick={() => setElegida(t.id)}
                     className={[
                       'rounded-full px-3 py-1.5 text-[11px] font-medium transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm',
@@ -190,7 +194,6 @@ export default function DemoTransiciones() {
                   >
                     {t.nombre}
                   </button>
-                </Tooltip>
               ))}
             </div>
           </div>

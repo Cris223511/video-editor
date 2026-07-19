@@ -3,7 +3,7 @@ import { Circle, Droplet, EyeOff, Grid2x2, Move, Square } from 'lucide-react'
 import { Deslizador } from '../ui/Controls'
 
 const FOTO =
-  'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1200&q=70'
+  'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1800&q=80'
 
 // más bajo que antes: a 500 de alto la pieza dominaba la sección entera
 const ANCHO = 880
@@ -58,7 +58,13 @@ export default function DemoCensura() {
     if (!c || !ctx || !img) return
 
     ctx.clearRect(0, 0, ANCHO, ALTO)
-    ctx.drawImage(img, 0, 0, ANCHO, ALTO)
+    // recorte que cubre, para no deformar la fotografía
+    const e = Math.max(ANCHO / img.naturalWidth, ALTO / img.naturalHeight)
+    const iw = img.naturalWidth * e
+    const ih = img.naturalHeight * e
+    const ix = (ANCHO - iw) / 2
+    const iy = (ALTO - ih) / 2
+    ctx.drawImage(img, ix, iy, iw, ih)
 
     const x = caja.x * ANCHO
     const y = caja.y * ALTO
@@ -79,7 +85,7 @@ export default function DemoCensura() {
       ctx.filter = `blur(${Math.max(2, intensidad * 0.6)}px)`
       // se redibuja la foto entera recortada a la zona, así el desenfoque toma
       // color de alrededor y no deja un halo en los bordes
-      ctx.drawImage(img, 0, 0, ANCHO, ALTO)
+      ctx.drawImage(img, ix, iy, iw, ih)
       ctx.restore()
     } else {
       const off = auxiliar.current

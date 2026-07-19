@@ -120,7 +120,7 @@ export default function DemoColor() {
           <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
             Ruedas:
           </p>
-          <div className="flex items-end justify-between gap-2">
+          <div className="flex items-end gap-5">
             {ZONAS.map((z) => (
               <RuedaColor
                 key={z.campo}
@@ -153,7 +153,7 @@ export default function DemoColor() {
         </div>
 
         <div>
-          <div className="mb-2.5 flex items-center justify-between gap-2">
+          <div className="mb-2.5 flex items-center gap-3">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
               Curvas:
             </p>
@@ -180,7 +180,7 @@ export default function DemoColor() {
               ))}
             </div>
           </div>
-          <div className="mx-auto w-full max-w-[15rem]">
+          <div className="w-full max-w-[15rem]">
             <EditorCurva
               puntos={curvas[canal]}
               color={CANALES.find((c) => c.campo === canal)!.color}

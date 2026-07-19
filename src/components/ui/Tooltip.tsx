@@ -48,15 +48,25 @@ export default function Tooltip({
           sideOffset={8}
           collisionPadding={10}
           className="z-[60] flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium shadow-lg data-[state=delayed-open]:animate-tip-in"
-          style={{ background: 'var(--text)', color: 'rgb(var(--surface))' }}
+          style={{
+            // sigue el tema: antes usaba el color del texto como fondo, que en
+            // oscuro daba una etiqueta clara sobre una interfaz oscura
+            background: 'rgb(var(--surface))',
+            color: 'var(--text)',
+            border: '1px solid rgb(var(--border) / 0.16)',
+            boxShadow: '0 8px 24px rgb(6 12 24 / 0.18)',
+          }}
         >
           {texto}
           {atajo && (
-            <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] tracking-wide">
+            <span
+              className="rounded px-1.5 py-0.5 text-[10px] tracking-wide"
+              style={{ background: 'rgb(var(--border) / 0.12)' }}
+            >
               {atajo}
             </span>
           )}
-          <Tip.Arrow style={{ fill: 'var(--text)' }} width={10} height={5} />
+          <Tip.Arrow style={{ fill: 'rgb(var(--surface))' }} width={10} height={5} />
         </Tip.Content>
       </Tip.Portal>
     </Tip.Root>
