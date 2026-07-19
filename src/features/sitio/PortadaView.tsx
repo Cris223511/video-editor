@@ -48,11 +48,9 @@ const MEDIOS = {
     // el respaldo se saca del propio video, guardado en public, así que lo que se
     // ve antes de que cargue coincide con el clip en lugar de una foto distinta
     imagen: '/poster-equipo.jpg',
-    // clip nuevo, una red de datos que enlaza sola. los otros tres videos ya
-    // estaban repartidos por las demás piezas y aquí se repetía uno; este encaja
-    // con la idea de que el material se procesa en tu propio equipo. comprobado que
-    // el enlace responde y sirve contenido de verdad
-    video: 'https://videos.pexels.com/video-files/3129671/3129671-hd_1920_1080_30fps.mp4',
+    // un paisaje, costa tropical vista desde el aire, que no aparece en ninguna
+    // otra pieza. comprobado que el enlace responde y sirve contenido de verdad
+    video: 'https://videos.pexels.com/video-files/2169880/2169880-hd_1920_1080_30fps.mp4',
   },
 }
 
@@ -390,7 +388,7 @@ export default function PortadaView() {
               <MedioHover
                 imagen={MEDIOS.equipo.imagen}
                 video={MEDIOS.equipo.video}
-                alt="Una red de datos que enlaza puntos entre sí"
+                alt="Costa tropical vista desde el aire, con agua turquesa y palmeras"
                 proporcion="aspect-[5/4]"
               />
             </Parallax>
