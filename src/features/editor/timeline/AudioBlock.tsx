@@ -3,7 +3,7 @@ import { RegionAudio } from '../../../types/audio'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
 import { amplitudEn, picosDeMedio, PerfilPicos } from '../../../lib/audio/picos'
-import { imantarMover, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
+import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
 
 interface Props {
   region: RegionAudio
@@ -209,13 +209,24 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     e.stopPropagation()
     e.preventDefault()
     seleccionarRegion(region.id)
-    let lastX = e.clientX
+    const startX = e.clientX
+    const inicioBase = region.inicio
+    const finBase = region.inicio + region.duracion
+    const umbral = UMBRAL_IMAN_PX / pxPorSegundo
+    const propios = [inicioBase, finBase]
+    // el borde de la franja también se imanta al cabezal, al cero y a los bordes
+    // de los demás, con su guía; se aplica en incrementos hacia el borde enganchado
+    let ultimoBorde = lado === 'inicio' ? inicioBase : finBase
     const mover = (ev: globalThis.MouseEvent) => {
-      const delta = (ev.clientX - lastX) / pxPorSegundo
-      lastX = ev.clientX
-      recortarRegionAudio(region.id, lado, delta)
+      const bordeBruto = (lado === 'inicio' ? inicioBase : finBase) + (ev.clientX - startX) / pxPorSegundo
+      const enganche = imantarBorde(bordeBruto, puntos, umbral, propios)
+      const bordeFinal = enganche ? enganche.punto : bordeBruto
+      setGuiaImantado(enganche ? enganche.guia : null)
+      recortarRegionAudio(region.id, lado, bordeFinal - ultimoBorde)
+      ultimoBorde = bordeFinal
     }
     const soltar = () => {
+      setGuiaImantado(null)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }

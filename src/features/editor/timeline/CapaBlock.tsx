@@ -1,7 +1,7 @@
 import { MouseEvent as ReactMouseEvent } from 'react'
 import { Capa } from '../../../types/layers'
 import { useEditorStore } from '../../../store/useEditorStore'
-import { imantarMover, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
+import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
 
 interface Props {
   capa: Capa
@@ -55,13 +55,25 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     e.stopPropagation()
     e.preventDefault()
     seleccionarCapa(capa.id)
-    let lastX = e.clientX
+    const startX = e.clientX
+    const inicioBase = capa.inicio
+    const finBase = capa.inicio + capa.duracion
+    const umbral = UMBRAL_IMAN_PX / pxPorSegundo
+    const propios = [inicioBase, finBase]
+    // el borde se lleva a donde diga el cursor, pero si roza el cabezal, el cero o
+    // el borde de otro elemento se pega a él y sale la guía. el desplazamiento se
+    // aplica en incrementos hacia el borde ya imantado, para no descuadrarse
+    let ultimoBorde = lado === 'inicio' ? inicioBase : finBase
     const mover = (ev: globalThis.MouseEvent) => {
-      const delta = (ev.clientX - lastX) / pxPorSegundo
-      lastX = ev.clientX
-      recortarCapaTiempo(capa.id, lado, delta)
+      const bordeBruto = (lado === 'inicio' ? inicioBase : finBase) + (ev.clientX - startX) / pxPorSegundo
+      const enganche = imantarBorde(bordeBruto, puntos, umbral, propios)
+      const bordeFinal = enganche ? enganche.punto : bordeBruto
+      setGuiaImantado(enganche ? enganche.guia : null)
+      recortarCapaTiempo(capa.id, lado, bordeFinal - ultimoBorde)
+      ultimoBorde = bordeFinal
     }
     const soltar = () => {
+      setGuiaImantado(null)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }

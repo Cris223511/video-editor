@@ -37,6 +37,7 @@ export default function Preview() {
   const irA = useEditorStore((s) => s.irA)
   const pausar = useEditorStore((s) => s.pausar)
   const seleccionar = useEditorStore((s) => s.seleccionar)
+  const limpiarSeleccion = useEditorStore((s) => s.limpiarSeleccion)
   const agregarFigura = useEditorStore((s) => s.agregarFigura)
   const hayCapas = useEditorStore((s) => s.capas.length > 0)
   const hayCensura = useEditorStore((s) => s.capas.some((c) => c.tipo === 'censura'))
@@ -602,6 +603,10 @@ export default function Preview() {
         hayContenido ? 'bg-black/40' : '',
       ].join(' ')}
       style={hayContenido ? undefined : { background: 'rgb(var(--surface-2))' }}
+      // un clic en el fondo del visor, por fuera del lienzo, suelta lo que hubiera
+      // seleccionado. el propio lienzo corta la propagación, así que este deseleccionar
+      // solo se dispara cuando de verdad se pulsa fuera de la imagen
+      onMouseDown={() => limpiarSeleccion()}
     >
       {!hayContenido ? (
         <div className="w-full max-w-sm">
@@ -617,8 +622,10 @@ export default function Preview() {
             style={{ width: lienzoRect.w, height: lienzoRect.h, background: colorFondo }}
             // un clic sobre la imagen elige el clip que hay bajo el cabezal para
             // poder reencuadrarlo; las capas y los tiradores cortan la
-            // propagación, así que solo llega aquí el clic en el propio video
-            onMouseDown={() => {
+            // propagación, así que solo llega aquí el clic en el propio video. se
+            // corta la propagación para que no llegue al fondo y deseleccione
+            onMouseDown={(e) => {
+              e.stopPropagation()
               if (activo) seleccionar(activo.id)
             }}
             // aceptar el soltar de una forma arrastrada desde el panel de figuras.
