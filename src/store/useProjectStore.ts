@@ -50,7 +50,10 @@ export const useProjectStore = create<EstadoProyecto>((set) => ({
   sinGuardar: false,
   titulo: 'Proyecto sin título',
   medios: [],
-  renombrar: (titulo) => set({ titulo: titulo || 'Proyecto sin título' }),
+  // mientras se escribe se admite cualquier valor, incluido el vacío, para poder
+  // borrar todo y volver a teclear. el relleno con el nombre por defecto se hace
+  // recién al salir del foco, no en cada pulsación
+  renombrar: (titulo) => set({ titulo }),
   agregar: (medio) => set((s) => ({ medios: [...s.medios, medio] })),
   quitar: (id) =>
     set((s) => {

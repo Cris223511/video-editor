@@ -6,6 +6,7 @@ import { posicionCapa } from '../layers/motion'
 import { esTonoNeutro, filtroCss, hayEfectoFiltro } from '../color/tono'
 import { REPETICIONES_BRILLO, desenfoqueBrillo } from '../layers/defaults'
 import { anterior, pintarTransicion, progreso } from '../transiciones/pintar'
+import { encuadreDe, rectClip } from '../timeline/encuadre'
 
 export interface Escena {
   ancho: number
@@ -445,9 +446,9 @@ export function dibujarFotograma(
     const pintar = (clip: Clip, alfa: number) => {
       const video = videoDe(clip.id)
       if (!video || !video.videoWidth) return
-      const escC = Math.min(ancho / video.videoWidth, alto / video.videoHeight)
-      const dw = video.videoWidth * escC
-      const dh = video.videoHeight * escC
+      // el rect donde va el video sale del encuadre del clip; sin encuadre queda
+      // centrado y a tamaño "contener", igual que antes
+      const { dx, dy, dw, dh } = rectClip(video.videoWidth, video.videoHeight, ancho, alto, encuadreDe(clip))
       ctx.save()
       ctx.globalAlpha = alfa
 
@@ -471,7 +472,7 @@ export function dibujarFotograma(
       if (!esTonoNeutro(clip.tono) || hayEfectoFiltro(efectos)) {
         ctx.filter = filtroCss(clip.tono, `tonoexp-${clip.id}`, efectos)
       }
-      ctx.drawImage(video, (ancho - dw) / 2, (alto - dh) / 2, dw, dh)
+      ctx.drawImage(video, dx, dy, dw, dh)
       ctx.filter = 'none'
       ctx.restore()
     }

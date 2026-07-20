@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Track, AjusteTono, Transicion, PistaMeta, EfectoClip } from '../types/timeline'
+import { Track, AjusteTono, Transicion, PistaMeta, EfectoClip, Encuadre } from '../types/timeline'
 import { MediaAsset } from '../types/media'
 import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto } from '../types/layers'
 import { RegionAudio } from '../types/audio'
@@ -116,6 +116,10 @@ interface EstadoEditor {
   setVelocidadClip: (id: string, velocidad: number) => void
   setTono: (id: string, cambios: Partial<AjusteTono>) => void
   resetTono: (id: string) => void
+  // encuadre del clip en el lienzo: posición y tamaño del video. actualizar
+  // recibe cambios sueltos y reset lo devuelve al centrado de siempre
+  actualizarEncuadre: (id: string, cambios: Partial<Encuadre>) => void
+  resetEncuadre: (id: string) => void
   // cadena de efectos del clip: se suman, se ajustan y se quitan por su id
   agregarEfecto: (id: string, efecto: EfectoClip) => void
   actualizarEfecto: (id: string, efectoId: string, cambios: Partial<EfectoClip>) => void
@@ -326,6 +330,8 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'setVelocidadClip',
   'setTono',
   'resetTono',
+  'actualizarEncuadre',
+  'resetEncuadre',
   'agregarEfecto',
   'actualizarEfecto',
   'quitarEfecto',
@@ -721,6 +727,28 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       pista: {
         ...s.pista,
         clips: s.pista.clips.map((c) => (c.id === id ? { ...c, tono: { ...tonoNeutro } } : c)),
+      },
+    })),
+
+  actualizarEncuadre: (id, cambios) =>
+    set((s) => ({
+      pista: {
+        ...s.pista,
+        clips: s.pista.clips.map((c) => {
+          if (c.id !== id) return c
+          // se parte del encuadre vigente, o del neutro si el clip aún no tenía
+          const base = c.encuadre ?? { x: 0.5, y: 0.5, escala: 1 }
+          return { ...c, encuadre: { ...base, ...cambios } }
+        }),
+      },
+    })),
+
+  resetEncuadre: (id) =>
+    set((s) => ({
+      pista: {
+        ...s.pista,
+        // quitar el encuadre por completo devuelve el clip al centrado natural
+        clips: s.pista.clips.map((c) => (c.id === id ? { ...c, encuadre: undefined } : c)),
       },
     })),
 

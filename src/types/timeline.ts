@@ -29,6 +29,18 @@ export interface EfectoDesenfoque {
 // el modelo: basta con añadir otra variante a esta unión
 export type EfectoClip = { id: string } & EfectoDesenfoque
 
+// encuadre del clip dentro del lienzo. x e y son el centro del video en
+// coordenadas del lienzo, de 0 a 1, con 0.5 en el medio; escala multiplica el
+// tamaño con el que el video cabe "contenido". neutro (centrado y escala 1) es
+// el encaje de toda la vida, así que un clip sin encuadre se ve igual que antes.
+// el centro puede salirse del rango 0..1 a propósito: sacar parte del video
+// fuera del lienzo es válido, y lo que sobresale no se exporta
+export interface Encuadre {
+  x: number
+  y: number
+  escala: number
+}
+
 // el identificador sale del catálogo de transiciones. es una cadena libre para
 // que ampliar el catálogo no obligue a tocar el modelo ni rompa lo ya guardado
 export type TipoTransicion = string
@@ -54,6 +66,7 @@ export interface Clip {
   tono: AjusteTono // corrección de color del clip
   efectos: EfectoClip[] // cadena de efectos, vacía mientras no se aplique ninguno
   transicion: Transicion // cómo entra el clip respecto al anterior
+  encuadre?: Encuadre // posición y tamaño del video en el lienzo; ausente = centrado a escala 1
 }
 
 export interface Track {

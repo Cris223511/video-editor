@@ -7,6 +7,7 @@ import { useEditorStore, Herramienta } from '../../store/useEditorStore'
 import { herramientas } from './RielHerramientas'
 import { useProjectStore } from '../../store/useProjectStore'
 import { formatearDuracion } from '../../lib/format/duracion'
+import { encuadreNeutro } from '../../lib/timeline/encuadre'
 import { Campo, Deslizador } from '../../components/ui/Controls'
 import TextPanel from './panels/TextPanel'
 import ImagePanel from './panels/ImagePanel'
@@ -26,10 +27,14 @@ function Propiedades() {
   const clips = useEditorStore((s) => s.pista.clips)
   const quitarClip = useEditorStore((s) => s.quitarClip)
   const setTransicion = useEditorStore((s) => s.setTransicion)
+  const resetEncuadre = useEditorStore((s) => s.resetEncuadre)
   const medios = useProjectStore((s) => s.medios)
 
   const clip = clips.find((c) => c.id === clipSeleccionado) ?? null
   const asset = clip ? medios.find((m) => m.id === clip.assetId) ?? null : null
+  // un clip está reencuadrado cuando su encuadre ya no es el centrado natural;
+  // solo entonces tiene sentido ofrecer el botón de recentrar
+  const reencuadrado = !!clip?.encuadre && !encuadreNeutro(clip.encuadre)
 
   if (!clip || !asset) {
     return (
@@ -74,6 +79,23 @@ function Propiedades() {
               onChange={(v) => setTransicion(clip.id, { duracion: v / 10 })}
             />
           </Campo>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/10">
+        <span className="text-sm font-medium">Encuadre</span>
+        <p className="text-xs leading-relaxed text-[color:var(--muted)]">
+          Arrastra el video en el visor para recolocarlo y tira de sus esquinas para cambiar el
+          tamaño. Lo que quede fuera del lienzo no aparece en el video final.
+        </p>
+        {reencuadrado && (
+          <button
+            onClick={() => resetEncuadre(clip.id)}
+            className="interactivo inline-flex items-center justify-center gap-2 rounded-lg border border-black/10 py-2 text-sm font-medium text-[color:var(--muted)] hover:text-[color:var(--text)] dark:border-white/10"
+          >
+            <Icon name="lienzo" size={15} />
+            Centrar de nuevo
+          </button>
         )}
       </div>
 

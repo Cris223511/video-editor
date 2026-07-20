@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../components/ui/Icon'
 import CapasOverlay from './overlays/CapasOverlay'
+import ClipOverlay from './overlays/ClipOverlay'
 import Vacio from '../../components/ui/Vacio'
 import MarcoOverlay from './overlays/MarcoOverlay'
 import { useEditorStore } from '../../store/useEditorStore'
 import { useProjectStore } from '../../store/useProjectStore'
 import { MediaAsset } from '../../types/media'
 import { clipEnTiempo, duracionTotal } from '../../lib/timeline/clips'
+import { encuadreDe, encuadreNeutro, rectClip } from '../../lib/timeline/encuadre'
 import { gananciaEn } from '../../lib/audio/ganancia'
 import { rectContenido } from '../../lib/layers/rect'
 import { posicionCapa } from '../../lib/layers/motion'
@@ -33,6 +35,7 @@ export default function Preview() {
   const reproduciendo = useEditorStore((s) => s.reproduciendo)
   const irA = useEditorStore((s) => s.irA)
   const pausar = useEditorStore((s) => s.pausar)
+  const seleccionar = useEditorStore((s) => s.seleccionar)
   const hayCapas = useEditorStore((s) => s.capas.length > 0)
   const hayCensura = useEditorStore((s) => s.capas.some((c) => c.tipo === 'censura'))
   const resolucion = useEditorStore((s) => s.resolucion)
@@ -477,12 +480,12 @@ export default function Preview() {
       const pintar = (clip: Clip, alfa: number) => {
         const v = videosRef.current.get(clip.id)
         if (!v || !v.videoWidth) return
-        const e = Math.min(lienzo.width / v.videoWidth, lienzo.height / v.videoHeight)
-        const dw = v.videoWidth * e
-        const dh = v.videoHeight * e
+        // durante una transición geométrica el video también respeta su encuadre,
+        // para que reencuadrar un clip se vea igual dentro y fuera de la transición
+        const { dx, dy, dw, dh } = rectClip(v.videoWidth, v.videoHeight, lienzo.width, lienzo.height, encuadreDe(clip))
         ctx.save()
         ctx.globalAlpha = alfa
-        ctx.drawImage(v, (lienzo.width - dw) / 2, (lienzo.height - dh) / 2, dw, dh)
+        ctx.drawImage(v, dx, dy, dw, dh)
         ctx.restore()
       }
 
@@ -533,67 +536,91 @@ export default function Preview() {
           <div
             className="relative shadow-2xl"
             style={{ width: lienzoRect.w, height: lienzoRect.h, background: colorFondo }}
+            // un clic sobre la imagen elige el clip que hay bajo el cabezal para
+            // poder reencuadrarlo; las capas y los tiradores cortan la
+            // propagación, así que solo llega aquí el clic en el propio video
+            onMouseDown={() => {
+              if (activo) seleccionar(activo.id)
+            }}
           >
-            {clipsOrdenados.map((c) => {
-              const asset = assetPorId.get(c.assetId)
-              if (!asset) return null
-              return (
-                <video
-                  key={c.id}
-                  ref={(el) => {
-                    if (el) videosRef.current.set(c.id, el)
-                    else videosRef.current.delete(c.id)
-                  }}
-                  src={asset.url}
-                  playsInline
-                  preload="auto"
-                  className="absolute inset-0 h-full w-full object-contain"
-                  style={{
-                    opacity: conLienzo ? 0 : opacidadDe(c),
-                    filter:
-                      esTonoNeutro(c.tono) && !hayEfectoFiltro(c.efectos ?? [])
-                        ? undefined
-                        : filtroCss(c.tono, `tono-${c.id}`, c.efectos ?? []),
-                  }}
-                />
-              )
-            })}
-
-            {/* relleno con el propio video, ampliado y borroso, para que un
-                video vertical en un lienzo cuadrado no deje dos franjas planas.
-                va detrás del video real y se recorta al lienzo. no reproduce
-                sonido porque es el mismo material que ya suena delante */}
-            {fondo === 'desenfoque' &&
-              (() => {
-                const act = clipEnTiempo(clipsOrdenados, playhead, ocultas)
-                const asset = act ? assetPorId.get(act.assetId) : null
+            {/* capa recortada: aquí vive todo lo que es imagen del video. el
+                overflow oculto hace que lo que un clip empuje fuera del lienzo no
+                asome, tal como lo recorta el lienzo de la exportación */}
+            <div className="absolute inset-0 overflow-hidden">
+              {clipsOrdenados.map((c) => {
+                const asset = assetPorId.get(c.assetId)
                 if (!asset) return null
+                // el encuadre se aplica como transformación del elemento: se
+                // escala respecto al centro y luego se lleva a su posición, en
+                // fracción del lienzo. coincide con lo que dibuja el compositor
+                const enc = encuadreDe(c)
+                const transform = encuadreNeutro(enc)
+                  ? undefined
+                  : `translate(${(enc.x - 0.5) * 100}%, ${(enc.y - 0.5) * 100}%) scale(${enc.escala})`
                 return (
                   <video
-                    key={`fondo-${act!.id}`}
+                    key={c.id}
                     ref={(el) => {
-                      if (el) fondoRef.current = el
-                      else fondoRef.current = null
+                      if (el) videosRef.current.set(c.id, el)
+                      else videosRef.current.delete(c.id)
                     }}
                     src={asset.url}
-                    muted
                     playsInline
                     preload="auto"
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover"
+                    className="absolute inset-0 h-full w-full object-contain"
                     style={{
-                      filter: `blur(${Math.round(desenfoqueFondo * 0.6)}px) brightness(0.72)`,
-                      transform: 'scale(1.12)',
+                      opacity: conLienzo ? 0 : opacidadDe(c),
+                      transform,
+                      transformOrigin: 'center',
+                      filter:
+                        esTonoNeutro(c.tono) && !hayEfectoFiltro(c.efectos ?? [])
+                          ? undefined
+                          : filtroCss(c.tono, `tono-${c.id}`, c.efectos ?? []),
                     }}
                   />
                 )
-              })()}
-            {conLienzo && (
+              })}
+
+              {/* relleno con el propio video, ampliado y borroso, para que un
+                  video vertical en un lienzo cuadrado no deje dos franjas planas.
+                  va detrás del video real. no reproduce sonido porque es el mismo
+                  material que ya suena delante */}
+              {fondo === 'desenfoque' &&
+                (() => {
+                  const act = clipEnTiempo(clipsOrdenados, playhead, ocultas)
+                  const asset = act ? assetPorId.get(act.assetId) : null
+                  if (!asset) return null
+                  return (
+                    <video
+                      key={`fondo-${act!.id}`}
+                      ref={(el) => {
+                        if (el) fondoRef.current = el
+                        else fondoRef.current = null
+                      }}
+                      src={asset.url}
+                      muted
+                      playsInline
+                      preload="auto"
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover"
+                      style={{
+                        filter: `blur(${Math.round(desenfoqueFondo * 0.6)}px) brightness(0.72)`,
+                        transform: 'scale(1.12)',
+                      }}
+                    />
+                  )
+                })()}
+              {conLienzo && (
+                <canvas
+                  ref={transRef}
+                  className="pointer-events-none absolute inset-0 h-full w-full"
+                />
+              )}
               <canvas
-                ref={transRef}
+                ref={censuraCanvasRef}
                 className="pointer-events-none absolute inset-0 h-full w-full"
               />
-            )}
+            </div>
 
             {filtrosClip.length > 0 && (
               <svg className="absolute h-0 w-0">
@@ -627,10 +654,9 @@ export default function Preview() {
                 </defs>
               </svg>
             )}
-            <canvas
-              ref={censuraCanvasRef}
-              className="pointer-events-none absolute inset-0 h-full w-full"
-            />
+            {/* los overlays quedan por encima del recorte: así se puede agarrar un
+                tirador aunque el clip esté medio fuera del lienzo */}
+            <ClipOverlay />
             <CapasOverlay />
             <MarcoOverlay alturaLienzo={lienzoRect.h} />
           </div>

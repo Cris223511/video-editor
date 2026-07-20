@@ -103,6 +103,11 @@ export default function TopBar() {
               <input
                 value={titulo}
                 onChange={(e) => renombrar(e.target.value)}
+                // al perder el foco, un nombre vacío o de puros espacios vuelve
+                // al de por defecto para que el proyecto nunca quede sin título
+                onBlur={(e) => {
+                  if (!e.target.value.trim()) renombrar('Proyecto sin título')
+                }}
                 spellCheck={false}
                 className="w-40 truncate rounded-lg border border-transparent bg-transparent px-2 py-1 text-[15px] font-semibold tracking-tight outline-none transition-colors hover:border-[rgb(var(--border)/0.18)] focus:border-brand sm:w-56"
               />
