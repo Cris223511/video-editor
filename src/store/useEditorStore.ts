@@ -551,7 +551,6 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         pista: { ...s.pista, clips: nuevosClips },
         clipSeleccionado: clip.id,
         capaSeleccionada: null,
-        herramienta: 'transiciones',
         pxPorSegundo: encaje ?? s.pxPorSegundo,
         resolucion,
         resolucionAuto,
@@ -825,12 +824,14 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       return { pista: { ...s.pista, clips }, clipSeleccionado: segunda.id }
     }),
 
+  // seleccionar un clip ya no cambia la herramienta abierta: el panel del lado se
+  // queda donde estaba, así elegir un video para reencuadrarlo o alinearlo no
+  // arrastra al usuario fuera de donde estaba trabajando
   seleccionar: (id) =>
     set((s) => ({
       clipSeleccionado: id,
       capaSeleccionada: id ? null : s.capaSeleccionada,
       regionSeleccionada: id ? null : s.regionSeleccionada,
-      herramienta: id ? 'transiciones' : s.herramienta,
     })),
 
   limpiarSeleccion: () =>

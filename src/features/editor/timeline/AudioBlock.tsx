@@ -29,11 +29,34 @@ export function alturasOnda(semilla: string, n: number): number[] {
   return alturas
 }
 
+// dibuja una lista de alturas (0..1) como líneas verticales finas y centradas.
+// cada línea mide un solo píxel de ancho y crece de forma simétrica desde el eje
+// horizontal del carril, así que la franja se lee como el waveform de un editor
+// de audio y no como una fila de bloques anchos. el reparto lo hace justify-between
+// para que las líneas queden bien pegadas ocupando todo el ancho disponible
+function LineasOnda({ alturas, color }: { alturas: number[]; color: string }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-between overflow-hidden px-1">
+      {alturas.map((h, i) => (
+        <span
+          key={i}
+          style={{
+            width: 1,
+            flex: '0 0 1px',
+            height: `${Math.round(h * 100)}%`,
+            background: color,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 // barras verticales que representan la onda. se usan tanto dentro de una región
-// de audio como, muy tenues, en el fondo del carril vacío. el trazo es fino y
-// apretado para leerse como una forma de onda real, no como píldoras gordas; por
-// eso el valor por defecto de barras es alto y así el respaldo sintético queda
-// tan detallado como la onda de picos reales
+// de audio como, muy tenues, en el fondo del carril vacío. el trazo es de un píxel
+// y va bien apretado para leerse como una forma de onda real, no como píldoras
+// gordas; por eso el valor por defecto de barras es alto y así el respaldo
+// sintético queda tan detallado como la onda de picos reales
 export function OndaAudio({
   semilla,
   color,
@@ -47,35 +70,16 @@ export function OndaAudio({
 }) {
   const alturas = alturasOnda(semilla, barras)
   return (
-    <div
-      className="pointer-events-none absolute inset-0 flex items-center gap-[0.5px] overflow-hidden px-1"
-      style={{ opacity: opacidad }}
-    >
-      {alturas.map((h, i) => (
-        <span
-          key={i}
-          className="flex-1"
-          style={{ height: `${Math.round(h * 100)}%`, background: color, minWidth: 1 }}
-        />
-      ))}
+    <div className="pointer-events-none absolute inset-0" style={{ opacity: opacidad }}>
+      <LineasOnda alturas={alturas} color={color} />
     </div>
   )
 }
 
-// barras finas dibujadas a partir de picos reales (0..1). se ven como líneas
-// verticales conforme al sonido, más finas y nerviosas que la onda sintética
+// líneas finas dibujadas a partir de picos reales (0..1). siguen el sonido de
+// verdad, con un trazo aún más nervioso que el de la onda sintética
 function OndaReal({ alturas, color }: { alturas: number[]; color: string }) {
-  return (
-    <div className="pointer-events-none absolute inset-0 flex items-center gap-[0.5px] overflow-hidden px-1">
-      {alturas.map((h, i) => (
-        <span
-          key={i}
-          className="flex-1"
-          style={{ height: `${Math.round(h * 100)}%`, background: color, minWidth: 1 }}
-        />
-      ))}
-    </div>
-  )
+  return <LineasOnda alturas={alturas} color={color} />
 }
 
 // calcula la onda real de la franja a partir del audio de los clips que quedan

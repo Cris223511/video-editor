@@ -55,7 +55,10 @@ export default function EditorView() {
   const suave = plegando ? 'transition-[flex-grow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]' : ''
 
   return (
-    <div className="h-[calc(100dvh-3.5rem)] p-1.5">
+    // el editor no deja seleccionar texto al arrastrar por sus paneles ni por el
+    // visor, que es lo que se espera de una herramienta de este tipo; los campos
+    // de escritura vuelven a permitir selección con una regla aparte en el css
+    <div className="editor-noselect h-[calc(100dvh-3.5rem)] p-1.5">
       <PanelGroup direction="vertical" autoSaveId="ve-vertical-3">
         {/* fila superior: herramientas, opciones y visor */}
         <Panel defaultSize={64} minSize={35}>

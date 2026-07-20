@@ -149,6 +149,20 @@ export default function Preview() {
       }
       if (!v.paused) v.pause()
     })
+    // el relleno borroso comparte asset y tiempos con el clip activo, así que se
+    // coloca en el mismo fotograma y se queda quieto mientras el visor no corre
+    const f = fondoRef.current
+    if (f && act) {
+      const objetivo = act.recorteInicio + (playhead - act.inicio) * act.velocidad
+      if (Math.abs(f.currentTime - objetivo) > 0.05) {
+        try {
+          f.currentTime = objetivo
+        } catch {
+          // todavía sin metadatos, no pasa nada
+        }
+      }
+      if (!f.paused) f.pause()
+    }
   }, [playhead, reproduciendo, clipsOrdenados, ocultas])
 
   // durante la reproducción avanza el clip activo y salta al siguiente al
@@ -222,6 +236,21 @@ export default function Preview() {
         }
         v.play().catch(() => {})
       }
+      // el fondo borroso persigue al video real: mismo asset, misma velocidad y
+      // mismo tiempo, para que se vea el material en movimiento y no un cuadro
+      // congelado. si se desfasa un poco se reengancha sin cortar la imagen
+      const f = fondoRef.current
+      if (f) {
+        f.playbackRate = v.playbackRate
+        if (Math.abs(f.currentTime - v.currentTime) > 0.15) {
+          try {
+            f.currentTime = v.currentTime
+          } catch {
+            // sin metadatos todavía
+          }
+        }
+        if (f.paused) f.play().catch(() => {})
+      }
       const finUso = act.recorteInicio + act.duracion * act.velocidad
       if (v.currentTime >= finUso - 0.02) {
         v.pause()
@@ -243,6 +272,7 @@ export default function Preview() {
       cancelado = true
       cancelAnimationFrame(raf)
       videosRef.current.forEach((v) => v.pause())
+      fondoRef.current?.pause()
     }
   }, [reproduciendo, clipsOrdenados, total, irA, pausar])
 
@@ -547,6 +577,37 @@ export default function Preview() {
                 overflow oculto hace que lo que un clip empuje fuera del lienzo no
                 asome, tal como lo recorta el lienzo de la exportación */}
             <div className="absolute inset-0 overflow-hidden">
+              {/* relleno de las bandas con el propio video, ampliado y borroso,
+                  para que un video apaisado en un lienzo vertical no deje dos
+                  franjas planas. va el primero, así queda por debajo del video
+                  real que se pinta encima; no lleva z negativo porque eso lo
+                  hundía por detrás del fondo del lienzo y no se veía. no suena,
+                  que el sonido lo lleva el video de delante */}
+              {fondo === 'desenfoque' &&
+                (() => {
+                  const act = clipEnTiempo(clipsOrdenados, playhead, ocultas)
+                  const asset = act ? assetPorId.get(act.assetId) : null
+                  if (!asset) return null
+                  return (
+                    <video
+                      key={`fondo-${act!.id}`}
+                      ref={(el) => {
+                        if (el) fondoRef.current = el
+                        else fondoRef.current = null
+                      }}
+                      src={asset.url}
+                      muted
+                      playsInline
+                      preload="auto"
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+                      style={{
+                        filter: `blur(${Math.round(desenfoqueFondo * 0.6)}px) brightness(0.72)`,
+                        transform: 'scale(1.12)',
+                      }}
+                    />
+                  )
+                })()}
               {clipsOrdenados.map((c) => {
                 const asset = assetPorId.get(c.assetId)
                 if (!asset) return null
@@ -581,35 +642,6 @@ export default function Preview() {
                 )
               })}
 
-              {/* relleno con el propio video, ampliado y borroso, para que un
-                  video vertical en un lienzo cuadrado no deje dos franjas planas.
-                  va detrás del video real. no reproduce sonido porque es el mismo
-                  material que ya suena delante */}
-              {fondo === 'desenfoque' &&
-                (() => {
-                  const act = clipEnTiempo(clipsOrdenados, playhead, ocultas)
-                  const asset = act ? assetPorId.get(act.assetId) : null
-                  if (!asset) return null
-                  return (
-                    <video
-                      key={`fondo-${act!.id}`}
-                      ref={(el) => {
-                        if (el) fondoRef.current = el
-                        else fondoRef.current = null
-                      }}
-                      src={asset.url}
-                      muted
-                      playsInline
-                      preload="auto"
-                      aria-hidden
-                      className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover"
-                      style={{
-                        filter: `blur(${Math.round(desenfoqueFondo * 0.6)}px) brightness(0.72)`,
-                        transform: 'scale(1.12)',
-                      }}
-                    />
-                  )
-                })()}
               {conLienzo && (
                 <canvas
                   ref={transRef}

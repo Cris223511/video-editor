@@ -1,4 +1,7 @@
+import { Crosshair, Maximize2, MoveHorizontal, MoveVertical } from 'lucide-react'
 import { useEditorStore } from '../../../store/useEditorStore'
+import { useProjectStore } from '../../../store/useProjectStore'
+import Tooltip from '../../../components/ui/Tooltip'
 import { Campo, ColorCampo, Deslizador, Segmentado } from '../../../components/ui/Controls'
 
 const PROPORCIONES = [
@@ -15,6 +18,37 @@ const PROPORCIONES = [
 // abajo, que es justo lo que la maqueta quiere enseñar
 const DEGRADADO_VIDEO = 'linear-gradient(135deg, #12a5f0 0%, #1861ff 52%, #7c3aed 100%)'
 
+// un botón de acomodo con su tooltip. apagado cuando no hay video que tocar, se
+// enciende al elegir uno; el icono va centrado y la explicación sale al pasar el
+// cursor por encima
+function BotonEncuadre({
+  etiqueta,
+  descripcion,
+  disabled,
+  onClick,
+  children,
+}: {
+  etiqueta: string
+  descripcion: string
+  disabled: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <Tooltip texto={descripcion} lado="abajo">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={etiqueta}
+        className="grid h-10 w-full place-items-center rounded-lg border border-black/10 text-[color:var(--muted)] transition-colors duration-200 hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-35 dark:border-white/10"
+      >
+        {children}
+      </button>
+    </Tooltip>
+  )
+}
+
 // panel del lienzo: proporción del proyecto y color de fondo. el fondo se ve en
 // las bandas cuando el video no cubre todo el lienzo. el contenido se reparte en
 // dos zonas, la maqueta y los ajustes, para que no queden apelmazados
@@ -29,6 +63,32 @@ export default function LienzoPanel() {
   const setLienzo = useEditorStore((s) => s.setLienzo)
   const setLienzoAuto = useEditorStore((s) => s.setLienzoAuto)
   const setColorFondo = useEditorStore((s) => s.setColorFondo)
+  // el encuadre del clip elegido se acomoda desde aquí, al estilo de las opciones
+  // de alinear de un editor vectorial: sin video seleccionado los botones van
+  // apagados, y con uno elegido colocan el video centrado y ajustado al lienzo
+  const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
+  const clips = useEditorStore((s) => s.pista.clips)
+  const actualizarEncuadre = useEditorStore((s) => s.actualizarEncuadre)
+  const resetEncuadre = useEditorStore((s) => s.resetEncuadre)
+  const medios = useProjectStore((s) => s.medios)
+
+  const clip = clips.find((c) => c.id === clipSeleccionado) ?? null
+  const asset = clip ? medios.find((m) => m.id === clip.assetId) ?? null : null
+  const hayVideo = !!clip && !!asset
+
+  // el factor con el que el video cabe "contenido" en el lienzo actual. de ahí
+  // salen las escalas de cada ajuste: al ancho, al alto o llenando del todo
+  function encuadrar(modo: 'ancho' | 'alto' | 'llenar') {
+    if (!clip || !asset) return
+    const base = Math.min(resolucion.ancho / asset.ancho, resolucion.alto / asset.alto)
+    const dw = asset.ancho * base
+    const dh = asset.alto * base
+    let escala = 1
+    if (modo === 'ancho') escala = resolucion.ancho / dw
+    else if (modo === 'alto') escala = resolucion.alto / dh
+    else escala = Math.max(resolucion.ancho / dw, resolucion.alto / dh)
+    actualizarEncuadre(clip.id, { x: 0.5, y: 0.5, escala })
+  }
 
   const activa = (a: number, b: number) =>
     lienzoManual && resolucion.ancho === a && resolucion.alto === b
@@ -174,6 +234,52 @@ export default function LienzoPanel() {
           <p className="text-xs leading-relaxed text-[color:var(--muted)]">
             El fondo rellena las zonas que el video no cubre cuando cambias la proporción del lienzo.
           </p>
+
+          {/* acomodo del video dentro del lienzo. como en un editor vectorial, los
+              botones se apagan si no hay ningún video elegido y se encienden al
+              seleccionar uno en el visor o en la línea de tiempo */}
+          <div className="flex flex-col gap-2 border-t border-black/10 pt-4 dark:border-white/10">
+            <span className="text-xs font-medium text-[color:var(--muted)]">Acomodar el video</span>
+            <div className="grid grid-cols-4 gap-2">
+              <BotonEncuadre
+                etiqueta="Centrar"
+                descripcion="Vuelve el video al centro, a su tamaño natural"
+                disabled={!hayVideo}
+                onClick={() => clip && resetEncuadre(clip.id)}
+              >
+                <Crosshair size={17} />
+              </BotonEncuadre>
+              <BotonEncuadre
+                etiqueta="Ajustar al ancho"
+                descripcion="Estira el video hasta tocar los bordes izquierdo y derecho"
+                disabled={!hayVideo}
+                onClick={() => encuadrar('ancho')}
+              >
+                <MoveHorizontal size={17} />
+              </BotonEncuadre>
+              <BotonEncuadre
+                etiqueta="Ajustar al alto"
+                descripcion="Estira el video hasta tocar los bordes de arriba y abajo"
+                disabled={!hayVideo}
+                onClick={() => encuadrar('alto')}
+              >
+                <MoveVertical size={17} />
+              </BotonEncuadre>
+              <BotonEncuadre
+                etiqueta="Llenar el lienzo"
+                descripcion="Agranda el video hasta cubrir todo el lienzo, recortando lo que sobre"
+                disabled={!hayVideo}
+                onClick={() => encuadrar('llenar')}
+              >
+                <Maximize2 size={17} />
+              </BotonEncuadre>
+            </div>
+            {!hayVideo && (
+              <p className="text-[11px] leading-relaxed text-[color:var(--muted)]">
+                Selecciona un video en el visor o en la línea de tiempo para acomodarlo.
+              </p>
+            )}
+          </div>
         </section>
       </div>
     </div>

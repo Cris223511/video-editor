@@ -8,6 +8,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* el editor no deja seleccionar texto al arrastrar por sus paneles o el visor,
+   como cualquier herramienta de escritorio. las zonas de escritura de verdad
+   (campos e inputs, áreas de texto y contenido editable) recuperan la selección
+   para que ahí sí se pueda escribir y marcar con el cursor */
+.editor-noselect {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.editor-noselect input,
+.editor-noselect textarea,
+.editor-noselect [contenteditable='true'] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 /* tokens de color del tema, tomados del azul del logo. toda la interfaz se
    apoya en ellos para que el salto entre claro y oscuro salga uniforme sin
    duplicar estilos. el claro es el modo por defecto */
