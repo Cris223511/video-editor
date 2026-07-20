@@ -1,6 +1,8 @@
 import { useEditorStore } from '../../store/useEditorStore'
 import { useProjectStore, CLAVE_SESION } from '../../store/useProjectStore'
 import { guardarProyecto, leerProyecto } from './almacen'
+import { clipEnTiempo, duracionTotal } from '../timeline/clips'
+import { frameDeVideo } from '../media/probeVideo'
 import {
   guardadoAMedio,
   medioAGuardado,
@@ -8,19 +10,39 @@ import {
   VERSION_FORMATO,
 } from './formato'
 
+// arma la portada del proyecto para la lista. con línea de tiempo montada, se
+// toma el fotograma que se ve justo en la mitad del montaje: se busca qué clip
+// cae en ese instante y se captura el frame de su medio en el segundo que le
+// corresponde, teniendo en cuenta el recorte y la velocidad, igual que haría el
+// visor. sin nada montado, se cae al fotograma de la mitad del primer medio, que
+// ya viene calculado. si no hay medios, queda vacía y la lista pinta su marcador
+async function calcularPortada(): Promise<string> {
+  const ed = useEditorStore.getState()
+  const medios = useProjectStore.getState().medios
+  const clips = ed.pista.clips
+
+  if (clips.length > 0) {
+    const total = duracionTotal(clips)
+    const ordenados = [...clips].sort((a, b) => a.inicio - b.inicio)
+    const activo = clipEnTiempo(ordenados, total / 2) ?? ordenados[0]
+    const medio = medios.find((m) => m.id === activo.assetId)
+    if (medio) {
+      const segundoFuente = activo.recorteInicio + (total / 2 - activo.inicio) * activo.velocidad
+      const frame = await frameDeVideo(medio.url, segundoFuente)
+      if (frame) return frame
+    }
+  }
+
+  return medios[0]?.miniatura ?? ''
+}
+
 // recoge el estado vivo del editor y lo deja listo para guardar. el id se pasa
 // desde fuera: si es el de un proyecto ya existente se sobrescribe, y si es uno
 // nuevo se crea otra entrada
-export function capturarProyecto(id: string, creado: number): ProyectoGuardado {
+export function capturarProyecto(id: string, creado: number, portada: string): ProyectoGuardado {
   const ed = useEditorStore.getState()
   const pr = useProjectStore.getState()
   const medios = pr.medios.map(medioAGuardado)
-
-  // la portada de la lista sale del primer medio del proyecto. su miniatura ya
-  // es un fotograma tomado de la mitad exacta del video, así que reutilizarla
-  // basta: no hace falta volver a leer el archivo ni dibujar otro frame. si el
-  // proyecto todavía no tiene medios queda vacía y la lista pinta su marcador
-  const medioPortada = pr.medios[0]
 
   return {
     version: VERSION_FORMATO,
@@ -28,7 +50,7 @@ export function capturarProyecto(id: string, creado: number): ProyectoGuardado {
     titulo: pr.titulo,
     creado,
     modificado: Date.now(),
-    portada: medioPortada?.miniatura ?? '',
+    portada,
     medios,
     edicion: {
       clips: ed.pista.clips,
@@ -49,7 +71,10 @@ export function capturarProyecto(id: string, creado: number): ProyectoGuardado {
 }
 
 export async function guardarSesion(id: string, creado: number): Promise<void> {
-  await guardarProyecto(capturarProyecto(id, creado))
+  // la portada se calcula antes de guardar porque puede implicar leer un frame
+  // del video (la mitad del montaje), que es una operación asíncrona
+  const portada = await calcularPortada()
+  await guardarProyecto(capturarProyecto(id, creado, portada))
   // se recuerda cuál es el proyecto abierto, para poder recargarlo al refrescar
   try {
     localStorage.setItem(CLAVE_SESION, id)
