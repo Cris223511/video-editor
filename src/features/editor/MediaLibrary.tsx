@@ -90,8 +90,10 @@ export default function MediaLibrary() {
           </ul>
         )}
 
-        {/* zona para soltar archivos del explorador; se ilumina al pasar por
-            encima con algo arrastrado */}
+        {/* con videos ya cargados, el cartel grande sobra y solo mete ruido. se
+            deja un botón discreto para añadir más, que sigue aceptando archivos
+            soltados encima. sin ninguno todavía, se muestra la zona amplia que
+            invita a empezar */}
         <label
           onDragOver={(e) => {
             e.preventDefault()
@@ -99,25 +101,42 @@ export default function MediaLibrary() {
           }}
           onDragLeave={() => setEncima(false)}
           onDrop={soltarArchivos}
-          className={[
-            'flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-3 text-center transition-all duration-200',
-            medios.length ? 'py-4' : 'py-10',
-            encima
-              ? 'scale-[1.02] border-brand bg-brand/10'
-              : 'border-[rgb(var(--border)/0.22)] hover:border-brand/60 hover:bg-brand/5',
-            ocupado ? 'pointer-events-none opacity-60' : '',
-          ].join(' ')}
+          className={
+            medios.length
+              ? [
+                  'flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed py-2 text-center transition-all duration-200',
+                  encima
+                    ? 'border-brand bg-brand/10'
+                    : 'border-[rgb(var(--border)/0.22)] text-[color:var(--muted)] hover:border-brand/60 hover:text-brand',
+                  ocupado ? 'pointer-events-none opacity-60' : '',
+                ].join(' ')
+              : [
+                  'flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-3 py-10 text-center transition-all duration-200',
+                  encima
+                    ? 'scale-[1.02] border-brand bg-brand/10'
+                    : 'border-[rgb(var(--border)/0.22)] hover:border-brand/60 hover:bg-brand/5',
+                  ocupado ? 'pointer-events-none opacity-60' : '',
+                ].join(' ')
+          }
         >
           <Icon
-            name="subir"
-            size={medios.length ? 16 : 22}
+            name={medios.length ? 'mas' : 'subir'}
+            size={medios.length ? 15 : 22}
             className={encima ? 'text-brand' : 'text-[color:var(--muted)]'}
           />
-          <span className="text-[13px] font-medium leading-tight text-[color:var(--muted)]">
-            {encima ? 'Suelta para importar' : 'Arrastra tus videos aquí'}
-          </span>
-          {!medios.length && (
-            <span className="text-[10px] text-[color:var(--muted)]">o haz clic para elegirlos</span>
+          {medios.length ? (
+            <span className="text-[13px] font-medium">
+              {encima ? 'Suelta para importar' : 'Agregar más'}
+            </span>
+          ) : (
+            <>
+              <span className="text-[13px] font-medium leading-tight text-[color:var(--muted)]">
+                {encima ? 'Suelta para importar' : 'Arrastra tus videos aquí'}
+              </span>
+              <span className="text-[10px] text-[color:var(--muted)]">
+                o haz clic para elegirlos
+              </span>
+            </>
           )}
           <input
             type="file"
