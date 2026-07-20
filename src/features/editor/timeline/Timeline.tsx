@@ -13,6 +13,8 @@ import PistaHeader from './PistaHeader'
 import { HUECO_PISTA } from './ClipBlock'
 import CapaBlock from './CapaBlock'
 import AudioBlock from './AudioBlock'
+import CarrilHeader from './CarrilHeader'
+import AgregarNivelMenu from './AgregarNivelMenu'
 
 const MIN = 0.1
 // alto de la regla de tiempo, replicado en la columna de cabeceras para que las
@@ -221,17 +223,19 @@ export default function Timeline({
               <PistaHeader key={p} indice={p} alto={altosPista[p]} />
             ))}
           </div>
-          {/* añadir un nivel desde el pie de la columna de cabeceras, además del
-              botón de la barra superior. se apaga al llegar al tope de niveles */}
-          <button
-            onClick={agregarPista}
-            disabled={numPistas >= 6}
-            className="interactivo mt-1.5 flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] font-medium text-[color:var(--muted)] disabled:pointer-events-none disabled:opacity-40"
-            style={{ border: '1px dashed rgb(var(--border) / 0.2)' }}
-          >
-            <Icon name="video" size={14} />
-            Agregar nivel
-          </button>
+          {/* cabeceras de los carriles de texto y de audio, alineadas con sus
+              filas del lado derecho (mismo margen y alto). se muestran siempre,
+              aunque el carril esté vacío, para que se entienda que ese espacio
+              existe y qué le corresponde */}
+          <div className="mt-1.5">
+            <CarrilHeader icono="texto" titulo="Texto y figuras" acento="#f59e0b" alto={36} />
+          </div>
+          <div className="mt-1.5">
+            <CarrilHeader icono="audio" titulo="Audio" acento="#10b981" alto={32} />
+          </div>
+          {/* el antiguo botón de agregar nivel ahora abre un menú con los tres
+              tipos de carril. se queda al pie de la columna de cabeceras */}
+          <AgregarNivelMenu />
         </div>
 
       <div
