@@ -32,6 +32,7 @@ import { formatearBytes } from '../../lib/format/bytes'
 import { ANCHO_CONTENIDO, RELLENO } from '../../components/sitio/Contenedor'
 import FichaProyecto from './FichaProyecto'
 import Confirmar from '../../components/ui/Confirmar'
+import Modal from '../../components/ui/Modal'
 
 // fecha escrita en largo, la misma forma que usa la ficha de detalles. antes la
 // tarjeta decía cosas como "hoy a las 2:22", que se lee rápido pero no sirve para
@@ -58,6 +59,9 @@ export default function ProyectosView() {
   const [lista, setLista] = useState<ResumenProyecto[] | null>(null)
   const [uso, setUso] = useState<{ usado: number; total: number } | null>(null)
   const [confirmar, setConfirmar] = useState<string | null>(null)
+  // proyecto que se está por duplicar, con el nombre propuesto para la copia. al
+  // pulsar duplicar no se copia de una: primero se pregunta cómo llamarla
+  const [duplicando, setDuplicando] = useState<{ id: string; nombre: string } | null>(null)
   // qué proyecto tiene la ficha abierta. null cuando no hay ninguna
   const [detalles, setDetalles] = useState<string | null>(null)
   const entrada = useRef<HTMLInputElement>(null)
@@ -99,9 +103,10 @@ export default function ProyectosView() {
     }
   }
 
-  async function duplicar(id: string) {
+  async function duplicar(id: string, nombre: string) {
     try {
-      await duplicarProyecto(id)
+      await duplicarProyecto(id, nombre)
+      setDuplicando(null)
       mostrar('success', 'Proyecto duplicado.')
       refrescar()
     } catch {
@@ -391,7 +396,7 @@ export default function ProyectosView() {
               <div className="mt-3 flex justify-end gap-1">
                 <Tooltip texto="Duplicar">
                   <button
-                    onClick={() => duplicar(p.id)}
+                    onClick={() => setDuplicando({ id: p.id, nombre: `Copia de ${p.titulo}` })}
                     aria-label="Duplicar"
                     className="grid h-8 w-8 place-items-center rounded-lg text-[color:var(--muted)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand/10 hover:text-brand"
                   >
@@ -437,13 +442,22 @@ export default function ProyectosView() {
           <b className="font-semibold text-[color:var(--text)]">
             {formatearBytes(uso.usado)} de los {formatearBytes(uso.total)}
           </b>{' '}
-          que tu navegador reserva en este equipo. Es un espacio tuyo y de nadie más: cada persona
-          que use la aplicación tiene el suyo propio, en su propia máquina, porque nada se sube a
+          que tu navegador reserva en este equipo. Es un espacio tuyo y de nadie más, ya que cada
+          persona que use la aplicación tiene el suyo propio en su propia máquina y nada se sube a
           ningún servidor.
         </p>
       )}
 
       <FichaProyecto id={detalles} onCerrar={() => setDetalles(null)} />
+
+      {/* al duplicar se pregunta el nombre de la copia en la misma clase de
+          ventana que el resto de la aplicación, con el campo ya enfocado */}
+      <ModalDuplicar
+        abierto={duplicando !== null}
+        nombre={duplicando?.nombre ?? ''}
+        onCancelar={() => setDuplicando(null)}
+        onAceptar={(nombre) => duplicando && duplicar(duplicando.id, nombre)}
+      />
 
       {/* borrar un proyecto se lleva también sus videos y no tiene vuelta atrás,
           así que la pregunta se hace en una ventana y no de lado en la tarjeta */}
@@ -457,5 +471,85 @@ export default function ProyectosView() {
         onCancelar={() => setConfirmar(null)}
       />
     </div>
+  )
+}
+
+// ventana para nombrar la copia antes de duplicar. arranca con el nombre
+// propuesto ("Copia de ...") ya seleccionado, así que se puede escribir encima o
+// pulsar aceptar sin más. enter confirma y esc cierra, como en cualquier campo
+function ModalDuplicar({
+  abierto,
+  nombre,
+  onCancelar,
+  onAceptar,
+}: {
+  abierto: boolean
+  nombre: string
+  onCancelar: () => void
+  onAceptar: (nombre: string) => void
+}) {
+  const [valor, setValor] = useState(nombre)
+  const campo = useRef<HTMLInputElement>(null)
+
+  // cada vez que se abre con otro proyecto se recarga el nombre propuesto y, en
+  // cuanto la ventana termina de aparecer, el campo recibe el foco con todo el
+  // texto marcado para poder reemplazarlo de un tirón. el modal cancela el
+  // enfoque automático de radix, de ahí que haya que pedirlo a mano
+  useEffect(() => {
+    if (!abierto) return
+    setValor(nombre)
+    const t = window.setTimeout(() => {
+      campo.current?.focus()
+      campo.current?.select()
+    }, 80)
+    return () => window.clearTimeout(t)
+  }, [abierto, nombre])
+
+  const confirmar = () => {
+    if (!valor.trim()) return
+    onAceptar(valor)
+  }
+
+  return (
+    <Modal titulo="Duplicar proyecto" abierto={abierto} onCerrar={onCancelar} ancho="max-w-sm">
+      <label className="mb-1.5 block text-[13px] font-medium text-[color:var(--muted)]">
+        Nombre de la copia
+      </label>
+      <input
+        ref={campo}
+        value={valor}
+        onChange={(e) => setValor(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            confirmar()
+          }
+        }}
+        spellCheck={false}
+        className="w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-brand"
+        style={{
+          background: 'rgb(var(--surface))',
+          border: '1px solid rgb(var(--border) / 0.16)',
+        }}
+      />
+
+      <div className="mt-5 flex justify-end gap-2">
+        <button
+          onClick={onCancelar}
+          className="rounded-lg px-4 py-2 text-[13px] font-medium text-[color:var(--muted)] transition-colors duration-200 hover:text-[color:var(--text)]"
+          style={{ border: '1px solid rgb(var(--border) / 0.16)' }}
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={confirmar}
+          disabled={!valor.trim()}
+          className="rounded-lg px-4 py-2 text-[13px] font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 disabled:pointer-events-none disabled:opacity-50"
+          style={{ background: 'rgb(var(--accent-boton))' }}
+        >
+          Duplicar
+        </button>
+      </div>
+    </Modal>
   )
 }

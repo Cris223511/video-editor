@@ -4,9 +4,15 @@ import { useProjectStore } from '../../store/useProjectStore'
 import { guardarSesion } from '../../lib/proyecto/sesion'
 
 // cuánto se espera desde el último cambio antes de guardar solo. guardar en
-// cada tecla sería absurdo cuando el proyecto lleva videos dentro, así que se
-// deja reposar unos segundos
-const ESPERA = 4000
+// cada tecla sería absurdo cuando el proyecto lleva videos dentro, pero tampoco
+// conviene tardar tanto que el aviso de "guardando" llegue mucho después del
+// cambio; un reposo corto se siente inmediato sin disparar en cada micro-ajuste
+const ESPERA = 1200
+
+// el aviso de "guardando" se deja puesto un mínimo de tiempo aunque el guardado
+// real termine antes. si no, con un montaje ligero el texto y su animación
+// parpadearían tan rápido que ni se verían
+const VISIBLE_MIN = 1600
 
 // campos cuyo cambio significa que el montaje se ha tocado de verdad. mover el
 // cabezal o cambiar de herramienta no cuenta, o estaría guardando cada segundo
@@ -57,6 +63,10 @@ export function useAutoguardado(activo: boolean) {
         // no tiene sentido guardar un proyecto que aún no tiene nada dentro
         if (useProjectStore.getState().medios.length === 0) return
         guardando.current = true
+        // se enciende el aviso visible y se anota el instante para no apagarlo
+        // antes del mínimo, aunque el guardado en sí sea casi instantáneo
+        const desde = Date.now()
+        useProjectStore.setState({ guardando: true })
         try {
           const p = useProjectStore.getState()
           await guardarSesion(p.idProyecto, p.creado)
@@ -65,7 +75,13 @@ export function useAutoguardado(activo: boolean) {
           // si falla se deja marcado como pendiente y se reintenta al siguiente
           // cambio; avisar aquí con un mensaje sería ruido constante
         } finally {
-          guardando.current = false
+          const resto = VISIBLE_MIN - (Date.now() - desde)
+          const apagar = () => {
+            guardando.current = false
+            useProjectStore.setState({ guardando: false })
+          }
+          if (resto > 0) window.setTimeout(apagar, resto)
+          else apagar()
         }
       }, ESPERA)
     }

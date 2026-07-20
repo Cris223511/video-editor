@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FolderOpen, Moon, Redo2, Save, Sun, Undo2 } from 'lucide-react'
+import { FolderOpen, Loader2, Moon, Redo2, Save, Sun, Undo2 } from 'lucide-react'
 import Icon from '../ui/Icon'
 import Tooltip from '../ui/Tooltip'
 import { useToast } from '../ui/ToastProvider'
@@ -24,10 +24,15 @@ export default function TopBar() {
   const medios = useProjectStore((s) => s.medios)
   const sinGuardar = useProjectStore((s) => s.sinGuardar)
   const guardadoEn = useProjectStore((s) => s.guardadoEn)
+  // el guardado automático también enciende este aviso, no solo el botón manual
+  const guardandoAuto = useProjectStore((s) => s.guardando)
   const tema = useThemeStore((s) => s.tema)
   const alternar = useThemeStore((s) => s.alternar)
   const { mostrar } = useToast()
   const [guardando, setGuardando] = useState(false)
+  // el aviso se muestra tanto si el guardado lo pidió el botón como si lo lanzó
+  // el guardado automático por debajo
+  const enGuardado = guardando || guardandoAuto
   const enEditor = pathname === RUTAS.editor
   // los botones de historial se apagan cuando no queda nada por deshacer o
   // rehacer, para que se vea de un vistazo si hay pasos disponibles
@@ -194,13 +199,19 @@ export default function TopBar() {
                 disabled={guardando}
                 className="interactivo inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium text-[color:var(--muted)] disabled:opacity-50"
               >
-                <Save size={16} />
+                {/* mientras se escribe en el almacén el icono pasa a ser un loader
+                    que gira, la señal clara de que el guardado está en marcha */}
+                {enGuardado ? (
+                  <Loader2 size={16} className="animate-spin text-brand" />
+                ) : (
+                  <Save size={16} />
+                )}
                 <span className="hidden sm:inline">
-                  {guardando ? 'Guardando...' : sinGuardar ? 'Guardar' : guardadoEn ? 'Guardado' : 'Guardar'}
+                  {enGuardado ? 'Guardando...' : sinGuardar ? 'Guardar' : guardadoEn ? 'Guardado' : 'Guardar'}
                 </span>
                 {/* el punto avisa de que hay trabajo aún no guardado, sin robar
                     atención con un mensaje cada vez que se toca algo */}
-                {sinGuardar && !guardando && (
+                {sinGuardar && !enGuardado && (
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                 )}
               </button>

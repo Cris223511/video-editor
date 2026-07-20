@@ -9,6 +9,10 @@ interface EstadoProyecto {
   // cuándo se guardó por última vez y si hay cambios posteriores sin guardar
   guardadoEn: number | null
   sinGuardar: boolean
+  // true mientras se está escribiendo en el almacén, tanto al guardar a mano como
+  // en el guardado automático. la barra superior lo usa para mostrar el aviso de
+  // "guardando" con su animación mientras dura
+  guardando: boolean
   titulo: string
   medios: MediaAsset[]
   renombrar: (titulo: string) => void
@@ -48,6 +52,7 @@ export const useProjectStore = create<EstadoProyecto>((set) => ({
   creado: Date.now(),
   guardadoEn: null,
   sinGuardar: false,
+  guardando: false,
   titulo: 'Proyecto sin título',
   medios: [],
   // mientras se escribe se admite cualquier valor, incluido el vacío, para poder

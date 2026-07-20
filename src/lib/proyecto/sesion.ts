@@ -166,15 +166,17 @@ function regenerarMiniaturas(medios: MediaAsset[]): void {
 }
 
 // duplicar copia el proyecto entero con otro id, incluidos los archivos, para
-// que tocar la copia no afecte al original
-export async function duplicarProyecto(id: string): Promise<void> {
+// que tocar la copia no afecte al original. el nombre lo elige quien duplica; si
+// no llega ninguno, se cae al viejo "(copia)" para no dejar la copia sin título
+export async function duplicarProyecto(id: string, nombre?: string): Promise<void> {
   const p = await leerProyecto(id)
   if (!p) return
   const ahora = Date.now()
+  const titulo = nombre?.trim() || `${p.titulo} (copia)`
   await guardarProyecto({
     ...p,
     id: crypto.randomUUID(),
-    titulo: `${p.titulo} (copia)`,
+    titulo,
     creado: ahora,
     modificado: ahora,
   })

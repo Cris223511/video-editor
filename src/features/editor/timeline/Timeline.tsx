@@ -78,6 +78,7 @@ export default function Timeline({
   const playhead = useEditorStore((s) => s.playhead)
   const pxPorSegundo = useEditorStore((s) => s.pxPorSegundo)
   const irA = useEditorStore((s) => s.irA)
+  const pausar = useEditorStore((s) => s.pausar)
   const aplicarZoom = useEditorStore((s) => s.aplicarZoom)
   const setAnchoTimeline = useEditorStore((s) => s.setAnchoTimeline)
   const limpiarSeleccion = useEditorStore((s) => s.limpiarSeleccion)
@@ -216,6 +217,9 @@ export default function Timeline({
   function arrastrarCabezal(e: MouseEvent) {
     e.stopPropagation()
     e.preventDefault()
+    // mover el cabezal a mano pausa la reproducción: uno agarra la línea para
+    // buscar un fotograma, no para seguir viendo. al soltar se queda quieto ahí
+    pausar()
     setCabezalActivo(true)
     moverCabezal(e.clientX)
     const mover = (ev: globalThis.MouseEvent) => moverCabezal(ev.clientX)
@@ -234,6 +238,9 @@ export default function Timeline({
     // la regla mueve el cabezal, no cambia la selección: por eso corta la
     // propagación antes de que el clic llegue al deseleccionado del fondo
     e.stopPropagation()
+    // pulsar o arrastrar por la regla también pausa, para buscar sin que el video
+    // siga corriendo por debajo
+    pausar()
     setCabezalActivo(true)
     moverCabezal(e.clientX)
     const mover = (ev: globalThis.MouseEvent) => moverCabezal(ev.clientX)

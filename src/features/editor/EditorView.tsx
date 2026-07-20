@@ -120,12 +120,13 @@ export default function EditorView() {
                   order={1}
                   collapsible
                   collapsedSize={0}
-                  defaultSize={20}
-                  // el panel de medios no debe poder encogerse más que el de
-                  // opciones de arriba: se le da el mismo mínimo para que ninguno
-                  // de los dos quede notablemente más estrecho que el otro
-                  minSize={18}
-                  maxSize={38}
+                  // el grupo de abajo no tiene el riel de herramientas delante, así
+                  // que arranca más a la izquierda que el de arriba. para que el
+                  // borde derecho de medios quede a la altura del de opciones hace
+                  // falta darle bastante más ancho; de ahí estos valores altos
+                  defaultSize={25}
+                  minSize={22}
+                  maxSize={40}
                   onCollapse={() => setVerMedios(false)}
                   onExpand={() => setVerMedios(true)}
                   className={`flex ${suave}`}
