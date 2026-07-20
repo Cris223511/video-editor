@@ -51,8 +51,8 @@ function BotonEstilo({
 }
 
 // editor de la capa de texto seleccionada: contenido, tipografía, color, estilo,
-// fondo, contorno y sombra. la posición y la franja de tiempo se ajustan en el
-// visor y en la línea de tiempo
+// fondo, contorno, sombra y brillo. la posición y la franja de tiempo se ajustan
+// en el visor y en la línea de tiempo
 export default function TextPanel() {
   const capas = useEditorStore((s) => s.capas)
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
@@ -156,6 +156,14 @@ export default function TextPanel() {
                     onChange={(v) => editar('opacidadFondo', v)}
                   />
                 </Campo>
+                <Campo etiqueta={`Redondeo del fondo (${capa.radioFondo} px)`}>
+                  <Deslizador
+                    valor={capa.radioFondo}
+                    min={0}
+                    max={80}
+                    onChange={(v) => editar('radioFondo', v)}
+                  />
+                </Campo>
               </>
             )}
           </div>
@@ -179,6 +187,23 @@ export default function TextPanel() {
 
           <div className="border-t border-black/10 pt-3 dark:border-white/10">
             <Interruptor etiqueta="Sombra" activo={capa.sombra} onChange={(v) => editar('sombra', v)} />
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-black/10 pt-3 dark:border-white/10">
+            <Interruptor etiqueta="Brillo" activo={capa.brillo} onChange={(v) => editar('brillo', v)} />
+            {capa.brillo && (
+              <>
+                <ColorCampo valor={capa.colorBrillo} onChange={(v) => editar('colorBrillo', v)} />
+                <Campo etiqueta={`Intensidad (${capa.intensidadBrillo}%)`}>
+                  <Deslizador
+                    valor={capa.intensidadBrillo}
+                    min={0}
+                    max={100}
+                    onChange={(v) => editar('intensidadBrillo', v)}
+                  />
+                </Campo>
+              </>
+            )}
           </div>
 
           <MotionControls capa={capa} />

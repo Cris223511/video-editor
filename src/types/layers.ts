@@ -37,10 +37,15 @@ export interface CapaTexto extends CapaBase {
   fondo: boolean
   colorFondo: string
   opacidadFondo: number
+  radioFondo: number // radio de las esquinas del fondo, en píxeles del proyecto
   contorno: boolean
   grosorContorno: number
   colorContorno: string
   sombra: boolean
+  // resplandor alrededor del texto (efecto de brillo o neón)
+  brillo: boolean
+  colorBrillo: string
+  intensidadBrillo: number // 0 a 100, controla cuánto se difumina el halo
 }
 
 export interface CapaImagen extends CapaBase {

@@ -1,7 +1,7 @@
 import { CSSProperties, MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { Capa, CapaCensura, CapaFigura, CapaImagen } from '../../../types/layers'
-import { hexAOpacidad } from '../../../lib/layers/defaults'
+import { REPETICIONES_BRILLO, desenfoqueBrillo, hexAOpacidad } from '../../../lib/layers/defaults'
 import { rectContenido } from '../../../lib/layers/rect'
 import { posicionCapa } from '../../../lib/layers/motion'
 import { Ancla, Caja, redimensionar } from '../../../lib/layers/resize'
@@ -410,6 +410,18 @@ export default function CapasOverlay() {
           )
         }
 
+        // la sombra y el resplandor se apilan en una sola propiedad textShadow.
+        // el brillo se arma con varias sombras iguales del color elegido y sin
+        // desplazamiento, con el mismo desenfoque y las mismas repeticiones que
+        // usa el exportador, ya escalado al tamaño en pantalla para que el halo
+        // que se ve al editar sea el que sale al exportar
+        const sombras: string[] = []
+        if (c.sombra) sombras.push('0 2px 8px rgba(0,0,0,.6)')
+        if (c.brillo && c.intensidadBrillo > 0) {
+          const b = desenfoqueBrillo(c.tamano, c.intensidadBrillo) * escala
+          for (let k = 0; k < REPETICIONES_BRILLO; k++) sombras.push(`0 0 ${b}px ${c.colorBrillo}`)
+        }
+
         const estilo: CSSProperties = {
           left: centroX,
           top: centroY,
@@ -426,8 +438,8 @@ export default function CapasOverlay() {
           lineHeight: 1.2,
           padding: c.fondo ? `${0.18 * c.tamano * escala}px ${0.36 * c.tamano * escala}px` : 0,
           background: c.fondo ? hexAOpacidad(c.colorFondo, c.opacidadFondo) : 'transparent',
-          borderRadius: c.fondo ? 6 : 0,
-          textShadow: c.sombra ? '0 2px 8px rgba(0,0,0,.6)' : 'none',
+          borderRadius: c.fondo ? (c.radioFondo ?? 6) * escala : 0,
+          textShadow: sombras.length ? sombras.join(', ') : 'none',
           WebkitTextStroke: c.contorno ? `${c.grosorContorno * escala}px ${c.colorContorno}` : undefined,
         }
         return (

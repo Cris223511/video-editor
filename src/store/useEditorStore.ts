@@ -63,6 +63,7 @@ interface EstadoEditor {
   quitarClip: (id: string) => void
   moverClip: (id: string, nuevoInicio: number) => void
   recortarClip: (id: string, lado: 'inicio' | 'fin', deltaSegundos: number) => void
+  estirarVelocidad: (id: string, lado: 'inicio' | 'fin', deltaSegundos: number) => void
   setVelocidadClip: (id: string, velocidad: number) => void
   setTono: (id: string, cambios: Partial<AjusteTono>) => void
   resetTono: (id: string) => void
@@ -102,6 +103,9 @@ interface EstadoEditor {
   // el recorrido grabado se puede retocar después: mover un nodo o borrarlo
   moverKeyframe: (id: string, indice: number, x: number, y: number) => void
   quitarKeyframe: (id: string, indice: number) => void
+  // fija los tiradores de curvatura de un nodo (la tangente de la curva a su
+  // paso). con undefined en ambos, el nodo vuelve a calcular su tangente solo
+  setTiradorNodo: (id: string, indice: number, hx?: number, hy?: number) => void
   // reduce los cientos de puntos de una grabación a los que definen la forma
   simplificarCapa: (id: string) => void
   // a qué ritmo corre el video mientras se graba un recorrido
@@ -282,6 +286,47 @@ export const useEditorStore = create<EstadoEditor>((set, get) => ({
         const dMax = (c.duracionFuente - c.recorteInicio) / v - c.duracion
         const d = Math.max(dMin, Math.min(delta, dMax))
         return { ...c, duracion: c.duracion + d }
+      })
+      return { pista: { ...s.pista, clips }, playhead: Math.min(s.playhead, duracionTotal(clips)) }
+    }),
+
+  estirarVelocidad: (id, lado, delta) =>
+    set((s) => {
+      const clips = s.pista.clips.map((c) => {
+        if (c.id !== id) return c
+        // los segundos reales de fuente que consume el clip no varían al estirar
+        // con alt; lo que cambia es cuánto tiempo de pista ocupan, y de ahí sale
+        // la nueva velocidad. estirar reparte el mismo trozo en más tiempo (más
+        // lento) y encoger lo comprime en menos (más rápido)
+        const consumidoFuente = c.duracion * c.velocidad
+        if (lado === 'inicio') {
+          // por el borde izquierdo el inicio se desplaza junto con la duración,
+          // porque el final del clip permanece clavado en su sitio
+          let duracionNueva = c.duracion - delta
+          // la duración queda atada al rango de velocidad admitido (0.25 a 4x),
+          // el mismo que ofrece el panel de velocidad
+          const durMin = consumidoFuente / 4
+          const durMax = consumidoFuente / 0.25
+          duracionNueva = Math.max(durMin, Math.min(duracionNueva, durMax))
+          let corrimiento = c.duracion - duracionNueva
+          // el clip no puede empezar antes del cero de la línea de tiempo
+          if (c.inicio + corrimiento < 0) {
+            corrimiento = -c.inicio
+            duracionNueva = c.duracion - corrimiento
+          }
+          return {
+            ...c,
+            inicio: c.inicio + corrimiento,
+            duracion: duracionNueva,
+            velocidad: consumidoFuente / duracionNueva,
+          }
+        }
+        // borde derecho: el inicio no se mueve, solo se estira o encoge el final
+        let duracionNueva = c.duracion + delta
+        const durMin = consumidoFuente / 4
+        const durMax = consumidoFuente / 0.25
+        duracionNueva = Math.max(durMin, Math.min(duracionNueva, durMax))
+        return { ...c, duracion: duracionNueva, velocidad: consumidoFuente / duracionNueva }
       })
       return { pista: { ...s.pista, clips }, playhead: Math.min(s.playhead, duracionTotal(clips)) }
     }),
@@ -592,6 +637,23 @@ export const useEditorStore = create<EstadoEditor>((set, get) => ({
     set((s) => ({
       capas: s.capas.map((c) =>
         c.id === id ? { ...c, keyframes: c.keyframes.filter((_, i) => i !== indice) } : c,
+      ),
+    })),
+
+  setTiradorNodo: (id, indice, hx, hy) =>
+    set((s) => ({
+      capas: s.capas.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              // igual que al mover un nodo, el instante no cambia: solo se ajusta
+              // la tangente. escribir hx/hy hace que posicionCapa deje de inferir
+              // la pendiente y respete la curvatura que el usuario acaba de dar
+              keyframes: c.keyframes.map((k, i) =>
+                i === indice ? { ...k, hx, hy } : k,
+              ),
+            }
+          : c,
       ),
     })),
 

@@ -4,6 +4,7 @@ import { Marco } from '../../types/marco'
 import { clipEnTiempo } from '../timeline/clips'
 import { posicionCapa } from '../layers/motion'
 import { esTonoNeutro, filtroCss } from '../color/tono'
+import { REPETICIONES_BRILLO, desenfoqueBrillo } from '../layers/defaults'
 import { anterior, pintarTransicion, progreso } from '../transiciones/pintar'
 
 export interface Escena {
@@ -53,8 +54,26 @@ function dibujarTexto(ctx: CanvasRenderingContext2D, c: CapaTexto, ancho: number
     ctx.save()
     ctx.globalAlpha = (c.opacidad / 100) * (c.opacidadFondo / 100)
     ctx.fillStyle = c.colorFondo
-    rectRedondeado(ctx, -bw / 2, -bh / 2, bw, bh, 6)
+    rectRedondeado(ctx, -bw / 2, -bh / 2, bw, bh, c.radioFondo ?? 6)
     ctx.fill()
+    ctx.restore()
+  }
+
+  // el resplandor va bajo el texto real: se pinta el mismo texto varias veces
+  // con una sombra difuminada del color elegido y sin desplazamiento, lo que
+  // deja un halo que envuelve las letras. su propio save/restore evita que esta
+  // sombra se mezcle con la del efecto de sombra normal
+  if (c.brillo && c.intensidadBrillo > 0) {
+    ctx.save()
+    ctx.shadowColor = c.colorBrillo
+    ctx.shadowBlur = desenfoqueBrillo(c.tamano, c.intensidadBrillo)
+    ctx.shadowOffsetX = 0
+    ctx.shadowOffsetY = 0
+    ctx.fillStyle = c.color
+    lineas.forEach((linea, i) => {
+      const y = startY + i * lh
+      for (let k = 0; k < REPETICIONES_BRILLO; k++) ctx.fillText(linea, 0, y)
+    })
     ctx.restore()
   }
 

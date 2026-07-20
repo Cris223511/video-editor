@@ -24,10 +24,14 @@ export function crearCapaTexto(inicio: number, alturaProyecto: number): CapaText
     fondo: false,
     colorFondo: '#000000',
     opacidadFondo: 60,
+    radioFondo: 6,
     contorno: false,
     grosorContorno: 2,
     colorContorno: '#000000',
     sombra: true,
+    brillo: false,
+    colorBrillo: '#4da6ff',
+    intensidadBrillo: 60,
   }
 }
 
@@ -98,6 +102,18 @@ export function crearCapaFigura(inicio: number): CapaFigura {
     colorBorde: '#000000',
     grosorBorde: 6,
   }
+}
+
+// cuántas veces se repite el halo del resplandor. al pintar varias sombras
+// iguales una sobre otra el brillo se intensifica y deja de verse lavado
+export const REPETICIONES_BRILLO = 3
+
+// desenfoque del resplandor en función del tamaño del texto y la intensidad
+// elegida (0 a 100). el visor y el exportador llaman a esta misma función para
+// que el halo salga idéntico al editar y al exportar; el visor luego multiplica
+// el resultado por la escala del lienzo en pantalla
+export function desenfoqueBrillo(tamano: number, intensidad: number): number {
+  return tamano * 0.5 * (intensidad / 100)
 }
 
 // convierte un color hex y una opacidad de 0 a 100 en una cadena rgba
