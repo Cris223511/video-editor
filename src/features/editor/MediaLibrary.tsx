@@ -40,7 +40,15 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
       <div className="flex items-center gap-2 px-3 py-2.5">
         <Icon name="pelicula" size={15} className="text-[color:var(--muted)]" />
         <span className="text-[13px] font-semibold">Medios</span>
-        <span className="ml-auto text-[13px] text-[color:var(--muted)]">{medios.length}</span>
+        {/* el recuento iba suelto como un número a secas, sin decir de qué. ahora
+            se acompaña de la palabra para que se lea «1 medio» y quede claro que
+            cuenta los archivos importados */}
+        <span
+          className="ml-auto whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium text-[color:var(--muted)]"
+          style={{ background: 'rgb(var(--border) / 0.08)' }}
+        >
+          {medios.length} {medios.length === 1 ? 'medio' : 'medios'}
+        </span>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-2.5">

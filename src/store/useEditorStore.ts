@@ -92,6 +92,10 @@ interface EstadoEditor {
 
   agregarDesdeAsset: (asset: MediaAsset) => void
   quitarClip: (id: string) => void
+  // crea otra instancia del mismo clip (nuevo id, mismo assetId, recortes, tono y
+  // efectos). no toca los medios del proyecto: es otra aparición del mismo asset
+  // en la línea de tiempo. devuelve el id de la copia para poder arrastrarla
+  duplicarClip: (id: string) => string | null
   moverClip: (id: string, nuevoInicio: number) => void
   recortarClip: (
     id: string,
@@ -154,6 +158,9 @@ interface EstadoEditor {
       | Partial<CapaFigura>,
   ) => void
   quitarCapa: (id: string) => void
+  // clona una capa completa con nuevo id y los mismos datos (texto, estilo,
+  // recorrido y trazos incluidos). devuelve el id de la copia para arrastrarla
+  duplicarCapa: (id: string) => string | null
   seleccionarCapa: (id: string | null) => void
   moverCapaLienzo: (id: string, x: number, y: number) => void
   moverCapaTiempo: (id: string, nuevoInicio: number) => void
@@ -196,6 +203,9 @@ interface EstadoEditor {
   agregarRegionAudio: () => void
   actualizarRegionAudio: (id: string, cambios: Partial<RegionAudio>) => void
   quitarRegionAudio: (id: string) => void
+  // duplica una franja de volumen con nuevo id y los mismos valores. devuelve el
+  // id de la copia para arrastrarla al soltar
+  duplicarRegionAudio: (id: string) => string | null
   seleccionarRegion: (id: string | null) => void
   moverRegionAudio: (id: string, nuevoInicio: number) => void
   recortarRegionAudio: (id: string, lado: 'inicio' | 'fin', deltaSegundos: number) => void
@@ -301,6 +311,7 @@ const MAX_HISTORIAL = 50
 const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'agregarDesdeAsset',
   'quitarClip',
+  'duplicarClip',
   'moverClip',
   'recortarClip',
   'estirarVelocidad',
@@ -328,6 +339,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'agregarFigura',
   'actualizarCapa',
   'quitarCapa',
+  'duplicarCapa',
   'moverCapaLienzo',
   'moverCapaTiempo',
   'recortarCapaTiempo',
@@ -344,6 +356,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'agregarRegionAudio',
   'actualizarRegionAudio',
   'quitarRegionAudio',
+  'duplicarRegionAudio',
   'moverRegionAudio',
   'recortarRegionAudio',
   'setLienzo',
@@ -508,6 +521,27 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         playhead: Math.min(s.playhead, duracionTotal(clips)),
       }
     }),
+
+  duplicarClip: (id) => {
+    const s = get()
+    const orig = s.pista.clips.find((c) => c.id === id)
+    if (!orig) return null
+    // la copia arranca clavada sobre el original; el arrastre que dispara el gesto
+    // se encarga de llevarla a su sitio. structuredClone lleva consigo el tono con
+    // sus ruedas y curvas, y los efectos, sin referencias compartidas con el padre
+    const copia = structuredClone(orig)
+    copia.id = crypto.randomUUID()
+    // los efectos estrenan id propio: siguen siendo la misma cadena pero cada clip
+    // los edita por su cuenta sin pisar al otro
+    copia.efectos = copia.efectos.map((e) => ({ ...e, id: crypto.randomUUID() }))
+    set({
+      pista: { ...s.pista, clips: [...s.pista.clips, copia] },
+      clipSeleccionado: copia.id,
+      capaSeleccionada: null,
+      regionSeleccionada: null,
+    })
+    return copia.id
+  },
 
   moverClip: (id, nuevoInicio) =>
     set((s) => ({
@@ -905,6 +939,23 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       capaSeleccionada: s.capaSeleccionada === id ? null : s.capaSeleccionada,
     })),
 
+  duplicarCapa: (id) => {
+    const s = get()
+    const orig = s.capas.find((c) => c.id === id)
+    if (!orig) return null
+    // el clon copia todo tal cual, incluidos keyframes del recorrido y trazos de
+    // pincel, sin compartir arrays con la capa original
+    const copia = structuredClone(orig)
+    copia.id = crypto.randomUUID()
+    set({
+      capas: [...s.capas, copia],
+      capaSeleccionada: copia.id,
+      clipSeleccionado: null,
+      regionSeleccionada: null,
+    })
+    return copia.id
+  },
+
   seleccionarCapa: (id) =>
     set((s) => {
       const capa = id ? s.capas.find((c) => c.id === id) : null
@@ -1104,6 +1155,20 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       audioRegiones: s.audioRegiones.filter((r) => r.id !== id),
       regionSeleccionada: s.regionSeleccionada === id ? null : s.regionSeleccionada,
     })),
+
+  duplicarRegionAudio: (id) => {
+    const s = get()
+    const orig = s.audioRegiones.find((r) => r.id === id)
+    if (!orig) return null
+    const copia = { ...orig, id: crypto.randomUUID() }
+    set({
+      audioRegiones: [...s.audioRegiones, copia],
+      regionSeleccionada: copia.id,
+      clipSeleccionado: null,
+      capaSeleccionada: null,
+    })
+    return copia.id
+  },
 
   seleccionarRegion: (id) =>
     set((s) => ({

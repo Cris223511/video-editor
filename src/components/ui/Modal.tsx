@@ -68,13 +68,21 @@ export default function Modal({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 6, scale: 0.985 }}
                   transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                  className={`w-full ${ancho} rounded-2xl p-5 shadow-2xl`}
+                  // la tarjeta nunca pasa del 85% del alto de la ventana. como es
+                  // una columna flexible, la cabecera se queda fija arriba y solo
+                  // el cuerpo crece; cuando el contenido es alto (un video con su
+                  // ficha, por ejemplo) el desbordamiento se resuelve dentro del
+                  // cuerpo con su propio scroll, y el modal jamás se sale de vista
+                  className={`flex max-h-[85vh] w-full flex-col overflow-hidden rounded-2xl shadow-2xl ${ancho}`}
                   style={{
                     background: 'rgb(var(--surface))',
                     border: '1px solid rgb(var(--border) / 0.1)',
                   }}
                 >
-                  <div className="mb-4 flex items-start justify-between gap-3">
+                  {/* la cabecera no se desplaza: se mantiene visible mientras el
+                      cuerpo rueda por debajo. el shrink-0 evita que el flex la
+                      comprima cuando el contenido pide más alto del disponible */}
+                  <div className="flex shrink-0 items-start justify-between gap-3 px-5 pb-4 pt-5">
                     <div className="min-w-0">
                       {/* el título no pasa de dos líneas y se corta con puntos
                           suspensivos: un nombre de proyecto largo estiraba la
@@ -97,7 +105,12 @@ export default function Modal({
                       </button>
                     </Dialog.Close>
                   </div>
-                  {children}
+                  {/* el cuerpo se lleva el scroll propio con una barra fina y
+                      redondeada. el padding derecho deja aire entre el contenido y
+                      esa barra para que no queden pegados al desplazar */}
+                  <div className="scroll-modal min-h-0 flex-1 overflow-y-auto px-5 pb-5">
+                    {children}
+                  </div>
                 </motion.div>
               </div>
             </Dialog.Content>

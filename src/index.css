@@ -237,6 +237,28 @@ html.tema-en-transicion * {
   background: rgb(var(--accent) / 0.45);
 }
 
+/* barra de desplazamiento del cuerpo de los modales: más delgada y discreta que
+   la general, con transición al pasar el cursor para que no cambie de golpe. en
+   firefox se pide una barra fina por las propiedades estándar */
+.scroll-modal {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--border) / 0.3) transparent;
+}
+
+.scroll-modal::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scroll-modal::-webkit-scrollbar-thumb {
+  background: rgb(var(--border) / 0.28);
+  border-radius: 8px;
+  transition: background 0.2s ease;
+}
+
+.scroll-modal::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--accent) / 0.5);
+}
+
 /* muestras de la galería de transiciones. en reposo se ve solo el primer plano,
    quieto; al pasar el cursor por la tarjeta arranca la transición en bucle sobre
    dos fotos reales, que es lo que deja comparar unas con otras */

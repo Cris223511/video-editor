@@ -35,6 +35,7 @@ export default function ClipBlock({
   const seleccionado = useEditorStore((s) => s.clipSeleccionado === clip.id)
   const seleccionar = useEditorStore((s) => s.seleccionar)
   const moverClip = useEditorStore((s) => s.moverClip)
+  const duplicarClip = useEditorStore((s) => s.duplicarClip)
   const recortarClip = useEditorStore((s) => s.recortarClip)
   const estirarVelocidad = useEditorStore((s) => s.estirarVelocidad)
   const moverClipAPista = useEditorStore((s) => s.moverClipAPista)
@@ -54,7 +55,18 @@ export default function ClipBlock({
 
   function iniciarMover(e: ReactMouseEvent) {
     e.stopPropagation()
-    seleccionar(clip.id)
+    // este gesto nace en el cuerpo del clip; los tiradores de borde tienen su
+    // propio manejador con stopPropagation, así que alt aquí nunca es el de la
+    // velocidad. con alt pulsado se crea una copia y es ella la que sigue al
+    // cursor, dejando el original quieto en su sitio
+    const duplicando = e.altKey && !bloqueada
+    let idGesto = clip.id
+    if (duplicando) {
+      const nuevo = duplicarClip(clip.id)
+      if (nuevo) idGesto = nuevo
+    } else {
+      seleccionar(clip.id)
+    }
     // en un nivel bloqueado el gesto termina en la selección: no se mueve nada
     if (bloqueada) return
     const startX = e.clientX
@@ -153,7 +165,7 @@ export default function ClipBlock({
           }
           if (v.destino !== null && v.destino !== pistaActual) {
             pistaActual = v.destino
-            moverClipAPista(clip.id, v.destino)
+            moverClipAPista(idGesto, v.destino)
           }
         }
       }
@@ -172,12 +184,12 @@ export default function ClipBlock({
           break
         }
       }
-      moverClip(clip.id, candidato)
+      moverClip(idGesto, candidato)
     }
     const soltar = () => {
       // si el gesto acabó sobre una separación, se abre allí el nivel nuevo y el
       // clip aterriza dentro; comparte el mismo paso de historial que el arrastre
-      if (insercionActual !== null) insertarPistaEn(insercionActual, clip.id)
+      if (insercionActual !== null) insertarPistaEn(insercionActual, idGesto)
       setInsercionPista(null)
       finGesto()
       window.removeEventListener('mousemove', mover)

@@ -16,9 +16,14 @@ import { HUECO_PISTA } from './ClipBlock'
 import CapaBlock from './CapaBlock'
 import AudioBlock from './AudioBlock'
 import CarrilHeader from './CarrilHeader'
-import AgregarNivelMenu from './AgregarNivelMenu'
+import AgregarNivelGuia from './AgregarNivelGuia'
 
 const MIN = 0.1
+// ancho de la columna fija de cabeceras (w-44) y el hueco que la separa de las
+// filas (gap-2), en píxeles. se restan del ancho visible para saber cuánto
+// espacio real les queda a las filas y así llenarlo sin dejar franjas muertas
+const ANCHO_CABECERAS = 176
+const HUECO_COLUMNAS = 8
 // alto de la regla de tiempo, replicado en la columna de cabeceras para que las
 // filas de ambas columnas queden a la misma altura
 const ALTO_REGLA = 29
@@ -76,7 +81,14 @@ export default function Timeline({
   const insercionPista = useEditorStore((s) => s.insercionPista)
   const medios = useProjectStore((s) => s.medios)
 
+  // único contenedor con desplazamiento: lleva el scroll horizontal y, cuando
+  // hacen falta muchos niveles, también el vertical. dentro conviven la columna
+  // de cabeceras (pegada a la izquierda) y la zona de filas
   const scrollRef = useRef<HTMLDivElement>(null)
+  // zona de las filas propiamente dicha, la que se desplaza en horizontal. sus
+  // coordenadas de pantalla ya incluyen el desplazamiento, así que sirve de
+  // origen para traducir la posición del cursor a segundos sin sumar scrollLeft
+  const contenidoRef = useRef<HTMLDivElement>(null)
   // contenedor de las filas de video; su distancia al borde del contenido sitúa
   // la guía de inserción a la altura exacta de cada separación entre niveles
   const filasRef = useRef<HTMLDivElement>(null)
@@ -137,16 +149,20 @@ export default function Timeline({
     function alGirar(e: WheelEvent) {
       if (!e.ctrlKey && !e.metaKey) return
       e.preventDefault()
-      const caja = cont!.getBoundingClientRect()
-      const dentro = e.clientX - caja.left
-      // el segundo que hay justo bajo el cursor antes de cambiar la escala. se
-      // conserva después ajustando el desplazamiento, y así el zoom crece hacia
-      // donde se está mirando en lugar de hacia el principio de la pista
+      const zona = contenidoRef.current
+      if (!zona) return
+      // distancia en píxeles desde el borde izquierdo de las filas hasta el
+      // cursor. como el rect ya trae aplicado el desplazamiento, no hace falta
+      // sumar scrollLeft aparte
+      const d = e.clientX - zona.getBoundingClientRect().left
       const st = useEditorStore.getState()
-      const segundo = (dentro + cont!.scrollLeft) / st.pxPorSegundo
+      const pxAntes = st.pxPorSegundo
       st.aplicarZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15)
-      const escala = useEditorStore.getState().pxPorSegundo
-      cont!.scrollLeft = segundo * escala - dentro
+      const pxDespues = useEditorStore.getState().pxPorSegundo
+      // se conserva bajo el cursor el mismo instante: al crecer la escala, el
+      // punto que estaba a d píxeles pasa a estar a d·(nueva/vieja), y el scroll
+      // compensa esa diferencia para que el zoom tire hacia donde se mira
+      cont!.scrollLeft += d * (pxDespues / pxAntes - 1)
     }
 
     cont.addEventListener('wheel', alGirar, { passive: false })
@@ -159,10 +175,13 @@ export default function Timeline({
     const cont = scrollRef.current
     if (!cont) return
     const medir = () => {
-      setAnchoVisible(cont.clientWidth)
+      // a las filas les queda el ancho del contenedor menos la columna de
+      // cabeceras y el hueco que las separa; ese es el espacio que deben cubrir
+      const util = Math.max(0, cont.clientWidth - ANCHO_CABECERAS - HUECO_COLUMNAS)
+      setAnchoVisible(util)
       // el mismo ancho se comparte con el store, que lo usa para encuadrar el
       // zoom al soltar un video
-      setAnchoTimeline(cont.clientWidth)
+      setAnchoTimeline(util)
     }
     const ro = new ResizeObserver(medir)
     ro.observe(cont)
@@ -171,11 +190,10 @@ export default function Timeline({
   }, [setAnchoTimeline])
 
   function moverCabezal(clientX: number) {
-    const cont = scrollRef.current
-    if (!cont) return
-    const rect = cont.getBoundingClientRect()
-    const x = clientX - rect.left + cont.scrollLeft
-    irA(x / pxPorSegundo)
+    const zona = contenidoRef.current
+    if (!zona) return
+    const rect = zona.getBoundingClientRect()
+    irA(Math.max(0, (clientX - rect.left) / pxPorSegundo))
   }
 
   // el cabezal se puede arrastrar agarrando su manija superior, además de
@@ -218,11 +236,10 @@ export default function Timeline({
   // él para pintar el scrubber. el cálculo replica el de mover el cabezal, pero
   // sin tocar el estado del reproductor: es solo una previsualización
   function seguirScrubber(e: MouseEvent) {
-    const cont = scrollRef.current
-    if (!cont) return
-    const rect = cont.getBoundingClientRect()
-    const x = e.clientX - rect.left + cont.scrollLeft
-    setHoverSeg(Math.max(0, x / pxPorSegundo))
+    const zona = contenidoRef.current
+    if (!zona) return
+    const rect = zona.getBoundingClientRect()
+    setHoverSeg(Math.max(0, (e.clientX - rect.left) / pxPorSegundo))
   }
 
   // punto donde el fondo vacío suelta la selección. los clips, capas y regiones
@@ -304,57 +321,64 @@ export default function Timeline({
         </div>
       </div>
 
-      {/* las dos columnas comparten un único desplazamiento vertical (el de este
-          contenedor) para que cabeceras y filas suban y bajen juntas sin
-          desalinearse. entre ambas queda un hueco limpio, sin línea divisoria */}
-      <div className="flex min-h-0 flex-1 gap-2 overflow-y-auto overflow-x-hidden">
-        {/* columna fija con la cabecera de cada nivel, alineada con sus filas.
-            el grupo permite que el «+» de agregar nivel asome solo al pasar el
-            cursor por encima, en vez de ocupar sitio siempre */}
-        <div className="group/cols w-44 shrink-0">
-          <div style={{ height: ALTO_REGLA }} />
-          {/* el bloque de niveles de video es relativo para colgar de su borde
-              inferior el «+» de agregar, que asoma al pasar el cursor sin ocupar
-              sitio en el flujo y, por tanto, sin descuadrar los carriles */}
-          <div className="relative mt-2 flex flex-col" style={{ gap: HUECO_PISTA }}>
-            {filas.map((p) => (
-              <motion.div key={pistasMeta[p]?.id ?? p} layout="position" transition={DESLIZA}>
-                <PistaHeader indice={p} alto={altosPista[p]} />
-              </motion.div>
-            ))}
-            <AgregarNivelMenu />
+      {/* un solo contenedor con desplazamiento para toda la línea de tiempo:
+          lleva el scroll horizontal y, cuando se acumulan muchos niveles, el
+          vertical. antes había un overflow anidado que sacaba dos barras y
+          descuadraba las columnas; ahora la columna de cabeceras va pegada a la
+          izquierda y acompaña el mismo scroll, así que nunca se desalinean */}
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
+        <div className="flex w-max gap-2">
+          {/* columna de cabeceras anclada a la izquierda: sube y baja con las
+              filas al desplazar en vertical, pero se queda fija al desplazar en
+              horizontal. el fondo sólido tapa las filas que resbalan por debajo.
+              el grupo deja que las guías de «insertar nivel» asomen al pasar el
+              cursor por las separaciones */}
+          <div
+            className="group/cols sticky left-0 z-20 w-44 shrink-0"
+            style={{ background: 'rgb(var(--surface))' }}
+          >
+            <div style={{ height: ALTO_REGLA }} />
+            {/* bloque de niveles de video, relativo para colgar de él las guías
+                de inserción entre filas sin que ocupen sitio en el flujo */}
+            <div className="relative mt-2 flex flex-col" style={{ gap: HUECO_PISTA }}>
+              {filas.map((p) => (
+                <motion.div key={pistasMeta[p]?.id ?? p} layout="position" transition={DESLIZA}>
+                  <PistaHeader indice={p} alto={altosPista[p]} />
+                </motion.div>
+              ))}
+              <AgregarNivelGuia />
+            </div>
+            {/* cabeceras de los carriles de texto y de audio, alineadas con sus
+                filas del lado derecho (mismo margen y alto). se muestran siempre,
+                aunque el carril esté vacío, para que se entienda que ese espacio
+                existe y qué le corresponde */}
+            <div style={{ marginTop: SEP_SECCION }}>
+              <CarrilHeader icono="texto" titulo="Texto y figuras" acento="#f59e0b" alto={36} />
+            </div>
+            <div style={{ marginTop: SEP_SECCION }}>
+              <CarrilHeader icono="musica" titulo="Audio" acento="#10b981" alto={32} />
+            </div>
           </div>
-          {/* cabeceras de los carriles de texto y de audio, alineadas con sus
-              filas del lado derecho (mismo margen y alto). se muestran siempre,
-              aunque el carril esté vacío, para que se entienda que ese espacio
-              existe y qué le corresponde */}
-          <div style={{ marginTop: SEP_SECCION }}>
-            <CarrilHeader icono="texto" titulo="Texto y figuras" acento="#f59e0b" alto={36} />
-          </div>
-          <div style={{ marginTop: SEP_SECCION }}>
-            <CarrilHeader icono="musica" titulo="Audio" acento="#10b981" alto={32} />
-          </div>
-        </div>
 
-      <div
-        ref={scrollRef}
-        onDragOver={(e) => {
-          if (e.dataTransfer.types.includes(TIPO_ARRASTRE)) {
-            e.preventDefault()
-            setRecibiendo(true)
-          }
-        }}
-        onDragLeave={() => setRecibiendo(false)}
-        onDrop={alSoltar}
-        onMouseDown={deseleccionarFondo}
-        onMouseMove={seguirScrubber}
-        onMouseLeave={() => setHoverSeg(null)}
-        className={[
-          'relative min-h-0 flex-1 overflow-x-auto overflow-y-auto transition-colors duration-200',
-          recibiendo ? 'bg-brand/10 ring-2 ring-inset ring-brand/40' : '',
-        ].join(' ')}
-      >
-        <div className="relative" style={{ width: anchoContenido }}>
+          <div
+            ref={contenidoRef}
+            onDragOver={(e) => {
+              if (e.dataTransfer.types.includes(TIPO_ARRASTRE)) {
+                e.preventDefault()
+                setRecibiendo(true)
+              }
+            }}
+            onDragLeave={() => setRecibiendo(false)}
+            onDrop={alSoltar}
+            onMouseDown={deseleccionarFondo}
+            onMouseMove={seguirScrubber}
+            onMouseLeave={() => setHoverSeg(null)}
+            className={[
+              'relative shrink-0 rounded-lg transition-colors duration-200',
+              recibiendo ? 'bg-brand/10 ring-2 ring-inset ring-brand/40' : '',
+            ].join(' ')}
+            style={{ width: anchoContenido }}
+          >
           <div onMouseDown={alPresionarRegla}>
             <TimeRuler total={total} pxPorSegundo={pxPorSegundo} ancho={anchoContenido} alto={ALTO_REGLA} />
           </div>

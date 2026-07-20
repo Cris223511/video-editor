@@ -31,7 +31,7 @@ export interface ControlExport {
 }
 
 // elige el mejor formato de contenedor que soporte el navegador
-function elegirMime(): string {
+export function elegirMime(): string {
   const candidatos = [
     'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
     'video/webm;codecs=vp9,opus',
@@ -42,6 +42,14 @@ function elegirMime(): string {
     if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m)) return m
   }
   return 'video/webm'
+}
+
+// bits por segundo de video que se le pide a la grabadora. la fórmula sube con
+// la cantidad de píxeles pero se topa en 40 Mbps para no disparar el archivo en
+// resoluciones altas. vive suelta acá para que el diálogo estime el peso con el
+// mismo número que se usa al grabar, sin copiarlo a mano
+export function bitrateVideo(ancho: number, alto: number): number {
+  return Math.min(40_000_000, Math.round(ancho * alto * 8))
 }
 
 function cargarImagen(src: string): Promise<HTMLImageElement> {
@@ -193,7 +201,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
         const mime = elegirMime()
         const grabadora = new MediaRecorder(stream, {
           mimeType: mime,
-          videoBitsPerSecond: Math.min(40_000_000, Math.round(ancho * alto * 8)),
+          videoBitsPerSecond: bitrateVideo(ancho, alto),
         })
         const trozos: BlobPart[] = []
         grabadora.ondataavailable = (e) => {

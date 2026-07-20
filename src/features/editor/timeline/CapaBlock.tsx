@@ -16,11 +16,20 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   const seleccionado = useEditorStore((s) => s.capaSeleccionada === capa.id)
   const seleccionarCapa = useEditorStore((s) => s.seleccionarCapa)
   const moverCapaTiempo = useEditorStore((s) => s.moverCapaTiempo)
+  const duplicarCapa = useEditorStore((s) => s.duplicarCapa)
   const recortarCapaTiempo = useEditorStore((s) => s.recortarCapaTiempo)
 
   function iniciarMover(e: ReactMouseEvent) {
     e.stopPropagation()
-    seleccionarCapa(capa.id)
+    // con alt pulsado el arrastre no mueve la capa sino que suelta una copia que
+    // sigue al cursor, con la original intacta. sin alt es el movimiento de siempre
+    let idGesto = capa.id
+    if (e.altKey) {
+      const nuevo = duplicarCapa(capa.id)
+      if (nuevo) idGesto = nuevo
+    } else {
+      seleccionarCapa(capa.id)
+    }
     const startX = e.clientX
     const inicioOriginal = capa.inicio
     const umbral = UMBRAL_PX / pxPorSegundo
@@ -38,7 +47,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
           break
         }
       }
-      moverCapaTiempo(capa.id, candidato)
+      moverCapaTiempo(idGesto, candidato)
     }
     const soltar = () => {
       window.removeEventListener('mousemove', mover)
