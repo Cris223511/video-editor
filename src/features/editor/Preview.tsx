@@ -219,7 +219,17 @@ export default function Preview() {
 
     const paso = () => {
       if (cancelado) return
-      const ph = phRef.current
+      // si el cabezal se movió a mano durante la reproducción (arrastrando la línea
+      // azul), el store tendrá un instante distinto del que sigue el video. en ese
+      // caso la reproducción salta a esa posición en vez de ignorarla, para poder
+      // rebobinar o adelantar sin tener que pausar antes
+      let ph = phRef.current
+      const playheadStore = useEditorStore.getState().playhead
+      const salto = Math.abs(playheadStore - ph) > 0.05
+      if (salto) {
+        ph = playheadStore
+        phRef.current = ph
+      }
       if (ph >= total) {
         irA(total)
         pausar()
@@ -265,13 +275,15 @@ export default function Preview() {
       // línea de tiempo no se descuadra
       const st = useEditorStore.getState()
       v.playbackRate = act.velocidad * (st.grabandoMovimiento ? st.velocidadGrabacion : 1)
-      if (v.paused) {
+      // se recoloca el video si estaba en pausa o si el cabezal acaba de saltar a
+      // mano; así el arrastre de la línea azul mueve de verdad la imagen
+      if (v.paused || salto) {
         try {
           v.currentTime = act.recorteInicio + (ph - act.inicio) * act.velocidad
         } catch {
           // sin metadatos todavía
         }
-        v.play().catch(() => {})
+        if (v.paused) v.play().catch(() => {})
       }
       // el fondo borroso persigue al video real: mismo asset, misma velocidad y
       // mismo tiempo, para que se vea el material en movimiento y no un cuadro
