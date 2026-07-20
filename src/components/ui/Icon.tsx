@@ -2,6 +2,7 @@ import { CSSProperties } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
+  Blend,
   Check,
   ChevronRight,
   Clapperboard,
@@ -62,6 +63,7 @@ const iconos = {
   audio: Volume2,
   musica: Music,
   ajustes: SlidersHorizontal,
+  transiciones: Blend,
   tijeras: Scissors,
   censura: EyeOff,
   velocidad: Gauge,

@@ -5,9 +5,6 @@ import Tooltip from '../../components/ui/Tooltip'
 import { useCongelarAncho } from './useCongelarAncho'
 import { useEditorStore, Herramienta } from '../../store/useEditorStore'
 import { herramientas } from './RielHerramientas'
-import { useProjectStore } from '../../store/useProjectStore'
-import { formatearDuracion } from '../../lib/format/duracion'
-import { encuadreNeutro } from '../../lib/timeline/encuadre'
 import { Campo, Deslizador } from '../../components/ui/Controls'
 import TextPanel from './panels/TextPanel'
 import ImagePanel from './panels/ImagePanel'
@@ -21,50 +18,29 @@ import LienzoPanel from './panels/LienzoPanel'
 import MarcoPanel from './panels/MarcoPanel'
 import FiguraPanel from './panels/FiguraPanel'
 
-// propiedades del clip seleccionado, con su transición de entrada
-function Propiedades() {
+// transiciones del clip seleccionado. los datos del medio (dimensiones, formato)
+// se consultan desde el panel de Medios, así que aquí va solo lo de las
+// transiciones y la acción de quitar el clip. el encuadre se hace directamente en
+// el visor, arrastrando el video y sus tiradores
+function Transiciones() {
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
   const clips = useEditorStore((s) => s.pista.clips)
   const quitarClip = useEditorStore((s) => s.quitarClip)
   const setTransicion = useEditorStore((s) => s.setTransicion)
-  const resetEncuadre = useEditorStore((s) => s.resetEncuadre)
-  const medios = useProjectStore((s) => s.medios)
 
   const clip = clips.find((c) => c.id === clipSeleccionado) ?? null
-  const asset = clip ? medios.find((m) => m.id === clip.assetId) ?? null : null
-  // un clip está reencuadrado cuando su encuadre ya no es el centrado natural;
-  // solo entonces tiene sentido ofrecer el botón de recentrar
-  const reencuadrado = !!clip?.encuadre && !encuadreNeutro(clip.encuadre)
 
-  if (!clip || !asset) {
+  if (!clip) {
     return (
-      <SinSeleccion icono="ajustes" titulo="Ningún clip seleccionado">
-        Pulsa un clip en la línea de tiempo para ver sus datos y elegir con qué transición entra.
+      <SinSeleccion icono="transiciones" titulo="Ningún clip seleccionado">
+        Pulsa un clip en la línea de tiempo o en el visor para elegir con qué transición entra.
       </SinSeleccion>
     )
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <img src={asset.miniatura} alt="" className="w-full rounded-lg bg-black/30 object-cover" />
-      <div className="text-sm">
-        <p className="truncate font-medium">{asset.nombre}</p>
-        <p className="mt-1 text-xs text-[color:var(--muted)]">
-          {asset.ancho}×{asset.alto}
-        </p>
-      </div>
-      <dl className="flex flex-col gap-2 text-sm">
-        <div className="flex justify-between">
-          <dt className="text-[color:var(--muted)]">Inicio en la pista</dt>
-          <dd>{formatearDuracion(clip.inicio)}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-[color:var(--muted)]">Duración</dt>
-          <dd>{formatearDuracion(clip.duracion)}</dd>
-        </div>
-      </dl>
-
-      <div className="flex flex-col gap-3 border-t border-black/10 pt-3 dark:border-white/10">
+      <div className="flex flex-col gap-3">
         <span className="text-sm font-medium">Transición de entrada</span>
         <GaleriaTransiciones
           actual={clip.transicion.tipo}
@@ -79,23 +55,6 @@ function Propiedades() {
               onChange={(v) => setTransicion(clip.id, { duracion: v / 10 })}
             />
           </Campo>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/10">
-        <span className="text-sm font-medium">Encuadre</span>
-        <p className="text-xs leading-relaxed text-[color:var(--muted)]">
-          Arrastra el video en el visor para recolocarlo y tira de sus esquinas para cambiar el
-          tamaño. Lo que quede fuera del lienzo no aparece en el video final.
-        </p>
-        {reencuadrado && (
-          <button
-            onClick={() => resetEncuadre(clip.id)}
-            className="interactivo inline-flex items-center justify-center gap-2 rounded-lg border border-black/10 py-2 text-sm font-medium text-[color:var(--muted)] hover:text-[color:var(--text)] dark:border-white/10"
-          >
-            <Icon name="lienzo" size={15} />
-            Centrar de nuevo
-          </button>
         )}
       </div>
 
@@ -126,7 +85,7 @@ export default function OptionsPanel({
 
   const paneles: Record<Herramienta, JSX.Element> = {
     proyecto: <ProyectoPanel />,
-    propiedades: <Propiedades />,
+    transiciones: <Transiciones />,
     lienzo: <LienzoPanel />,
     marco: <MarcoPanel />,
     texto: <TextPanel />,

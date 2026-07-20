@@ -30,12 +30,15 @@ export function alturasOnda(semilla: string, n: number): number[] {
 }
 
 // barras verticales que representan la onda. se usan tanto dentro de una región
-// de audio como, muy tenues, en el fondo del carril vacío
+// de audio como, muy tenues, en el fondo del carril vacío. el trazo es fino y
+// apretado para leerse como una forma de onda real, no como píldoras gordas; por
+// eso el valor por defecto de barras es alto y así el respaldo sintético queda
+// tan detallado como la onda de picos reales
 export function OndaAudio({
   semilla,
   color,
   opacidad = 1,
-  barras = 64,
+  barras = 200,
 }: {
   semilla: string
   color: string
@@ -45,13 +48,13 @@ export function OndaAudio({
   const alturas = alturasOnda(semilla, barras)
   return (
     <div
-      className="pointer-events-none absolute inset-0 flex items-center gap-px overflow-hidden px-1"
+      className="pointer-events-none absolute inset-0 flex items-center gap-[0.5px] overflow-hidden px-1"
       style={{ opacity: opacidad }}
     >
       {alturas.map((h, i) => (
         <span
           key={i}
-          className="flex-1 rounded-full"
+          className="flex-1"
           style={{ height: `${Math.round(h * 100)}%`, background: color, minWidth: 1 }}
         />
       ))}

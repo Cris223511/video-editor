@@ -5,7 +5,7 @@ import { useEditorStore, Herramienta } from '../../store/useEditorStore'
 
 export const herramientas: { id: Herramienta; icono: NombreIcono; etiqueta: string }[] = [
   { id: 'proyecto', icono: 'logo', etiqueta: 'Proyecto' },
-  { id: 'propiedades', icono: 'ajustes', etiqueta: 'Propiedades' },
+  { id: 'transiciones', icono: 'transiciones', etiqueta: 'Transiciones' },
   { id: 'lienzo', icono: 'lienzo', etiqueta: 'Lienzo' },
   { id: 'marco', icono: 'marco', etiqueta: 'Marco' },
   { id: 'texto', icono: 'texto', etiqueta: 'Texto' },

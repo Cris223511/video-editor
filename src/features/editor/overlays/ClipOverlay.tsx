@@ -5,6 +5,7 @@ import { rectContenido } from '../../../lib/layers/rect'
 import { rectClip, encuadreDe } from '../../../lib/timeline/encuadre'
 import { clipEnTiempo } from '../../../lib/timeline/clips'
 import { Ancla, redimensionar } from '../../../lib/layers/resize'
+import { Guia, imantar } from '../../../lib/layers/guias'
 import Tiradores from './Tiradores'
 
 // caja de selección del clip activo sobre el visor. arrastrando el cuerpo se
@@ -24,6 +25,9 @@ export default function ClipOverlay() {
 
   const rootRef = useRef<HTMLDivElement>(null)
   const [tam, setTam] = useState({ w: 0, h: 0 })
+  // líneas guía que aparecen solo mientras se arrastra, cuando un borde o el
+  // centro del clip se alinea con el centro o los bordes del lienzo
+  const [guias, setGuias] = useState<Guia[]>([])
 
   useEffect(() => {
     const el = rootRef.current
@@ -58,15 +62,32 @@ export default function ClipOverlay() {
   }
 
   // recolocar: se toma el encuadre del arranque y se le suma el desplazamiento
-  // total del cursor, en vez de acumular pasos, para que no haya deriva
-  function iniciarArrastre(e: ReactMouseEvent, id: string, base: { x: number; y: number }) {
+  // total del cursor, en vez de acumular pasos, para que no haya deriva. mientras
+  // se mueve, el clip se imanta al centro y a los bordes del lienzo, y ahí sale la
+  // línea guía; con Alt se desactiva por si hay que colocarlo justo al lado sin que
+  // salte
+  function iniciarArrastre(
+    e: ReactMouseEvent,
+    id: string,
+    base: { x: number; y: number },
+    tamCaja: { w: number; h: number },
+  ) {
     e.stopPropagation()
     const inicio = normalizar(e.nativeEvent)
     const mover = (ev: globalThis.MouseEvent) => {
       const p = normalizar(ev)
-      actualizarEncuadre(id, { x: base.x + (p.x - inicio.x), y: base.y + (p.y - inicio.y) })
+      const bruto = { x: base.x + (p.x - inicio.x), y: base.y + (p.y - inicio.y) }
+      if (ev.altKey) {
+        setGuias([])
+        actualizarEncuadre(id, bruto)
+        return
+      }
+      const r = imantar({ x: bruto.x, y: bruto.y, w: tamCaja.w, h: tamCaja.h }, [])
+      setGuias(r.guias)
+      actualizarEncuadre(id, { x: r.x, y: r.y })
     }
     const soltar = () => {
+      setGuias([])
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
@@ -116,8 +137,20 @@ export default function ClipOverlay() {
 
   return (
     <div ref={rootRef} className="pointer-events-none absolute inset-0">
+      {/* líneas guía del imantado, visibles solo durante el arrastre */}
+      {guias.map((g) => (
+        <div
+          key={`${g.eje}-${g.pos}`}
+          className="pointer-events-none absolute z-30"
+          style={
+            g.eje === 'x'
+              ? { left: rect.ox + g.pos * rect.w, top: rect.oy, width: 1, height: rect.h, background: '#f472b6' }
+              : { left: rect.ox, top: rect.oy + g.pos * rect.h, width: rect.w, height: 1, background: '#f472b6' }
+          }
+        />
+      ))}
       <div
-        onMouseDown={(e) => iniciarArrastre(e, activo.id, { x: enc.x, y: enc.y })}
+        onMouseDown={(e) => iniciarArrastre(e, activo.id, { x: enc.x, y: enc.y }, { w: caja.w, h: caja.h })}
         onDoubleClick={(e) => {
           e.stopPropagation()
           resetEncuadre(activo.id)

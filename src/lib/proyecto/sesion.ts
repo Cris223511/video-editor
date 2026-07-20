@@ -3,6 +3,7 @@ import { useProjectStore, CLAVE_SESION } from '../../store/useProjectStore'
 import { guardarProyecto, leerProyecto } from './almacen'
 import { clipEnTiempo, duracionTotal } from '../timeline/clips'
 import { frameDeVideo } from '../media/probeVideo'
+import { MediaAsset } from '../../types/media'
 import {
   guardadoAMedio,
   medioAGuardado,
@@ -126,7 +127,37 @@ export async function abrirSesion(id: string): Promise<boolean> {
     capaSeleccionada: null,
     regionSeleccionada: null,
   })
+
+  // los proyectos guardados antes del arreglo tienen miniaturas negras, porque en
+  // su día se capturaba el primer fotograma del video (que solía salir oscuro). una
+  // vez montada la sesión, se vuelve a leer el fotograma de la mitad de cada medio y
+  // se refresca su miniatura. va en segundo plano a propósito: no interesa retrasar
+  // la apertura, así que ni se espera ni se encadena al valor de retorno
+  regenerarMiniaturas(medios)
+
   return true
+}
+
+// recorre los medios y, para cada uno, saca un fotograma de la mitad del video para
+// usarlo como miniatura nueva. se hace medio por medio y cada resultado se vuelca en
+// cuanto está listo, leyendo el estado más reciente del store para no pisar cambios
+// que hayan ocurrido mientras tanto. si el proyecto ya se cerró o el medio ya no está,
+// simplemente no se toca nada
+function regenerarMiniaturas(medios: MediaAsset[]): void {
+  for (const medio of medios) {
+    const segundo = (medio.duracion || 0) / 2
+    frameDeVideo(medio.url, segundo).then((frame) => {
+      if (!frame) return
+      const actuales = useProjectStore.getState().medios
+      let cambio = false
+      const nuevos = actuales.map((m) => {
+        if (m.id !== medio.id) return m
+        cambio = true
+        return { ...m, miniatura: frame }
+      })
+      if (cambio) useProjectStore.setState({ medios: nuevos })
+    })
+  }
 }
 
 // duplicar copia el proyecto entero con otro id, incluidos los archivos, para

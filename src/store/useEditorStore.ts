@@ -44,7 +44,7 @@ const DURACION_MINIMA_CAPA = 0.2
 
 export type Herramienta =
   | 'proyecto'
-  | 'propiedades'
+  | 'transiciones'
   | 'texto'
   | 'imagen'
   | 'audio'
@@ -470,7 +470,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   clipSeleccionado: null,
   capaSeleccionada: null,
   regionSeleccionada: null,
-  herramienta: 'propiedades',
+  herramienta: 'transiciones',
   pxPorSegundo: PX_POR_SEGUNDO_DEFECTO,
   anchoTimeline: 0,
   setAnchoTimeline: (px) => set({ anchoTimeline: px }),
@@ -551,7 +551,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         pista: { ...s.pista, clips: nuevosClips },
         clipSeleccionado: clip.id,
         capaSeleccionada: null,
-        herramienta: 'propiedades',
+        herramienta: 'transiciones',
         pxPorSegundo: encaje ?? s.pxPorSegundo,
         resolucion,
         resolucionAuto,
@@ -830,7 +830,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       clipSeleccionado: id,
       capaSeleccionada: id ? null : s.capaSeleccionada,
       regionSeleccionada: id ? null : s.regionSeleccionada,
-      herramienta: id ? 'propiedades' : s.herramienta,
+      herramienta: id ? 'transiciones' : s.herramienta,
     })),
 
   limpiarSeleccion: () =>
