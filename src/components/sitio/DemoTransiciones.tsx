@@ -52,7 +52,7 @@ export default function DemoTransiciones() {
   const bucle = useRef(0)
   const [elegida, setElegida] = useState('desvanecer')
   const [listo, setListo] = useState(false)
-  const [avance, setAvance] = useState(1)
+
 
   const lista = CATALOGO.filter((t) => ELEGIDAS.includes(t.id))
 
@@ -114,7 +114,7 @@ export default function DemoTransiciones() {
     const inicio = performance.now()
     const paso = () => {
       const p = Math.min(1, (performance.now() - inicio) / DURACION)
-      setAvance(p)
+
       dibujar(t, p)
       if (p < 1) bucle.current = requestAnimationFrame(paso)
     }
@@ -145,13 +145,6 @@ export default function DemoTransiciones() {
           className="block w-full"
           style={{ aspectRatio: `${ANCHO} / ${ALTO}` }}
         />
-        {/* avance de la transición, para saber en qué punto va */}
-        <span className="absolute inset-x-0 bottom-0 h-1 bg-black/30">
-          <span
-            className="block h-full bg-brand transition-[width] duration-75"
-            style={{ width: `${avance * 100}%` }}
-          />
-        </span>
         <button
           onClick={() => reproducir(elegida)}
           className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-[#13233d] transition-transform duration-200 hover:scale-105 active:scale-95"
