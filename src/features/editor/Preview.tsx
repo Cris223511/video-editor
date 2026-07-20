@@ -43,6 +43,7 @@ export default function Preview() {
   const fondo = useEditorStore((s) => s.fondo)
   const desenfoqueFondo = useEditorStore((s) => s.desenfoqueFondo)
   const audioRegiones = useEditorStore((s) => s.audioRegiones)
+  const audios = useEditorStore((s) => s.audios)
   const volumenGlobal = useEditorStore((s) => s.volumenGlobal)
   const pistasMeta = useEditorStore((s) => s.pistasMeta)
   const medios = useProjectStore((s) => s.medios)
@@ -54,6 +55,8 @@ export default function Preview() {
   const transRef = useRef<HTMLCanvasElement>(null)
   // video del relleno borroso: sigue el tiempo del clip activo sin sonar
   const fondoRef = useRef<HTMLVideoElement | null>(null)
+  // elementos de sonido de los audios importados, uno por clip de audio
+  const audiosRef = useRef<Map<string, HTMLAudioElement>>(new Map())
   const areaRef = useRef<HTMLDivElement>(null)
   const [areaTam, setAreaTam] = useState({ w: 0, h: 0 })
 
@@ -164,6 +167,38 @@ export default function Preview() {
       if (!f.paused) f.pause()
     }
   }, [playhead, reproduciendo, clipsOrdenados, ocultas])
+
+  // los audios importados siguen al cabezal: cada uno suena mientras el cabezal
+  // cae en su tramo, colocado en el segundo de su fuente que le toca, y calla
+  // fuera de él. el volumen combina el del clip con el general del proyecto. se
+  // resincroniza en cada cambio de cabezal, que durante la reproducción llega
+  // fotograma a fotograma
+  useEffect(() => {
+    audios.forEach((a) => {
+      const el = audiosRef.current.get(a.id)
+      if (!el) return
+      const dentro = playhead >= a.inicio && playhead < a.inicio + a.duracion
+      el.volume = Math.max(0, Math.min(1, a.volumen * volumenGlobal))
+      if (!dentro) {
+        if (!el.paused) el.pause()
+        return
+      }
+      const objetivo = a.recorteInicio + (playhead - a.inicio)
+      if (reproduciendo) {
+        if (Math.abs(el.currentTime - objetivo) > 0.25) el.currentTime = objetivo
+        if (el.paused) el.play().catch(() => {})
+      } else {
+        if (Math.abs(el.currentTime - objetivo) > 0.05) {
+          try {
+            el.currentTime = objetivo
+          } catch {
+            // sin metadatos todavía, se ignora
+          }
+        }
+        if (!el.paused) el.pause()
+      }
+    })
+  }, [playhead, reproduciendo, audios, volumenGlobal])
 
   // durante la reproducción avanza el clip activo y salta al siguiente al
   // terminar; el cabezal se calcula desde el tiempo real del video
@@ -691,6 +726,24 @@ export default function Preview() {
             <ClipOverlay />
             <CapasOverlay />
             <MarcoOverlay alturaLienzo={lienzoRect.h} />
+
+            {/* elementos de sonido de los audios importados. no se ven; solo
+                suenan, sincronizados con el cabezal por el efecto de arriba */}
+            {audios.map((a) => {
+              const asset = assetPorId.get(a.assetId)
+              if (!asset) return null
+              return (
+                <audio
+                  key={a.id}
+                  ref={(el) => {
+                    if (el) audiosRef.current.set(a.id, el)
+                    else audiosRef.current.delete(a.id)
+                  }}
+                  src={asset.url}
+                  preload="auto"
+                />
+              )
+            })}
           </div>
         </div>
       )}

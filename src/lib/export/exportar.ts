@@ -1,7 +1,7 @@
 import { Clip, PistaMeta } from '../../types/timeline'
 import { Capa } from '../../types/layers'
 import { Marco } from '../../types/marco'
-import { RegionAudio } from '../../types/audio'
+import { RegionAudio, ClipAudio } from '../../types/audio'
 import { clipEnTiempo, duracionTotal } from '../timeline/clips'
 import { gananciaEn } from '../audio/ganancia'
 import { usaMatriz, matrizTono, tablasColor, stdDeviationsDesenfoque } from '../color/tono'
@@ -18,6 +18,8 @@ export interface DatosExport {
   capas: Capa[]
   marco: Marco
   audioRegiones: RegionAudio[]
+  // audios importados sueltos en la pista de sonido, con su propio material
+  audios: ClipAudio[]
   volumenGlobal: number
   // metadatos por nivel: se usan para saltar los ocultos al elegir el clip
   // visible y para callar los silenciados en la mezcla
@@ -69,6 +71,17 @@ function cargarVideo(src: string): Promise<HTMLVideoElement> {
     v.crossOrigin = 'anonymous'
     v.onloadeddata = () => resolve(v)
     v.onerror = () => reject(new Error('video'))
+  })
+}
+
+function cargarAudio(src: string): Promise<HTMLAudioElement> {
+  return new Promise((resolve, reject) => {
+    const a = document.createElement('audio')
+    a.src = src
+    a.preload = 'auto'
+    a.crossOrigin = 'anonymous'
+    a.onloadeddata = () => resolve(a)
+    a.onerror = () => reject(new Error('audio'))
   })
 }
 
@@ -202,6 +215,26 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
         limpiezas.push(() => ctxAudio.close().catch(() => {}))
         await ctxAudio.resume().catch(() => {})
 
+        // audios importados: cada uno se enruta por su propio nodo de ganancia
+        // hacia el mismo destino que graba la mezcla, con su volumen ya aplicado
+        const audiosEl = new Map<string, HTMLAudioElement>()
+        for (const a of datos.audios) {
+          const url = datos.urlDeAsset(a.assetId)
+          if (!url) continue
+          try {
+            const el = await cargarAudio(url)
+            const fuente = ctxAudio.createMediaElementSource(el)
+            const g = ctxAudio.createGain()
+            g.gain.value = a.volumen * datos.volumenGlobal
+            fuente.connect(g)
+            g.connect(destino)
+            audiosEl.set(a.id, el)
+          } catch {
+            // si un audio no carga, la exportación sigue sin él
+          }
+        }
+        limpiezas.push(() => audiosEl.forEach((el) => el.pause()))
+
         // stream de video del canvas + audio mezclado
         const streamVideo = canvas.captureStream(datos.fps)
         const stream = new MediaStream([
@@ -236,9 +269,27 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
           }
         }
 
+        // coloca cada audio importado en el segundo que le toca y lo reproduce o
+        // lo calla según si el instante actual cae dentro de su tramo
+        const sincronizarAudios = (t: number) => {
+          datos.audios.forEach((a) => {
+            const el = audiosEl.get(a.id)
+            if (!el) return
+            const dentro = t >= a.inicio && t < a.inicio + a.duracion
+            if (!dentro) {
+              if (!el.paused) el.pause()
+              return
+            }
+            const objetivo = a.recorteInicio + (t - a.inicio)
+            if (Math.abs(el.currentTime - objetivo) > 0.25) el.currentTime = objetivo
+            if (el.paused) el.play().catch(() => {})
+          })
+        }
+
         const paso = () => {
           if (cancelado) return
           const t = phRef.t
+          sincronizarAudios(t)
           if (t >= total) {
             dibujarFotograma(ctx, escena(), Math.max(0, total - 0.001), (id) => videos.get(id) ?? null, (id) => imagenes.get(id), off)
             onProgreso(1)

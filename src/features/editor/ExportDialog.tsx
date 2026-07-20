@@ -91,6 +91,7 @@ export default function ExportDialog() {
         capas: estado.capas,
         marco: estado.marco,
         audioRegiones: estado.audioRegiones,
+        audios: estado.audios,
         volumenGlobal: estado.volumenGlobal,
         pistasMeta: estado.pistasMeta,
         urlDeAsset: (id) => medios.find((m) => m.id === id)?.url,

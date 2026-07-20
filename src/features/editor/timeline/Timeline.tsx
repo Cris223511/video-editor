@@ -15,6 +15,7 @@ import PistaHeader from './PistaHeader'
 import { HUECO_PISTA } from './ClipBlock'
 import CapaBlock from './CapaBlock'
 import AudioBlock from './AudioBlock'
+import AudioClipBlock from './AudioClipBlock'
 import CarrilHeader from './CarrilHeader'
 import AgregarNivelGuia from './AgregarNivelGuia'
 import { resolverDestinoVertical } from './destinoVertical'
@@ -73,6 +74,7 @@ export default function Timeline({
   const [pistaResaltada, setPistaResaltada] = useState<number | null>(null)
   const capas = useEditorStore((s) => s.capas)
   const audioRegiones = useEditorStore((s) => s.audioRegiones)
+  const audios = useEditorStore((s) => s.audios)
   const playhead = useEditorStore((s) => s.playhead)
   const pxPorSegundo = useEditorStore((s) => s.pxPorSegundo)
   const irA = useEditorStore((s) => s.irA)
@@ -124,8 +126,9 @@ export default function Timeline({
     clips.forEach((c) => p.push(c.inicio, c.inicio + c.duracion))
     capas.forEach((c) => p.push(c.inicio, c.inicio + c.duracion))
     audioRegiones.forEach((r) => p.push(r.inicio, r.inicio + r.duracion))
+    audios.forEach((a) => p.push(a.inicio, a.inicio + a.duracion))
     return p
-  }, [clips, capas, audioRegiones, playhead])
+  }, [clips, capas, audioRegiones, audios, playhead])
 
   const puedeDividir = clips.some(
     (c) => playhead > c.inicio + MIN && playhead < c.inicio + c.duracion - MIN,
@@ -516,7 +519,7 @@ export default function Timeline({
             className="relative h-8 overflow-hidden rounded-lg"
             style={{ marginTop: SEP_SECCION, background: 'rgb(var(--border) / 0.05)' }}
           >
-            {audioRegiones.length === 0 ? (
+            {audioRegiones.length === 0 && audios.length === 0 ? (
               <>
                 {/* el rótulo del carril va a la izquierda y limpio; ninguna onda
                     pasa por debajo para que se lea sin ruido */}
@@ -539,10 +542,22 @@ export default function Timeline({
                 </div>
               </>
             ) : (
-              // al haber audio, sus regiones ocupan el carril y sustituyen al relleno
-              audioRegiones.map((r) => (
-                <AudioBlock key={r.id} region={r} pxPorSegundo={pxPorSegundo} puntos={puntos} />
-              ))
+              <>
+                {/* franjas de ganancia (verdes) y audios importados (azules)
+                    conviven en el mismo carril, cada uno con su color */}
+                {audioRegiones.map((r) => (
+                  <AudioBlock key={r.id} region={r} pxPorSegundo={pxPorSegundo} puntos={puntos} />
+                ))}
+                {audios.map((a) => (
+                  <AudioClipBlock
+                    key={a.id}
+                    audio={a}
+                    asset={medios.find((m) => m.id === a.assetId)}
+                    pxPorSegundo={pxPorSegundo}
+                    puntos={puntos}
+                  />
+                ))}
+              </>
             )}
           </div>
 

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { Track, AjusteTono, Transicion, PistaMeta, EfectoClip, Encuadre } from '../types/timeline'
 import { MediaAsset } from '../types/media'
 import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto } from '../types/layers'
-import { RegionAudio } from '../types/audio'
+import { RegionAudio, ClipAudio } from '../types/audio'
 import { Marco } from '../types/marco'
 import { tonoNeutro } from '../lib/color/tono'
 import {
@@ -222,6 +222,13 @@ interface EstadoEditor {
   moverRegionAudio: (id: string, nuevoInicio: number) => void
   recortarRegionAudio: (id: string, lado: 'inicio' | 'fin', deltaSegundos: number) => void
 
+  // audios importados sueltos en la pista de sonido, cada uno con su material
+  audios: ClipAudio[]
+  moverAudio: (id: string, nuevoInicio: number) => void
+  recortarAudio: (id: string, lado: 'inicio' | 'fin', deltaSegundos: number) => void
+  quitarAudio: (id: string) => void
+  setVolumenAudio: (id: string, volumen: number) => void
+
   setHerramienta: (h: Herramienta) => void
   setLienzo: (ancho: number, alto: number) => void
   setLienzoAuto: () => void
@@ -262,6 +269,7 @@ type Documento = Pick<
   | 'marco'
   | 'volumenGlobal'
   | 'audioRegiones'
+  | 'audios'
   | 'resolucion'
   | 'resolucionAuto'
   | 'lienzoManual'
@@ -279,6 +287,7 @@ function tomarDocumento(s: EstadoEditor): Documento {
     numPistas: s.numPistas,
     altosPista: s.altosPista,
     pistasMeta: s.pistasMeta,
+    audios: s.audios,
     capas: s.capas,
     marco: s.marco,
     volumenGlobal: s.volumenGlobal,
@@ -373,6 +382,10 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'duplicarRegionAudio',
   'moverRegionAudio',
   'recortarRegionAudio',
+  'moverAudio',
+  'recortarAudio',
+  'quitarAudio',
+  'setVolumenAudio',
   'setLienzo',
   'setLienzoAuto',
   'setColorFondo',
@@ -483,6 +496,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   marco: { tipo: 'ninguno', color: '#ffffff', grosor: 30, radio: 40 },
   volumenGlobal: 1,
   audioRegiones: [],
+  audios: [],
   grabandoMovimiento: false,
   dibujandoMascara: false,
   insercionPista: null,
@@ -490,6 +504,34 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   agregarDesdeAsset: (asset, destino) =>
     set((s) => {
+      // una imagen no ocupa un nivel de video: entra como capa desde el cabezal,
+      // con una duración corta que se ajusta si el montaje termina antes, igual
+      // que la imagen que se coloca desde su propio panel
+      if (asset.clase === 'imagen') {
+        const capa = crearCapaImagen(s.playhead, asset.url, asset.ancho, asset.alto)
+        const DUR_IMAGEN = 5
+        const fin = duracionTotal(s.pista.clips)
+        const disponible = fin > s.playhead ? fin - s.playhead : DUR_IMAGEN
+        capa.duracion = Math.max(1, Math.min(DUR_IMAGEN, disponible))
+        return { capas: [...s.capas, capa], capaSeleccionada: capa.id, clipSeleccionado: null }
+      }
+
+      // un audio importado va a la pista de sonido como un clip propio, pegado al
+      // final de lo que ya haya ahí, con su duración completa y a volumen normal
+      if (asset.clase === 'audio') {
+        const inicio = s.audios.reduce((t, a) => Math.max(t, a.inicio + a.duracion), 0)
+        const audio: ClipAudio = {
+          id: crypto.randomUUID(),
+          assetId: asset.id,
+          inicio,
+          duracion: asset.duracion,
+          recorteInicio: 0,
+          duracionFuente: asset.duracion,
+          volumen: 1,
+        }
+        return { audios: [...s.audios, audio], regionSeleccionada: null, clipSeleccionado: null, capaSeleccionada: null }
+      }
+
       // por defecto los tres arrays de niveles se quedan como están; solo cambian
       // si el arrastre pidió abrir una pista nueva en una separación
       let numPistas = s.numPistas
@@ -1273,6 +1315,41 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         }
         return { ...r, duracion: Math.max(DURACION_MINIMA_CAPA, r.duracion + delta) }
       }),
+    })),
+
+  moverAudio: (id, nuevoInicio) =>
+    set((s) => ({
+      audios: s.audios.map((a) => (a.id === id ? { ...a, inicio: Math.max(0, nuevoInicio) } : a)),
+    })),
+
+  // recortar un audio por sus bordes. el borde de inicio mueve además el punto de
+  // entrada en la fuente, y ninguno de los dos puede pasar de lo que dura el
+  // material original ni bajar de la duración mínima
+  recortarAudio: (id, lado, delta) =>
+    set((s) => ({
+      audios: s.audios.map((a) => {
+        if (a.id !== id) return a
+        if (lado === 'inicio') {
+          const fin = a.inicio + a.duracion
+          const dMin = -a.recorteInicio
+          const dMax = a.duracion - DURACION_MINIMA_CAPA
+          const d = Math.max(dMin, Math.min(delta, dMax))
+          return { ...a, inicio: Math.max(0, a.inicio + d), duracion: fin - Math.max(0, a.inicio + d), recorteInicio: a.recorteInicio + d }
+        }
+        const tope = a.duracionFuente - a.recorteInicio
+        return { ...a, duracion: Math.max(DURACION_MINIMA_CAPA, Math.min(tope, a.duracion + delta)) }
+      }),
+    })),
+
+  quitarAudio: (id) =>
+    set((s) => ({
+      audios: s.audios.filter((a) => a.id !== id),
+      regionSeleccionada: s.regionSeleccionada === id ? null : s.regionSeleccionada,
+    })),
+
+  setVolumenAudio: (id, volumen) =>
+    set((s) => ({
+      audios: s.audios.map((a) => (a.id === id ? { ...a, volumen: Math.max(0, Math.min(2, volumen)) } : a)),
     })),
 
   setHerramienta: (h) => set({ herramienta: h }),

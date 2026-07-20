@@ -1,7 +1,7 @@
 import { Capa } from '../../types/layers'
 import { Clip } from '../../types/timeline'
 import { MediaAsset, ClaseMedio } from '../../types/media'
-import { RegionAudio } from '../../types/audio'
+import { RegionAudio, ClipAudio } from '../../types/audio'
 import { Marco } from '../../types/marco'
 
 // versión del formato guardado. si más adelante cambia la forma de los datos,
@@ -42,6 +42,7 @@ export interface ProyectoGuardado {
     altosPista: number[]
     capas: Capa[]
     audioRegiones: RegionAudio[]
+    audios?: ClipAudio[]
     volumenGlobal: number
     resolucion: { ancho: number; alto: number }
     resolucionAuto: { ancho: number; alto: number }
