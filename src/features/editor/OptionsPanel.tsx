@@ -2,6 +2,7 @@ import GaleriaTransiciones from './GaleriaTransiciones'
 import SinSeleccion from '../../components/ui/SinSeleccion'
 import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
+import { useCongelarAncho } from './useCongelarAncho'
 import { useEditorStore, Herramienta } from '../../store/useEditorStore'
 import { herramientas } from './RielHerramientas'
 import { useProjectStore } from '../../store/useProjectStore'
@@ -89,8 +90,17 @@ function Propiedades() {
 
 // panel derecho contextual. la barra de herramientas cambia el contenido; todas
 // las herramientas ya tienen su panel funcionando
-export default function OptionsPanel({ onOcultar }: { onOcultar?: () => void }) {
+export default function OptionsPanel({
+  onOcultar,
+  plegando = false,
+}: {
+  onOcultar?: () => void
+  plegando?: boolean
+}) {
   const herramienta = useEditorStore((s) => s.herramienta)
+  // mientras el panel se pliega o despliega, su ancho lo dicta este hook para
+  // que el texto no se aplaste: el contenido conserva su ancho y se recorta
+  const { ref, estiloAncho } = useCongelarAncho(plegando)
 
   const paneles: Record<Herramienta, JSX.Element> = {
     proyecto: <ProyectoPanel />,
@@ -110,8 +120,13 @@ export default function OptionsPanel({ onOcultar }: { onOcultar?: () => void }) 
   const actual = herramientas.find((h) => h.id === herramienta)
 
   return (
-    <aside className="panel flex w-full min-w-0 overflow-hidden rounded-xl">
-      <div className="flex min-w-0 flex-1 flex-col">
+    <aside ref={ref} className="panel relative w-full overflow-hidden rounded-xl">
+      {/* el bloque va en absoluto y con un ancho controlado: al animarse el panel
+          este contenido no se estira ni se comprime, solo se descubre o se tapa */}
+      <div
+        className="absolute inset-y-0 left-0 flex flex-col"
+        style={{ width: estiloAncho }}
+      >
         <div
           className="flex items-center gap-2 px-3 py-2.5"
           style={{ borderBottom: '1px solid rgb(var(--border) / 0.1)' }}
@@ -122,6 +137,7 @@ export default function OptionsPanel({ onOcultar }: { onOcultar?: () => void }) 
             <Tooltip texto="Ocultar el panel" lado="abajo">
               <button
                 onClick={onOcultar}
+                aria-label="Ocultar el panel"
                 className="interactivo -mr-1 ml-auto grid h-7 w-7 place-items-center rounded-lg text-[color:var(--muted)]"
               >
                 <Icon name="atras" size={14} />

@@ -20,6 +20,11 @@ const MIN = 0.1
 // alto de la regla de tiempo, replicado en la columna de cabeceras para que las
 // filas de ambas columnas queden a la misma altura
 const ALTO_REGLA = 29
+// separación vertical entre secciones (el hueco que despega el carril de texto
+// del bloque de video y el de audio del de texto). se aplica idéntica en la
+// columna de cabeceras y en las filas del lado derecho para que no se
+// desalineen. el hueco entre niveles de video vive en HUECO_PISTA
+const SEP_SECCION = 12
 
 // espacios vacíos entre clips consecutivos de un mismo nivel, incluido el que
 // pueda quedar antes del primero
@@ -61,8 +66,12 @@ export default function Timeline({
   const medios = useProjectStore((s) => s.medios)
 
   const scrollRef = useRef<HTMLDivElement>(null)
+  // ancho visible del contenedor con desplazamiento. se mide en vivo para que la
+  // regla y las filas cubran todo el ancho disponible aunque el proyecto sea
+  // corto o esté vacío, y no se corten a media pista
+  const [anchoVisible, setAnchoVisible] = useState(0)
   const total = duracionTotal(clips)
-  const anchoContenido = Math.max(total * pxPorSegundo + 200, 600)
+  const anchoContenido = Math.max(total * pxPorSegundo + 200, anchoVisible || 600)
 
   // instantes a los que se imantan clips y capas: el cero, el cabezal y los
   // bordes de todos los elementos
@@ -123,12 +132,41 @@ export default function Timeline({
     return () => cont.removeEventListener('wheel', alGirar)
   }, [])
 
+  // el ancho útil de la pista se sigue con un observador: al cambiar el tamaño
+  // del panel o plegar los medios, la regla se reajusta para no quedarse a medias
+  useEffect(() => {
+    const cont = scrollRef.current
+    if (!cont) return
+    const ro = new ResizeObserver(() => setAnchoVisible(cont.clientWidth))
+    ro.observe(cont)
+    setAnchoVisible(cont.clientWidth)
+    return () => ro.disconnect()
+  }, [])
+
   function moverCabezal(clientX: number) {
     const cont = scrollRef.current
     if (!cont) return
     const rect = cont.getBoundingClientRect()
     const x = clientX - rect.left + cont.scrollLeft
     irA(x / pxPorSegundo)
+  }
+
+  // el cabezal se puede arrastrar agarrando su manija superior, además de
+  // pulsando en la regla. el gesto reutiliza moverCabezal, así que el cabezal
+  // sigue al cursor mientras se mantiene pulsado
+  function arrastrarCabezal(e: MouseEvent) {
+    e.stopPropagation()
+    e.preventDefault()
+    moverCabezal(e.clientX)
+    const mover = (ev: globalThis.MouseEvent) => moverCabezal(ev.clientX)
+    const soltar = () => {
+      document.body.style.cursor = ''
+      window.removeEventListener('mousemove', mover)
+      window.removeEventListener('mouseup', soltar)
+    }
+    document.body.style.cursor = 'grabbing'
+    window.addEventListener('mousemove', mover)
+    window.addEventListener('mouseup', soltar)
   }
 
   function alPresionarRegla(e: MouseEvent) {
@@ -162,6 +200,7 @@ export default function Timeline({
           <Tooltip texto={mediosVisibles ? 'Ocultar medios' : 'Mostrar medios'} lado="abajo">
             <button
               onClick={onOcultarMedios}
+              aria-label={mediosVisibles ? 'Ocultar medios' : 'Mostrar medios'}
               className="interactivo grid h-8 w-8 place-items-center rounded-lg text-[color:var(--muted)]"
             >
               <Icon name="pelicula" size={16} />
@@ -212,30 +251,33 @@ export default function Timeline({
       </div>
 
       <div className="flex min-h-0 flex-1 overflow-y-auto">
-        {/* columna fija con la cabecera de cada nivel, alineada con sus filas */}
+        {/* columna fija con la cabecera de cada nivel, alineada con sus filas.
+            el grupo permite que el «+» de agregar nivel asome solo al pasar el
+            cursor por encima, en vez de ocupar sitio siempre */}
         <div
-          className="w-44 shrink-0"
+          className="group/cols w-44 shrink-0"
           style={{ borderRight: '1px solid rgb(var(--border) / 0.1)' }}
         >
           <div style={{ height: ALTO_REGLA }} />
-          <div className="mt-2 flex flex-col" style={{ gap: HUECO_PISTA }}>
+          {/* el bloque de niveles de video es relativo para colgar de su borde
+              inferior el «+» de agregar, que asoma al pasar el cursor sin ocupar
+              sitio en el flujo y, por tanto, sin descuadrar los carriles */}
+          <div className="relative mt-2 flex flex-col" style={{ gap: HUECO_PISTA }}>
             {filas.map((p) => (
               <PistaHeader key={p} indice={p} alto={altosPista[p]} />
             ))}
+            <AgregarNivelMenu />
           </div>
           {/* cabeceras de los carriles de texto y de audio, alineadas con sus
               filas del lado derecho (mismo margen y alto). se muestran siempre,
               aunque el carril esté vacío, para que se entienda que ese espacio
               existe y qué le corresponde */}
-          <div className="mt-1.5">
+          <div style={{ marginTop: SEP_SECCION }}>
             <CarrilHeader icono="texto" titulo="Texto y figuras" acento="#f59e0b" alto={36} />
           </div>
-          <div className="mt-1.5">
+          <div style={{ marginTop: SEP_SECCION }}>
             <CarrilHeader icono="audio" titulo="Audio" acento="#10b981" alto={32} />
           </div>
-          {/* el antiguo botón de agregar nivel ahora abre un menú con los tres
-              tipos de carril. se queda al pie de la columna de cabeceras */}
-          <AgregarNivelMenu />
         </div>
 
       <div
@@ -277,9 +319,11 @@ export default function Timeline({
                   }}
                 >
                   {vacio && p === 0 && clips.length === 0 && (
-                    <div className="flex h-full items-center gap-2 px-4 text-xs text-[color:var(--muted)]">
+                    <div className="flex h-full items-center gap-2.5 px-6 text-xs text-[color:var(--muted)]">
                       <Icon name="subir" size={14} />
-                      Arrastra un video desde el panel de medios hasta aquí.
+                      <span className="leading-relaxed">
+                        Arrastra un video desde el panel de medios hasta aquí.
+                      </span>
                     </div>
                   )}
                   {fila?.huecos.map((h) => (
@@ -311,15 +355,16 @@ export default function Timeline({
             })}
           </div>
 
-          {/* pista de capas */}
-          <div className="relative mt-1.5 h-9">
+          {/* pista de capas. el margen superior es el mismo SEP_SECCION que separa
+              las cabeceras del lado izquierdo, para que ambas columnas cuadren */}
+          <div className="relative h-9" style={{ marginTop: SEP_SECCION }}>
             {capas.map((c) => (
               <CapaBlock key={c.id} capa={c} pxPorSegundo={pxPorSegundo} puntos={puntos} />
             ))}
           </div>
 
           {/* pista de audio */}
-          <div className="relative mt-1.5 h-8">
+          <div className="relative h-8" style={{ marginTop: SEP_SECCION }}>
             {audioRegiones.map((r) => (
               <AudioBlock key={r.id} region={r} pxPorSegundo={pxPorSegundo} puntos={puntos} />
             ))}
@@ -329,7 +374,18 @@ export default function Timeline({
             className="pointer-events-none absolute bottom-0 top-0 z-20 w-px bg-brand"
             style={{ left: playhead * pxPorSegundo }}
           >
-            <div className="absolute -left-1.5 top-0 h-3 w-3 rounded-sm bg-brand" />
+            {/* manija superior: se puede agarrar y arrastrar a lo largo de la
+                pista para mover el cabezal. es lo único con eventos activos de
+                esta capa, el resto de la línea azul no intercepta el ratón */}
+            <div
+              onMouseDown={arrastrarCabezal}
+              title="Arrastra para mover el cabezal"
+              className="pointer-events-auto absolute -top-0.5 left-1/2 flex h-4 w-4 -translate-x-1/2 cursor-grab items-start justify-center active:cursor-grabbing"
+            >
+              <span className="h-3 w-3 rounded-sm bg-brand shadow-sm" />
+              {/* puntita inferior que ancla la manija a la línea */}
+              <span className="absolute top-2.5 h-1.5 w-1.5 rotate-45 bg-brand" />
+            </div>
           </div>
         </div>
       </div>

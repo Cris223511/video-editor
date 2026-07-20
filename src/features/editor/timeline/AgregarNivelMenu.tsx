@@ -8,11 +8,12 @@ import { useEditorStore, Herramienta } from '../../../store/useEditorStore'
 const ACENTO_TEXTO = '#f59e0b'
 const ACENTO_AUDIO = '#10b981'
 
-// el botón «Agregar nivel» dejó de añadir siempre una pista de video y ahora
-// abre este menú, donde se elige qué tipo de carril interesa. la pista de video
-// se crea de verdad; las opciones de texto y audio, al existir un solo carril de
-// cada uno, se limitan a llevar el foco allí seleccionando su herramienta para
-// empezar a añadir contenido
+// agregar un nivel dejó de ser un botón fijo al pie de la columna, que se veía
+// pesado. ahora es un «+» discreto colgado del borde inferior del bloque de
+// video: asoma al pasar el cursor por la columna de cabeceras y, al pulsarlo,
+// abre el mismo menú con los tres tipos de carril. la pista de video se crea de
+// verdad; texto y audio, al existir un único carril de cada uno, solo llevan el
+// foco allí seleccionando su herramienta para empezar a añadir contenido
 export default function AgregarNivelMenu() {
   const agregarPista = useEditorStore((s) => s.agregarPista)
   const numPistas = useEditorStore((s) => s.numPistas)
@@ -66,26 +67,44 @@ export default function AgregarNivelMenu() {
   ]
 
   return (
-    <div ref={contenedor} className="relative mt-1.5">
+    // colgado del borde inferior del bloque de video y centrado; translate-y lo
+    // deja montado sobre esa línea. no ocupa alto en el flujo, así que los
+    // carriles de abajo no se descuadran con la columna del lado derecho
+    <div
+      ref={contenedor}
+      className="absolute inset-x-0 bottom-0 z-40 flex translate-y-1/2 justify-center"
+    >
       <button
         onClick={() => setAbierto((v) => !v)}
         aria-expanded={abierto}
-        className="interactivo flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] font-medium text-[color:var(--muted)]"
-        style={{ border: '1px dashed rgb(var(--border) / 0.2)' }}
+        aria-label="Agregar nivel"
+        title="Agregar nivel"
+        className={[
+          'interactivo grid h-6 w-6 place-items-center rounded-full shadow-md ring-2 transition-all duration-150',
+          abierto
+            ? 'scale-100 opacity-100'
+            : 'scale-90 opacity-0 group-hover/cols:scale-100 group-hover/cols:opacity-100 focus-visible:scale-100 focus-visible:opacity-100',
+        ].join(' ')}
+        style={{
+          background: 'rgb(var(--brand))',
+          color: 'white',
+          // el aro del color del fondo recorta el botón sobre la línea divisoria
+          '--tw-ring-color': 'rgb(var(--surface))',
+        } as React.CSSProperties}
       >
         <Icon name="mas" size={14} />
-        Agregar nivel
       </button>
 
-      {/* el panel se abre hacia arriba: el botón está al pie de la columna y,
-          dentro del contenedor con desplazamiento, un menú hacia abajo quedaría
-          recortado */}
+      {/* el panel se despliega hacia abajo: el «+» queda cerca del borde
+          superior de la línea de tiempo, así que abrirlo hacia arriba lo
+          recortaría contra los controles del visor. hacia abajo hay sitio de
+          sobra sobre los carriles */}
       <div
         className={[
-          'absolute bottom-full left-0 z-50 mb-1 w-full min-w-[11rem] transition-all duration-150 ease-out',
+          'absolute top-full left-1/2 z-50 mt-2 w-44 -translate-x-1/2 transition-all duration-150 ease-out',
           abierto
             ? 'pointer-events-auto translate-y-0 opacity-100'
-            : 'pointer-events-none translate-y-1 opacity-0',
+            : 'pointer-events-none -translate-y-1 opacity-0',
         ].join(' ')}
       >
         <div

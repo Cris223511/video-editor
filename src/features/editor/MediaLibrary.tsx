@@ -6,6 +6,7 @@ import { useProjectStore } from '../../store/useProjectStore'
 import { useImportarMedios } from '../import/useImportarMedios'
 import { formatearDuracion } from '../../lib/format/duracion'
 import FichaMedio from './FichaMedio'
+import { useCongelarAncho } from './useCongelarAncho'
 import { MediaAsset } from '../../types/media'
 
 // tipo de dato que viaja al arrastrar un medio hacia la línea de tiempo
@@ -14,11 +15,14 @@ export const TIPO_ARRASTRE = 'application/x-video-editor-asset'
 // panel de medios, abajo a la izquierda y junto a la línea de tiempo. los
 // medios se arrastran desde aquí hasta la pista, y se importan más soltando
 // archivos del explorador sobre la zona punteada
-export default function MediaLibrary() {
+export default function MediaLibrary({ plegando = false }: { plegando?: boolean }) {
   const medios = useProjectStore((s) => s.medios)
   const quitar = useProjectStore((s) => s.quitar)
   const { procesar, ocupado } = useImportarMedios()
   const [encima, setEncima] = useState(false)
+  // igual que en el panel de opciones: el ancho se congela durante el plegado
+  // para que el contenido no se reflowee mientras el panel se estrecha
+  const { ref, estiloAncho } = useCongelarAncho(plegando)
   // qué medio tiene la ficha de detalles abierta
   const [detalle, setDetalle] = useState<MediaAsset | null>(null)
 
@@ -29,7 +33,10 @@ export default function MediaLibrary() {
   }
 
   return (
-    <aside className="panel flex min-w-0 flex-1 flex-col rounded-xl">
+    <aside ref={ref} className="panel relative flex-1 overflow-hidden rounded-xl">
+      {/* bloque en absoluto con ancho controlado para que, al plegar o desplegar,
+          las miniaturas y textos no se estiren: solo se descubren o se recortan */}
+      <div className="absolute inset-y-0 left-0 flex flex-col" style={{ width: estiloAncho }}>
       <div className="flex items-center gap-2 px-3 py-2.5">
         <Icon name="pelicula" size={15} className="text-[color:var(--muted)]" />
         <span className="text-[13px] font-semibold">Medios</span>
@@ -146,6 +153,7 @@ export default function MediaLibrary() {
             onChange={(e) => e.target.files && procesar(e.target.files)}
           />
         </label>
+      </div>
       </div>
 
       <FichaMedio medio={detalle} onCerrar={() => setDetalle(null)} />

@@ -19,7 +19,7 @@ interface Props {
 const UMBRAL_PX = 8
 // separación vertical entre niveles; debe coincidir con la que usa la línea de
 // tiempo al apilar las filas, o el clip caería en la pista equivocada al soltarlo
-export const HUECO_PISTA = 6
+export const HUECO_PISTA = 10
 
 // bloque de un clip en la pista. se puede seleccionar, mover con imantado y
 // recortar por sus bordes con los tiradores laterales

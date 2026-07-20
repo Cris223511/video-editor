@@ -7,6 +7,8 @@ import PlaybackControls from './PlaybackControls'
 import OptionsPanel from './OptionsPanel'
 import Timeline from './timeline/Timeline'
 import ExportDialog from './ExportDialog'
+import Icon from '../../components/ui/Icon'
+import Tooltip from '../../components/ui/Tooltip'
 import { useAtajos } from './useAtajos'
 import { useAutoguardado } from './useAutoguardado'
 import { useRestaurarSesion } from './useRestaurarSesion'
@@ -60,6 +62,12 @@ export default function EditorView() {
           <div className="flex h-full gap-1.5">
             <RielHerramientas onElegir={() => !verOpciones && alternar(opciones, false)} />
 
+            {/* con el panel plegado queda esta pestaña fina en su sitio para
+                volver a abrirlo; sin ella solo el riel serviría de reapertura */}
+            {!verOpciones && (
+              <BarraReabrir titulo="Mostrar el panel" onClick={() => alternar(opciones, false)} />
+            )}
+
             <div className="min-w-0 flex-1">
               <PanelGroup direction="horizontal" autoSaveId="ve-horizontal-3">
                 <Panel
@@ -75,7 +83,7 @@ export default function EditorView() {
                   onExpand={() => setVerOpciones(true)}
                   className={`flex ${suave}`}
                 >
-                  <OptionsPanel onOcultar={() => alternar(opciones, true)} />
+                  <OptionsPanel onOcultar={() => alternar(opciones, true)} plegando={plegando} />
                 </Panel>
 
                 <Tirador orientacion="vertical" />
@@ -95,39 +103,74 @@ export default function EditorView() {
 
         {/* fila inferior: medios a la izquierda y línea de tiempo al lado */}
         <Panel defaultSize={36} minSize={18}>
-          <PanelGroup direction="horizontal" autoSaveId="ve-inferior-3">
-            <Panel
-              ref={medios}
-              id="medios"
-              order={1}
-              collapsible
-              collapsedSize={0}
-              defaultSize={20}
-              minSize={12}
-              maxSize={38}
-              onCollapse={() => setVerMedios(false)}
-              onExpand={() => setVerMedios(true)}
-              className={`flex ${suave}`}
-            >
-              <MediaLibrary />
-            </Panel>
+          <div className="flex h-full gap-1.5">
+            {/* misma pestaña de reapertura que arriba, ahora para los medios */}
+            {!verMedios && (
+              <BarraReabrir titulo="Mostrar los medios" onClick={() => alternar(medios, false)} />
+            )}
 
-            <Tirador orientacion="vertical" />
+            <div className="min-w-0 flex-1">
+              <PanelGroup direction="horizontal" autoSaveId="ve-inferior-3">
+                <Panel
+                  ref={medios}
+                  id="medios"
+                  order={1}
+                  collapsible
+                  collapsedSize={0}
+                  defaultSize={20}
+                  // el grupo inferior es más ancho que el de arriba porque el riel
+                  // de herramientas y su separación quedan fuera de él. para que el
+                  // ancho mínimo en píxeles coincida con el del panel de opciones
+                  // (16% de un grupo más estrecho) este porcentaje baja a 15,3
+                  minSize={15.3}
+                  maxSize={38}
+                  onCollapse={() => setVerMedios(false)}
+                  onExpand={() => setVerMedios(true)}
+                  className={`flex ${suave}`}
+                >
+                  <MediaLibrary plegando={plegando} />
+                </Panel>
 
-            <Panel id="linea" order={2} minSize={40} className={`flex ${suave}`}>
-              <div className="panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl">
-                <Timeline
-                  onOcultarMedios={() => alternar(medios, verMedios)}
-                  mediosVisibles={verMedios}
-                />
-              </div>
-            </Panel>
-          </PanelGroup>
+                <Tirador orientacion="vertical" />
+
+                <Panel id="linea" order={2} minSize={40} className={`flex ${suave}`}>
+                  <div className="panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl">
+                    <Timeline
+                      onOcultarMedios={() => alternar(medios, verMedios)}
+                      mediosVisibles={verMedios}
+                    />
+                  </div>
+                </Panel>
+              </PanelGroup>
+            </div>
+          </div>
         </Panel>
       </PanelGroup>
 
       <ExportDialog />
     </div>
+  )
+}
+
+// pestaña delgada que reemplaza a un panel plegado. ocupa su hueco a la
+// izquierda y, al pulsarla, vuelve a desplegarlo. la flecha hacia la derecha y
+// el cursor de mano dejan claro que sirve para abrir
+function BarraReabrir({ titulo, onClick }: { titulo: string; onClick: () => void }) {
+  return (
+    <Tooltip texto={titulo} lado="derecha">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={titulo}
+        className="panel group grid w-6 shrink-0 cursor-pointer place-items-center rounded-xl text-[color:var(--muted)] transition-colors hover:bg-brand/10 hover:text-brand"
+      >
+        <Icon
+          name="desplegar"
+          size={16}
+          className="transition-transform duration-200 group-hover:translate-x-0.5"
+        />
+      </button>
+    </Tooltip>
   )
 }
 

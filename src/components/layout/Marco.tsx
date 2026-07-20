@@ -48,7 +48,7 @@ export default function Marco() {
   useScrollSuave(!enEditor)
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex min-h-screen flex-col">
       {/* el cielo solo en el sitio: dentro del editor competiría con el visor y
           añadiría trabajo de pintado mientras se reproduce un video */}
       {!enEditor && <Estrellas />}

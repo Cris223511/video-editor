@@ -38,7 +38,22 @@ export default function Modal({
               />
             </Dialog.Overlay>
 
-            <Dialog.Content asChild forceMount aria-describedby={undefined}>
+            <Dialog.Content
+              asChild
+              forceMount
+              aria-describedby={undefined}
+              // al abrir, Radix lleva el foco al primer elemento enfocable de la
+              // ventana. como el contenedor está fijo arriba a la izquierda, el
+              // navegador desplazaba la página hasta el tope para dejarlo a la
+              // vista, y el fondo daba un salto brusco hacia arriba. cancelando
+              // ese enfoque automático el fondo se queda donde estaba; el trampeo
+              // de foco de Radix sigue vivo, así que tab y esc funcionan igual.
+              onOpenAutoFocus={(e) => e.preventDefault()}
+              // lo mismo al cerrar: Radix devuelve el foco al botón que la abrió,
+              // que puede haber quedado fuera de la pantalla y provocar otro
+              // salto. cancelándolo, el fondo tampoco se mueve al cerrar
+              onCloseAutoFocus={(e) => e.preventDefault()}
+            >
               {/* El centrado lo hace este contenedor y no la animación.
                   Antes la ventana se colocaba con posición absoluta al centro y
                   se corregía con un desplazamiento de media ventana metido dentro

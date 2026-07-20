@@ -28,7 +28,7 @@ export default function TimeRuler({ total, pxPorSegundo, ancho }: Props) {
   for (let t = 0; t <= hasta; t += paso) marcas.push(t)
 
   return (
-    <div className="relative h-7 cursor-ew-resize select-none border-b border-black/10 dark:border-white/10">
+    <div className="relative h-7 cursor-pointer select-none border-b border-black/10 dark:border-white/10">
       {marcas.map((t) => (
         <div key={t} className="absolute top-0 h-full" style={{ left: t * pxPorSegundo }}>
           <div className="h-2 w-px bg-black/25 dark:bg-white/25" />

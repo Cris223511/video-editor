@@ -63,21 +63,29 @@ html.dark {
   --profundo-2: 10 30 78;
 }
 
-/* nada decorativo debe ensanchar la página: si un adorno sobresale por un
-   lado, el navegador cuenta ese ancho extra y todo lo centrado se corre unos
-   píxeles, con lo que la barra deja de alinearse con el contenido */
+/* nada decorativo debe ensanchar la página: si un adorno sobresale por un lado,
+   el navegador cuenta ese ancho extra y todo lo centrado se corre unos píxeles,
+   con lo que la barra deja de alinearse con el contenido. el recorte horizontal
+   sigue en los dos, que es lo que atrapa esos desbordes */
 html,
 body {
   overflow-x: clip;
 }
 
-html,
-body,
-#root {
+html {
   height: 100%;
 }
 
+/* aquí estaba el salto de los modales. el body valía height 100%, o sea justo el
+   alto de una pantalla. al abrir un modal, radix bloquea el scroll del fondo
+   poniéndole overflow hidden al body, y con el alto clavado en una pantalla ese
+   hidden recortaba de golpe todo lo que quedaba por debajo: el documento se
+   quedaba sin nada que desplazar y la página saltaba hasta arriba. con min-height
+   el body ocupa la pantalla entera cuando hay poco contenido, pero se estira con
+   el resto cuando hay más, así que el hidden ya no recorta nada y el fondo se
+   queda quieto al abrir cualquier ventana */
 body {
+  min-height: 100%;
   margin: 0;
   background: var(--bg);
   color: var(--text);
