@@ -39,6 +39,9 @@ export default function ClipBlock({
   const estirarVelocidad = useEditorStore((s) => s.estirarVelocidad)
   const moverClipAPista = useEditorStore((s) => s.moverClipAPista)
   const altosPista = useEditorStore((s) => s.altosPista)
+  // un clip de un nivel bloqueado no se puede arrastrar ni recortar; solo
+  // seleccionar. la comprobación se hace por su pista
+  const bloqueada = useEditorStore((s) => s.pistasMeta[clip.pista]?.bloqueada ?? false)
   const tira = useTira(clip.assetId, url, clip.duracionFuente)
 
   // mientras se arrastra un borde con alt no se recorta, se cambia la velocidad;
@@ -50,6 +53,8 @@ export default function ClipBlock({
   function iniciarMover(e: ReactMouseEvent) {
     e.stopPropagation()
     seleccionar(clip.id)
+    // en un nivel bloqueado el gesto termina en la selección: no se mueve nada
+    if (bloqueada) return
     const startX = e.clientX
     const startY = e.clientY
     const inicioOriginal = clip.inicio
@@ -102,6 +107,7 @@ export default function ClipBlock({
     e.stopPropagation()
     e.preventDefault()
     seleccionar(clip.id)
+    if (bloqueada) return
     let lastX = e.clientX
     setEstirandoVelocidad(e.altKey)
     const mover = (ev: globalThis.MouseEvent) => {
@@ -130,7 +136,8 @@ export default function ClipBlock({
     <div
       onMouseDown={iniciarMover}
       className={[
-        'group absolute top-0 flex h-full cursor-grab items-end overflow-hidden rounded-lg border-2 transition-[border-color]',
+        'group absolute top-0 flex h-full items-end overflow-hidden rounded-lg border-2 transition-[border-color]',
+        bloqueada ? 'cursor-default' : 'cursor-grab',
         seleccionado ? 'border-brand' : 'border-transparent hover:border-white/30',
       ].join(' ')}
       style={{
@@ -184,22 +191,28 @@ export default function ClipBlock({
         </span>
       )}
 
-      <div
-        onMouseDown={(e) => iniciarRecorte(e, 'inicio')}
-        title="Recortar por el inicio (con Alt cambia la velocidad)"
-        className={[
-          'absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-brand/80 transition-opacity',
-          seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-        ].join(' ')}
-      />
-      <div
-        onMouseDown={(e) => iniciarRecorte(e, 'fin')}
-        title="Recortar por el final (con Alt cambia la velocidad)"
-        className={[
-          'absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-brand/80 transition-opacity',
-          seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-        ].join(' ')}
-      />
+      {/* los tiradores de recorte solo tienen sentido si la pista deja tocar el
+          clip; en un nivel bloqueado desaparecen para no invitar a arrastrar */}
+      {!bloqueada && (
+        <>
+          <div
+            onMouseDown={(e) => iniciarRecorte(e, 'inicio')}
+            title="Recortar por el inicio (con Alt cambia la velocidad)"
+            className={[
+              'absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-brand/80 transition-opacity',
+              seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+            ].join(' ')}
+          />
+          <div
+            onMouseDown={(e) => iniciarRecorte(e, 'fin')}
+            title="Recortar por el final (con Alt cambia la velocidad)"
+            className={[
+              'absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-brand/80 transition-opacity',
+              seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+            ].join(' ')}
+          />
+        </>
+      )}
     </div>
   )
 }

@@ -54,6 +54,7 @@ export default function Timeline({
   const dividirEnCabezal = useEditorStore((s) => s.dividirEnCabezal)
   const numPistas = useEditorStore((s) => s.numPistas)
   const altosPista = useEditorStore((s) => s.altosPista)
+  const pistasMeta = useEditorStore((s) => s.pistasMeta)
   const agregarPista = useEditorStore((s) => s.agregarPista)
   const medios = useProjectStore((s) => s.medios)
 
@@ -211,7 +212,7 @@ export default function Timeline({
       <div className="flex min-h-0 flex-1 overflow-y-auto">
         {/* columna fija con la cabecera de cada nivel, alineada con sus filas */}
         <div
-          className="w-28 shrink-0"
+          className="w-44 shrink-0"
           style={{ borderRight: '1px solid rgb(var(--border) / 0.1)' }}
         >
           <div style={{ height: ALTO_REGLA }} />
@@ -220,6 +221,17 @@ export default function Timeline({
               <PistaHeader key={p} indice={p} alto={altosPista[p]} />
             ))}
           </div>
+          {/* añadir un nivel desde el pie de la columna de cabeceras, además del
+              botón de la barra superior. se apaga al llegar al tope de niveles */}
+          <button
+            onClick={agregarPista}
+            disabled={numPistas >= 6}
+            className="interactivo mt-1.5 flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] font-medium text-[color:var(--muted)] disabled:pointer-events-none disabled:opacity-40"
+            style={{ border: '1px dashed rgb(var(--border) / 0.2)' }}
+          >
+            <Icon name="video" size={14} />
+            Agregar nivel
+          </button>
         </div>
 
       <div
@@ -247,13 +259,17 @@ export default function Timeline({
             {filas.map((p) => {
               const fila = porPista.get(p)
               const vacio = !fila || fila.clips.length === 0
+              const oculta = pistasMeta[p]?.oculta
               return (
                 <div
                   key={p}
-                  className="relative rounded-md"
+                  className="relative rounded-md transition-opacity duration-200"
                   style={{
                     height: altosPista[p],
                     background: vacio ? 'rgb(var(--border) / 0.05)' : undefined,
+                    // un nivel oculto no se pinta en el visor; en la pista se
+                    // atenúa para recordarlo sin sacarlo de en medio
+                    opacity: oculta ? 0.4 : 1,
                   }}
                 >
                   {vacio && p === 0 && clips.length === 0 && (

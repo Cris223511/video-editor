@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Track, AjusteTono, Transicion } from '../types/timeline'
+import { Track, AjusteTono, Transicion, PistaMeta } from '../types/timeline'
 import { MediaAsset } from '../types/media'
 import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto } from '../types/layers'
 import { RegionAudio } from '../types/audio'
@@ -39,6 +39,9 @@ interface EstadoEditor {
   // todos en la misma lista y su campo pista dice en cuál se dibujan
   numPistas: number
   altosPista: number[]
+  // metadatos de cada nivel, en el mismo orden que altosPista. lo que decide si
+  // un nivel suena, se ve o se puede tocar vive aquí
+  pistasMeta: PistaMeta[]
   capas: Capa[]
   playhead: number
   reproduciendo: boolean
@@ -76,6 +79,12 @@ interface EstadoEditor {
   quitarPista: (indice: number) => void
   setAltoPista: (indice: number, alto: number) => void
   moverClipAPista: (id: string, pista: number) => void
+  alternarSilencioPista: (indice: number) => void
+  alternarOcultarPista: (indice: number) => void
+  alternarBloquearPista: (indice: number) => void
+  // sube o baja un nivel un puesto, llevándose consigo sus clips, su alto y sus
+  // metadatos. 'arriba' lo acerca a la cima (índice mayor), 'abajo' al suelo
+  reordenarPista: (indice: number, direccion: 'arriba' | 'abajo') => void
 
   agregarTexto: () => void
   agregarImagen: (src: string, anchoNatural: number, altoNatural: number) => void
@@ -171,6 +180,7 @@ type Documento = Pick<
   | 'pista'
   | 'numPistas'
   | 'altosPista'
+  | 'pistasMeta'
   | 'capas'
   | 'marco'
   | 'volumenGlobal'
@@ -191,6 +201,7 @@ function tomarDocumento(s: EstadoEditor): Documento {
     pista: s.pista,
     numPistas: s.numPistas,
     altosPista: s.altosPista,
+    pistasMeta: s.pistasMeta,
     capas: s.capas,
     marco: s.marco,
     volumenGlobal: s.volumenGlobal,
@@ -248,6 +259,10 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'quitarPista',
   'setAltoPista',
   'moverClipAPista',
+  'alternarSilencioPista',
+  'alternarOcultarPista',
+  'alternarBloquearPista',
+  'reordenarPista',
   'agregarTexto',
   'agregarImagen',
   'agregarCensura',
@@ -289,6 +304,15 @@ const ALTO_PISTA_BASE = 64
 const ALTO_PISTA_MIN = 40
 const ALTO_PISTA_MAX = 160
 const entre01 = (v: number) => Math.max(0, Math.min(1, v))
+
+// metadatos de partida para un nivel recién nacido: rótulo con su número y los
+// tres interruptores en reposo
+const metaPista = (n: number): PistaMeta => ({
+  nombre: `Video ${n}`,
+  silenciada: false,
+  oculta: false,
+  bloqueada: false,
+})
 
 // estado del editor: una pista de video con posiciones libres, las capas que se
 // dibujan encima, el cabezal, la selección y el zoom. cada clip guarda la
@@ -352,6 +376,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   pista: pistaVacia,
   numPistas: 1,
   altosPista: [64],
+  pistasMeta: [metaPista(1)],
   capas: [],
   playhead: 0,
   reproduciendo: false,
@@ -591,16 +616,21 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       herramienta: id ? 'propiedades' : s.herramienta,
     })),
 
-  // el nivel nuevo aparece encima de los demás, vacío y con el alto estándar
+  // el nivel nuevo aparece encima de los demás, vacío y con el alto estándar y
+  // sus metadatos en reposo
   agregarPista: () =>
-    set((s) => ({
-      numPistas: Math.min(s.numPistas + 1, MAX_PISTAS),
-      altosPista:
-        s.numPistas < MAX_PISTAS ? [...s.altosPista, ALTO_PISTA_BASE] : s.altosPista,
-    })),
+    set((s) => {
+      if (s.numPistas >= MAX_PISTAS) return {}
+      return {
+        numPistas: s.numPistas + 1,
+        altosPista: [...s.altosPista, ALTO_PISTA_BASE],
+        pistasMeta: [...s.pistasMeta, metaPista(s.numPistas + 1)],
+      }
+    }),
 
   // al eliminar un nivel se van con él sus clips, y los que estaban por encima
-  // bajan una posición para que no queden filas huecas en medio
+  // bajan una posición para que no queden filas huecas en medio. su alto y sus
+  // metadatos se retiran a la vez para que los tres arrays sigan cuadrando
   quitarPista: (indice) =>
     set((s) => {
       if (s.numPistas <= 1) return {}
@@ -608,14 +638,52 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         .filter((c) => c.pista !== indice)
         .map((c) => (c.pista > indice ? { ...c, pista: c.pista - 1 } : c))
       const altosPista = s.altosPista.filter((_, i) => i !== indice)
+      const pistasMeta = s.pistasMeta.filter((_, i) => i !== indice)
       const seguiaVivo = clips.some((c) => c.id === s.clipSeleccionado)
       return {
         numPistas: s.numPistas - 1,
         altosPista,
+        pistasMeta,
         pista: { ...s.pista, clips },
         clipSeleccionado: seguiaVivo ? s.clipSeleccionado : null,
         playhead: Math.min(s.playhead, duracionTotal(clips)),
       }
+    }),
+
+  alternarSilencioPista: (indice) =>
+    set((s) => ({
+      pistasMeta: s.pistasMeta.map((m, i) => (i === indice ? { ...m, silenciada: !m.silenciada } : m)),
+    })),
+
+  alternarOcultarPista: (indice) =>
+    set((s) => ({
+      pistasMeta: s.pistasMeta.map((m, i) => (i === indice ? { ...m, oculta: !m.oculta } : m)),
+    })),
+
+  alternarBloquearPista: (indice) =>
+    set((s) => ({
+      pistasMeta: s.pistasMeta.map((m, i) => (i === indice ? { ...m, bloqueada: !m.bloqueada } : m)),
+    })),
+
+  // intercambia un nivel con su vecino. los clips de ambos cambian su índice de
+  // pista para viajar con la fila, y el alto y los metadatos se permutan igual,
+  // de modo que lo que ves subir o bajar arrastra todo su contenido
+  reordenarPista: (indice, direccion) =>
+    set((s) => {
+      const otro = direccion === 'arriba' ? indice + 1 : indice - 1
+      if (otro < 0 || otro >= s.numPistas) return {}
+      const clips = s.pista.clips.map((c) =>
+        c.pista === indice
+          ? { ...c, pista: otro }
+          : c.pista === otro
+            ? { ...c, pista: indice }
+            : c,
+      )
+      const altosPista = [...s.altosPista]
+      ;[altosPista[indice], altosPista[otro]] = [altosPista[otro], altosPista[indice]]
+      const pistasMeta = [...s.pistasMeta]
+      ;[pistasMeta[indice], pistasMeta[otro]] = [pistasMeta[otro], pistasMeta[indice]]
+      return { pista: { ...s.pista, clips }, altosPista, pistasMeta }
     }),
 
   setAltoPista: (indice, alto) =>

@@ -45,3 +45,14 @@ export interface Track {
   tipo: 'video'
   clips: Clip[]
 }
+
+// metadatos de cada nivel de video. viven en un array paralelo a altosPista e
+// indexado igual que el campo pista de los clips: la posición i describe el
+// nivel i. guardan el rótulo del nivel y sus tres interruptores, más el orden
+// que el usuario le haya dado al subirlo o bajarlo
+export interface PistaMeta {
+  nombre: string
+  silenciada: boolean
+  oculta: boolean
+  bloqueada: boolean
+}

@@ -18,6 +18,9 @@ export interface Escena {
   clips: Clip[] // ya ordenados por inicio
   capas: Capa[]
   marco: Marco
+  // niveles de video escondidos: al elegir el clip visible se saltan, para que
+  // lo exportado coincida con lo que muestra el visor
+  ocultas?: Set<number>
 }
 
 
@@ -430,7 +433,7 @@ export function dibujarFotograma(
   ctx.fillStyle = colorFondo
   ctx.fillRect(0, 0, ancho, alto)
 
-  const activo = clipEnTiempo(clips, t)
+  const activo = clipEnTiempo(clips, t, escena.ocultas)
 
   // el clip visible y, si está en plena transición de entrada, el que estaba
   // antes en su misma pista. la coreografía la lleva el motor compartido, así

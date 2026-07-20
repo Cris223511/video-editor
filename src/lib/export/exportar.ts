@@ -1,4 +1,4 @@
-import { Clip } from '../../types/timeline'
+import { Clip, PistaMeta } from '../../types/timeline'
 import { Capa } from '../../types/layers'
 import { Marco } from '../../types/marco'
 import { RegionAudio } from '../../types/audio'
@@ -19,6 +19,9 @@ export interface DatosExport {
   marco: Marco
   audioRegiones: RegionAudio[]
   volumenGlobal: number
+  // metadatos por nivel: se usan para saltar los ocultos al elegir el clip
+  // visible y para callar los silenciados en la mezcla
+  pistasMeta: PistaMeta[]
   urlDeAsset: (assetId: string) => string | undefined
 }
 
@@ -79,6 +82,13 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
     ;(async () => {
       const { ancho, alto } = datos
       const clips = [...datos.clips].sort((a, b) => a.inicio - b.inicio)
+      // niveles escondidos y silenciados, resueltos una sola vez. el visible se
+      // elige ignorando los ocultos y el audio se apaga si el clip que suena cae
+      // en un nivel silenciado, exactamente el criterio del visor
+      const ocultas = new Set<number>()
+      datos.pistasMeta.forEach((m, i) => {
+        if (m.oculta) ocultas.add(i)
+      })
       const total = duracionTotal(clips)
       if (total <= 0) {
         reject(new Error('No hay nada que exportar.'))
@@ -202,7 +212,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
             grabadora.stop()
             return
           }
-          const act = clipEnTiempo(clips, t)
+          const act = clipEnTiempo(clips, t, ocultas)
           if (!act) {
             phRef.t = Math.min(t + 0.033, total)
             dibujarFotograma(ctx, escena(), t, (id) => videos.get(id) ?? null, (id) => imagenes.get(id), off)
@@ -218,7 +228,10 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
             if (id !== act.id && !otro.paused) otro.pause()
           })
           cablear(act.id, v)
-          ganancia.gain.value = gananciaEn(datos.audioRegiones, datos.volumenGlobal, t)
+          const silenciada = datos.pistasMeta[act.pista]?.silenciada ?? false
+          ganancia.gain.value = silenciada
+            ? 0
+            : gananciaEn(datos.audioRegiones, datos.volumenGlobal, t)
           v.playbackRate = act.velocidad
           if (v.paused) {
             try {
@@ -250,6 +263,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
           clips,
           capas: datos.capas,
           marco: datos.marco,
+          ocultas,
         })
 
         raf = requestAnimationFrame(paso)

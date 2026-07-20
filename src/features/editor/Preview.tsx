@@ -33,6 +33,7 @@ export default function Preview() {
   const desenfoqueFondo = useEditorStore((s) => s.desenfoqueFondo)
   const audioRegiones = useEditorStore((s) => s.audioRegiones)
   const volumenGlobal = useEditorStore((s) => s.volumenGlobal)
+  const pistasMeta = useEditorStore((s) => s.pistasMeta)
   const medios = useProjectStore((s) => s.medios)
 
   const videosRef = useRef<Map<string, HTMLVideoElement>>(new Map())
@@ -95,6 +96,15 @@ export default function Preview() {
   }, [clips.length, hayCapas])
 
   const clipsOrdenados = useMemo(() => [...clips].sort((a, b) => a.inicio - b.inicio), [clips])
+  // niveles escondidos, en forma de conjunto para consultarlos rápido al elegir
+  // el clip visible. esconder el de arriba deja aflorar el de debajo
+  const ocultas = useMemo(() => {
+    const set = new Set<number>()
+    pistasMeta.forEach((m, i) => {
+      if (m.oculta) set.add(i)
+    })
+    return set
+  }, [pistasMeta])
   const total = useMemo(() => duracionTotal(clips), [clips])
   const assetPorId = useMemo(() => {
     const mapa = new Map<string, MediaAsset>()
@@ -102,7 +112,7 @@ export default function Preview() {
     return mapa
   }, [medios])
 
-  const activo = clipEnTiempo(clipsOrdenados, playhead)
+  const activo = clipEnTiempo(clipsOrdenados, playhead, ocultas)
 
   // en pausa, el cabezal manda: phRef lo sigue para arrancar donde toca
   useEffect(() => {
@@ -112,7 +122,7 @@ export default function Preview() {
   // en pausa cada video se coloca en su fotograma exacto y se detiene
   useEffect(() => {
     if (reproduciendo) return
-    const act = clipEnTiempo(clipsOrdenados, playhead)
+    const act = clipEnTiempo(clipsOrdenados, playhead, ocultas)
     clipsOrdenados.forEach((c) => {
       const v = videosRef.current.get(c.id)
       if (!v) return
@@ -128,7 +138,7 @@ export default function Preview() {
       }
       if (!v.paused) v.pause()
     })
-  }, [playhead, reproduciendo, clipsOrdenados])
+  }, [playhead, reproduciendo, clipsOrdenados, ocultas])
 
   // durante la reproducción avanza el clip activo y salta al siguiente al
   // terminar; el cabezal se calcula desde el tiempo real del video
@@ -153,7 +163,14 @@ export default function Preview() {
         pausar()
         return
       }
-      const act = clipEnTiempo(clipsOrdenados, ph)
+      // los metadatos se leen en vivo para que esconder o silenciar un nivel
+      // surta efecto sin cortar la reproducción
+      const metas = useEditorStore.getState().pistasMeta
+      const ocultasVivo = new Set<number>()
+      metas.forEach((m, i) => {
+        if (m.oculta) ocultasVivo.add(i)
+      })
+      const act = clipEnTiempo(clipsOrdenados, ph, ocultasVivo)
       if (!act) {
         phRef.current = Math.min(ph + 0.033, total)
         irA(phRef.current)
@@ -173,7 +190,13 @@ export default function Preview() {
       })
       const nodo = asegurarGrafo()
       cablearVideo(act.id, v)
-      if (nodo) nodo.gain.value = gananciaEn(audioRef.current.regiones, audioRef.current.general, ph)
+      // un nivel silenciado no aporta sonido: su clip se ve pero la ganancia baja
+      // a cero, igual que hará la exportación
+      if (nodo) {
+        nodo.gain.value = metas[act.pista]?.silenciada
+          ? 0
+          : gananciaEn(audioRef.current.regiones, audioRef.current.general, ph)
+      }
       // grabando un recorrido el video corre más despacio, que es la única forma
       // de seguir con el cursor algo que se mueve rápido sin ir a tirones. el
       // cabezal se sigue calculando desde el tiempo real del video, así que la
@@ -349,7 +372,11 @@ export default function Preview() {
         const ph = st.playhead
         const rect = rectContenido(w, h, st.resolucion.ancho / st.resolucion.alto)
         const ordenados = [...st.pista.clips].sort((a, b) => a.inicio - b.inicio)
-        const activoClip = clipEnTiempo(ordenados, ph)
+        const ocultasSt = new Set<number>()
+        st.pistasMeta.forEach((m, i) => {
+          if (m.oculta) ocultasSt.add(i)
+        })
+        const activoClip = clipEnTiempo(ordenados, ph, ocultasSt)
         const video = activoClip ? videosRef.current.get(activoClip.id) : null
         if (video && video.videoWidth > 0) {
           for (const capa of st.capas) {
@@ -421,7 +448,11 @@ export default function Preview() {
     let raf = 0
     const paso = () => {
       const st = useEditorStore.getState()
-      const act = clipEnTiempo(clipsOrdenados, st.playhead)
+      const ocultasSt = new Set<number>()
+      st.pistasMeta.forEach((m, i) => {
+        if (m.oculta) ocultasSt.add(i)
+      })
+      const act = clipEnTiempo(clipsOrdenados, st.playhead, ocultasSt)
       if (!act) {
         raf = requestAnimationFrame(paso)
         return
@@ -519,7 +550,7 @@ export default function Preview() {
                 sonido porque es el mismo material que ya suena delante */}
             {fondo === 'desenfoque' &&
               (() => {
-                const act = clipEnTiempo(clipsOrdenados, playhead)
+                const act = clipEnTiempo(clipsOrdenados, playhead, ocultas)
                 const asset = act ? assetPorId.get(act.assetId) : null
                 if (!asset) return null
                 return (
