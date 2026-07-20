@@ -25,6 +25,19 @@ export interface Escena {
 }
 
 
+// lienzo auxiliar reutilizado para el desenfoque de movimiento. el video se
+// pinta primero aquí con su color y luego se vuelca al lienzo final aplicando
+// solo el desenfoque, porque combinar funciones nativas con un filtro svg de
+// desenfoque en ctx.filter deja el fotograma en negro. se crea una vez y se
+// reajusta de tamaño, para no fabricar un canvas por fotograma
+let lienzoDesenfoque: HTMLCanvasElement | null = null
+function auxDesenfoque(w: number, h: number): HTMLCanvasElement {
+  if (!lienzoDesenfoque) lienzoDesenfoque = document.createElement('canvas')
+  if (lienzoDesenfoque.width !== w) lienzoDesenfoque.width = w
+  if (lienzoDesenfoque.height !== h) lienzoDesenfoque.height = h
+  return lienzoDesenfoque
+}
+
 function rectRedondeado(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   const rr = Math.min(r, w / 2, h / 2)
   ctx.beginPath()
@@ -466,14 +479,33 @@ export function dibujarFotograma(
         ctx.restore()
       }
 
-      // el mismo filtro que el visor: color y, si lo hay, el desenfoque de
-      // movimiento. se aplica también cuando el color es neutro pero hay efecto
+      // el color se resuelve como en el visor: funciones nativas más, si hay
+      // temperatura o ruedas, el filtro svg de color. el desenfoque de movimiento
+      // no puede ir en la misma cadena de ctx.filter (dejaría el canvas negro),
+      // así que cuando lo hay se pinta en dos pasadas conservando el mismo orden
+      // que el visor: primero el video con su color, después ese resultado con el
+      // desenfoque solo
       const efectos = clip.efectos ?? []
-      if (!esTonoNeutro(clip.tono) || hayEfectoFiltro(efectos)) {
-        ctx.filter = filtroCss(clip.tono, `tonoexp-${clip.id}`, efectos)
+      const hayColor = !esTonoNeutro(clip.tono)
+      const hayDesenfoque = hayEfectoFiltro(efectos)
+      if (hayDesenfoque) {
+        const aux = auxDesenfoque(ancho, alto)
+        const actx = aux.getContext('2d')
+        if (actx) {
+          actx.setTransform(1, 0, 0, 1, 0, 0)
+          actx.clearRect(0, 0, ancho, alto)
+          actx.filter = hayColor ? filtroCss(clip.tono, `tonoexp-${clip.id}`, []) : 'none'
+          actx.drawImage(video, dx, dy, dw, dh)
+          actx.filter = 'none'
+          ctx.filter = `url(#blurexp-${clip.id})`
+          ctx.drawImage(aux, 0, 0)
+          ctx.filter = 'none'
+        }
+      } else {
+        if (hayColor) ctx.filter = filtroCss(clip.tono, `tonoexp-${clip.id}`, [])
+        ctx.drawImage(video, dx, dy, dw, dh)
+        ctx.filter = 'none'
       }
-      ctx.drawImage(video, dx, dy, dw, dh)
-      ctx.filter = 'none'
       ctx.restore()
     }
 

@@ -4,7 +4,7 @@ import { Marco } from '../../types/marco'
 import { RegionAudio } from '../../types/audio'
 import { clipEnTiempo, duracionTotal } from '../timeline/clips'
 import { gananciaEn } from '../audio/ganancia'
-import { usaMatriz, matrizTono, tablasColor, hayEfectoFiltro, stdDeviationsDesenfoque } from '../color/tono'
+import { usaMatriz, matrizTono, tablasColor, stdDeviationsDesenfoque } from '../color/tono'
 import { dibujarFotograma, Escena } from './compositor'
 
 export interface DatosExport {
@@ -120,13 +120,16 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
       clips.forEach((c) => {
         const efectos = c.efectos ?? []
         const desenfoques = stdDeviationsDesenfoque(efectos)
-        // sin color que corregir ni efecto activo no hace falta filtro alguno
-        if (!usaMatriz(c.tono) && !hayEfectoFiltro(efectos)) return
-        const filtro = document.createElementNS('http://www.w3.org/2000/svg', 'filter')
-        filtro.setAttribute('id', `tonoexp-${c.id}`)
-        filtro.setAttribute('color-interpolation-filters', 'sRGB')
 
+        // filtro de color: temperatura, tinte, ruedas y curvas. va aparte del
+        // desenfoque porque el compositor los aplica en pasadas distintas para
+        // esquivar el fallo de ctx.filter que ennegrece el canvas al mezclar
+        // funciones nativas con un desenfoque svg
         if (usaMatriz(c.tono)) {
+          const filtro = document.createElementNS('http://www.w3.org/2000/svg', 'filter')
+          filtro.setAttribute('id', `tonoexp-${c.id}`)
+          filtro.setAttribute('color-interpolation-filters', 'sRGB')
+
           const fe = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix')
           fe.setAttribute('type', 'matrix')
           fe.setAttribute('values', matrizTono(c.tono))
@@ -145,17 +148,24 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
             })
             filtro.appendChild(trans)
           }
+          defs.appendChild(filtro)
         }
 
-        // el desenfoque de movimiento va tras el color, con el mismo stdDeviation
-        // direccional que calcula el visor, de modo que exportar y editar coinciden
-        desenfoques.forEach((sd) => {
-          const blur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur')
-          blur.setAttribute('stdDeviation', sd)
-          blur.setAttribute('edgeMode', 'duplicate')
-          filtro.appendChild(blur)
-        })
-        defs.appendChild(filtro)
+        // filtro de solo desenfoque, con el mismo stdDeviation direccional que
+        // calcula el visor. el compositor lo aplica en su propia pasada, tras el
+        // color, de modo que el orden coincide con el del visor
+        if (desenfoques.length) {
+          const filtroB = document.createElementNS('http://www.w3.org/2000/svg', 'filter')
+          filtroB.setAttribute('id', `blurexp-${c.id}`)
+          filtroB.setAttribute('color-interpolation-filters', 'sRGB')
+          desenfoques.forEach((sd) => {
+            const blur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur')
+            blur.setAttribute('stdDeviation', sd)
+            blur.setAttribute('edgeMode', 'duplicate')
+            filtroB.appendChild(blur)
+          })
+          defs.appendChild(filtroB)
+        }
       })
       svg.appendChild(defs)
       document.body.appendChild(svg)
