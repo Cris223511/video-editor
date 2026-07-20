@@ -1,4 +1,4 @@
-const MAX_BYTES = 20 * 1024 * 1024
+const MAX_BYTES = 5 * 1024 * 1024
 const EXTENSIONES = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'avif']
 
 export interface ResultadoValidacion {
@@ -20,7 +20,7 @@ export async function validarImagen(file: File): Promise<ResultadoValidacion> {
     return { ok: false, motivo: 'El archivo está vacío.' }
   }
   if (file.size > MAX_BYTES) {
-    return { ok: false, motivo: 'La imagen no debe superar los 20 MB.' }
+    return { ok: false, motivo: 'La imagen no debe superar los 5 MB.' }
   }
 
   const b = new Uint8Array(await file.slice(0, 16).arrayBuffer())

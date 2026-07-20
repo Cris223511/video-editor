@@ -40,14 +40,18 @@ export default function EditorCurva({
     }
   }
 
-  function agarrar(e: ReactMouseEvent, indice: number) {
-    e.stopPropagation()
-    e.preventDefault()
+  // engancha el arrastre de un nodo. la lista de trabajo se guarda en vivos para
+  // que cada movimiento parta de la última posición, no de la que había al
+  // empezar. se usa tanto al agarrar un nodo existente como al crear uno
+  function iniciarArrastre(indice: number, base: PuntoCurva[]) {
+    vivos.current = base
     setArrastrando(indice)
 
     const mover = (ev: globalThis.MouseEvent) => {
       const p = aCurva(ev)
-      onChange(moverPunto(vivos.current, indice, p.x, p.y))
+      const siguiente = moverPunto(vivos.current, indice, p.x, p.y)
+      vivos.current = siguiente
+      onChange(siguiente)
     }
     const soltar = () => {
       setArrastrando(null)
@@ -56,6 +60,12 @@ export default function EditorCurva({
     }
     window.addEventListener('mousemove', mover)
     window.addEventListener('mouseup', soltar)
+  }
+
+  function agarrar(e: ReactMouseEvent, indice: number) {
+    e.stopPropagation()
+    e.preventDefault()
+    iniciarArrastre(indice, vivos.current)
   }
 
   // el trazo se dibuja muestreando la curva, no uniendo los puntos con rectas,
@@ -72,8 +82,16 @@ export default function EditorCurva({
       className="w-full cursor-crosshair rounded-lg"
       style={{ background: 'rgb(var(--border) / 0.08)', aspectRatio: '1 / 1' }}
       onMouseDown={(e) => {
+        // pulsar sobre el fondo crea un punto y lo deja ya cogido, así que se
+        // mueve con el mismo gesto sin tener que soltar y volver a pulsar encima.
+        // los nodos detienen la propagación, de modo que aquí solo llegan los
+        // clics en zona vacía
         const p = aCurva(e)
-        onChange(agregarPunto(puntos, p.x, p.y))
+        const nuevos = agregarPunto(puntos, p.x, p.y)
+        // el punto recién creado es el que quedó en la posición pulsada
+        const indice = nuevos.findIndex((q) => q.x === p.x && q.y === p.y)
+        onChange(nuevos)
+        if (indice >= 0) iniciarArrastre(indice, nuevos)
       }}
     >
       {/* rejilla en tercios, la referencia habitual para leer una curva */}
