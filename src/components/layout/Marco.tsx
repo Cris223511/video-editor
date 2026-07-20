@@ -48,7 +48,11 @@ export default function Marco() {
   useScrollSuave(!enEditor)
 
   return (
-    <div className="flex min-h-screen flex-col">
+    // el editor ocupa exactamente una pantalla y no desplaza la pagina: es una
+    // aplicacion de trabajo a pantalla completa, no un documento que crece. el
+    // sitio si usa alto minimo, para que el contenido crezca y el pie quede abajo.
+    // fijarlo aqui evita el scroll fantasma que salia en el editor sin nada debajo
+    <div className={enEditor ? 'flex h-screen flex-col overflow-hidden' : 'flex min-h-screen flex-col'}>
       {/* el cielo solo en el sitio: dentro del editor competiría con el visor y
           añadiría trabajo de pintado mientras se reproduce un video */}
       {!enEditor && <Estrellas />}
