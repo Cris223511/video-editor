@@ -23,6 +23,10 @@ const ANCHO = 240
 const ALTO = 135
 const PERIODO = 1800
 
+// dato que viaja al arrastrar una transición desde la galería hasta un clip de
+// la línea de tiempo. lleva el identificador del tipo de transición
+export const TIPO_TRANSICION = 'application/x-ve-transicion'
+
 // clips de mentira para poder reutilizar el mismo motor que dibuja de verdad.
 // así la muestra no es una imitación: es la transición real ejecutada sobre dos
 // fotos en lugar de sobre dos videos
@@ -206,9 +210,16 @@ export default function GaleriaTransiciones({
                 <button
                   key={t.id}
                   onClick={() => onElegir(t.id)}
-                  title={t.descripcion}
+                  // además de aplicarse con un clic, la transición se puede
+                  // arrastrar y soltar sobre un clip de la línea de tiempo
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(TIPO_TRANSICION, t.id)
+                    e.dataTransfer.effectAllowed = 'copy'
+                  }}
+                  title={`${t.descripcion} · arrástrala sobre un clip para aplicarla`}
                   className={[
-                    'group/muestra flex flex-col gap-1.5 rounded-xl p-1.5 text-left transition-all duration-200',
+                    'group/muestra flex cursor-grab flex-col gap-1.5 rounded-xl p-1.5 text-left transition-all duration-200 active:cursor-grabbing',
                     elegida
                       ? 'ring-2 ring-brand'
                       : 'ring-1 ring-black/10 hover:ring-brand/50 dark:ring-white/10',

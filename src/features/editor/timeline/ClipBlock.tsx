@@ -5,6 +5,7 @@ import { useTira } from './useTira'
 import FrameStrip from './FrameStrip'
 import MedioNoDisponible from '../../../components/ui/MedioNoDisponible'
 import TransicionBlock from './TransicionBlock'
+import { TIPO_TRANSICION } from '../GaleriaTransiciones'
 import { resolverDestinoVertical } from './destinoVertical'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
 
@@ -35,6 +36,7 @@ export default function ClipBlock({
 }: Props) {
   const seleccionado = useEditorStore((s) => s.clipSeleccionado === clip.id)
   const seleccionar = useEditorStore((s) => s.seleccionar)
+  const setTransicion = useEditorStore((s) => s.setTransicion)
   const moverClip = useEditorStore((s) => s.moverClip)
   const duplicarClip = useEditorStore((s) => s.duplicarClip)
   const recortarClip = useEditorStore((s) => s.recortarClip)
@@ -57,6 +59,9 @@ export default function ClipBlock({
   // se vuelve a encender para que, al cerrar un hueco, el clip se deslice hasta
   // su nuevo sitio en vez de saltar de golpe
   const [interactuando, setInteractuando] = useState(false)
+  // se enciende mientras se arrastra una transición de la galería sobre el clip,
+  // para señalar que al soltar se aplicará en su borde de entrada
+  const [transicionEncima, setTransicionEncima] = useState(false)
 
   const ancho = Math.max(clip.duracion * pxPorSegundo, 8)
 
@@ -212,9 +217,31 @@ export default function ClipBlock({
     window.addEventListener('mouseup', soltar)
   }
 
+  // al soltar una transición arrastrada desde la galería, se aplica como
+  // transición de entrada de este clip, que es su unión con el clip anterior
+  function alSoltarTransicion(e: React.DragEvent) {
+    const tipo = e.dataTransfer.getData(TIPO_TRANSICION)
+    if (!tipo) return
+    e.preventDefault()
+    e.stopPropagation()
+    setTransicionEncima(false)
+    setTransicion(clip.id, { tipo })
+    seleccionar(clip.id)
+  }
+
   return (
     <div
       onMouseDown={iniciarMover}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes(TIPO_TRANSICION)) {
+          e.preventDefault()
+          if (!transicionEncima) setTransicionEncima(true)
+        }
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setTransicionEncima(false)
+      }}
+      onDrop={alSoltarTransicion}
       className={[
         'group absolute top-0 flex h-full items-end overflow-hidden rounded-lg border-2 transition-[border-color]',
         bloqueada ? 'cursor-default' : 'cursor-grab',
@@ -254,6 +281,20 @@ export default function ClipBlock({
       )}
 
       <TransicionBlock clip={clip} pxPorSegundo={pxPorSegundo} />
+
+      {/* señal de que se está soltando una transición encima: un aro azul y una
+          franja en el borde de entrada, que es donde va a colocarse */}
+      {transicionEncima && (
+        <div className="pointer-events-none absolute inset-0 z-20 rounded-lg ring-2 ring-inset ring-brand">
+          <div
+            className="absolute left-0 top-0 h-full w-8"
+            style={{
+              background:
+                'linear-gradient(105deg, rgb(24 97 255 / 0.75) 0%, rgb(24 97 255 / 0.25) 60%, transparent 100%)',
+            }}
+          />
+        </div>
+      )}
 
       <span className="pointer-events-none relative w-full truncate bg-gradient-to-t from-black/85 to-transparent px-2 pb-0.5 pt-2 text-[10px] font-medium text-white">
         {nombre}
