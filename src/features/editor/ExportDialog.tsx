@@ -192,12 +192,42 @@ export default function ExportDialog() {
       {fase === 'exportando' && (
         <>
           <p className="mb-3 text-sm">Exportando… {Math.round(progreso * 100)}%</p>
-          <div className="mb-5 h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+          {/* riel de fondo tenue con un relleno de marca bien contrastado. el ancho
+              se ata directamente a progreso (0 a 1) y anima suave al crecer. el
+              degradado y el brillo que recorre el relleno dan sensación de trabajo
+              en curso sin resultar estridentes */}
+          <div className="mb-5 h-3 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
             <div
-              className="h-full rounded-full bg-brand transition-[width] duration-150"
-              style={{ width: `${progreso * 100}%` }}
-            />
+              className="relative h-full min-w-[0.75rem] rounded-full bg-brand transition-[width] duration-300 ease-out"
+              style={{
+                width: `${Math.max(0, Math.min(1, progreso)) * 100}%`,
+                // colores literales del azul de marca: el tema no expone --brand
+                // como variable, así que un var() aquí dejaría el degradado sin pintar
+                backgroundImage: 'linear-gradient(90deg, #1861ff, #4b83ff)',
+              }}
+            >
+              {/* franja clara que se desplaza en bucle sobre el relleno; queda
+                  recortada por el redondeo del riel gracias al overflow oculto */}
+              <span
+                className="absolute inset-0 rounded-full opacity-60"
+                style={{
+                  backgroundImage:
+                    'linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)',
+                  backgroundSize: '40% 100%',
+                  backgroundRepeat: 'no-repeat',
+                  animation: 'export-shine 1.4s linear infinite',
+                }}
+              />
+            </div>
           </div>
+          {/* animación local del brillo; recorre el relleno de izquierda a derecha
+              de forma continua mientras dura la exportación */}
+          <style>{`
+            @keyframes export-shine {
+              0% { background-position: -40% 0; }
+              100% { background-position: 140% 0; }
+            }
+          `}</style>
           <button
             onClick={cerrarTodo}
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/10 py-2.5 text-sm font-medium transition-colors duration-200 hover:border-rose-500 hover:text-rose-500 dark:border-white/10"

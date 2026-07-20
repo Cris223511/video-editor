@@ -33,6 +33,9 @@ const ALTO_REGLA = 29
 // columna de cabeceras y en las filas del lado derecho para que no se
 // desalineen. el hueco entre niveles de video vive en HUECO_PISTA
 const SEP_SECCION = 12
+// ancho que se reserva para el rótulo «Añadir audio» del carril vacío. la onda
+// tenue de relleno arranca pasado ese punto para no quedar por debajo del texto
+const ANCHO_ROTULO_AUDIO = 120
 
 // transición del deslizamiento de las filas al reordenarlas: corta y con una
 // curva de salida suave, para que una pista que cambia de sitio se vea resbalar
@@ -513,16 +516,26 @@ export default function Timeline({
             className="relative h-8 overflow-hidden rounded-lg"
             style={{ marginTop: SEP_SECCION, background: 'rgb(var(--border) / 0.05)' }}
           >
-            <OndaAudio semilla="fondo-audio" color="rgb(var(--border) / 0.5)" opacidad={0.35} barras={120} />
-            {audioRegiones.length === 0 && (
-              <div className="pointer-events-none relative flex h-full items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
-                <Icon name="musica" size={13} />
-                <span>Añadir audio</span>
-              </div>
+            {audioRegiones.length === 0 ? (
+              <>
+                {/* el rótulo del carril va a la izquierda y limpio; ninguna onda
+                    pasa por debajo para que se lea sin ruido */}
+                <div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
+                  <Icon name="musica" size={13} />
+                  <span>Añadir audio</span>
+                </div>
+                {/* la onda tenue de relleno arranca pasado el rótulo, así las
+                    líneas empiezan después del texto y no lo tapan */}
+                <div className="absolute inset-y-0 right-0" style={{ left: ANCHO_ROTULO_AUDIO }}>
+                  <OndaAudio semilla="fondo-audio" color="rgb(var(--border) / 0.5)" opacidad={0.35} barras={110} />
+                </div>
+              </>
+            ) : (
+              // al haber audio, sus regiones ocupan el carril y sustituyen al relleno
+              audioRegiones.map((r) => (
+                <AudioBlock key={r.id} region={r} pxPorSegundo={pxPorSegundo} puntos={puntos} />
+              ))
             )}
-            {audioRegiones.map((r) => (
-              <AudioBlock key={r.id} region={r} pxPorSegundo={pxPorSegundo} puntos={puntos} />
-            ))}
           </div>
 
           {/* guía de inserción: la línea celeste que cruza la pista mientras se
