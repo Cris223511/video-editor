@@ -62,10 +62,15 @@ export default function Timeline({
   const numPistas = useEditorStore((s) => s.numPistas)
   const altosPista = useEditorStore((s) => s.altosPista)
   const pistasMeta = useEditorStore((s) => s.pistasMeta)
-  const agregarPista = useEditorStore((s) => s.agregarPista)
+  // separación entre dos niveles marcada mientras se arrastra un clip: si no es
+  // null, ahí se dibuja la guía celeste que promete crear una pista al soltar
+  const insercionPista = useEditorStore((s) => s.insercionPista)
   const medios = useProjectStore((s) => s.medios)
 
   const scrollRef = useRef<HTMLDivElement>(null)
+  // contenedor de las filas de video; su distancia al borde del contenido sitúa
+  // la guía de inserción a la altura exacta de cada separación entre niveles
+  const filasRef = useRef<HTMLDivElement>(null)
   // ancho visible del contenedor con desplazamiento. se mide en vivo para que la
   // regla y las filas cubran todo el ancho disponible aunque el proyecto sea
   // corto o esté vacío, y no se corten a media pista
@@ -180,6 +185,18 @@ export default function Timeline({
     window.addEventListener('mouseup', soltar)
   }
 
+  // altura, dentro del contenido de la pista, de la separación donde nacería el
+  // nivel nuevo. el índice va de 0 (una fila al ras del suelo) a numPistas (una
+  // por encima de todo). las filas se dibujan de la pista mayor a la menor, así
+  // que el borde inferior de la fila k, más medio hueco, cae justo en su ranura
+  function yInsercion(k: number): number {
+    const base = filasRef.current?.offsetTop ?? ALTO_REGLA + 8
+    if (k >= numPistas) return base - HUECO_PISTA / 2
+    let arriba = 0
+    for (let u = numPistas - 1; u > k; u--) arriba += altosPista[u] + HUECO_PISTA
+    return base + arriba + altosPista[k] + HUECO_PISTA / 2
+  }
+
   // al soltar un medio arrastrado desde el panel, se añade a la pista
   function alSoltar(e: React.DragEvent) {
     e.preventDefault()
@@ -211,16 +228,6 @@ export default function Timeline({
           Línea de tiempo · {formatearDuracion(total)}
         </span>
         <div className="ml-auto flex items-center gap-1">
-          <Tooltip texto="Añadir un nivel de video encima" lado="abajo">
-            <button
-              onClick={agregarPista}
-              disabled={numPistas >= 6}
-              className="interactivo grid h-8 w-8 place-items-center rounded-lg text-[color:var(--muted)] disabled:pointer-events-none disabled:opacity-40"
-            >
-              <Icon name="video" size={17} />
-            </button>
-          </Tooltip>
-          <span className="mx-1 h-5 w-px" style={{ background: 'rgb(var(--border) / 0.14)' }} />
           <Tooltip texto="Dividir en el cabezal" atajo="S" lado="abajo">
             <button
               onClick={dividirEnCabezal}
@@ -301,7 +308,7 @@ export default function Timeline({
           </div>
 
           {/* niveles de video, del más alto al más bajo */}
-          <div className="mt-2 flex flex-col" style={{ gap: HUECO_PISTA }}>
+          <div ref={filasRef} data-tracks className="mt-2 flex flex-col" style={{ gap: HUECO_PISTA }}>
             {filas.map((p) => {
               const fila = porPista.get(p)
               const vacio = !fila || fila.clips.length === 0
@@ -309,6 +316,7 @@ export default function Timeline({
               return (
                 <div
                   key={p}
+                  data-fila-pista={p}
                   className="relative rounded-md transition-opacity duration-200"
                   style={{
                     height: altosPista[p],
@@ -369,6 +377,25 @@ export default function Timeline({
               <AudioBlock key={r.id} region={r} pxPorSegundo={pxPorSegundo} puntos={puntos} />
             ))}
           </div>
+
+          {/* guía de inserción: la línea celeste que cruza la pista mientras se
+              arrastra un clip sobre la separación entre dos niveles. anuncia que
+              soltar ahí abre una fila nueva justo en ese punto. lleva un rótulo a
+              la izquierda para que se entienda la promesa sin adivinar */}
+          {insercionPista !== null && (
+            <div
+              className="pointer-events-none absolute z-30 flex items-center"
+              style={{ top: yInsercion(insercionPista) - 1, left: 0, width: anchoContenido }}
+            >
+              <span className="h-0.5 w-full" style={{ background: '#38bdf8', boxShadow: '0 0 6px rgba(56,189,248,0.9)' }} />
+              <span
+                className="absolute left-2 -translate-y-px rounded px-1.5 py-0.5 text-[10px] font-medium text-white"
+                style={{ background: '#38bdf8' }}
+              >
+                Nueva pista aquí
+              </span>
+            </div>
+          )}
 
           <div
             className="pointer-events-none absolute bottom-0 top-0 z-20 w-px bg-brand"

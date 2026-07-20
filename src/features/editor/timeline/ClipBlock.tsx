@@ -38,7 +38,9 @@ export default function ClipBlock({
   const recortarClip = useEditorStore((s) => s.recortarClip)
   const estirarVelocidad = useEditorStore((s) => s.estirarVelocidad)
   const moverClipAPista = useEditorStore((s) => s.moverClipAPista)
-  const altosPista = useEditorStore((s) => s.altosPista)
+  const insertarPistaEn = useEditorStore((s) => s.insertarPistaEn)
+  const setInsercionPista = useEditorStore((s) => s.setInsercionPista)
+  const finGesto = useEditorStore((s) => s.finGesto)
   // un clip de un nivel bloqueado no se puede arrastrar ni recortar; solo
   // seleccionar. la comprobación se hace por su pista
   const bloqueada = useEditorStore((s) => s.pistasMeta[clip.pista]?.bloqueada ?? false)
@@ -56,28 +58,105 @@ export default function ClipBlock({
     // en un nivel bloqueado el gesto termina en la selección: no se mueve nada
     if (bloqueada) return
     const startX = e.clientX
-    const startY = e.clientY
     const inicioOriginal = clip.inicio
     const umbral = UMBRAL_PX / pxPorSegundo
 
-    // centro vertical de cada nivel, medido desde arriba. las filas se dibujan
-    // con la pista más alta primero, así que se recorren al revés
-    const centros: number[] = new Array(altosPista.length)
-    let acumulado = 0
-    for (let p = altosPista.length - 1; p >= 0; p--) {
-      centros[p] = acumulado + altosPista[p] / 2
-      acumulado += altosPista[p] + HUECO_PISTA
+    // contenedor real de los niveles de video en el dom. sus filas, medidas en
+    // vivo, dicen dónde está cada pista y dónde caen las separaciones entre ellas.
+    // trabajar con la geometría real evita descuadres cuando cambian los altos
+    const stack = (e.currentTarget as HTMLElement).closest('[data-tracks]') as HTMLElement | null
+
+    // qué nivel manda ahora mismo el arrastre y qué separación (si alguna) se
+    // está señalando. se guardan aparte para no repetir llamadas idénticas al
+    // store en cada fotograma del movimiento
+    let pistaActual = clip.pista
+    let insercionActual: number | null = null
+
+    // franja superior e inferior de cada fila que ya no cuenta como «soltar
+    // encima» sino como «abrir un nivel en esta separación». deja el centro de la
+    // fila para el cambio de pista de siempre y los bordes para insertar
+    const BORDE = 0.3
+
+    // decide, a partir de la posición del cursor, si el gesto apunta al centro de
+    // una fila (mover el clip a ese nivel) o a una separación (crear uno nuevo).
+    // devuelve un destino de pista o un índice de inserción, nunca ambos
+    const decidirVertical = (clientY: number) => {
+      if (!stack) return
+      const numPistas = useEditorStore.getState().numPistas
+      const filas = [...stack.children]
+        .map((el) => ({ p: Number((el as HTMLElement).dataset.filaPista), r: el.getBoundingClientRect() }))
+        .filter((f) => Number.isFinite(f.p))
+      if (filas.length === 0) return
+      // las filas vienen dibujadas de arriba (pista mayor) hacia abajo (pista 0)
+      const arriba = filas[0]
+      const abajo = filas[filas.length - 1]
+      const topeAlcanzado = numPistas >= 6
+
+      let destino: number | null = null
+      let insercion: number | null = null
+
+      if (clientY < arriba.r.top) {
+        // por encima de todo: nace una pista en la cima
+        insercion = numPistas
+      } else if (clientY > abajo.r.bottom) {
+        // por debajo de todo: nace una pista en el suelo
+        insercion = 0
+      } else {
+        const dentro = filas.find((f) => clientY >= f.r.top && clientY <= f.r.bottom)
+        if (dentro) {
+          const frac = (clientY - dentro.r.top) / dentro.r.height
+          if (frac < BORDE) insercion = dentro.p + 1 // pegado al borde de arriba
+          else if (frac > 1 - BORDE) insercion = dentro.p // pegado al borde de abajo
+          else destino = dentro.p // en el cuerpo de la fila: mover aquí
+        } else {
+          // el cursor cayó en el hueco entre dos filas: la de arriba marca dónde
+          // se inserta, porque el nuevo nivel se acomoda justo debajo de ella
+          for (let i = 0; i < filas.length - 1; i++) {
+            if (clientY > filas[i].r.bottom && clientY < filas[i + 1].r.top) {
+              insercion = filas[i].p
+              break
+            }
+          }
+        }
+      }
+
+      // con el máximo de niveles ocupado no se ofrece insertar: la separación
+      // señalada se reinterpreta como mover a la fila más cercana, y así el
+      // arrastre vertical sigue respondiendo
+      if (insercion !== null && topeAlcanzado) {
+        insercion = null
+        let mejor = filas[0]
+        for (const f of filas) {
+          const c = f.r.top + f.r.height / 2
+          if (Math.abs(clientY - c) < Math.abs(clientY - (mejor.r.top + mejor.r.height / 2))) mejor = f
+        }
+        destino = mejor.p
+      }
+
+      return { destino, insercion }
     }
 
     const mover = (ev: globalThis.MouseEvent) => {
-      // el clip cambia de nivel cuando el cursor se acerca más al centro de otra
-      // fila que a la suya, igual que arrastrando entre carriles en Premiere
-      const objetivo = centros[clip.pista] + (ev.clientY - startY)
-      let destino = clip.pista
-      for (let p = 0; p < centros.length; p++) {
-        if (Math.abs(centros[p] - objetivo) < Math.abs(centros[destino] - objetivo)) destino = p
+      const v = decidirVertical(ev.clientY)
+      if (v) {
+        if (v.insercion !== null) {
+          // apuntando a una separación: se pinta la guía y el clip se queda donde
+          // esté hasta que se suelte
+          if (v.insercion !== insercionActual) {
+            insercionActual = v.insercion
+            setInsercionPista(v.insercion)
+          }
+        } else {
+          if (insercionActual !== null) {
+            insercionActual = null
+            setInsercionPista(null)
+          }
+          if (v.destino !== null && v.destino !== pistaActual) {
+            pistaActual = v.destino
+            moverClipAPista(clip.id, v.destino)
+          }
+        }
       }
-      if (destino !== clip.pista) moverClipAPista(clip.id, destino)
 
       const dx = (ev.clientX - startX) / pxPorSegundo
       let candidato = Math.max(0, inicioOriginal + dx)
@@ -96,6 +175,11 @@ export default function ClipBlock({
       moverClip(clip.id, candidato)
     }
     const soltar = () => {
+      // si el gesto acabó sobre una separación, se abre allí el nivel nuevo y el
+      // clip aterriza dentro; comparte el mismo paso de historial que el arrastre
+      if (insercionActual !== null) insertarPistaEn(insercionActual, clip.id)
+      setInsercionPista(null)
+      finGesto()
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
@@ -108,19 +192,30 @@ export default function ClipBlock({
     e.preventDefault()
     seleccionar(clip.id)
     if (bloqueada) return
-    let lastX = e.clientX
+    // se recuerda dónde empezó el ratón y cómo estaba el clip en ese instante.
+    // cada movimiento aplica el desplazamiento total (ev.clientX menos el inicio)
+    // sobre esa base, en lugar de ir sumando el trocito de cada fotograma. así,
+    // si el cursor se pasa del límite y regresa, el clip vuelve a seguirlo sin
+    // arrastrar el error que acumulaba el método anterior
+    const inicioX = e.clientX
+    const base = {
+      inicio: clip.inicio,
+      duracion: clip.duracion,
+      recorteInicio: clip.recorteInicio,
+      velocidad: clip.velocidad,
+      duracionFuente: clip.duracionFuente,
+    }
     setEstirandoVelocidad(e.altKey)
     const mover = (ev: globalThis.MouseEvent) => {
-      const delta = (ev.clientX - lastX) / pxPorSegundo
-      lastX = ev.clientX
+      const delta = (ev.clientX - inicioX) / pxPorSegundo
       // con alt el gesto deja de recortar y pasa a repartir el mismo trozo de
       // video en más o menos tiempo, que es tal cual cambiar la velocidad
       if (ev.altKey) {
         setEstirandoVelocidad(true)
-        estirarVelocidad(clip.id, lado, delta)
+        estirarVelocidad(clip.id, lado, delta, base)
       } else {
         setEstirandoVelocidad(false)
-        recortarClip(clip.id, lado, delta)
+        recortarClip(clip.id, lado, delta, base)
       }
     }
     const soltar = () => {

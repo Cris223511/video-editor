@@ -14,6 +14,18 @@ import {
 import { simplificarRecorrido } from '../lib/layers/motion'
 import { duracionTotal } from '../lib/timeline/clips'
 
+// estado del clip al empezar un arrastre de recorte o de velocidad. arrastrar
+// midiendo el desplazamiento total desde este punto de partida, en vez de sumar
+// deltas fotograma a fotograma, evita que el recorte se descuadre cuando el
+// cursor se pasa del límite y luego vuelve
+export type BaseRecorte = {
+  inicio: number
+  duracion: number
+  recorteInicio: number
+  velocidad: number
+  duracionFuente: number
+}
+
 const PX_POR_SEGUNDO_DEFECTO = 60
 const PX_MIN = 12
 const PX_MAX = 400
@@ -66,8 +78,18 @@ interface EstadoEditor {
   agregarDesdeAsset: (asset: MediaAsset) => void
   quitarClip: (id: string) => void
   moverClip: (id: string, nuevoInicio: number) => void
-  recortarClip: (id: string, lado: 'inicio' | 'fin', deltaSegundos: number) => void
-  estirarVelocidad: (id: string, lado: 'inicio' | 'fin', deltaSegundos: number) => void
+  recortarClip: (
+    id: string,
+    lado: 'inicio' | 'fin',
+    deltaSegundos: number,
+    base?: BaseRecorte,
+  ) => void
+  estirarVelocidad: (
+    id: string,
+    lado: 'inicio' | 'fin',
+    deltaSegundos: number,
+    base?: BaseRecorte,
+  ) => void
   setVelocidadClip: (id: string, velocidad: number) => void
   setTono: (id: string, cambios: Partial<AjusteTono>) => void
   resetTono: (id: string) => void
@@ -81,9 +103,19 @@ interface EstadoEditor {
   seleccionar: (id: string | null) => void
 
   agregarPista: () => void
+  // crea un nivel nuevo en la posición indicada empujando hacia arriba los que ya
+  // estaban en ese índice o por encima. si se pasa un clip, aterriza en el nivel
+  // recién creado. es lo que permite soltar un clip entre dos pistas y abrir un
+  // hueco propio para él
+  insertarPistaEn: (indice: number, clipId?: string) => void
   quitarPista: (indice: number) => void
   setAltoPista: (indice: number, alto: number) => void
   moverClipAPista: (id: string, pista: number) => void
+  // guía celeste que aparece mientras se arrastra un clip sobre la separación
+  // entre dos niveles: guarda el índice donde nacería la pista nueva, o null si
+  // ahora mismo no se está apuntando a ninguna separación
+  insercionPista: number | null
+  setInsercionPista: (indice: number | null) => void
   alternarSilencioPista: (indice: number) => void
   alternarOcultarPista: (indice: number) => void
   alternarBloquearPista: (indice: number) => void
@@ -264,6 +296,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'dividirEnCabezal',
   'cerrarHueco',
   'agregarPista',
+  'insertarPistaEn',
   'quitarPista',
   'setAltoPista',
   'moverClipAPista',
@@ -404,6 +437,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   audioRegiones: [],
   grabandoMovimiento: false,
   dibujandoMascara: false,
+  insercionPista: null,
 
   agregarDesdeAsset: (asset) =>
     set((s) => {
@@ -482,66 +516,74 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       }
     }),
 
-  recortarClip: (id, lado, delta) =>
+  recortarClip: (id, lado, delta, base) =>
     set((s) => {
       const clips = s.pista.clips.map((c) => {
         if (c.id !== id) return c
-        const v = c.velocidad
+        // el punto de partida es el estado del clip cuando arrancó el gesto; si
+        // no llega (por ejemplo desde un atajo), se usa el estado actual. delta
+        // es el desplazamiento total del cursor desde ese arranque, no un paso
+        const b = base ?? c
+        const v = b.velocidad
         if (lado === 'inicio') {
           // delta va en segundos de la pista; el punto de entrada en la fuente
           // avanza a razón de la velocidad. el borde derecho queda fijo
-          const dMin = -c.recorteInicio / v
-          const dMax = c.duracion - DURACION_MINIMA
+          const dMin = -b.recorteInicio / v
+          const dMax = b.duracion - DURACION_MINIMA
           const d = Math.max(dMin, Math.min(delta, dMax))
           return {
             ...c,
-            inicio: c.inicio + d,
-            duracion: c.duracion - d,
-            recorteInicio: c.recorteInicio + d * v,
+            inicio: b.inicio + d,
+            duracion: b.duracion - d,
+            recorteInicio: b.recorteInicio + d * v,
           }
         }
         // borde derecho: no puede pasar del final del video fuente
-        const dMin = DURACION_MINIMA - c.duracion
-        const dMax = (c.duracionFuente - c.recorteInicio) / v - c.duracion
+        const dMin = DURACION_MINIMA - b.duracion
+        const dMax = (b.duracionFuente - b.recorteInicio) / v - b.duracion
         const d = Math.max(dMin, Math.min(delta, dMax))
-        return { ...c, duracion: c.duracion + d }
+        return { ...c, duracion: b.duracion + d }
       })
       return { pista: { ...s.pista, clips }, playhead: Math.min(s.playhead, duracionTotal(clips)) }
     }),
 
-  estirarVelocidad: (id, lado, delta) =>
+  estirarVelocidad: (id, lado, delta, base) =>
     set((s) => {
       const clips = s.pista.clips.map((c) => {
         if (c.id !== id) return c
+        // igual que en el recorte, se parte del estado que tenía el clip al
+        // empezar el gesto y se aplica el desplazamiento total; así pasarse del
+        // límite y volver no deja la velocidad descuadrada
+        const b = base ?? c
         // los segundos reales de fuente que consume el clip no varían al estirar
         // con alt; lo que cambia es cuánto tiempo de pista ocupan, y de ahí sale
         // la nueva velocidad. estirar reparte el mismo trozo en más tiempo (más
         // lento) y encoger lo comprime en menos (más rápido)
-        const consumidoFuente = c.duracion * c.velocidad
+        const consumidoFuente = b.duracion * b.velocidad
         if (lado === 'inicio') {
           // por el borde izquierdo el inicio se desplaza junto con la duración,
           // porque el final del clip permanece clavado en su sitio
-          let duracionNueva = c.duracion - delta
+          let duracionNueva = b.duracion - delta
           // la duración queda atada al rango de velocidad admitido (0.25 a 4x),
           // el mismo que ofrece el panel de velocidad
           const durMin = consumidoFuente / 4
           const durMax = consumidoFuente / 0.25
           duracionNueva = Math.max(durMin, Math.min(duracionNueva, durMax))
-          let corrimiento = c.duracion - duracionNueva
+          let corrimiento = b.duracion - duracionNueva
           // el clip no puede empezar antes del cero de la línea de tiempo
-          if (c.inicio + corrimiento < 0) {
-            corrimiento = -c.inicio
-            duracionNueva = c.duracion - corrimiento
+          if (b.inicio + corrimiento < 0) {
+            corrimiento = -b.inicio
+            duracionNueva = b.duracion - corrimiento
           }
           return {
             ...c,
-            inicio: c.inicio + corrimiento,
+            inicio: b.inicio + corrimiento,
             duracion: duracionNueva,
             velocidad: consumidoFuente / duracionNueva,
           }
         }
         // borde derecho: el inicio no se mueve, solo se estira o encoge el final
-        let duracionNueva = c.duracion + delta
+        let duracionNueva = b.duracion + delta
         const durMin = consumidoFuente / 4
         const durMax = consumidoFuente / 0.25
         duracionNueva = Math.max(durMin, Math.min(duracionNueva, durMax))
@@ -673,6 +715,34 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         pistasMeta: [...s.pistasMeta, metaPista(s.numPistas + 1)],
       }
     }),
+
+  // abre un nivel intermedio en el índice pedido. todo lo que vivía en ese índice
+  // o más arriba sube un puesto para dejarle sitio, y los tres arrays (clips por
+  // su campo pista, altos y metadatos) se corren igual para no descuadrarse. si
+  // llega un clip, se le muda al nivel recién nacido; así soltar entre dos pistas
+  // crea la fila y deja el clip dentro de una sola pasada
+  insertarPistaEn: (indice, clipId) =>
+    set((s) => {
+      if (s.numPistas >= MAX_PISTAS) return {}
+      const k = Math.max(0, Math.min(s.numPistas, indice))
+      const clips = s.pista.clips.map((c) => {
+        if (clipId && c.id === clipId) return { ...c, pista: k }
+        return c.pista >= k ? { ...c, pista: c.pista + 1 } : c
+      })
+      const altosPista = [...s.altosPista]
+      altosPista.splice(k, 0, ALTO_PISTA_BASE)
+      const pistasMeta = [...s.pistasMeta]
+      pistasMeta.splice(k, 0, metaPista(s.numPistas + 1))
+      return {
+        numPistas: s.numPistas + 1,
+        altosPista,
+        pistasMeta,
+        pista: { ...s.pista, clips },
+        clipSeleccionado: clipId ?? s.clipSeleccionado,
+      }
+    }),
+
+  setInsercionPista: (indice) => set({ insercionPista: indice }),
 
   // al eliminar un nivel se van con él sus clips, y los que estaban por encima
   // bajan una posición para que no queden filas huecas en medio. su alto y sus
@@ -1046,10 +1116,12 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   setMarco: (cambios) => set((s) => ({ marco: { ...s.marco, ...cambios } })),
 
   irA: (t) =>
-    set((s) => {
-      const total = duracionTotal(s.pista.clips)
-      return { playhead: Math.max(0, Math.min(t, total)) }
-    }),
+    // el cabezal se mueve libremente por el tiempo, incluso más allá del último
+    // clip o con la pista vacía: hace falta para posicionarse antes de soltar un
+    // medio o para dejar el cabezal donde empezará el siguiente. antes se topaba
+    // con la duración total, que en una pista sin clips vale cero y dejaba el
+    // cabezal clavado en el origen sin poder arrastrarlo
+    set(() => ({ playhead: Math.max(0, t) })),
 
   reproducir: () =>
     set((s) => {

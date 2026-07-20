@@ -175,7 +175,12 @@ function BarraReabrir({ titulo, onClick }: { titulo: string; onClick: () => void
 }
 
 // separador entre paneles: fino en reposo, azul al pasar el cursor o mientras
-// se arrastra, con la zona sensible más ancha de lo que se ve
+// se arrastra, con la zona sensible más ancha de lo que se ve. la línea visible
+// no llega hasta los extremos del tirador: se retira un trecho en cada punta
+// (RETIRO) para que, donde un separador vertical se topa con el horizontal, no
+// se dibuje una cruz sino un hueco limpio en esa esquina. el área arrastrable
+// sigue ocupando todo el largo, así que retirar la línea no le quita agarre
+const RETIRO = 12
 function Tirador({ orientacion }: { orientacion: 'vertical' | 'horizontal' }) {
   const esVertical = orientacion === 'vertical'
   return (
@@ -188,8 +193,8 @@ function Tirador({ orientacion }: { orientacion: 'vertical' | 'horizontal' }) {
       <div
         className="absolute inset-0 m-auto rounded-full transition-colors duration-200 group-hover:bg-brand group-data-[resize-handle-state=drag]:bg-brand"
         style={{
-          width: esVertical ? 2 : '100%',
-          height: esVertical ? '100%' : 2,
+          width: esVertical ? 2 : `calc(100% - ${RETIRO * 2}px)`,
+          height: esVertical ? `calc(100% - ${RETIRO * 2}px)` : 2,
           background: 'rgb(var(--border) / 0.14)',
         }}
       />
