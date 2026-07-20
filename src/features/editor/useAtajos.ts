@@ -31,6 +31,25 @@ export function useAtajos() {
           st.alternarReproduccion()
           return
 
+        case 'z':
+        case 'Z':
+          // Ctrl+Z deshace; con Shift rehace, la alternativa que muchos editores
+          // aceptan además de Ctrl+Y
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            if (e.shiftKey) st.rehacer()
+            else st.deshacer()
+          }
+          return
+
+        case 'y':
+        case 'Y':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            st.rehacer()
+          }
+          return
+
         case 's':
         case 'S':
           if (e.ctrlKey || e.metaKey) return
@@ -87,7 +106,18 @@ export function useAtajos() {
       }
     }
 
+    // al soltar el ratón o una tecla se cierra el gesto en curso: la siguiente
+    // edición abrirá un paso de historial nuevo aunque llegue de inmediato. así
+    // un arrastre entero es un solo paso, pero dos gestos seguidos no se funden
+    const finGesto = () => useEditorStore.getState().finGesto()
+
     window.addEventListener('keydown', alPulsar)
-    return () => window.removeEventListener('keydown', alPulsar)
+    window.addEventListener('pointerup', finGesto)
+    window.addEventListener('keyup', finGesto)
+    return () => {
+      window.removeEventListener('keydown', alPulsar)
+      window.removeEventListener('pointerup', finGesto)
+      window.removeEventListener('keyup', finGesto)
+    }
   }, [])
 }

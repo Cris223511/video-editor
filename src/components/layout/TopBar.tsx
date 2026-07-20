@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FolderOpen, Moon, Save, Sun } from 'lucide-react'
+import { FolderOpen, Moon, Redo2, Save, Sun, Undo2 } from 'lucide-react'
 import Icon from '../ui/Icon'
 import Tooltip from '../ui/Tooltip'
 import { useToast } from '../ui/ToastProvider'
@@ -8,6 +8,7 @@ import { useAppStore } from '../../store/useAppStore'
 import { RUTAS } from '../../rutasDef'
 import { useProjectStore } from '../../store/useProjectStore'
 import { useThemeStore } from '../../store/useThemeStore'
+import { useEditorStore } from '../../store/useEditorStore'
 import { guardarSesion } from '../../lib/proyecto/sesion'
 import { VERSION } from '../../config/constants'
 
@@ -28,6 +29,12 @@ export default function TopBar() {
   const { mostrar } = useToast()
   const [guardando, setGuardando] = useState(false)
   const enEditor = pathname === RUTAS.editor
+  // los botones de historial se apagan cuando no queda nada por deshacer o
+  // rehacer, para que se vea de un vistazo si hay pasos disponibles
+  const deshacer = useEditorStore((s) => s.deshacer)
+  const rehacer = useEditorStore((s) => s.rehacer)
+  const puedeDeshacer = useEditorStore((s) => s.pasado.length > 0)
+  const puedeRehacer = useEditorStore((s) => s.futuro.length > 0)
 
   async function guardar() {
     if (guardando) return
@@ -122,6 +129,31 @@ export default function TopBar() {
       </div>
 
       <div className="flex items-center gap-2">
+        {enEditor && (
+          <div className="mr-1 flex items-center gap-1">
+            <Tooltip texto="Deshacer" atajo="Ctrl+Z" lado="abajo">
+              <button
+                onClick={deshacer}
+                disabled={!puedeDeshacer}
+                aria-label="Deshacer"
+                className="interactivo grid h-9 w-9 place-items-center rounded-lg text-[color:var(--muted)] disabled:pointer-events-none disabled:opacity-35"
+              >
+                <Undo2 size={18} />
+              </button>
+            </Tooltip>
+            <Tooltip texto="Rehacer" atajo="Ctrl+Y" lado="abajo">
+              <button
+                onClick={rehacer}
+                disabled={!puedeRehacer}
+                aria-label="Rehacer"
+                className="interactivo grid h-9 w-9 place-items-center rounded-lg text-[color:var(--muted)] disabled:pointer-events-none disabled:opacity-35"
+              >
+                <Redo2 size={18} />
+              </button>
+            </Tooltip>
+          </div>
+        )}
+
         <span className="hidden text-[13px] font-medium text-[color:var(--muted)] sm:inline">
           v{VERSION}
         </span>

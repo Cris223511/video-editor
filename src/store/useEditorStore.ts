@@ -148,7 +148,137 @@ interface EstadoEditor {
   pausar: () => void
   alternarReproduccion: () => void
   aplicarZoom: (factor: number) => void
+
+  // historial de deshacer y rehacer. cada entrada es una instantánea del
+  // documento (solo lo editable), sin la selección ni el cabezal ni el zoom
+  pasado: Documento[]
+  futuro: Documento[]
+  // guarda el estado actual antes de una edición. se usa una sola vez por gesto:
+  // varias llamadas seguidas de un mismo arrastre se funden en un único paso
+  capturar: () => void
+  // marca que el gesto en curso terminó, para que la siguiente edición abra un
+  // paso nuevo aunque llegue enseguida. la dispara el soltar del ratón o la tecla
+  finGesto: () => void
+  deshacer: () => void
+  rehacer: () => void
 }
+
+// el documento es lo único que entra al historial: el contenido editable del
+// proyecto, nada de selección, cabezal, herramienta ni zoom. si mañana se añade
+// un campo editable, hay que sumarlo también a esta lista
+type Documento = Pick<
+  EstadoEditor,
+  | 'pista'
+  | 'numPistas'
+  | 'altosPista'
+  | 'capas'
+  | 'marco'
+  | 'volumenGlobal'
+  | 'audioRegiones'
+  | 'resolucion'
+  | 'resolucionAuto'
+  | 'lienzoManual'
+  | 'colorFondo'
+  | 'fondo'
+  | 'desenfoqueFondo'
+>
+
+// toma la foto del documento a partir del estado. como el store siempre sustituye
+// objetos y arrays en lugar de mutarlos, basta con quedarse con las referencias:
+// nadie va a cambiarlas por debajo
+function tomarDocumento(s: EstadoEditor): Documento {
+  return {
+    pista: s.pista,
+    numPistas: s.numPistas,
+    altosPista: s.altosPista,
+    capas: s.capas,
+    marco: s.marco,
+    volumenGlobal: s.volumenGlobal,
+    audioRegiones: s.audioRegiones,
+    resolucion: s.resolucion,
+    resolucionAuto: s.resolucionAuto,
+    lienzoManual: s.lienzoManual,
+    colorFondo: s.colorFondo,
+    fondo: s.fondo,
+    desenfoqueFondo: s.desenfoqueFondo,
+  }
+}
+
+// vuelca una foto en el estado. si el elemento que estaba seleccionado ya no
+// existe en la foto restaurada, la selección se limpia para no dejar apuntando a
+// algo que desapareció; el resto de la selección y el cabezal se respetan
+function restaurarDocumento(doc: Documento, s: EstadoEditor): Partial<EstadoEditor> {
+  const clip = s.clipSeleccionado && doc.pista.clips.some((c) => c.id === s.clipSeleccionado)
+    ? s.clipSeleccionado
+    : null
+  const capa = s.capaSeleccionada && doc.capas.some((c) => c.id === s.capaSeleccionada)
+    ? s.capaSeleccionada
+    : null
+  const region = s.regionSeleccionada && doc.audioRegiones.some((r) => r.id === s.regionSeleccionada)
+    ? s.regionSeleccionada
+    : null
+  return {
+    ...doc,
+    clipSeleccionado: clip,
+    capaSeleccionada: capa,
+    regionSeleccionada: region,
+  }
+}
+
+// cuántos pasos guarda el historial hacia atrás; pasado ese tope se olvidan los
+// más antiguos para no dejar que la memoria crezca sin freno
+const MAX_HISTORIAL = 50
+
+// nombres de las acciones que tocan el documento. son las únicas que se envuelven
+// para capturar antes de mutar. seleccionar, mover el cabezal, el zoom o cambiar
+// de herramienta no entran, porque no son parte de lo que se deshace
+const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
+  'agregarDesdeAsset',
+  'quitarClip',
+  'moverClip',
+  'recortarClip',
+  'estirarVelocidad',
+  'setVelocidadClip',
+  'setTono',
+  'resetTono',
+  'setTransicion',
+  'dividirEnCabezal',
+  'cerrarHueco',
+  'agregarPista',
+  'quitarPista',
+  'setAltoPista',
+  'moverClipAPista',
+  'agregarTexto',
+  'agregarImagen',
+  'agregarCensura',
+  'agregarFigura',
+  'actualizarCapa',
+  'quitarCapa',
+  'moverCapaLienzo',
+  'moverCapaTiempo',
+  'recortarCapaTiempo',
+  'desplazarCapa',
+  'registrarPunto',
+  'quitarMovimiento',
+  'moverKeyframe',
+  'quitarKeyframe',
+  'setTiradorNodo',
+  'simplificarCapa',
+  'anadirTrazo',
+  'limpiarTrazos',
+  'setVolumenGlobal',
+  'agregarRegionAudio',
+  'actualizarRegionAudio',
+  'quitarRegionAudio',
+  'moverRegionAudio',
+  'recortarRegionAudio',
+  'setLienzo',
+  'setLienzoAuto',
+  'setColorFondo',
+  'setFondo',
+  'setDesenfoqueFondo',
+  'setMarco',
+]
 
 const pistaVacia: Track = { id: 'video-1', tipo: 'video', clips: [] }
 
@@ -163,7 +293,62 @@ const entre01 = (v: number) => Math.max(0, Math.min(1, v))
 // estado del editor: una pista de video con posiciones libres, las capas que se
 // dibujan encima, el cabezal, la selección y el zoom. cada clip guarda la
 // duración de su fuente para saber hasta dónde alargarse al recortar
-export const useEditorStore = create<EstadoEditor>((set, get) => ({
+export const useEditorStore = create<EstadoEditor>((set, get) => {
+  // bandera del gesto en curso y sello de tiempo de la última captura. mientras
+  // un gesto sigue abierto (por ejemplo, un arrastre) las capturas repetidas se
+  // ignoran, así cientos de fotogramas de movimiento cuentan como un solo paso.
+  // el tiempo es una red de seguridad por si el soltar del ratón no llega
+  let capturado = false
+  let ultimoSello = 0
+
+  // empuja la foto actual a la pila de pasado y borra el futuro, porque tras una
+  // edición nueva ya no tiene sentido rehacer lo que se había deshecho
+  const preparar = () => {
+    const ahora = performance.now()
+    if (capturado && ahora - ultimoSello < 500) {
+      ultimoSello = ahora
+      return
+    }
+    const s = get()
+    const pasado = [...s.pasado, tomarDocumento(s)]
+    if (pasado.length > MAX_HISTORIAL) pasado.shift()
+    set({ pasado, futuro: [] })
+    capturado = true
+    ultimoSello = ahora
+  }
+
+  const finGesto = () => {
+    capturado = false
+  }
+
+  const deshacer = () => {
+    const s = get()
+    if (s.pasado.length === 0) return
+    const anterior = s.pasado[s.pasado.length - 1]
+    // lo que se ve ahora pasa al futuro por si el usuario quiere rehacer
+    const actual = tomarDocumento(s)
+    capturado = false
+    set({
+      ...restaurarDocumento(anterior, s),
+      pasado: s.pasado.slice(0, -1),
+      futuro: [...s.futuro, actual],
+    })
+  }
+
+  const rehacer = () => {
+    const s = get()
+    if (s.futuro.length === 0) return
+    const siguiente = s.futuro[s.futuro.length - 1]
+    const actual = tomarDocumento(s)
+    capturado = false
+    set({
+      ...restaurarDocumento(siguiente, s),
+      pasado: [...s.pasado, actual],
+      futuro: s.futuro.slice(0, -1),
+    })
+  }
+
+  const acciones: EstadoEditor = {
   pista: pistaVacia,
   numPistas: 1,
   altosPista: [64],
@@ -768,4 +953,27 @@ export const useEditorStore = create<EstadoEditor>((set, get) => ({
     set((s) => ({
       pxPorSegundo: Math.max(PX_MIN, Math.min(PX_MAX, s.pxPorSegundo * factor)),
     })),
-}))
+
+    pasado: [],
+    futuro: [],
+    capturar: preparar,
+    finGesto,
+    deshacer,
+    rehacer,
+  }
+
+  // cada acción que toca el documento se envuelve para que tome la foto justo
+  // antes de mutar. así el historial se llena solo, sin salpicar de llamadas a
+  // capturar() por toda la interfaz, y la lógica de coalescencia decide si el
+  // gesto merece un paso nuevo o se funde con el anterior
+  const tabla = acciones as unknown as Record<string, (...args: unknown[]) => unknown>
+  for (const nombre of ACCIONES_DOCUMENTO) {
+    const original = tabla[nombre]
+    tabla[nombre] = (...args: unknown[]) => {
+      preparar()
+      return original(...args)
+    }
+  }
+
+  return acciones
+})
