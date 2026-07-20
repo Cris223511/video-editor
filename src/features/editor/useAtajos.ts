@@ -111,13 +111,22 @@ export function useAtajos() {
     // un arrastre entero es un solo paso, pero dos gestos seguidos no se funden
     const finGesto = () => useEditorStore.getState().finGesto()
 
+    // el soltar de una tecla NO cierra el gesto si se está escribiendo en un
+    // campo: la edición de texto se agrupa por su propio foco, no tecla a tecla,
+    // para que deshacer revierta la palabra entera y no letra por letra
+    const finGestoTecla = (e: KeyboardEvent) => {
+      const t = e.target
+      if (t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      useEditorStore.getState().finGesto()
+    }
+
     window.addEventListener('keydown', alPulsar)
     window.addEventListener('pointerup', finGesto)
-    window.addEventListener('keyup', finGesto)
+    window.addEventListener('keyup', finGestoTecla)
     return () => {
       window.removeEventListener('keydown', alPulsar)
       window.removeEventListener('pointerup', finGesto)
-      window.removeEventListener('keyup', finGesto)
+      window.removeEventListener('keyup', finGestoTecla)
     }
   }, [])
 }

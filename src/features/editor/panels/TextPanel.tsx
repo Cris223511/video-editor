@@ -83,6 +83,9 @@ export default function TextPanel() {
   const agregarTexto = useEditorStore((s) => s.agregarTexto)
   const actualizarCapa = useEditorStore((s) => s.actualizarCapa)
   const quitarCapa = useEditorStore((s) => s.quitarCapa)
+  // agrupan toda la escritura del contenido en un único paso de deshacer
+  const abrirGesto = useEditorStore((s) => s.abrirGesto)
+  const finGesto = useEditorStore((s) => s.finGesto)
 
   const capa = capas.find((c) => c.id === capaSeleccionada && c.tipo === 'texto') as
     | CapaTexto
@@ -112,6 +115,8 @@ export default function TextPanel() {
             <textarea
               value={capa.texto}
               onChange={(e) => editar('texto', e.target.value)}
+              onFocus={abrirGesto}
+              onBlur={finGesto}
               rows={2}
               className="w-full resize-none rounded-lg border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand dark:border-white/10"
             />

@@ -282,6 +282,9 @@ interface EstadoEditor {
   // marca que el gesto en curso terminó, para que la siguiente edición abra un
   // paso nuevo aunque llegue enseguida. la dispara el soltar del ratón o la tecla
   finGesto: () => void
+  // abre un paso de historial continuo mientras se escribe en un campo, para que
+  // toda la edición cuente como uno solo; se cierra con finGesto al perder el foco
+  abrirGesto: () => void
   deshacer: () => void
   rehacer: () => void
 }
@@ -457,12 +460,16 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   // el tiempo es una red de seguridad por si el soltar del ratón no llega
   let capturado = false
   let ultimoSello = 0
+  // mientras un campo de escritura tiene el foco se abre un gesto continuo: todas
+  // las teclas cuentan como un solo paso aunque haya pausas largas, para que
+  // deshacer no vaya letra a letra sino que revierta la edición entera de una vez
+  let gestoContinuo = false
 
   // empuja la foto actual a la pila de pasado y borra el futuro, porque tras una
   // edición nueva ya no tiene sentido rehacer lo que se había deshecho
   const preparar = () => {
     const ahora = performance.now()
-    if (capturado && ahora - ultimoSello < 500) {
+    if (capturado && (gestoContinuo || ahora - ultimoSello < 500)) {
       ultimoSello = ahora
       return
     }
@@ -474,8 +481,17 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     ultimoSello = ahora
   }
 
+  // al entrar en un campo de texto se arranca el gesto continuo. capturado vuelve
+  // a false para que el primer cambio guarde la foto de antes de editar; a partir
+  // de ahí todo se agrupa hasta que el campo pierde el foco
+  const abrirGesto = () => {
+    gestoContinuo = true
+    capturado = false
+  }
+
   const finGesto = () => {
     capturado = false
+    gestoContinuo = false
   }
 
   const deshacer = () => {
@@ -1517,6 +1533,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     futuro: [],
     capturar: preparar,
     finGesto,
+    abrirGesto,
     deshacer,
     rehacer,
   }
