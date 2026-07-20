@@ -187,7 +187,7 @@ export default function PortadaView() {
           <Aparece>
             <Chip destacado>Gratuito y de código abierto</Chip>
             <Titulo nivel="xl" como="h1" className="mt-4">
-              Edita tu video sin salir <Subrayado>del navegador</Subrayado>
+              Edita tu video <Subrayado>de principio a fin</Subrayado>
             </Titulo>
             <p className="mt-5 max-w-2xl text-entrada text-[color:var(--muted)]">
               Un editor completo que corre en tu equipo. Monta la línea de tiempo, ajusta el color,

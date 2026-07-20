@@ -108,11 +108,6 @@ export default function DemoColor() {
             filter: tocada ? `url(#demo-color) ${filtroNumerico}` : undefined,
           }}
         />
-        {!tocada && (
-          <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-3 text-xs font-medium text-white">
-            Arrastra una rueda para corregir este clip
-          </span>
-        )}
       </div>
 
       <svg className="absolute h-0 w-0">
