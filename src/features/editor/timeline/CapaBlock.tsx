@@ -1,14 +1,13 @@
 import { MouseEvent as ReactMouseEvent } from 'react'
 import { Capa } from '../../../types/layers'
 import { useEditorStore } from '../../../store/useEditorStore'
+import { imantarMover, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
 
 interface Props {
   capa: Capa
   pxPorSegundo: number
   puntos: number[]
 }
-
-const UMBRAL_PX = 8
 
 // bloque de una capa en su pista de tiempo. define de qué segundo a qué segundo
 // aparece; se mueve con imantado y se recorta por los bordes
@@ -18,6 +17,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   const moverCapaTiempo = useEditorStore((s) => s.moverCapaTiempo)
   const duplicarCapa = useEditorStore((s) => s.duplicarCapa)
   const recortarCapaTiempo = useEditorStore((s) => s.recortarCapaTiempo)
+  const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
 
   function iniciarMover(e: ReactMouseEvent) {
     e.stopPropagation()
@@ -32,24 +32,18 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     }
     const startX = e.clientX
     const inicioOriginal = capa.inicio
-    const umbral = UMBRAL_PX / pxPorSegundo
+    const umbral = UMBRAL_IMAN_PX / pxPorSegundo
+    const propios = [inicioOriginal, inicioOriginal + capa.duracion]
 
     const mover = (ev: globalThis.MouseEvent) => {
       const dx = (ev.clientX - startX) / pxPorSegundo
-      let candidato = Math.max(0, inicioOriginal + dx)
-      for (const p of puntos) {
-        if (Math.abs(candidato - p) < umbral) {
-          candidato = p
-          break
-        }
-        if (Math.abs(candidato + capa.duracion - p) < umbral) {
-          candidato = Math.max(0, p - capa.duracion)
-          break
-        }
-      }
-      moverCapaTiempo(idGesto, candidato)
+      const bruto = Math.max(0, inicioOriginal + dx)
+      const { inicio, guia } = imantarMover(bruto, capa.duracion, puntos, umbral, propios)
+      setGuiaImantado(guia)
+      moverCapaTiempo(idGesto, inicio)
     }
     const soltar = () => {
+      setGuiaImantado(null)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }

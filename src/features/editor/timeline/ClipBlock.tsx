@@ -6,6 +6,7 @@ import FrameStrip from './FrameStrip'
 import MedioNoDisponible from '../../../components/ui/MedioNoDisponible'
 import TransicionBlock from './TransicionBlock'
 import { resolverDestinoVertical } from './destinoVertical'
+import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
 
 interface Props {
   clip: Clip
@@ -17,7 +18,6 @@ interface Props {
   puntos: number[] // instantes a los que imantar el clip al moverlo
 }
 
-const UMBRAL_PX = 8
 // separación vertical entre niveles; debe coincidir con la que usa la línea de
 // tiempo al apilar las filas, o el clip caería en la pista equivocada al soltarlo
 export const HUECO_PISTA = 10
@@ -42,6 +42,7 @@ export default function ClipBlock({
   const moverClipAPista = useEditorStore((s) => s.moverClipAPista)
   const insertarPistaEn = useEditorStore((s) => s.insertarPistaEn)
   const setInsercionPista = useEditorStore((s) => s.setInsercionPista)
+  const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
   const finGesto = useEditorStore((s) => s.finGesto)
   // un clip de un nivel bloqueado no se puede arrastrar ni recortar; solo
   // seleccionar. la comprobación se hace por su pista
@@ -51,6 +52,11 @@ export default function ClipBlock({
   // mientras se arrastra un borde con alt no se recorta, se cambia la velocidad;
   // este estado enciende la pista visual con el valor resultante en vivo
   const [estirandoVelocidad, setEstirandoVelocidad] = useState(false)
+  // mientras dura un gesto propio (mover o recortar) el bloque debe seguir al
+  // cursor sin retraso, así que se apaga el suavizado de su posición. en reposo
+  // se vuelve a encender para que, al cerrar un hueco, el clip se deslice hasta
+  // su nuevo sitio en vez de saltar de golpe
+  const [interactuando, setInteractuando] = useState(false)
 
   const ancho = Math.max(clip.duracion * pxPorSegundo, 8)
 
@@ -70,9 +76,13 @@ export default function ClipBlock({
     }
     // en un nivel bloqueado el gesto termina en la selección: no se mueve nada
     if (bloqueada) return
+    setInteractuando(true)
     const startX = e.clientX
     const inicioOriginal = clip.inicio
-    const umbral = UMBRAL_PX / pxPorSegundo
+    const umbral = UMBRAL_IMAN_PX / pxPorSegundo
+    // bordes de partida del propio clip: se excluyen del imantado para que no se
+    // enganche a sí mismo ni pinte una guía sobre su sitio actual
+    const propios = [inicioOriginal, inicioOriginal + clip.duracion]
 
     // contenedor real de los niveles de video en el dom. sus filas, medidas en
     // vivo, dicen dónde está cada pista y dónde caen las separaciones entre ellas.
@@ -117,26 +127,22 @@ export default function ClipBlock({
       }
 
       const dx = (ev.clientX - startX) / pxPorSegundo
-      let candidato = Math.max(0, inicioOriginal + dx)
-      // imantado: si el inicio o el fin del clip caen cerca de un punto de
-      // anclaje, se pegan a él para que sea fácil unir clips sin huecos
-      for (const p of puntos) {
-        if (Math.abs(candidato - p) < umbral) {
-          candidato = p
-          break
-        }
-        if (Math.abs(candidato + clip.duracion - p) < umbral) {
-          candidato = Math.max(0, p - clip.duracion)
-          break
-        }
-      }
-      moverClip(idGesto, candidato)
+      const bruto = Math.max(0, inicioOriginal + dx)
+      // imantado: si el inicio o el fin del clip caen cerca de un anclaje, se
+      // pegan a él para que sea fácil unir clips sin huecos ni solapes. cuando
+      // engancha, se enciende la línea guía en ese instante
+      const { inicio, guia } = imantarMover(bruto, clip.duracion, puntos, umbral, propios)
+      setGuiaImantado(guia)
+      moverClip(idGesto, inicio)
     }
     const soltar = () => {
       // si el gesto acabó sobre una separación, se abre allí el nivel nuevo y el
       // clip aterriza dentro; comparte el mismo paso de historial que el arrastre
       if (insercionActual !== null) insertarPistaEn(insercionActual, idGesto)
       setInsercionPista(null)
+      // al soltar, la guía desaparece: el clip ya quedó encajado en su sitio
+      setGuiaImantado(null)
+      setInteractuando(false)
       finGesto()
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
@@ -163,6 +169,11 @@ export default function ClipBlock({
       velocidad: clip.velocidad,
       duracionFuente: clip.duracionFuente,
     }
+    const umbral = UMBRAL_IMAN_PX / pxPorSegundo
+    // los dos bordes de partida del clip se apartan del imantado: el fijo no
+    // debe atraer al que se arrastra, y el móvil no debe pegarse a su origen
+    const propios = [base.inicio, base.inicio + base.duracion]
+    setInteractuando(true)
     setEstirandoVelocidad(e.altKey)
     const mover = (ev: globalThis.MouseEvent) => {
       const delta = (ev.clientX - inicioX) / pxPorSegundo
@@ -170,14 +181,30 @@ export default function ClipBlock({
       // video en más o menos tiempo, que es tal cual cambiar la velocidad
       if (ev.altKey) {
         setEstirandoVelocidad(true)
+        setGuiaImantado(null)
         estirarVelocidad(clip.id, lado, delta, base)
       } else {
         setEstirandoVelocidad(false)
-        recortarClip(clip.id, lado, delta, base)
+        // posición actual del borde que se arrastra; si roza un anclaje se pega a
+        // él ajustando el desplazamiento, y se pinta la guía en ese instante
+        const bordeBruto =
+          lado === 'inicio' ? base.inicio + delta : base.inicio + base.duracion + delta
+        const enganche = imantarBorde(bordeBruto, puntos, umbral, propios)
+        let d = delta
+        if (enganche) {
+          d =
+            lado === 'inicio'
+              ? enganche.punto - base.inicio
+              : enganche.punto - base.inicio - base.duracion
+        }
+        setGuiaImantado(enganche ? enganche.guia : null)
+        recortarClip(clip.id, lado, d, base)
       }
     }
     const soltar = () => {
       setEstirandoVelocidad(false)
+      setGuiaImantado(null)
+      setInteractuando(false)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
@@ -196,6 +223,10 @@ export default function ClipBlock({
       style={{
         left: clip.inicio * pxPorSegundo,
         width: ancho,
+        // en reposo la posición se anima con una curva suave, de modo que al
+        // cerrar un hueco los clips se deslizan hasta su nuevo sitio; durante un
+        // arrastre propio el suavizado se apaga para no ir por detrás del cursor
+        transition: interactuando ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
         // mientras la tira se extrae, el clip se ve con su miniatura muy
         // atenuada y el azul de fondo, sin saltos bruscos al llegar
         backgroundImage: !tira && miniatura ? `url(${miniatura})` : undefined,

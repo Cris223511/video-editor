@@ -84,6 +84,9 @@ export default function Timeline({
   // null, ahí se dibuja la guía celeste que promete crear una pista al soltar
   const insercionPista = useEditorStore((s) => s.insercionPista)
   const setInsercionPista = useEditorStore((s) => s.setInsercionPista)
+  // instante donde pintar la línea guía del imantado mientras se mueve o recorta
+  // un bloque; null cuando ningún borde está enganchado a un anclaje
+  const guiaImantado = useEditorStore((s) => s.guiaImantado)
   const medios = useProjectStore((s) => s.medios)
 
   // único contenedor con desplazamiento: lleva el scroll horizontal y, cuando
@@ -539,6 +542,22 @@ export default function Timeline({
                 Nueva pista aquí
               </span>
             </div>
+          )}
+
+          {/* línea guía del imantado: una vertical fina y de color propio que
+              aparece justo donde un borde se enganchó a un anclaje (el cero, el
+              cabezal o el borde de otro bloque) mientras se mueve o recorta. sus
+              extremos van redondeados y lleva un leve resplandor para que se lea
+              limpia, y se esfuma sola al soltar porque el estado vuelve a null */}
+          {guiaImantado !== null && (
+            <div
+              className="pointer-events-none absolute bottom-0 top-0 z-30 w-0.5 -translate-x-px rounded-full"
+              style={{
+                left: guiaImantado * pxPorSegundo,
+                background: '#f472b6',
+                boxShadow: '0 0 6px rgba(244,114,182,0.8)',
+              }}
+            />
           )}
 
           {/* scrubber: línea fina de previsualización que sigue al cursor, más

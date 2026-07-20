@@ -142,6 +142,10 @@ interface EstadoEditor {
   // ahora mismo no se está apuntando a ninguna separación
   insercionPista: number | null
   setInsercionPista: (indice: number | null) => void
+  // instante (en segundos) donde se dibuja la línea guía del imantado mientras se
+  // mueve o recorta un bloque. queda en null cuando no hay ningún enganche activo
+  guiaImantado: number | null
+  setGuiaImantado: (segundo: number | null) => void
   alternarSilencioPista: (indice: number) => void
   alternarOcultarPista: (indice: number) => void
   alternarBloquearPista: (indice: number) => void
@@ -476,6 +480,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   grabandoMovimiento: false,
   dibujandoMascara: false,
   insercionPista: null,
+  guiaImantado: null,
 
   agregarDesdeAsset: (asset, destino) =>
     set((s) => {
@@ -842,6 +847,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     }),
 
   setInsercionPista: (indice) => set({ insercionPista: indice }),
+  setGuiaImantado: (segundo) => set({ guiaImantado: segundo }),
 
   // al eliminar un nivel se van con él sus clips, y los que estaban por encima
   // bajan una posición para que no queden filas huecas en medio. su alto y sus
@@ -933,6 +939,13 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   agregarImagen: (src, anchoNatural, altoNatural) =>
     set((s) => {
       const capa = crearCapaImagen(s.playhead, src, anchoNatural, altoNatural)
+      // una imagen recién puesta ocupa unos pocos segundos, no todo el proyecto:
+      // arranca con una duración corta y, si el video ya colocado termina antes,
+      // se ajusta hasta ese final para no sobrar por el borde derecho
+      const DUR_IMAGEN = 5
+      const finProyecto = duracionTotal(s.pista.clips)
+      const disponible = finProyecto > s.playhead ? finProyecto - s.playhead : DUR_IMAGEN
+      capa.duracion = Math.max(1, Math.min(DUR_IMAGEN, disponible))
       return {
         capas: [...s.capas, capa],
         capaSeleccionada: capa.id,

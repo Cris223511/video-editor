@@ -1,10 +1,11 @@
-import { X } from 'lucide-react'
+import Icon from '../../../components/ui/Icon'
 import Tooltip from '../../../components/ui/Tooltip'
 import { useEditorStore } from '../../../store/useEditorStore'
 
-// espacio vacío entre dos clips. en reposo se insinúa con unas rayas tenues, y
-// al pasar el cursor aparece el botón que lo cierra, adelantando todo lo que
-// viene después. así no hace falta arrastrar los clips a mano para pegarlos
+// espacio vacío entre dos clips. se delata con un rayado diagonal para que se lea
+// como un hueco a la primera, y en su centro lleva una papelera que lo cierra:
+// al pulsarla, lo que viene después se adelanta y, gracias al suavizado de la
+// posición de los clips, se desliza hasta pegarse sin dejar el espacio
 export default function Hueco({
   desde,
   hasta,
@@ -26,24 +27,35 @@ export default function Hueco({
       className="group absolute top-0 h-full"
       style={{ left: desde * pxPorSegundo, width: ancho }}
     >
+      {/* franja rayada: unas diagonales tenues que se aclaran al pasar el cursor,
+          con los bordes redondeados para que no corte de golpe contra los clips */}
       <div
-        className="absolute inset-y-2 left-0 right-0 rounded-md border border-dashed transition-colors duration-200 group-hover:border-brand/70 group-hover:bg-brand/10"
-        style={{ borderColor: 'rgb(var(--border) / 0.25)' }}
+        className="absolute inset-y-2 left-0 right-0 overflow-hidden rounded-md border transition-colors duration-200 group-hover:border-brand/50"
+        style={{
+          borderColor: 'rgb(var(--border) / 0.22)',
+          backgroundImage:
+            'repeating-linear-gradient(45deg, rgb(var(--border) / 0.16) 0, rgb(var(--border) / 0.16) 1.5px, transparent 1.5px, transparent 7px)',
+        }}
       />
-      <div className="absolute inset-0 grid place-items-center opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-        <Tooltip texto="Cerrar este hueco">
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              cerrarHueco(desde, pista)
-            }}
-            aria-label="Cerrar hueco"
-            className="grid h-6 w-6 place-items-center rounded-full bg-brand text-white shadow-md transition-transform duration-200 hover:scale-110 active:scale-95"
-          >
-            <X size={13} />
-          </button>
-        </Tooltip>
-      </div>
+      {/* papelera centrada sobre el rayado. crece un poco al acercar el cursor y
+          se hunde al pulsar, para que el gesto se sienta. solo aparece si el hueco
+          da sitio a botón; en huecos muy finos se deja solo el rayado */}
+      {ancho >= 18 && (
+        <div className="absolute inset-0 grid place-items-center">
+          <Tooltip texto="Cerrar este hueco">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                cerrarHueco(desde, pista)
+              }}
+              aria-label="Cerrar hueco"
+              className="grid h-6 w-6 place-items-center rounded-full bg-brand text-white opacity-80 shadow-md transition-all duration-200 hover:scale-110 hover:opacity-100 active:scale-95"
+            >
+              <Icon name="papelera" size={13} />
+            </button>
+          </Tooltip>
+        </div>
+      )}
     </div>
   )
 }

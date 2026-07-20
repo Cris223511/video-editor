@@ -3,14 +3,13 @@ import { RegionAudio } from '../../../types/audio'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
 import { amplitudEn, picosDeMedio, PerfilPicos } from '../../../lib/audio/picos'
+import { imantarMover, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
 
 interface Props {
   region: RegionAudio
   pxPorSegundo: number
   puntos: number[]
 }
-
-const UMBRAL_PX = 8
 
 // alturas de las barras de una onda, entre 0 y 1, a partir de una semilla de
 // texto. sin acceso garantizado a las muestras reales del audio, se sintetiza un
@@ -165,6 +164,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
   const moverRegionAudio = useEditorStore((s) => s.moverRegionAudio)
   const duplicarRegionAudio = useEditorStore((s) => s.duplicarRegionAudio)
   const recortarRegionAudio = useEditorStore((s) => s.recortarRegionAudio)
+  const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
 
   function iniciarMover(e: ReactMouseEvent) {
     e.stopPropagation()
@@ -179,24 +179,18 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     }
     const startX = e.clientX
     const inicioOriginal = region.inicio
-    const umbral = UMBRAL_PX / pxPorSegundo
+    const umbral = UMBRAL_IMAN_PX / pxPorSegundo
+    const propios = [inicioOriginal, inicioOriginal + region.duracion]
 
     const mover = (ev: globalThis.MouseEvent) => {
       const dx = (ev.clientX - startX) / pxPorSegundo
-      let candidato = Math.max(0, inicioOriginal + dx)
-      for (const p of puntos) {
-        if (Math.abs(candidato - p) < umbral) {
-          candidato = p
-          break
-        }
-        if (Math.abs(candidato + region.duracion - p) < umbral) {
-          candidato = Math.max(0, p - region.duracion)
-          break
-        }
-      }
-      moverRegionAudio(idGesto, candidato)
+      const bruto = Math.max(0, inicioOriginal + dx)
+      const { inicio, guia } = imantarMover(bruto, region.duracion, puntos, umbral, propios)
+      setGuiaImantado(guia)
+      moverRegionAudio(idGesto, inicio)
     }
     const soltar = () => {
+      setGuiaImantado(null)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
