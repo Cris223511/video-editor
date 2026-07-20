@@ -1,6 +1,13 @@
 import { useEffect } from 'react'
 import { useEditorStore } from '../../store/useEditorStore'
 import { duracionTotal } from '../../lib/timeline/clips'
+import { posicionCapa } from '../../lib/layers/motion'
+import { CapaCensura } from '../../types/layers'
+
+// paso de las flechas al ajustar una censura: uno fino para moverla y otro para
+// estirarla, ambos en fracción del lienzo
+const PASO_MOVER = 0.006
+const PASO_TAMANO = 0.01
 
 // paso del cabezal con las flechas: un fotograma a 30 imágenes por segundo, o un
 // segundo entero si se mantiene Shift
@@ -24,6 +31,38 @@ export function useAtajos() {
       const st = useEditorStore.getState()
       const total = duracionTotal(st.pista.clips)
       const largo = e.shiftKey ? PASO_LARGO : PASO
+
+      // con una censura seleccionada, las flechas dejan de mover el cabezal y pasan
+      // a gobernar la caja: solas la mueven, con Alt cambian el ancho y con Ctrl el
+      // alto. es lo mismo que anuncia la ayuda de atajos de la herramienta
+      const censura = st.capas.find(
+        (c) => c.id === st.capaSeleccionada && c.tipo === 'censura',
+      ) as CapaCensura | undefined
+      if (censura && e.key.startsWith('Arrow')) {
+        e.preventDefault()
+        if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+          const d = e.key === 'ArrowRight' ? PASO_TAMANO : -PASO_TAMANO
+          st.actualizarCapa(censura.id, { anchoRel: Math.max(0.03, Math.min(2, censura.anchoRel + d)) })
+          return
+        }
+        if (e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+          const d = e.key === 'ArrowUp' ? PASO_TAMANO : -PASO_TAMANO
+          st.actualizarCapa(censura.id, { altoRel: Math.max(0.03, Math.min(2, censura.altoRel + d)) })
+          return
+        }
+        let dx = 0
+        let dy = 0
+        if (e.key === 'ArrowLeft') dx = -PASO_MOVER
+        if (e.key === 'ArrowRight') dx = PASO_MOVER
+        if (e.key === 'ArrowUp') dy = -PASO_MOVER
+        if (e.key === 'ArrowDown') dy = PASO_MOVER
+        if (censura.keyframes.length > 0) st.desplazarCapa(censura.id, dx, dy)
+        else {
+          const pos = posicionCapa(censura, st.playhead)
+          st.moverCapaLienzo(censura.id, pos.x + dx, pos.y + dy)
+        }
+        return
+      }
 
       switch (e.key) {
         case ' ':

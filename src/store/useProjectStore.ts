@@ -13,6 +13,10 @@ interface EstadoProyecto {
   // en el guardado automático. la barra superior lo usa para mostrar el aviso de
   // "guardando" con su animación mientras dura
   guardando: boolean
+  // true desde que se suelta un archivo para crear un proyecto hasta que el editor
+  // ya lo tiene cargado y visible. mientras dura se muestra el cargador a pantalla
+  // completa, para que uno no vea el editor a medio montar con un video pesado
+  preparando: boolean
   titulo: string
   medios: MediaAsset[]
   renombrar: (titulo: string) => void
@@ -53,6 +57,7 @@ export const useProjectStore = create<EstadoProyecto>((set) => ({
   guardadoEn: null,
   sinGuardar: false,
   guardando: false,
+  preparando: false,
   titulo: 'Proyecto sin título',
   medios: [],
   // mientras se escribe se admite cualquier valor, incluido el vacío, para poder

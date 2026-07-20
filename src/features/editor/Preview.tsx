@@ -600,9 +600,10 @@ export default function Preview() {
         // apaisado: cada píxel que se quita de arriba y de abajo se convierte en
         // lienzo, mientras que quitarlo de los lados no cambia nada
         'relative flex min-h-0 flex-1 items-center justify-center px-4 py-2 transition-colors duration-300',
-        hayContenido ? 'bg-black/40' : '',
       ].join(' ')}
-      style={hayContenido ? undefined : { background: 'rgb(var(--surface-2))' }}
+      // las bandas alrededor del lienzo toman el color del marco del visor, claro en
+      // modo claro y casi negro en oscuro; sin contenido se usa la superficie suave
+      style={{ background: hayContenido ? 'rgb(var(--marco-visor))' : 'rgb(var(--surface-2))' }}
       // un clic en el fondo del visor, por fuera del lienzo, suelta lo que hubiera
       // seleccionado. el propio lienzo corta la propagación, así que este deseleccionar
       // solo se dispara cuando de verdad se pulsa fuera de la imagen
@@ -701,6 +702,12 @@ export default function Preview() {
                     src={asset.url}
                     playsInline
                     preload="auto"
+                    // si el cargador de preparación seguía encendido, se apaga en
+                    // cuanto el primer video tiene datos listos para mostrarse
+                    onLoadedData={() => {
+                      if (useProjectStore.getState().preparando)
+                        useProjectStore.setState({ preparando: false })
+                    }}
                     className="absolute inset-0 h-full w-full object-contain"
                     style={{
                       opacity: conLienzo ? 0 : opacidadDe(c),

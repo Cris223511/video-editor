@@ -14,17 +14,26 @@ const ANCHO = 880
 const ALTO = 400
 const DURACION = 1500
 
-// una selección corta del catálogo, con una de cada familia. mostrar las
-// veintiuna aquí convertiría la sección en un panel de trabajo
+// una muestra amplia del catálogo, con varias de cada familia para que se note
+// la variedad. no están las veintiuna porque enseñarlas todas convertiría la
+// sección en un panel de trabajo, pero sí bastantes más que una sola por grupo
 const ELEGIDAS = [
   'desvanecer',
   'fundido',
+  'fundido-blanco',
   'barrido-der',
+  'barrido-aba',
+  'diagonal',
   'circulo',
   'persianas',
   'puertas-h',
+  'puertas-v',
+  'rombo',
+  'tercios',
   'empujar-izq',
+  'empujar-aba',
   'acercar',
+  'alejar',
 ]
 
 function clipFalso(id: string, tipo: string, inicio: number): Clip {
@@ -128,13 +137,16 @@ export default function DemoTransiciones() {
 
   return (
     <div
-      className="overflow-hidden rounded-2xl p-4 shadow-lg sm:p-5"
+      className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl p-4 shadow-lg sm:p-5"
       style={{
         background: 'rgb(var(--surface))',
         border: '1px solid rgb(var(--border) / 0.1)',
       }}
     >
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+      {/* misma proporción de columnas que la demo de color, así el lienzo de la
+          izquierda queda del mismo ancho que su video y al saltar de una pestaña
+          a otra la vista previa no se desplaza */}
+      <div className="grid items-start gap-5 lg:grid-cols-[1.1fr_1fr]">
       {/* self-start evita que el grid estire esta columna hasta igualar la
           altura de la lista de transiciones: sin eso el fondo negro del
           contenedor sobraba por debajo de la foto, aunque el lienzo estuviera
@@ -157,8 +169,8 @@ export default function DemoTransiciones() {
       <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
         Transición:
       </p>
-      {/* agrupadas por familia: ocho pastillas sueltas no dejaban ver que hay
-          criterios distintos detrás de cada grupo */}
+      {/* agrupadas por familia: un montón de pastillas sueltas no dejaría ver
+          que hay criterios distintos detrás de cada grupo */}
       <div className="flex flex-col gap-3">
         {grupos.map(([grupo, opciones]) => (
           <div key={grupo}>
@@ -194,8 +206,8 @@ export default function DemoTransiciones() {
         ))}
       </div>
       <p className="mt-3 text-[11px] leading-relaxed text-[color:var(--muted)]">
-        Son ocho de las <b>veintiuna</b> disponibles, una por familia. En el editor las tienes todas
-        con buscador y muestra en movimiento.
+        Una muestra de las <b>veintiuna</b> disponibles, repartidas por familia. En el editor las
+        tienes todas con buscador y muestra en movimiento.
       </p>
       </div>
       </div>

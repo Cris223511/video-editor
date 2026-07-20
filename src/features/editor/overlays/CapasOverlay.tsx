@@ -75,12 +75,34 @@ export default function CapasOverlay() {
   const desplazarCapa = useEditorStore((s) => s.desplazarCapa)
   const registrarPunto = useEditorStore((s) => s.registrarPunto)
   const dibujandoMascara = useEditorStore((s) => s.dibujandoMascara)
+  const grabandoMovimiento = useEditorStore((s) => s.grabandoMovimiento)
   const anadirTrazo = useEditorStore((s) => s.anadirTrazo)
 
   const rootRef = useRef<HTMLDivElement>(null)
   const [tam, setTam] = useState({ w: 0, h: 0 })
   // líneas de alineación que se muestran solo mientras dura el arrastre
   const [guias, setGuias] = useState<Guia[]>([])
+  // id de la capa de texto que se está editando en el sitio, tras un doble clic
+  const [editando, setEditando] = useState<string | null>(null)
+  const editRef = useRef<HTMLDivElement | null>(null)
+
+  // al entrar en edición se vuelca el texto actual en el elemento editable, se le
+  // da el foco y el cursor se coloca al final, listo para escribir
+  useEffect(() => {
+    const el = editRef.current
+    if (!el || !editando) return
+    // se lee del store y no de la prop para no depender de `capas`: si dependiera,
+    // cada avance del cabezal reejecutaría esto y borraría el cursor a media palabra
+    const capa = useEditorStore.getState().capas.find((c) => c.id === editando)
+    el.innerText = capa && capa.tipo === 'texto' ? capa.texto : ''
+    el.focus()
+    const rango = document.createRange()
+    rango.selectNodeContents(el)
+    rango.collapse(false)
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(rango)
+  }, [editando])
 
   useEffect(() => {
     const el = rootRef.current
@@ -267,8 +289,10 @@ export default function CapasOverlay() {
           <RecorridoOverlay key={`ruta-${c.id}`} capa={c} rect={rect} normalizar={normalizar} />
         ))}
 
-      {/* guías de alineación, visibles solo durante el arrastre */}
-      {guias.map((g) => (
+      {/* guías de alineación, visibles solo durante el arrastre. mientras se graba
+          un recorrido no deben salir: ahí el arrastre traza el movimiento y las
+          líneas inteligentes solo estorbarían la vista */}
+      {!grabandoMovimiento && guias.map((g) => (
         <div
           key={`${g.eje}-${g.pos}`}
           className="pointer-events-none absolute z-30"
@@ -326,7 +350,9 @@ export default function CapasOverlay() {
                 width: c.anchoRel * rect.w,
                 height: c.altoRel * rect.h,
                 transform: 'translate(-50%, -50%)',
-                border: `2px solid ${seleccion ? '#1861ff' : 'rgba(255,255,255,.6)'}`,
+                // borde fino: el trazo grueso de antes tapaba parte de la escena y
+                // se veía tosco. seleccionada va en azul, en reposo en blanco tenue
+                border: `1px solid ${seleccion ? '#1861ff' : 'rgba(255,255,255,.5)'}`,
                 borderRadius: c.forma === 'circulo' ? '50%' : 6,
               }}
             >
@@ -452,20 +478,72 @@ export default function CapasOverlay() {
           textShadow: sombras.length ? sombras.join(', ') : 'none',
           WebkitTextStroke: c.contorno ? `${c.grosorContorno * escala}px ${c.colorContorno}` : undefined,
         }
+        // en edición el texto pasa a ser editable: doble clic lo abre, con un
+        // contorno azul que deja claro que se está escribiendo dentro
+        const enEdicion = editando === c.id
         return (
           <div
-            key={c.id}
-            onMouseDown={(e) => iniciarArrastre(e, c)}
+            // la clave cambia al entrar y salir de edición para que react rehaga el
+            // nodo desde cero. sin esto, al cerrar quedaba el texto que tecleó el
+            // usuario en el dom más el que react vuelve a pintar, y salía duplicado
+            key={enEdicion ? `${c.id}-edit` : c.id}
+            ref={enEdicion ? editRef : undefined}
+            // con doble clic se entra a escribir el texto directamente sobre el
+            // video, sin ir al panel; el arrastre queda en pausa mientras se edita
+            onDoubleClick={(e) => {
+              e.stopPropagation()
+              seleccionarCapa(c.id)
+              setEditando(c.id)
+            }}
+            onMouseDown={(e) => {
+              if (enEdicion) {
+                // durante la edición el clic coloca el cursor, no mueve la capa
+                e.stopPropagation()
+                return
+              }
+              iniciarArrastre(e, c)
+            }}
+            contentEditable={enEdicion}
+            suppressContentEditableWarning
+            onKeyDown={
+              enEdicion
+                ? (e) => {
+                    e.stopPropagation()
+                    // enter confirma y sale; con shift se hace un salto de línea.
+                    // escape también cierra dejando lo escrito
+                    if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Escape') {
+                      e.preventDefault()
+                      ;(e.currentTarget as HTMLElement).blur()
+                    }
+                  }
+                : undefined
+            }
+            onBlur={
+              enEdicion
+                ? (e) => {
+                    actualizarCapa(c.id, { texto: (e.currentTarget as HTMLElement).innerText })
+                    setEditando(null)
+                  }
+                : undefined
+            }
             className={[
-              'pointer-events-auto absolute max-w-[92%] cursor-move select-none',
-              seleccion ? 'outline outline-2 outline-brand' : '',
+              'pointer-events-auto absolute max-w-[92%]',
+              enEdicion
+                ? 'cursor-text outline outline-2 outline-brand'
+                : 'cursor-move select-none',
+              seleccion && !enEdicion ? 'outline outline-2 outline-brand' : '',
             ].join(' ')}
             style={estilo}
           >
-            {c.texto}
+            {/* mientras se edita, el contenido lo maneja el propio elemento editable
+                (se vuelca en el efecto), así que aquí no se pinta para no pelear con
+                el cursor */}
+            {!enEdicion && c.texto}
             {/* el texto solo escala por las esquinas: estirarlo por un lado lo
                 deformaría y dejaría de leerse bien */}
-            {seleccion && <Tiradores soloEsquinas onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />}
+            {seleccion && !enEdicion && (
+              <Tiradores soloEsquinas onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
+            )}
           </div>
         )
       })}

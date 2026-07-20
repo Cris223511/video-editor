@@ -87,7 +87,13 @@ export default function Selector({
             border: '1px solid rgb(var(--border) / 0.14)',
           }}
         >
-          {opciones.map((o, i) => (
+          {opciones.map((o, i) => {
+            // la entrada escalonada lleva su retardo, pero ese retardo NO debe caer
+            // sobre el color del hover: si no, al pasar el cursor la opción tardaba
+            // un buen rato en encenderse. por eso se declara la transición a mano,
+            // con el retardo solo en opacidad y desplazamiento y el fondo instantáneo
+            const retardo = abierto ? `${Math.min(i, 8) * 22}ms` : '0ms'
+            return (
             <button
               key={o.valor}
               type="button"
@@ -95,9 +101,12 @@ export default function Selector({
                 onChange(o.valor)
                 setAbierto(false)
               }}
-              style={{ ...o.estilo, transitionDelay: abierto ? `${Math.min(i, 8) * 22}ms` : '0ms' }}
+              style={{
+                ...o.estilo,
+                transition: `opacity 200ms ease ${retardo}, transform 200ms ease ${retardo}, background-color 110ms ease, color 110ms ease`,
+              }}
               className={[
-                'interactivo flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-all duration-200',
+                'flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-brand/10 hover:text-brand',
                 o.valor === valor ? 'text-brand' : 'text-[color:var(--muted)]',
                 abierto ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0',
               ].join(' ')}
@@ -109,7 +118,8 @@ export default function Selector({
               <span className="min-w-0 truncate">{o.etiqueta}</span>
               {o.valor === valor && <Check size={13} className="shrink-0" />}
             </button>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>

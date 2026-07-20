@@ -22,10 +22,13 @@ export const herramientas: { id: Herramienta; icono: NombreIcono; etiqueta: stri
 // no merece un store aparte, así que basta con localStorage
 const CLAVE_EXPANDIDO = 've-riel-expandido'
 
-// anchos del riel en cada estado. el estrecho deja hueco para el icono centrado;
-// el ancho suma el espacio del nombre que se revela al lado
-const ANCHO_COLAPSADO = 62
-const ANCHO_EXPANDIDO = 182
+// anchos del riel en cada estado. el estrecho deja hueco para el icono centrado
+// más el carril de la barra de desplazamiento a cada lado; el ancho suma el
+// espacio del nombre que se revela al lado. se ensanchó un poco respecto de antes
+// para que, al reservar el carril simétrico de la barra, el icono siga cabiendo
+// justo sin quedar apretado
+const ANCHO_COLAPSADO = 70
+const ANCHO_EXPANDIDO = 190
 
 // margen lateral de cada fila. el panel gasta 1px de borde por lado, así que del
 // ancho colapsado quedan 54px útiles; con 5px de aire a cada costado la fila mide
@@ -88,11 +91,13 @@ export default function RielHerramientas({ onElegir }: { onElegir?: () => void }
       style={{ width: expandido ? ANCHO_EXPANDIDO : ANCHO_COLAPSADO }}
     >
       <div
-        // la barra de desplazamiento se oculta a propósito: cuando asomaba, robaba
-        // ancho a la columna y descentraba los iconos, que es lo que se veía
-        // aplastado. el desplazamiento con la rueda sigue funcionando igual
-        className="flex flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{ paddingLeft: AIRE_LATERAL, paddingRight: AIRE_LATERAL }}
+        // la barra de desplazamiento sí se ve, pero fina. para que no descentre los
+        // iconos al aparecer, se reserva su carril en los dos costados con
+        // scrollbar-gutter: así el hueco es simétrico y el icono queda siempre en el
+        // eje, con barra o sin ella. el riel se ensanchó lo justo para que ese
+        // reservado no apriete el dibujo
+        className="scroll-riel flex flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden"
+        style={{ paddingLeft: AIRE_LATERAL, paddingRight: AIRE_LATERAL, scrollbarGutter: 'stable both-edges' }}
       >
         {herramientas.map((h) => (
           <ConTooltip key={h.id} activo={!expandido} texto={h.etiqueta}>

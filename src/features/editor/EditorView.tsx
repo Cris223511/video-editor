@@ -9,9 +9,12 @@ import Timeline from './timeline/Timeline'
 import ExportDialog from './ExportDialog'
 import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
+import Loader from '../../components/ui/Loader'
 import { useAtajos } from './useAtajos'
 import { useAutoguardado } from './useAutoguardado'
 import { useRestaurarSesion } from './useRestaurarSesion'
+import { useProjectStore } from '../../store/useProjectStore'
+import { useEffect } from 'react'
 
 // disposición al estilo de un editor de escritorio: opciones a la izquierda,
 // visor al centro, y abajo los medios junto a la línea de tiempo. el reparto lo
@@ -28,6 +31,16 @@ export default function EditorView() {
   // retraso en lugar de seguirlo
   const [plegando, setPlegando] = useState(false)
   const temporizador = useRef<number>()
+
+  // cargador que viene encendido desde la pantalla de importar mientras se
+  // prepara el proyecto. se apaga cuando el editor ya está montado y pintado; si
+  // hay un video en la pista, el visor lo apaga en cuanto lo tiene listo
+  const preparando = useProjectStore((s) => s.preparando)
+  useEffect(() => {
+    if (!preparando) return
+    const t = window.setTimeout(() => useProjectStore.setState({ preparando: false }), 350)
+    return () => window.clearTimeout(t)
+  }, [preparando])
 
   useAtajos()
   // el proyecto se guarda solo unos segundos después de cada cambio
@@ -59,6 +72,7 @@ export default function EditorView() {
     // visor, que es lo que se espera de una herramienta de este tipo; los campos
     // de escritura vuelven a permitir selección con una regla aparte en el css
     <div className="editor-noselect h-[calc(100dvh-3.5rem)] p-1.5">
+      {preparando && <Loader texto="Preparando tu proyecto..." />}
       <PanelGroup direction="vertical" autoSaveId="ve-vertical-3">
         {/* fila superior: herramientas, opciones y visor */}
         <Panel defaultSize={64} minSize={35}>
@@ -79,8 +93,11 @@ export default function EditorView() {
                   order={1}
                   collapsible
                   collapsedSize={0}
+                  // el panel de arriba no debe poder encogerse más que el de medios
+                  // de abajo, o los dos bordes derechos dejan de estar a la par y se
+                  // ve descuadrado. por eso comparte el mismo mínimo que medios
                   defaultSize={22}
-                  minSize={16}
+                  minSize={22}
                   maxSize={40}
                   onCollapse={() => setVerOpciones(false)}
                   onExpand={() => setVerOpciones(true)}
@@ -123,8 +140,8 @@ export default function EditorView() {
                   // el grupo de abajo no tiene el riel de herramientas delante, así
                   // que arranca más a la izquierda que el de arriba. para que el
                   // borde derecho de medios quede a la altura del de opciones hace
-                  // falta darle bastante más ancho; de ahí estos valores altos
-                  defaultSize={25}
+                  // falta darle algo más de ancho de salida; de ahí este valor
+                  defaultSize={26}
                   minSize={22}
                   maxSize={40}
                   onCollapse={() => setVerMedios(false)}

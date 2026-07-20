@@ -1,8 +1,21 @@
+import { ReactNode } from 'react'
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { CapaCensura } from '../../../types/layers'
 import { Campo, Deslizador, Segmentado } from '../../../components/ui/Controls'
 import MotionControls from './MotionControls'
+
+// tecla suelta del recordatorio de atajos, con el aspecto de una tecla física
+function Tecla({ children }: { children: ReactNode }) {
+  return (
+    <kbd
+      className="grid min-w-[1.4rem] place-items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--text)]"
+      style={{ background: 'rgb(var(--border) / 0.12)', border: '1px solid rgb(var(--border) / 0.16)' }}
+    >
+      {children}
+    </kbd>
+  )
+}
 
 // panel de censura: forma (círculo, rectángulo o pincel), efecto (pixelar,
 // difuminar o transparente), intensidad y recorrido. con el pincel se dibuja la
@@ -108,6 +121,28 @@ export default function CensuraPanel() {
               )}
             </div>
           )}
+
+          {/* recordatorio de los atajos de teclado con la censura seleccionada,
+              los mismos que se anuncian en la demostración del sitio */}
+          <div className="flex flex-col gap-1.5 rounded-xl border border-black/10 p-3 text-[11px] text-[color:var(--muted)] dark:border-white/10">
+            <p className="font-semibold text-[color:var(--text)]">Atajos de teclado</p>
+            <p className="flex items-center justify-between">
+              <span>Mover</span>
+              <Tecla>Flechas</Tecla>
+            </p>
+            <p className="flex items-center justify-between">
+              <span>Ancho</span>
+              <span className="flex items-center gap-1">
+                <Tecla>Alt</Tecla> + <Tecla>←</Tecla> <Tecla>→</Tecla>
+              </span>
+            </p>
+            <p className="flex items-center justify-between">
+              <span>Alto</span>
+              <span className="flex items-center gap-1">
+                <Tecla>Ctrl</Tecla> + <Tecla>↑</Tecla> <Tecla>↓</Tecla>
+              </span>
+            </p>
+          </div>
 
           <MotionControls capa={capa} />
 

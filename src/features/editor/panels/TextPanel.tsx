@@ -111,16 +111,18 @@ export default function TextPanel() {
         </p>
       ) : (
         <>
-          <Campo etiqueta="Contenido">
-            <textarea
-              value={capa.texto}
-              onChange={(e) => editar('texto', e.target.value)}
-              onFocus={abrirGesto}
-              onBlur={finGesto}
-              rows={2}
-              className="w-full resize-none rounded-lg border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand dark:border-white/10"
-            />
-          </Campo>
+          {/* el campo va sin etiqueta "Contenido": queda justo debajo del botón de
+              agregar y se entiende solo. al enfocarlo se rodea de azul para dejar
+              claro dónde se está escribiendo */}
+          <textarea
+            value={capa.texto}
+            onChange={(e) => editar('texto', e.target.value)}
+            onFocus={abrirGesto}
+            onBlur={finGesto}
+            rows={2}
+            placeholder="Escribe tu texto"
+            className="w-full resize-none rounded-lg border border-black/10 bg-transparent px-3 py-2 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/35 dark:border-white/10"
+          />
 
           <Campo etiqueta="Fuente">
             {/* cada tipografía se ve escrita con su propia letra, algo que el

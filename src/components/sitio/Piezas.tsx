@@ -76,6 +76,9 @@ export function Chip({
     // el texto no usa el azul del enlace sino su versión pensada para leerse
     // sobre fondo, así el contraste aguanta en claro y en oscuro
     color: 'rgb(var(--accent-texto))',
+    // un halo tenue del propio azul la despega del fondo; sin él la píldora
+    // destacada quedaba plana frente a las grises, que sí llevan sombra
+    boxShadow: '0 4px 14px rgb(var(--accent) / 0.20)',
   }
 
   return (

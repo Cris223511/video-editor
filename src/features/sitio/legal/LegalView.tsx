@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronRight, Menu, X } from 'lucide-react'
@@ -57,6 +57,12 @@ export default function LegalView({ documento }: { documento: 'terminos' | 'priv
   const [activo, setActivo] = useState(doc.secciones[0].id)
   const [panel, setPanel] = useState(false)
 
+  // mientras dura un salto por clic conviene silenciar al observador: si no, la
+  // sección que va cruzando la banda de detección pisa la que el usuario acaba
+  // de elegir y el resaltado se va a otra entrada a mitad del recorrido
+  const silenciado = useRef(false)
+  const temporizador = useRef<number | undefined>(undefined)
+
   // al cambiar de documento el índice vuelve a su primera entrada, o quedaría
   // marcada una sección que ya no existe. de subir la página se encarga el marco
   useEffect(() => {
@@ -65,22 +71,61 @@ export default function LegalView({ documento }: { documento: 'terminos' | 'priv
 
   // marca en el índice la sección que se está leyendo
   useEffect(() => {
+    const secciones = doc.secciones
+    const ultima = secciones[secciones.length - 1].id
+
+    // al tocar fondo la última sección nunca alcanza la banda de detección, así
+    // que su entrada quedaba imposible de resaltar. cuando la ventana llega al
+    // final de la página forzamos esa última para que se pueda seleccionar
+    const enElFondo = () =>
+      window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2
+
     const observador = new IntersectionObserver(
       (entradas) => {
+        if (silenciado.current) return
+        if (enElFondo()) {
+          setActivo(ultima)
+          return
+        }
         const visible = entradas.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
         if (visible) setActivo(visible.target.id)
       },
       { rootMargin: '-88px 0px -65% 0px' },
     )
-    doc.secciones.forEach((s) => {
+    secciones.forEach((s) => {
       const el = document.getElementById(s.id)
       if (el) observador.observe(el)
     })
-    return () => observador.disconnect()
+
+    // el observador no dispara si ya no cambia nada de intersección, y el tramo
+    // final de la página es justo eso: por eso vigilamos también el scroll a
+    // secas para reaccionar al llegar abajo del todo
+    const alDesplazar = () => {
+      if (silenciado.current) return
+      if (enElFondo()) setActivo(ultima)
+    }
+    window.addEventListener('scroll', alDesplazar, { passive: true })
+
+    return () => {
+      observador.disconnect()
+      window.removeEventListener('scroll', alDesplazar)
+    }
   }, [doc])
+
+  // los timeouts pendientes se limpian al desmontar para no tocar estado muerto
+  useEffect(() => () => window.clearTimeout(temporizador.current), [])
 
   function ir(id: string) {
     setPanel(false)
+    // la entrada elegida se resalta en el acto y silenciamos al observador un
+    // rato, lo que dura el desplazamiento suave, para que no lo reemplace por la
+    // sección que va pasando por pantalla
+    setActivo(id)
+    silenciado.current = true
+    window.clearTimeout(temporizador.current)
+    temporizador.current = window.setTimeout(() => {
+      silenciado.current = false
+    }, 750)
     // el salto lo lleva el desplazamiento suave, que además descuenta el alto de
     // la barra para que el título no quede escondido debajo
     irASeccion(id)
@@ -168,8 +213,9 @@ export default function LegalView({ documento }: { documento: 'terminos' | 'priv
         <AnimatePresence>
           {panel && (
             <div className="fixed inset-0 z-[60] lg:hidden">
-              {/* detrás no hay velo negro sino desenfoque, el mismo recurso que
-                  usa la barra de navegación */}
+              {/* detrás no hay velo negro sino un desenfoque suave, igual que el
+                  fondo de los modales de la app: apenas emborrona lo de atrás y
+                  deja un velo muy tenue por encima */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -177,41 +223,36 @@ export default function LegalView({ documento }: { documento: 'terminos' | 'priv
                 transition={{ duration: 0.24, ease: 'easeOut' }}
                 className="absolute inset-0"
                 style={{
-                  background: 'rgb(var(--surface) / 0.35)',
-                  backdropFilter: 'blur(14px) saturate(1.4)',
-                  WebkitBackdropFilter: 'blur(14px) saturate(1.4)',
+                  background: 'rgb(var(--surface) / 0.14)',
+                  backdropFilter: 'blur(7px) saturate(1.2)',
+                  WebkitBackdropFilter: 'blur(7px) saturate(1.2)',
                 }}
                 onClick={() => setPanel(false)}
                 aria-hidden
               />
 
-              {/* la caja intermedia repite el ancho y el relleno del sitio, de
-                  modo que el panel arranca justo donde arranca el texto y no
-                  pegado al filo de la pantalla. con `items-start` el panel se
-                  queda del alto de su lista: sin eso el estirado propio de flex
-                  lo llevaba hasta el tope permitido y sobraba media pantalla de
-                  cristal vacío debajo del último apartado */}
-              <div
-                className={`pointer-events-none relative mx-auto flex h-full w-full items-start ${ANCHO_CONTENIDO} ${RELLENO}`}
+              {/* cajón pegado al filo izquierdo y de alto completo, como la barra
+                  lateral de AppUSIL. entra deslizándose desde la izquierda y sale
+                  del mismo modo. solo se redondea el lado derecho porque el
+                  izquierdo queda a ras del borde de la pantalla; si la lista es
+                  larga se desplaza por dentro */}
+              <motion.div
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute inset-y-0 left-0 flex h-full w-72 max-w-[85%] flex-col overflow-y-auto rounded-r-2xl p-5 shadow-2xl"
+                style={CRISTAL}
               >
-                <motion.div
-                  initial={{ x: '-115%', opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  exit={{ x: '-115%', opacity: 0 }}
-                  transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
-                  className="pointer-events-auto mt-20 max-h-[calc(100%-6rem)] w-72 max-w-full overflow-y-auto rounded-2xl p-5 shadow-2xl"
-                  style={CRISTAL}
+                <button
+                  onClick={() => setPanel(false)}
+                  aria-label="Cerrar"
+                  className="interactivo mb-4 ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[color:var(--muted)]"
                 >
-                  <button
-                    onClick={() => setPanel(false)}
-                    aria-label="Cerrar"
-                    className="interactivo mb-4 ml-auto grid h-8 w-8 place-items-center rounded-lg text-[color:var(--muted)]"
-                  >
-                    <X size={16} />
-                  </button>
-                  <Indice doc={doc} activo={activo} onIr={ir} />
-                </motion.div>
-              </div>
+                  <X size={16} />
+                </button>
+                <Indice doc={doc} activo={activo} onIr={ir} />
+              </motion.div>
             </div>
           )}
         </AnimatePresence>,

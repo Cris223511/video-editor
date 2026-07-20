@@ -24,6 +24,15 @@ const FORMAS: { id: Forma; nombre: string; icono: JSX.Element }[] = [
   { id: 'circulo', nombre: 'Círculo', icono: <Circle size={13} /> },
 ]
 
+// atajos de teclado con los que el editor afina la selección: las flechas la
+// desplazan y, sujetando un modificador, ajustan su ancho o su alto. la flecha
+// en la leyenda representa las cuatro direcciones
+const ATAJOS: { teclas: string[]; texto: string }[] = [
+  { teclas: ['←', '→', '↑', '↓'], texto: 'mover' },
+  { teclas: ['Alt', '←→'], texto: 'ancho' },
+  { teclas: ['Ctrl', '↑↓'], texto: 'alto' },
+]
+
 // las cuatro esquinas, con el cursor que corresponde a cada una
 const ESQUINAS = [
   { id: 'nw', x: 0, y: 0, cursor: 'nwse-resize' },
@@ -108,10 +117,13 @@ export default function DemoCensura() {
       ctx.restore()
     }
 
+    // contorno de la selección: un punteado fino y discreto. antes iba a dos
+    // píxeles de grosor y con trazos largos, y sobre el clip se leía como un
+    // marco pesado que tapaba el borde de lo que se estaba censurando
     ctx.save()
-    ctx.strokeStyle = 'rgba(255,255,255,.9)'
-    ctx.lineWidth = 2
-    ctx.setLineDash([8, 6])
+    ctx.strokeStyle = 'rgba(255,255,255,.85)'
+    ctx.lineWidth = 1
+    ctx.setLineDash([4, 4])
     recortar(ctx, x, y, w, h)
     ctx.stroke()
     ctx.restore()
@@ -214,7 +226,7 @@ export default function DemoCensura() {
 
   return (
     <div
-      className="overflow-hidden rounded-2xl p-4 shadow-lg sm:p-5"
+      className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl p-4 shadow-lg sm:p-5"
       style={{
         background: 'rgb(var(--surface))',
         border: '1px solid rgb(var(--border) / 0.1)',
@@ -320,6 +332,35 @@ export default function DemoCensura() {
         <span className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-medium text-white">
           <Move size={11} /> Arrastra el recuadro o estíralo por las esquinas
         </span>
+      </div>
+
+      {/* atajos de teclado del editor para afinar la selección sin el ratón:
+          las flechas la mueven y, con un modificador, cambian su tamaño. se
+          enseñan como leyenda porque la demo se maneja con el ratón, pero en el
+          editor la selección responde también al teclado */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-[color:var(--muted)]">
+        {ATAJOS.map((a) => (
+          <span key={a.texto} className="inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1">
+              {a.teclas.map((k, i) => (
+                <span key={i} className="inline-flex items-center gap-1">
+                  {i > 0 && <span className="opacity-60">+</span>}
+                  <kbd
+                    className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[color:var(--text)]"
+                    style={{
+                      background: 'rgb(var(--border) / 0.1)',
+                      border: '1px solid rgb(var(--border) / 0.18)',
+                      boxShadow: '0 1px 0 rgb(var(--border) / 0.2)',
+                    }}
+                  >
+                    {k}
+                  </kbd>
+                </span>
+              ))}
+            </span>
+            {a.texto}
+          </span>
+        ))}
       </div>
 
       <p className="mt-3 text-[11px] leading-relaxed text-[color:var(--muted)]">

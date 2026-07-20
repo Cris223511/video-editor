@@ -98,7 +98,7 @@ export default function DemoLienzo() {
 
   return (
     <div
-      className="overflow-hidden rounded-2xl p-4 shadow-lg sm:p-5"
+      className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl p-4 shadow-lg sm:p-5"
       style={{
         background: 'rgb(var(--surface))',
         border: '1px solid rgb(var(--border) / 0.1)',

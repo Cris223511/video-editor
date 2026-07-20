@@ -2,25 +2,26 @@ import { useEffect, useRef, useState } from 'react'
 import { Pause, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react'
 
 // las tres direcciones que Pexels sirve de verdad. la mayoría de sus enlaces
-// directos devuelven 403, así que solo se usan las comprobadas una a una.
-// el nombre de cada pestaña describe la escena que aparece en pantalla: antes
-// prometían un montaje y una ciudad que no salían por ningún lado, y cambiar el
-// texto es más seguro que tocar unas direcciones que ya se sabe que responden
+// directos devuelven 403, así que cada una se comprobó a mano: responden con 206
+// y con la cabecera CORS abierta, lo mismo que pide el sitio al cargarlas en
+// modo anónimo. son tres clips distintos a los que se usan en el resto de
+// pruebas. los nombres quedan como estaban de momento, pendientes de reescribir,
+// así que todavía pueden no describir lo que se ve en pantalla
 const CLIPS = [
   {
     id: 'laboratorio',
     nombre: 'Laboratorio',
-    src: 'https://videos.pexels.com/video-files/3195394/3195394-hd_1920_1080_25fps.mp4',
+    src: 'https://videos.pexels.com/video-files/2098988/2098988-hd_1920_1080_30fps.mp4',
   },
   {
     id: 'costa',
     nombre: 'Costa desde el aire',
-    src: 'https://videos.pexels.com/video-files/3571264/3571264-hd_1920_1080_30fps.mp4',
+    src: 'https://videos.pexels.com/video-files/1409899/1409899-hd_1920_1080_25fps.mp4',
   },
   {
     id: 'teclado',
     nombre: 'Manos en el teclado',
-    src: 'https://videos.pexels.com/video-files/852421/852421-hd_1920_1080_30fps.mp4',
+    src: 'https://videos.pexels.com/video-files/3129671/3129671-hd_1920_1080_30fps.mp4',
   },
 ]
 
@@ -75,7 +76,7 @@ export default function DemoVideo() {
 
   return (
     <div
-      className="overflow-hidden rounded-2xl p-4 shadow-lg sm:p-5"
+      className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl p-4 shadow-lg sm:p-5"
       style={{
         background: 'rgb(var(--surface))',
         border: '1px solid rgb(var(--border) / 0.1)',

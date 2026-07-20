@@ -4,13 +4,11 @@ import {
   Download,
   Gauge,
   Layers,
-  MonitorPlay,
   Palette,
   PlayCircle,
   Save,
   Scissors,
   Sparkles,
-  Upload,
   Volume2,
   Wand2,
 } from 'lucide-react'
@@ -76,10 +74,10 @@ const CAPACIDADES = [
       'Tres ruedas para sombras, medios y luces, más cuatro curvas editables. Todo se aplica con aceleración por hardware y llega igual al archivo que exportas.',
   },
   {
-    icono: <MonitorPlay size={20} />,
-    titulo: 'Nada sale de tu equipo',
+    icono: <Download size={20} />,
+    titulo: 'Exporta a tu medida',
     texto:
-      'El video se procesa en tu navegador. No hay servidor que reciba tus archivos, ni al editar ni al exportar el resultado final.',
+      'Elige los fotogramas por segundo y descarga el resultado ya montado. El archivo sale limpio, sin recortes ni límite de duración, listo para publicar donde quieras.',
   },
   {
     icono: <Save size={20} />,
@@ -133,37 +131,6 @@ const HERRAMIENTAS = [
   },
 ]
 
-const PASOS = [
-  {
-    n: '01',
-    icono: <Upload size={19} />,
-    titulo: 'Trae tu material',
-    texto:
-      'Arrastra los videos a la zona de carga o búscalos en el equipo. Se abren directamente desde tu disco, sin ninguna subida previa.',
-  },
-  {
-    n: '02',
-    icono: <Layers size={19} />,
-    titulo: 'Monta la línea de tiempo',
-    texto:
-      'Coloca los clips, recórtalos, divídelos por el cabezal y repártelos en varios niveles hasta que el ritmo funcione.',
-  },
-  {
-    n: '03',
-    icono: <Palette size={19} />,
-    titulo: 'Dale el acabado',
-    texto:
-      'Corrige el color, elige la transición de entrada de cada plano y añade texto, figuras o censura sobre lo que haga falta.',
-  },
-  {
-    n: '04',
-    icono: <Download size={19} />,
-    titulo: 'Exporta el resultado',
-    texto:
-      'Elige los fotogramas por segundo y descarga el archivo terminado, sin marca de agua y sin límite de duración.',
-  },
-]
-
 const FORMATOS = ['MP4', 'WebM', '1080p', '4K', '24 fps', '30 fps', '60 fps']
 
 // portada del sitio. presenta qué hace el editor con ejemplos que se pueden
@@ -185,14 +152,18 @@ export default function PortadaView() {
 
         <div className={`mx-auto w-full ${ANCHO_CONTENIDO} ${RELLENO}`}>
           <Aparece>
-            <Chip destacado>Gratuito y de código abierto</Chip>
-            <Titulo nivel="xl" como="h1" className="mt-4">
+            {/* la píldora va en su propio contenedor con hueco abajo: así su
+                sombra respira y no queda cortada contra el título de debajo */}
+            <div className="pb-1.5">
+              <Chip destacado>Gratuito y de código abierto</Chip>
+            </div>
+            <Titulo nivel="xl" como="h1" className="mt-3">
               Edita tu video <Subrayado>de principio a fin</Subrayado>
             </Titulo>
             <p className="mt-5 max-w-2xl text-entrada text-[color:var(--muted)]">
-              Un editor completo que corre en tu equipo. Monta la línea de tiempo, ajusta el color,
-              añade texto y efectos, y exporta el archivo terminado. Los videos no se suben a ningún
-              servidor en ningún momento del proceso.
+              Un editor completo que corre dentro del navegador. Monta la línea de tiempo en varios
+              niveles, ajusta el color con ruedas y curvas, añade texto, figuras y censura en
+              movimiento, y exporta el archivo terminado a la calidad que elijas.
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-3">
               <button
@@ -202,7 +173,7 @@ export default function PortadaView() {
                 Abrir el editor
               </button>
               <span className="text-sm text-[color:var(--muted)]">
-                Sin cuenta, sin instalación, sin marca de agua.
+                Abres un archivo y ya estás editando.
               </span>
             </div>
           </Aparece>
@@ -327,7 +298,7 @@ export default function PortadaView() {
                   nombre: 'Transiciones',
                   icono: <Sparkles size={15} />,
                   descripcion:
-                    'Ocho de las veintiuna disponibles, una por familia. Ejecutan el mismo motor que aplica la transición a tu video y que genera el archivo al exportar.',
+                    'Varias de las veintiuna disponibles. Ejecutan el mismo motor que aplica la transición a tu video y genera el archivo al exportar. En el editor están todas, con buscador y muestra en movimiento.',
                   contenido: <DemoTransiciones />,
                 },
                 {
@@ -421,62 +392,6 @@ export default function PortadaView() {
         </div>
       </section>
 
-      {/* cómo funciona, en cuatro pasos numerados */}
-      <section className="relative py-20">
-        <Destello x="15%" y="45%" tamano={440} intensidad={0.18} />
-        <div className={`mx-auto w-full ${ANCHO_CONTENIDO} ${RELLENO}`}>
-          <Aparece>
-            <Titulo centrado>
-              Así se monta un video <Subrayado>de principio a fin</Subrayado>
-            </Titulo>
-          </Aparece>
-          <div className="mx-auto mt-16 grid max-w-3xl gap-x-6 gap-y-12 sm:grid-cols-2">
-            {PASOS.map((p, i) => (
-              <Aparece key={p.n} retraso={i * 0.09} className="h-full">
-                <div
-                  className="group relative flex h-full flex-col rounded-2xl px-5 pb-6 pt-9 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl"
-                  style={{
-                    background: 'rgb(var(--surface))',
-                    border: '1px solid rgb(var(--border) / 0.1)',
-                  }}
-                >
-                  {/* el icono sobresale por arriba de la tarjeta. va quieto: la
-                      flotación que tenía antes distraía de lo que cuenta el paso,
-                      y con cuatro tarjetas seguidas el conjunto no paraba nunca */}
-                  <span
-                    className="absolute -top-6 left-5 grid h-12 w-12 place-items-center rounded-2xl text-white shadow-lg"
-                    style={{
-                      background:
-                        'linear-gradient(140deg, rgb(var(--accent-boton)), rgb(var(--accent-soft)))',
-                    }}
-                  >
-                    {p.icono}
-                  </span>
-
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute right-4 top-3 font-display text-4xl font-extrabold leading-none"
-                    style={{ color: 'rgb(var(--accent) / 0.09)' }}
-                  >
-                    {p.n}
-                  </span>
-
-                  <span className="font-display text-[13px] font-extrabold tracking-wider text-brand">
-                    PASO {p.n}
-                  </span>
-                  <h3 className="mt-1.5 font-display text-base font-bold leading-snug">
-                    {p.titulo}
-                  </h3>
-                  <p className="mt-2.5 text-sm leading-relaxed text-[color:var(--muted)]">
-                    {p.texto}
-                  </p>
-                </div>
-              </Aparece>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* preguntas frecuentes */}
       <section className="relative py-20">
         <Destello x="80%" y="30%" tamano={460} intensidad={0.16} />
@@ -524,8 +439,8 @@ export default function PortadaView() {
               Empieza a editar tu video ahora.
             </h2>
             <p className="relative mx-auto mt-4 max-w-lg text-sm leading-relaxed text-white/65">
-              Arrastra un archivo y ponte a trabajar. No hay nada que instalar, ningún formulario
-              que rellenar y ninguna marca de agua esperándote al final.
+              Arrastra un archivo y ponte a trabajar. Montas la línea de tiempo, corriges el color,
+              añades efectos y descargas el resultado terminado, todo en la misma pestaña.
             </p>
             <button
               onClick={irAImportar}

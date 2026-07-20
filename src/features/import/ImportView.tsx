@@ -2,7 +2,6 @@ import Dropzone from './Dropzone'
 import { useImportarMedios } from './useImportarMedios'
 import { useProjectStore } from '../../store/useProjectStore'
 import { Link, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
 import { FolderOpen } from 'lucide-react'
 import Loader from '../../components/ui/Loader'
 import { VIDEO_EXTENSIONS } from '../../config/constants'
@@ -15,18 +14,24 @@ import { ANCHO_CONTENIDO, RELLENO } from '../../components/sitio/Contenedor'
 export default function ImportView() {
   const { procesar, ocupado } = useImportarMedios()
   const navegar = useNavigate()
-  const [preparando, setPreparando] = useState(false)
+  const preparando = useProjectStore((s) => s.preparando)
 
-  // en cuanto se importa algo, el editor se abre solo: no hace falta una lista
-  // intermedia ni un botón de confirmar. mientras se prepara aparece el cargador,
-  // que da un respiro y evita que el editor entre de golpe
+  // en cuanto se importa algo, el editor se abre solo, sin lista intermedia ni
+  // botón de confirmar. el cargador se enciende ANTES de procesar y se mantiene
+  // encendido durante todo el análisis del archivo y la entrada al editor; se
+  // apaga recién cuando el visor ya tiene el video cargado. así, con un archivo
+  // pesado, no se ve el editor montándose a medias ni el aviso antes de tiempo
   async function alImportar(files: FileList) {
     const antes = useProjectStore.getState().medios.length
+    useProjectStore.setState({ preparando: true })
     await procesar(files)
     const despues = useProjectStore.getState().medios.length
     if (despues > antes) {
-      setPreparando(true)
-      window.setTimeout(() => navegar(RUTAS.editor), 1800)
+      // el editor recoge el testigo del cargador y lo apaga al tener el video listo
+      navegar(RUTAS.editor)
+    } else {
+      // no entró nada (todo falló la validación): se apaga y se queda en esta vista
+      useProjectStore.setState({ preparando: false })
     }
   }
 

@@ -2,9 +2,8 @@ import { useMemo, useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import RuedaColor from '../ui/RuedaColor'
 import { PuntoRueda, RUEDAS_NEUTRAS, Ruedas } from '../../lib/color/ruedas'
-import { CURVAS_NEUTRAS, Curvas, PuntoCurva } from '../../lib/color/curvas'
+import { CURVAS_NEUTRAS } from '../../lib/color/curvas'
 import { tablasColor } from '../../lib/color/tono'
-import EditorCurva from '../ui/EditorCurva'
 import { Deslizador } from '../ui/Controls'
 
 // los mismos ajustes numéricos del editor, en dos columnas
@@ -13,13 +12,6 @@ const TONOS: { campo: 'exposicion' | 'contraste' | 'saturacion' | 'temperatura';
   { campo: 'contraste', etiqueta: 'Contraste' },
   { campo: 'saturacion', etiqueta: 'Saturación' },
   { campo: 'temperatura', etiqueta: 'Temperatura' },
-]
-
-const CANALES: { campo: keyof Curvas; etiqueta: string; color: string }[] = [
-  { campo: 'maestra', etiqueta: 'Luz', color: '#8ea4c4' },
-  { campo: 'r', etiqueta: 'Rojo', color: '#ff5a5a' },
-  { campo: 'g', etiqueta: 'Verde', color: '#3ddc84' },
-  { campo: 'b', etiqueta: 'Azul', color: '#4c8dff' },
 ]
 
 // una toma aérea de costa, con cielo, agua y tierra: los tres rangos de tono
@@ -38,8 +30,6 @@ const ZONAS: { campo: keyof Ruedas; etiqueta: string }[] = [
 // tablas por canal que se aplica al video y a la exportación
 export default function DemoColor() {
   const [ruedas, setRuedas] = useState<Ruedas>(RUEDAS_NEUTRAS)
-  const [curvas, setCurvas] = useState<Curvas>(CURVAS_NEUTRAS)
-  const [canal, setCanal] = useState<keyof Curvas>('maestra')
   const [tono, setTono] = useState({ exposicion: 0, contraste: 0, saturacion: 0, temperatura: 0 })
 
   function cambiar(zona: keyof Ruedas, p: PuntoRueda) {
@@ -48,13 +38,12 @@ export default function DemoColor() {
 
   const tocada =
     ZONAS.some((z) => Math.abs(ruedas[z.campo].x) > 0.001 || Math.abs(ruedas[z.campo].y) > 0.001) ||
-    curvas !== CURVAS_NEUTRAS ||
     Object.values(tono).some((v) => v !== 0)
 
   // el filtro svg se reconstruye con las tablas de cada canal, igual que en el
-  // editor. así lo que se ve aquí es exactamente la corrección real
-  // se apoya en el mismo cálculo del editor, que compone ruedas y curvas en una
-  // sola tabla por canal
+  // editor. así lo que se ve aquí es exactamente la corrección real. se apoya en
+  // el mismo cálculo del editor, que compone las ruedas en una sola tabla por
+  // canal; las curvas se dejan neutras porque su editor ya no vive en esta demo
   const tablas = useMemo(
     () =>
       tablasColor({
@@ -64,9 +53,9 @@ export default function DemoColor() {
         temperatura: 0,
         tinte: 0,
         ruedas,
-        curvas,
+        curvas: CURVAS_NEUTRAS,
       }) ?? ['', '', ''],
-    [ruedas, curvas],
+    [ruedas],
   )
 
   // exposición, contraste y saturación se resuelven con filtros nativos, que es
@@ -81,7 +70,7 @@ export default function DemoColor() {
 
   return (
     <div
-      className="overflow-hidden rounded-2xl p-4 shadow-lg"
+      className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl p-4 shadow-lg sm:p-5"
       style={{
         background: 'rgb(var(--surface))',
         border: '1px solid rgb(var(--border) / 0.1)',
@@ -158,53 +147,6 @@ export default function DemoColor() {
             ))}
           </div>
         </div>
-
-        <div>
-          <div className="mb-2.5 flex items-center gap-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
-              Curvas:
-            </p>
-            <div className="flex gap-1">
-              {CANALES.map((c) => (
-                <button
-                  key={c.campo}
-                  onClick={() => setCanal(c.campo)}
-                  className={[
-                    'rounded-full px-2.5 py-1 text-[10px] font-medium transition-all duration-200 hover:-translate-y-0.5',
-                    canal === c.campo ? 'text-white' : 'text-[color:var(--muted)]',
-                  ].join(' ')}
-                  style={
-                    canal === c.campo
-                      ? { background: c.color, border: `1px solid ${c.color}` }
-                      : {
-                          background: 'rgb(var(--border) / 0.07)',
-                          border: '1px solid rgb(var(--border) / 0.1)',
-                        }
-                  }
-                >
-                  {c.etiqueta}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="w-full max-w-[15rem]">
-            <EditorCurva
-              puntos={curvas[canal]}
-              color={CANALES.find((c) => c.campo === canal)!.color}
-              onChange={(p: PuntoCurva[]) => setCurvas((c) => ({ ...c, [canal]: p }))}
-            />
-            {/* los extremos de la curva dicen qué se está tocando en cada lado */}
-            <div className="mt-1.5 flex justify-between text-[10px] text-[color:var(--muted)]">
-              <span>Sombras</span>
-              <span>Medios</span>
-              <span>Luces</span>
-            </div>
-            <p className="mt-2 text-[11px] leading-relaxed text-[color:var(--muted)]">
-              Pulsa para añadir un punto, arrástralo para doblar la curva y dale doble clic para
-              quitarlo.
-            </p>
-          </div>
-        </div>
       </div>
       </div>
 
@@ -217,7 +159,6 @@ export default function DemoColor() {
           <button
             onClick={() => {
               setRuedas(RUEDAS_NEUTRAS)
-              setCurvas(CURVAS_NEUTRAS)
               setTono({ exposicion: 0, contraste: 0, saturacion: 0, temperatura: 0 })
             }}
             className="interactivo inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-[color:var(--muted)]"

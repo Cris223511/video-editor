@@ -178,7 +178,7 @@ export function Segmentado<T extends string>({
           title={o.titulo}
           onClick={() => onChange(o.valor)}
           className={[
-            'flex h-8 flex-1 items-center justify-center rounded-lg text-sm transition-all duration-200',
+            'flex h-8 flex-1 items-center justify-center rounded-lg text-sm transition-colors duration-100',
             valor === o.valor
               ? 'bg-brand text-white shadow-sm'
               : 'text-[color:var(--muted)] hover:bg-brand/10 hover:text-brand',

@@ -23,14 +23,16 @@ const GUION = [
   { hasta: 6.1, texto: 'Y el tercero en otro nivel' },
   { hasta: 8.35, texto: 'Estiras un clip para ajustar su duración' },
   { hasta: 10.1, texto: 'Añades un rótulo sobre la imagen' },
-  { hasta: 12.8, texto: 'Reproduces el montaje terminado' },
+  { hasta: 13.5, texto: 'Reproduces el montaje terminado' },
 ]
-const TOTAL = 12.8
-// el montaje se arma durante los primeros once segundos y medio; lo que queda
-// hasta el final de la vuelta es un descanso con el resultado a la vista. sin
-// ese alto la pieza encadenaba una vuelta con la siguiente y el ojo no llegaba
-// a quedarse con el montaje terminado
-const ACCION = 11.5
+const TOTAL = 13.5
+// el montaje se arma durante los primeros diez segundos; a partir de ahí el
+// cabezal recorre la reproducción, y esa pasada se dejó más larga a propósito
+// para que la línea de tiempo avance un poco más despacio y se lea mejor. lo que
+// queda hasta el final de la vuelta es un descanso con el resultado a la vista.
+// sin ese alto la pieza encadenaba una vuelta con la siguiente y el ojo no
+// llegaba a quedarse con el montaje terminado
+const ACCION = 12.2
 // factor por el que se estira la duración real de cada vuelta. por encima de 1 va
 // más despacio, sin cambiar nada de lo que ocurre dentro del ciclo
 const RITMO = 1.3
@@ -487,9 +489,12 @@ export default function DemoMontaje() {
               )}
             </div>
 
+            {/* el cabezal cruza la pista de punta a punta: antes se plantaba
+                sobre el 94% y parecía frenarse antes de terminar. ahora arranca
+                pegado al borde izquierdo y llega hasta el final de la línea */}
             <span
               className="pointer-events-none absolute inset-y-0 w-px bg-brand"
-              style={{ left: `${avance * 92 + 2}%`, opacity: reproduciendo ? 1 : 0.25 }}
+              style={{ left: `${avance * 99 + 0.5}%`, opacity: reproduciendo ? 1 : 0.25 }}
             >
               <span className="absolute -left-[5px] -top-[2px] h-2 w-3 rounded-sm bg-brand" />
             </span>

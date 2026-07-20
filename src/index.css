@@ -57,6 +57,11 @@
      la clase .glass y los paneles que lo aplican en línea leen esta variable,
      con lo que retocarla cambia el aspecto de todos a la vez */
   --cristal-desenfoque: blur(20px) saturate(1.6);
+  /* color de las bandas del visor alrededor del lienzo. en claro conviene un gris
+     suave que enmarque el video sin oscurecer la vista; en oscuro es casi negro,
+     que es lo mejor para juzgar el color. antes eran negras siempre y en modo
+     claro cantaban demasiado */
+  --marco-visor: 219 226 238;
 }
 
 html.dark {
@@ -76,6 +81,7 @@ html.dark {
   --alerta: 244 63 94;
   --profundo: 6 18 48;
   --profundo-2: 10 30 78;
+  --marco-visor: 7 13 24;
 }
 
 /* nada decorativo debe ensanchar la página: si un adorno sobresale por un lado,
@@ -159,10 +165,12 @@ html.tema-en-transicion * {
     }
   }
 
-  /* todo lo pulsable comparte la misma reacción al pasar el cursor */
+  /* todo lo pulsable comparte la misma reacción al pasar el cursor. la reacción
+     va corta a propósito: con tiempos largos el resaltado se sentía perezoso, como
+     si tardara en responder al cursor */
   .interactivo {
-    transition: background-color 0.18s ease, color 0.18s ease,
-      border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+    transition: background-color 0.12s ease, color 0.12s ease,
+      border-color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
   }
 
   .interactivo:hover {
@@ -271,6 +279,25 @@ html.tema-en-transicion * {
 }
 
 .scroll-modal::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--accent) / 0.5);
+}
+
+/* barra del riel de herramientas: fina y discreta. su carril se reserva a los dos
+   lados desde el propio riel con scrollbar-gutter, de modo que los iconos no se
+   descentran cuando la barra aparece o desaparece */
+.scroll-riel {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--border) / 0.28) transparent;
+}
+.scroll-riel::-webkit-scrollbar {
+  width: 4px;
+}
+.scroll-riel::-webkit-scrollbar-thumb {
+  background: rgb(var(--border) / 0.28);
+  border-radius: 8px;
+  transition: background 0.2s ease;
+}
+.scroll-riel::-webkit-scrollbar-thumb:hover {
   background: rgb(var(--accent) / 0.5);
 }
 
