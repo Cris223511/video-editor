@@ -1,4 +1,4 @@
-import { MouseEvent as ReactMouseEvent } from 'react'
+import { MouseEvent as ReactMouseEvent, useState } from 'react'
 import { Clip } from '../../../types/timeline'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useTira } from './useTira'
@@ -36,9 +36,14 @@ export default function ClipBlock({
   const seleccionar = useEditorStore((s) => s.seleccionar)
   const moverClip = useEditorStore((s) => s.moverClip)
   const recortarClip = useEditorStore((s) => s.recortarClip)
+  const estirarVelocidad = useEditorStore((s) => s.estirarVelocidad)
   const moverClipAPista = useEditorStore((s) => s.moverClipAPista)
   const altosPista = useEditorStore((s) => s.altosPista)
   const tira = useTira(clip.assetId, url, clip.duracionFuente)
+
+  // mientras se arrastra un borde con alt no se recorta, se cambia la velocidad;
+  // este estado enciende la pista visual con el valor resultante en vivo
+  const [estirandoVelocidad, setEstirandoVelocidad] = useState(false)
 
   const ancho = Math.max(clip.duracion * pxPorSegundo, 8)
 
@@ -98,12 +103,22 @@ export default function ClipBlock({
     e.preventDefault()
     seleccionar(clip.id)
     let lastX = e.clientX
+    setEstirandoVelocidad(e.altKey)
     const mover = (ev: globalThis.MouseEvent) => {
       const delta = (ev.clientX - lastX) / pxPorSegundo
       lastX = ev.clientX
-      recortarClip(clip.id, lado, delta)
+      // con alt el gesto deja de recortar y pasa a repartir el mismo trozo de
+      // video en más o menos tiempo, que es tal cual cambiar la velocidad
+      if (ev.altKey) {
+        setEstirandoVelocidad(true)
+        estirarVelocidad(clip.id, lado, delta)
+      } else {
+        setEstirandoVelocidad(false)
+        recortarClip(clip.id, lado, delta)
+      }
     }
     const soltar = () => {
+      setEstirandoVelocidad(false)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
@@ -159,9 +174,19 @@ export default function ClipBlock({
         </span>
       )}
 
+      {/* señal clara de que el arrastre con alt no recorta: se ve la velocidad
+          resultante en grande y centrada mientras dura el gesto */}
+      {estirandoVelocidad && (
+        <span className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+          <span className="rounded-md bg-brand/90 px-2 py-0.5 text-xs font-semibold text-white shadow">
+            {Number(clip.velocidad.toFixed(2))}x
+          </span>
+        </span>
+      )}
+
       <div
         onMouseDown={(e) => iniciarRecorte(e, 'inicio')}
-        title="Recortar por el inicio"
+        title="Recortar por el inicio (con Alt cambia la velocidad)"
         className={[
           'absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-brand/80 transition-opacity',
           seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
@@ -169,7 +194,7 @@ export default function ClipBlock({
       />
       <div
         onMouseDown={(e) => iniciarRecorte(e, 'fin')}
-        title="Recortar por el final"
+        title="Recortar por el final (con Alt cambia la velocidad)"
         className={[
           'absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-brand/80 transition-opacity',
           seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
