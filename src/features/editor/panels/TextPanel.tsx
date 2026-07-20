@@ -6,19 +6,43 @@ import { Campo, Deslizador, ColorCampo, Interruptor, Segmentado } from '../../..
 import Selector from '../../../components/ui/Selector'
 import MotionControls from './MotionControls'
 
+// tipografías ofrecidas. las dos primeras van empaquetadas con la aplicación; el
+// resto son fuentes corrientes del sistema (en windows están casi todas), así que
+// se ven de verdad tanto en el visor como al exportar sin descargar nada
 const FUENTES = [
   'Inter',
+  'Plus Jakarta Sans',
   'Arial',
-  'Georgia',
-  'Times New Roman',
-  'Courier New',
-  'Verdana',
-  'Trebuchet MS',
-  'Impact',
+  'Arial Black',
+  'Calibri',
+  'Cambria',
+  'Candara',
   'Comic Sans MS',
-  'Roboto',
-  'Montserrat',
-  'Poppins',
+  'Consolas',
+  'Constantia',
+  'Corbel',
+  'Courier New',
+  'Franklin Gothic Medium',
+  'Georgia',
+  'Impact',
+  'Lucida Sans',
+  'Palatino Linotype',
+  'Segoe UI',
+  'Sitka',
+  'Tahoma',
+  'Times New Roman',
+  'Trebuchet MS',
+  'Verdana',
+]
+
+// valores de interlineado con nombre, para el desplegable de más opciones que
+// sale por encima del control. cubren de muy ajustado a muy amplio
+const PRESETS_INTERLINEADO = [
+  { nombre: 'Ajustado', valor: 0.9 },
+  { nombre: 'Normal', valor: 1.2 },
+  { nombre: 'Cómodo', valor: 1.5 },
+  { nombre: 'Espacioso', valor: 2 },
+  { nombre: 'Doble', valor: 2.5 },
 ]
 
 // botón de estilo tipo negrita/cursiva/subrayado
@@ -105,6 +129,59 @@ export default function TextPanel() {
 
           <Campo etiqueta={`Tamaño (${capa.tamano} px)`}>
             <Deslizador valor={capa.tamano} min={8} max={400} onChange={(v) => editar('tamano', v)} />
+          </Campo>
+
+          {/* interlineado con su deslizador fino y, al lado, un botón que despliega
+              por encima una lista de valores con nombre para elegir de un vistazo */}
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-[11px] text-[color:var(--muted)]">
+                Interlineado: <b className="text-brand">{(capa.interlineado ?? 1.2).toFixed(2)}</b>
+              </span>
+              <div className="group/il relative">
+                <button
+                  type="button"
+                  className="rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[color:var(--muted)] transition-colors hover:text-brand"
+                  style={{ border: '1px solid rgb(var(--border) / 0.16)' }}
+                >
+                  Más opciones
+                </button>
+                <div
+                  className="invisible absolute bottom-full right-0 z-30 mb-2 w-44 translate-y-1 rounded-xl p-1.5 opacity-0 shadow-xl transition-all duration-200 group-hover/il:visible group-hover/il:translate-y-0 group-hover/il:opacity-100"
+                  style={{ background: 'rgb(var(--surface))', border: '1px solid rgb(var(--border) / 0.14)' }}
+                >
+                  <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
+                    Separación entre líneas
+                  </p>
+                  {PRESETS_INTERLINEADO.map((p) => (
+                    <button
+                      key={p.nombre}
+                      type="button"
+                      onClick={() => editar('interlineado', p.valor)}
+                      className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors hover:bg-brand/10 hover:text-brand"
+                    >
+                      <span>{p.nombre}</span>
+                      <span className="text-[11px] text-[color:var(--muted)]">{p.valor.toFixed(2)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <Deslizador
+              valor={Math.round((capa.interlineado ?? 1.2) * 100)}
+              min={70}
+              max={300}
+              onChange={(v) => editar('interlineado', v / 100)}
+            />
+          </div>
+
+          <Campo etiqueta={`Espaciado entre letras (${capa.tracking ?? 0} px)`}>
+            <Deslizador
+              valor={capa.tracking ?? 0}
+              min={-10}
+              max={60}
+              onChange={(v) => editar('tracking', v)}
+            />
           </Campo>
 
           <div className="flex gap-1">

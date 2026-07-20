@@ -34,6 +34,11 @@ export interface CapaTexto extends CapaBase {
   cursiva: boolean
   subrayado: boolean
   alineacion: 'left' | 'center' | 'right'
+  // separación entre líneas como múltiplo del tamaño (1.2 es el valor de siempre)
+  // y espacio entre letras en píxeles del proyecto (0 es el natural de la fuente).
+  // opcionales para no romper los textos guardados antes de que existieran
+  interlineado?: number
+  tracking?: number
   fondo: boolean
   colorFondo: string
   opacidadFondo: number

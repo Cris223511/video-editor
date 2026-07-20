@@ -21,6 +21,8 @@ export function crearCapaTexto(inicio: number, alturaProyecto: number): CapaText
     cursiva: false,
     subrayado: false,
     alineacion: 'center',
+    interlineado: 1.2,
+    tracking: 0,
     fondo: false,
     colorFondo: '#000000',
     opacidadFondo: 60,

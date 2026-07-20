@@ -57,9 +57,14 @@ function dibujarTexto(ctx: CanvasRenderingContext2D, c: CapaTexto, ancho: number
   ctx.font = `${c.cursiva ? 'italic ' : ''}${c.negrita ? '700' : '400'} ${c.tamano}px '${c.fuente}', sans-serif`
   ctx.textAlign = c.alineacion
   ctx.textBaseline = 'middle'
+  // el espacio entre letras y el interlineado se aplican igual que en el visor,
+  // para que el texto salga idéntico en el archivo. letterSpacing afecta también
+  // a la medida del ancho, así que va antes de medir
+  const ctxLs = ctx as CanvasRenderingContext2D & { letterSpacing?: string }
+  ctxLs.letterSpacing = `${c.tracking ?? 0}px`
 
   const lineas = (c.texto || '').split('\n')
-  const lh = c.tamano * 1.2
+  const lh = c.tamano * (c.interlineado ?? 1.2)
   const anchoMax = Math.max(1, ...lineas.map((l) => ctx.measureText(l).width))
   const startY = -((lineas.length - 1) * lh) / 2
 
