@@ -88,7 +88,7 @@ export default function RielHerramientas({ onElegir }: { onElegir?: () => void }
       style={{ width: expandido ? ANCHO_EXPANDIDO : ANCHO_COLAPSADO }}
     >
       <div
-        className="flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden"
+        className="flex flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden"
         style={{ paddingLeft: AIRE_LATERAL, paddingRight: AIRE_LATERAL }}
       >
         {herramientas.map((h) => (

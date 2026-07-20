@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { Info } from 'lucide-react'
 import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
+import Confirmar from '../../components/ui/Confirmar'
 import { useProjectStore } from '../../store/useProjectStore'
+import { useEditorStore } from '../../store/useEditorStore'
 import { useImportarMedios } from '../import/useImportarMedios'
 import { ACEPTA_MEDIOS } from '../../lib/validation/validateVideo'
 import { formatearDuracion } from '../../lib/format/duracion'
@@ -19,6 +21,7 @@ export const TIPO_ARRASTRE = 'application/x-video-editor-asset'
 export default function MediaLibrary({ plegando = false }: { plegando?: boolean }) {
   const medios = useProjectStore((s) => s.medios)
   const quitar = useProjectStore((s) => s.quitar)
+  const quitarUsosDeAsset = useEditorStore((s) => s.quitarUsosDeAsset)
   const { procesar, ocupado } = useImportarMedios()
   const [encima, setEncima] = useState(false)
   // igual que en el panel de opciones: el ancho se congela durante el plegado
@@ -26,6 +29,19 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
   const { ref, estiloAncho } = useCongelarAncho(plegando)
   // qué medio tiene la ficha de detalles abierta
   const [detalle, setDetalle] = useState<MediaAsset | null>(null)
+  // medio pendiente de confirmar antes de quitarlo. mientras no sea nulo, la
+  // ventana de aviso queda abierta preguntando por él
+  const [porQuitar, setPorQuitar] = useState<MediaAsset | null>(null)
+
+  // quita de verdad el medio una vez confirmado: primero se llevan sus usos de la
+  // línea de tiempo (clips, audios y capas de imagen) y luego se borra el asset
+  // del proyecto, así no queda nada apuntando a un medio que ya no existe
+  const confirmarQuitar = () => {
+    if (!porQuitar) return
+    quitarUsosDeAsset(porQuitar.id, porQuitar.url)
+    quitar(porQuitar.id)
+    setPorQuitar(null)
+  }
 
   const soltarArchivos = (e: React.DragEvent) => {
     e.preventDefault()
@@ -63,6 +79,32 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
                     e.dataTransfer.setData(TIPO_ARRASTRE, m.id)
                     e.dataTransfer.effectAllowed = 'copy'
                   }}
+                  // solo en los videos, al posar el cursor se reproduce la vista
+                  // previa en silencio desde el principio; al retirarlo se para y
+                  // rebobina para volver a mostrar la portada. las imágenes y el
+                  // audio se quedan como estaban
+                  onMouseEnter={
+                    m.clase === 'video'
+                      ? (e) => {
+                          const v = e.currentTarget.querySelector('video')
+                          if (v) {
+                            v.currentTime = 0
+                            void v.play().catch(() => {})
+                          }
+                        }
+                      : undefined
+                  }
+                  onMouseLeave={
+                    m.clase === 'video'
+                      ? (e) => {
+                          const v = e.currentTarget.querySelector('video')
+                          if (v) {
+                            v.pause()
+                            v.currentTime = 0
+                          }
+                        }
+                      : undefined
+                  }
                   // la miniatura ocupa toda la proporción del video, así se ve el
                   // encuadre de verdad en lugar de una franja recortada
                   className="group relative w-full cursor-grab overflow-hidden rounded-lg bg-black/40 ring-1 ring-[rgb(var(--border)/0.12)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:ring-brand/50 active:cursor-grabbing"
@@ -82,6 +124,21 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
                         'aspect-video w-full transition-transform duration-300 group-hover:scale-105',
                         m.clase === 'imagen' ? 'bg-black/40 object-contain' : 'object-cover',
                       ].join(' ')}
+                    />
+                  )}
+                  {/* el video de vista previa se monta encima de la portada y
+                      normalmente está invisible y parado; al pasar el cursor sube
+                      su opacidad y se reproduce, así la transición entre foto y
+                      video se ve suave. va sin arrastre propio para no estorbar al
+                      draggable de la tarjeta */}
+                  {m.clase === 'video' && (
+                    <video
+                      src={m.url}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      draggable={false}
+                      className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100"
                     />
                   )}
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2 py-1.5">
@@ -108,7 +165,7 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
                     </Tooltip>
                     <Tooltip texto="Quitar del proyecto">
                       <button
-                        onClick={() => quitar(m.id)}
+                        onClick={() => setPorQuitar(m)}
                         aria-label="Quitar del proyecto"
                         className="grid h-7 w-7 place-items-center rounded-md bg-black/60 text-white backdrop-blur transition-colors hover:bg-red-500"
                       >
@@ -182,6 +239,19 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
       </div>
 
       <FichaMedio medio={detalle} onCerrar={() => setDetalle(null)} />
+
+      {/* quitar un medio arrastra consigo todo lo que dependa de él en la línea
+          de tiempo, así que conviene preguntar antes en lugar de borrarlo de
+          golpe con un clic */}
+      <Confirmar
+        abierto={porQuitar !== null}
+        titulo="¿Quitar este medio?"
+        mensaje="Se eliminará también de la línea de tiempo: sus clips, los audios importados desde él y las capas de imagen que lo usan."
+        aceptar="Quitar"
+        peligro
+        onAceptar={confirmarQuitar}
+        onCancelar={() => setPorQuitar(null)}
+      />
     </aside>
   )
 }

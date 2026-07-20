@@ -89,7 +89,7 @@ export default function EditorView() {
                   <OptionsPanel onOcultar={() => alternar(opciones, true)} plegando={plegando} />
                 </Panel>
 
-                <Tirador orientacion="vertical" />
+                <Tirador orientacion="vertical" onDobleClic={() => alternar(opciones, verOpciones)} />
 
                 <Panel id="visor" order={2} minSize={30} className={`flex ${suave}`}>
                   <div className="panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl">
@@ -121,11 +121,10 @@ export default function EditorView() {
                   collapsible
                   collapsedSize={0}
                   defaultSize={20}
-                  // el grupo inferior es más ancho que el de arriba porque el riel
-                  // de herramientas y su separación quedan fuera de él. para que el
-                  // ancho mínimo en píxeles coincida con el del panel de opciones
-                  // (16% de un grupo más estrecho) este porcentaje baja a 15,3
-                  minSize={15.3}
+                  // el panel de medios no debe poder encogerse más que el de
+                  // opciones de arriba: se le da el mismo mínimo para que ninguno
+                  // de los dos quede notablemente más estrecho que el otro
+                  minSize={18}
                   maxSize={38}
                   onCollapse={() => setVerMedios(false)}
                   onExpand={() => setVerMedios(true)}
@@ -134,7 +133,7 @@ export default function EditorView() {
                   <MediaLibrary plegando={plegando} />
                 </Panel>
 
-                <Tirador orientacion="vertical" />
+                <Tirador orientacion="vertical" onDobleClic={() => alternar(medios, verMedios)} />
 
                 <Panel id="linea" order={2} minSize={40} className={`flex ${suave}`}>
                   <div className="panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl">
@@ -184,10 +183,19 @@ function BarraReabrir({ titulo, onClick }: { titulo: string; onClick: () => void
 // se dibuje una cruz sino un hueco limpio en esa esquina. el área arrastrable
 // sigue ocupando todo el largo, así que retirar la línea no le quita agarre
 const RETIRO = 12
-function Tirador({ orientacion }: { orientacion: 'vertical' | 'horizontal' }) {
+function Tirador({
+  orientacion,
+  onDobleClic,
+}: {
+  orientacion: 'vertical' | 'horizontal'
+  // al hacer doble clic sobre el separador se pliega el panel de al lado, un
+  // atajo habitual para ganar espacio sin ir a buscar el botón
+  onDobleClic?: () => void
+}) {
   const esVertical = orientacion === 'vertical'
   return (
     <PanelResizeHandle
+      onDoubleClick={onDobleClic}
       className={[
         'group relative shrink-0',
         esVertical ? 'w-1.5 cursor-col-resize' : 'h-1.5 cursor-row-resize',

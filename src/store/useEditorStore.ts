@@ -228,6 +228,11 @@ interface EstadoEditor {
   recortarAudio: (id: string, lado: 'inicio' | 'fin', deltaSegundos: number) => void
   quitarAudio: (id: string) => void
   setVolumenAudio: (id: string, volumen: number) => void
+  // borra en cascada todo lo que use un medio que se quita del proyecto: sus
+  // clips de video, los audios importados desde él y las capas de imagen creadas
+  // a partir de su object url. la url hace falta porque las capas de imagen no
+  // guardan el id del asset, solo el src con el que se pintan
+  quitarUsosDeAsset: (assetId: string, url: string) => void
 
   setHerramienta: (h: Herramienta) => void
   setLienzo: (ancho: number, alto: number) => void
@@ -386,6 +391,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'recortarAudio',
   'quitarAudio',
   'setVolumenAudio',
+  'quitarUsosDeAsset',
   'setLienzo',
   'setLienzoAuto',
   'setColorFondo',
@@ -1351,6 +1357,41 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     set((s) => ({
       audios: s.audios.map((a) => (a.id === id ? { ...a, volumen: Math.max(0, Math.min(2, volumen)) } : a)),
     })),
+
+  quitarUsosDeAsset: (assetId, url) =>
+    set((s) => {
+      // se van todos los rastros del medio en la línea de tiempo: los clips que
+      // lo reproducen, los audios importados desde él y las capas de imagen que
+      // apuntan a su url
+      const clips = s.pista.clips.filter((c) => c.assetId !== assetId)
+      const audios = s.audios.filter((a) => a.assetId !== assetId)
+      const capas = s.capas.filter((c) => !(c.tipo === 'imagen' && c.src === url))
+      // si lo que estaba seleccionado desapareció, esa marca queda huérfana y hay
+      // que soltarla. la selección de audio comparte campo con las regiones de
+      // ganancia, por eso se acepta como válida si sigue habiendo cualquiera de
+      // las dos con ese id
+      const clipSeleccionado = clips.some((c) => c.id === s.clipSeleccionado)
+        ? s.clipSeleccionado
+        : null
+      const capaSeleccionada = capas.some((c) => c.id === s.capaSeleccionada)
+        ? s.capaSeleccionada
+        : null
+      const regionSeleccionada =
+        s.regionSeleccionada &&
+        (s.audioRegiones.some((r) => r.id === s.regionSeleccionada) ||
+          audios.some((a) => a.id === s.regionSeleccionada))
+          ? s.regionSeleccionada
+          : null
+      return {
+        pista: { ...s.pista, clips },
+        audios,
+        capas,
+        clipSeleccionado,
+        capaSeleccionada,
+        regionSeleccionada,
+        playhead: Math.min(s.playhead, duracionTotal(clips)),
+      }
+    }),
 
   setHerramienta: (h) => set({ herramienta: h }),
 
