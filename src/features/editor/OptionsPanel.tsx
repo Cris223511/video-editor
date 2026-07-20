@@ -13,6 +13,7 @@ import AudioPanel from './panels/AudioPanel'
 import SpeedPanel from './panels/SpeedPanel'
 import CensuraPanel from './panels/CensuraPanel'
 import TonePanel from './panels/TonePanel'
+import EffectsPanel from './panels/EffectsPanel'
 import ProyectoPanel from './panels/ProyectoPanel'
 import LienzoPanel from './panels/LienzoPanel'
 import MarcoPanel from './panels/MarcoPanel'
@@ -103,6 +104,7 @@ export default function OptionsPanel({ onOcultar }: { onOcultar?: () => void }) 
     censura: <CensuraPanel />,
     velocidad: <SpeedPanel />,
     tono: <TonePanel />,
+    efectos: <EffectsPanel />,
   }
 
   const actual = herramientas.find((h) => h.id === herramienta)

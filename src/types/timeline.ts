@@ -14,6 +14,21 @@ export interface AjusteTono {
   curvas?: import('../lib/color/curvas').Curvas
 }
 
+// efecto de desenfoque de movimiento. la intensidad va de 0 a 100 y el ángulo
+// en grados marca la dirección del barrido: 0 es horizontal, 90 vertical, y los
+// valores intermedios reparten el desenfoque entre ambos ejes
+export interface EfectoDesenfoque {
+  tipo: 'desenfoque-movimiento'
+  intensidad: number
+  angulo: number
+}
+
+// un efecto aplicado a un clip. lleva su propio id para poder encadenar varios y
+// editarlos o quitarlos por separado. de momento solo existe el desenfoque de
+// movimiento, pero el campo tipo deja la puerta abierta a sumar más sin rehacer
+// el modelo: basta con añadir otra variante a esta unión
+export type EfectoClip = { id: string } & EfectoDesenfoque
+
 // el identificador sale del catálogo de transiciones. es una cadena libre para
 // que ampliar el catálogo no obligue a tocar el modelo ni rompa lo ya guardado
 export type TipoTransicion = string
@@ -37,6 +52,7 @@ export interface Clip {
   duracionFuente: number // duración total del video original, tope para recortar
   velocidad: number // 1 es normal; mayor acelera y ocupa menos en la pista
   tono: AjusteTono // corrección de color del clip
+  efectos: EfectoClip[] // cadena de efectos, vacía mientras no se aplique ninguno
   transicion: Transicion // cómo entra el clip respecto al anterior
 }
 

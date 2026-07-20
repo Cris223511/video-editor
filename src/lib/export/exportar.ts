@@ -4,7 +4,7 @@ import { Marco } from '../../types/marco'
 import { RegionAudio } from '../../types/audio'
 import { clipEnTiempo, duracionTotal } from '../timeline/clips'
 import { gananciaEn } from '../audio/ganancia'
-import { usaMatriz, matrizTono, tablasColor } from '../color/tono'
+import { usaMatriz, matrizTono, tablasColor, hayEfectoFiltro, stdDeviationsDesenfoque } from '../color/tono'
 import { dibujarFotograma, Escena } from './compositor'
 
 export interface DatosExport {
@@ -110,28 +110,43 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
       svg.setAttribute('style', 'position:absolute;width:0;height:0')
       const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs')
       clips.forEach((c) => {
-        if (!usaMatriz(c.tono)) return
+        const efectos = c.efectos ?? []
+        const desenfoques = stdDeviationsDesenfoque(efectos)
+        // sin color que corregir ni efecto activo no hace falta filtro alguno
+        if (!usaMatriz(c.tono) && !hayEfectoFiltro(efectos)) return
         const filtro = document.createElementNS('http://www.w3.org/2000/svg', 'filter')
         filtro.setAttribute('id', `tonoexp-${c.id}`)
         filtro.setAttribute('color-interpolation-filters', 'sRGB')
-        const fe = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix')
-        fe.setAttribute('type', 'matrix')
-        fe.setAttribute('values', matrizTono(c.tono))
-        filtro.appendChild(fe)
 
-        // las ruedas de color viajan como curva por canal, igual que en el visor,
-        // para que lo exportado coincida con lo que se vio al corregir
-        const tablas = tablasColor(c.tono)
-        if (tablas) {
-          const trans = document.createElementNS('http://www.w3.org/2000/svg', 'feComponentTransfer')
-          ;(['feFuncR', 'feFuncG', 'feFuncB'] as const).forEach((nombre, i) => {
-            const fn = document.createElementNS('http://www.w3.org/2000/svg', nombre)
-            fn.setAttribute('type', 'table')
-            fn.setAttribute('tableValues', tablas[i])
-            trans.appendChild(fn)
-          })
-          filtro.appendChild(trans)
+        if (usaMatriz(c.tono)) {
+          const fe = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix')
+          fe.setAttribute('type', 'matrix')
+          fe.setAttribute('values', matrizTono(c.tono))
+          filtro.appendChild(fe)
+
+          // las ruedas de color viajan como curva por canal, igual que en el
+          // visor, para que lo exportado coincida con lo que se vio al corregir
+          const tablas = tablasColor(c.tono)
+          if (tablas) {
+            const trans = document.createElementNS('http://www.w3.org/2000/svg', 'feComponentTransfer')
+            ;(['feFuncR', 'feFuncG', 'feFuncB'] as const).forEach((nombre, i) => {
+              const fn = document.createElementNS('http://www.w3.org/2000/svg', nombre)
+              fn.setAttribute('type', 'table')
+              fn.setAttribute('tableValues', tablas[i])
+              trans.appendChild(fn)
+            })
+            filtro.appendChild(trans)
+          }
         }
+
+        // el desenfoque de movimiento va tras el color, con el mismo stdDeviation
+        // direccional que calcula el visor, de modo que exportar y editar coinciden
+        desenfoques.forEach((sd) => {
+          const blur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur')
+          blur.setAttribute('stdDeviation', sd)
+          blur.setAttribute('edgeMode', 'duplicate')
+          filtro.appendChild(blur)
+        })
         defs.appendChild(filtro)
       })
       svg.appendChild(defs)

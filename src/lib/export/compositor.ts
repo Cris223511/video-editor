@@ -3,7 +3,7 @@ import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto } from '../../type
 import { Marco } from '../../types/marco'
 import { clipEnTiempo } from '../timeline/clips'
 import { posicionCapa } from '../layers/motion'
-import { esTonoNeutro, filtroCss } from '../color/tono'
+import { esTonoNeutro, filtroCss, hayEfectoFiltro } from '../color/tono'
 import { REPETICIONES_BRILLO, desenfoqueBrillo } from '../layers/defaults'
 import { anterior, pintarTransicion, progreso } from '../transiciones/pintar'
 
@@ -465,7 +465,12 @@ export function dibujarFotograma(
         ctx.restore()
       }
 
-      if (!esTonoNeutro(clip.tono)) ctx.filter = filtroCss(clip.tono, `tonoexp-${clip.id}`)
+      // el mismo filtro que el visor: color y, si lo hay, el desenfoque de
+      // movimiento. se aplica también cuando el color es neutro pero hay efecto
+      const efectos = clip.efectos ?? []
+      if (!esTonoNeutro(clip.tono) || hayEfectoFiltro(efectos)) {
+        ctx.filter = filtroCss(clip.tono, `tonoexp-${clip.id}`, efectos)
+      }
       ctx.drawImage(video, (ancho - dw) / 2, (alto - dh) / 2, dw, dh)
       ctx.filter = 'none'
       ctx.restore()

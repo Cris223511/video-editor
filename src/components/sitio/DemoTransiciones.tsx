@@ -38,6 +38,7 @@ function clipFalso(id: string, tipo: string, inicio: number): Clip {
     duracionFuente: 1,
     velocidad: 1,
     tono: { exposicion: 0, contraste: 0, saturacion: 0, temperatura: 0, tinte: 0 },
+    efectos: [],
     transicion: { tipo, duracion: 1 },
   }
 }

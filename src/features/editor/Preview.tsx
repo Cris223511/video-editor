@@ -12,7 +12,15 @@ import { rectContenido } from '../../lib/layers/rect'
 import { posicionCapa } from '../../lib/layers/motion'
 import { CapaCensura } from '../../types/layers'
 import { Clip } from '../../types/timeline'
-import { esTonoNeutro, filtroCss, matrizTono, usaMatriz, tablasColor } from '../../lib/color/tono'
+import {
+  esTonoNeutro,
+  filtroCss,
+  matrizTono,
+  usaMatriz,
+  tablasColor,
+  hayEfectoFiltro,
+  stdDeviationsDesenfoque,
+} from '../../lib/color/tono'
 import { anterior, pintarTransicion, progreso } from '../../lib/transiciones/pintar'
 import { buscarTransicion } from '../../lib/transiciones/catalogo'
 
@@ -485,7 +493,11 @@ export default function Preview() {
     return () => cancelAnimationFrame(raf)
   }, [conLienzo, activo, clipsOrdenados, resolucion, colorFondo])
 
-  const filtrosMatriz = clipsOrdenados.filter((c) => usaMatriz(c.tono))
+  // clips que necesitan el filtro svg: los que corrigen color y también los que
+  // llevan algún efecto de desenfoque, aunque no toquen el color
+  const filtrosClip = clipsOrdenados.filter(
+    (c) => usaMatriz(c.tono) || hayEfectoFiltro(c.efectos ?? []),
+  )
 
   const hayContenido = clipsOrdenados.length > 0 || hayCapas
 
@@ -538,7 +550,10 @@ export default function Preview() {
                   className="absolute inset-0 h-full w-full object-contain"
                   style={{
                     opacity: conLienzo ? 0 : opacidadDe(c),
-                    filter: esTonoNeutro(c.tono) ? undefined : filtroCss(c.tono, `tono-${c.id}`),
+                    filter:
+                      esTonoNeutro(c.tono) && !hayEfectoFiltro(c.efectos ?? [])
+                        ? undefined
+                        : filtroCss(c.tono, `tono-${c.id}`, c.efectos ?? []),
                   }}
                 />
               )
@@ -580,14 +595,17 @@ export default function Preview() {
               />
             )}
 
-            {filtrosMatriz.length > 0 && (
+            {filtrosClip.length > 0 && (
               <svg className="absolute h-0 w-0">
                 <defs>
-                  {filtrosMatriz.map((c) => {
+                  {filtrosClip.map((c) => {
                     const tablas = tablasColor(c.tono)
+                    const desenfoques = stdDeviationsDesenfoque(c.efectos ?? [])
                     return (
                       <filter key={c.id} id={`tono-${c.id}`} colorInterpolationFilters="sRGB">
-                        <feColorMatrix type="matrix" values={matrizTono(c.tono)} />
+                        {usaMatriz(c.tono) && (
+                          <feColorMatrix type="matrix" values={matrizTono(c.tono)} />
+                        )}
                         {/* las ruedas se aplican como curva por canal: cada zona
                             tonal empuja su tramo y deja el resto en su sitio */}
                         {tablas && (
@@ -597,6 +615,12 @@ export default function Preview() {
                             <feFuncB type="table" tableValues={tablas[2]} />
                           </feComponentTransfer>
                         )}
+                        {/* el desenfoque de movimiento va después del color y con
+                            stdDeviation en dos ejes queda direccional. cada efecto
+                            encadenado se apoya en el resultado del anterior */}
+                        {desenfoques.map((sd, i) => (
+                          <feGaussianBlur key={i} stdDeviation={sd} edgeMode="duplicate" />
+                        ))}
                       </filter>
                     )
                   })}

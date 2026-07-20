@@ -14,6 +14,7 @@ export const herramientas: { id: Herramienta; icono: NombreIcono; etiqueta: stri
   { id: 'censura', icono: 'censura', etiqueta: 'Censura' },
   { id: 'velocidad', icono: 'velocidad', etiqueta: 'Velocidad' },
   { id: 'tono', icono: 'tono', etiqueta: 'Tono' },
+  { id: 'efectos', icono: 'efectos', etiqueta: 'Efectos' },
 ]
 
 // columna de iconos que elige qué se ve en el panel de opciones. vive fuera de

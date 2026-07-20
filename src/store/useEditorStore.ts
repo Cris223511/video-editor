@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Track, AjusteTono, Transicion, PistaMeta } from '../types/timeline'
+import { Track, AjusteTono, Transicion, PistaMeta, EfectoClip } from '../types/timeline'
 import { MediaAsset } from '../types/media'
 import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto } from '../types/layers'
 import { RegionAudio } from '../types/audio'
@@ -29,6 +29,7 @@ export type Herramienta =
   | 'censura'
   | 'velocidad'
   | 'tono'
+  | 'efectos'
   | 'lienzo'
   | 'marco'
   | 'figura'
@@ -70,6 +71,10 @@ interface EstadoEditor {
   setVelocidadClip: (id: string, velocidad: number) => void
   setTono: (id: string, cambios: Partial<AjusteTono>) => void
   resetTono: (id: string) => void
+  // cadena de efectos del clip: se suman, se ajustan y se quitan por su id
+  agregarEfecto: (id: string, efecto: EfectoClip) => void
+  actualizarEfecto: (id: string, efectoId: string, cambios: Partial<EfectoClip>) => void
+  quitarEfecto: (id: string, efectoId: string) => void
   setTransicion: (id: string, cambios: Partial<Transicion>) => void
   dividirEnCabezal: () => void
   cerrarHueco: (desde: number, pista: number) => void
@@ -252,6 +257,9 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'setVelocidadClip',
   'setTono',
   'resetTono',
+  'agregarEfecto',
+  'actualizarEfecto',
+  'quitarEfecto',
   'setTransicion',
   'dividirEnCabezal',
   'cerrarHueco',
@@ -412,6 +420,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         duracionFuente: asset.duracion,
         velocidad: 1,
         tono: { ...tonoNeutro },
+        efectos: [] as EfectoClip[],
         transicion: { tipo: 'ninguna' as const, duracion: 0.5 },
       }
       // el primer clip fija la resolución automática del lienzo; solo se aplica
@@ -569,6 +578,43 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       pista: {
         ...s.pista,
         clips: s.pista.clips.map((c) => (c.id === id ? { ...c, tono: { ...tonoNeutro } } : c)),
+      },
+    })),
+
+  agregarEfecto: (id, efecto) =>
+    set((s) => ({
+      pista: {
+        ...s.pista,
+        clips: s.pista.clips.map((c) =>
+          c.id === id ? { ...c, efectos: [...(c.efectos ?? []), efecto] } : c,
+        ),
+      },
+    })),
+
+  actualizarEfecto: (id, efectoId, cambios) =>
+    set((s) => ({
+      pista: {
+        ...s.pista,
+        clips: s.pista.clips.map((c) =>
+          c.id === id
+            ? {
+                ...c,
+                efectos: (c.efectos ?? []).map((e) =>
+                  e.id === efectoId ? ({ ...e, ...cambios } as EfectoClip) : e,
+                ),
+              }
+            : c,
+        ),
+      },
+    })),
+
+  quitarEfecto: (id, efectoId) =>
+    set((s) => ({
+      pista: {
+        ...s.pista,
+        clips: s.pista.clips.map((c) =>
+          c.id === id ? { ...c, efectos: (c.efectos ?? []).filter((e) => e.id !== efectoId) } : c,
+        ),
       },
     })),
 

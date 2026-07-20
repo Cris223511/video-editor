@@ -1,4 +1,4 @@
-import { AjusteTono } from '../../types/timeline'
+import { AjusteTono, EfectoClip } from '../../types/timeline'
 import { PASOS, ruedasNeutras, valorCanal } from './ruedas'
 import { curvasNeutras, evaluar, PuntoCurva } from './curvas'
 
@@ -67,15 +67,43 @@ export function usaMatriz(t: AjusteTono): boolean {
   return t.temperatura !== 0 || t.tinte !== 0 || usaRuedas(t) || usaCurvas(t)
 }
 
+// cuánto stdDeviation en píxeles corresponde a la intensidad máxima. un valor
+// alto se nota mucho sin llegar a borrar la imagen del todo
+const DESENFOQUE_MAX_PX = 20
+
+// componentes x/y del stdDeviation de cada desenfoque de movimiento del clip. el
+// desenfoque de feGaussianBlur es direccional cuando se le dan dos valores: la
+// intensidad se reparte entre los ejes según el ángulo (0 grados barre en
+// horizontal, 90 en vertical) usando el coseno y el seno. se descartan los
+// efectos sin intensidad, que no aportarían nada
+export function stdDeviationsDesenfoque(efectos: EfectoClip[]): string[] {
+  return efectos
+    .filter((e) => e.tipo === 'desenfoque-movimiento' && e.intensidad > 0)
+    .map((e) => {
+      const mag = (e.intensidad / 100) * DESENFOQUE_MAX_PX
+      const rad = (e.angulo * Math.PI) / 180
+      const x = Math.abs(Math.cos(rad)) * mag
+      const y = Math.abs(Math.sin(rad)) * mag
+      return `${x.toFixed(2)} ${y.toFixed(2)}`
+    })
+}
+
+// hay algún efecto que obligue a montar el filtro svg del clip
+export function hayEfectoFiltro(efectos: EfectoClip[]): boolean {
+  return stdDeviationsDesenfoque(efectos).length > 0
+}
+
 // cadena de filtro css para el video. brillo, contraste y saturación son
-// nativos; la temperatura y el tinte se aplican con la matriz svg referenciada
-export function filtroCss(t: AjusteTono, idFiltro: string): string {
+// nativos; la temperatura, el tinte y el desenfoque de movimiento se resuelven
+// con el filtro svg referenciado, que se enlaza si hay color que corregir o
+// algún efecto activo
+export function filtroCss(t: AjusteTono, idFiltro: string, efectos: EfectoClip[] = []): string {
   const partes = [
     `brightness(${1 + t.exposicion / 100})`,
     `contrast(${1 + t.contraste / 100})`,
     `saturate(${1 + t.saturacion / 100})`,
   ]
-  if (usaMatriz(t)) partes.push(`url(#${idFiltro})`)
+  if (usaMatriz(t) || hayEfectoFiltro(efectos)) partes.push(`url(#${idFiltro})`)
   return partes.join(' ')
 }
 
