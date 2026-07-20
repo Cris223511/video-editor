@@ -1,6 +1,6 @@
 import { Capa } from '../../types/layers'
 import { Clip } from '../../types/timeline'
-import { MediaAsset } from '../../types/media'
+import { MediaAsset, ClaseMedio } from '../../types/media'
 import { RegionAudio } from '../../types/audio'
 import { Marco } from '../../types/marco'
 
@@ -14,6 +14,9 @@ export const VERSION_FORMATO = 1
 // la creó; al abrir el proyecto se genera una nueva
 export interface MedioGuardado {
   id: string
+  // clase del medio; opcional para no romper proyectos guardados antes de que
+  // existieran el audio y la imagen, que se dan por video al leerlos
+  clase?: ClaseMedio
   nombre: string
   tamano: number
   tipo: string
@@ -66,6 +69,7 @@ export interface ResumenProyecto {
 export function medioAGuardado(m: MediaAsset): MedioGuardado {
   return {
     id: m.id,
+    clase: m.clase,
     nombre: m.nombre,
     tamano: m.tamano,
     tipo: m.tipo,
@@ -86,6 +90,8 @@ export function guardadoAMedio(g: MedioGuardado): MediaAsset {
       : new File([g.archivo], g.nombre, { type: g.tipo || g.archivo.type })
   return {
     id: g.id,
+    // los proyectos viejos no guardaban la clase: se asumen video
+    clase: g.clase ?? 'video',
     file,
     nombre: g.nombre,
     tamano: g.tamano,

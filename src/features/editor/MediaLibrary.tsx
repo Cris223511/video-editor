@@ -4,6 +4,7 @@ import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
 import { useProjectStore } from '../../store/useProjectStore'
 import { useImportarMedios } from '../import/useImportarMedios'
+import { ACEPTA_MEDIOS } from '../../lib/validation/validateVideo'
 import { formatearDuracion } from '../../lib/format/duracion'
 import FichaMedio from './FichaMedio'
 import { useCongelarAncho } from './useCongelarAncho'
@@ -66,15 +67,31 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
                   // encuadre de verdad en lugar de una franja recortada
                   className="group relative w-full cursor-grab overflow-hidden rounded-lg bg-black/40 ring-1 ring-[rgb(var(--border)/0.12)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:ring-brand/50 active:cursor-grabbing"
                 >
-                  <img
-                    src={m.miniatura}
-                    alt=""
-                    className="aspect-video w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
+                  {/* la portada depende de la clase: el audio no tiene imagen y
+                      se pinta con su icono sobre un fondo verde; la imagen se ve
+                      entera sin recortar; el video usa su fotograma de portada */}
+                  {m.clase === 'audio' ? (
+                    <div className="grid aspect-video w-full place-items-center bg-gradient-to-br from-emerald-500/25 to-emerald-800/10">
+                      <Icon name="musica" size={26} className="text-emerald-400" />
+                    </div>
+                  ) : (
+                    <img
+                      src={m.miniatura}
+                      alt=""
+                      className={[
+                        'aspect-video w-full transition-transform duration-300 group-hover:scale-105',
+                        m.clase === 'imagen' ? 'bg-black/40 object-contain' : 'object-cover',
+                      ].join(' ')}
+                    />
+                  )}
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2 py-1.5">
                     <p className="truncate text-[12px] font-medium text-white">{m.nombre}</p>
                     <p className="truncate text-[10px] text-white/70">
-                      {formatearDuracion(m.duracion)} · {m.ancho}×{m.alto}
+                      {m.clase === 'audio'
+                        ? formatearDuracion(m.duracion)
+                        : m.clase === 'imagen'
+                          ? `${m.ancho}×${m.alto}`
+                          : `${formatearDuracion(m.duracion)} · ${m.ancho}×${m.alto}`}
                     </p>
                   </div>
                   {/* los dos botones salen al pasar el cursor: ver la ficha del
@@ -146,7 +163,7 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
           ) : (
             <>
               <span className="text-[13px] font-medium leading-tight text-[color:var(--muted)]">
-                {encima ? 'Suelta para importar' : 'Arrastra tus videos aquí'}
+                {encima ? 'Suelta para importar' : 'Arrastra videos, audio o imágenes'}
               </span>
               <span className="text-[10px] text-[color:var(--muted)]">
                 o haz clic para elegirlos
@@ -155,7 +172,7 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
           )}
           <input
             type="file"
-            accept="video/*"
+            accept={ACEPTA_MEDIOS}
             multiple
             hidden
             onChange={(e) => e.target.files && procesar(e.target.files)}

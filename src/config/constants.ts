@@ -9,6 +9,18 @@ export const MAX_VIDEO_BYTES = 1.5 * 1024 * 1024 * 1024
 
 export const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'mkv', 'avi', 'm4v', 'ogv'] as const
 
+// extensiones conocidas de audio e imagen. no se trata de una lista corta: la
+// idea es aceptar cualquier archivo corriente de cada familia, no solo dos o
+// tres. lo que no encaje por extensión aún puede pasar si el navegador declara
+// un tipo de la familia correcta
+export const AUDIO_EXTENSIONS = [
+  'mp3', 'wav', 'ogg', 'oga', 'm4a', 'aac', 'flac', 'opus', 'weba', 'wma', 'aiff', 'aif', 'mid', 'midi',
+] as const
+
+export const IMAGEN_EXTENSIONS = [
+  'jpg', 'jpeg', 'jpe', 'jfif', 'png', 'webp', 'gif', 'avif', 'bmp', 'svg', 'ico', 'tif', 'tiff', 'heic', 'heif',
+] as const
+
 export const VIDEO_MIME_PREFIX = 'video/'
 
 // firmas binarias mínimas para no fiarnos solo de la extensión o del tipo que

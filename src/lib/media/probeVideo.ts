@@ -1,5 +1,85 @@
 import { MediaAsset } from '../../types/media'
 
+// analiza un archivo de audio: solo hace falta su duración, porque no tiene
+// imagen que mostrar. el ancho, el alto y la miniatura quedan vacíos, y la
+// biblioteca lo pinta con su propio icono de sonido
+export function analizarAudio(file: File): Promise<Omit<MediaAsset, 'id'>> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const audio = document.createElement('audio')
+    audio.preload = 'metadata'
+    audio.src = url
+    audio.onloadedmetadata = () => {
+      resolve({
+        clase: 'audio',
+        file,
+        nombre: file.name,
+        tamano: file.size,
+        tipo: file.type || 'audio',
+        duracion: isFinite(audio.duration) ? audio.duration : 0,
+        ancho: 0,
+        alto: 0,
+        url,
+        miniatura: '',
+      })
+    }
+    audio.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('No se pudo leer el audio.'))
+    }
+  })
+}
+
+// analiza una imagen: interesan sus dimensiones y una miniatura, que es la
+// propia imagen reducida para no cargar la biblioteca con el archivo entero. no
+// tiene duración
+export function analizarImagen(file: File): Promise<Omit<MediaAsset, 'id'>> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      // se dibuja una versión pequeña conservando la proporción, con el lado
+      // mayor acotado, para que la miniatura pese poco al guardarla
+      const max = 320
+      const escala = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight))
+      const w = Math.max(1, Math.round(img.naturalWidth * escala))
+      const h = Math.max(1, Math.round(img.naturalHeight * escala))
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      let miniatura = ''
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, w, h)
+        try {
+          miniatura = canvas.toDataURL('image/jpeg', 0.7)
+        } catch {
+          // algunos formatos (por ejemplo svg de otro origen) no dejan leer el
+          // lienzo; en ese caso la miniatura se queda vacía y se usa un icono
+          miniatura = ''
+        }
+      }
+      resolve({
+        clase: 'imagen',
+        file,
+        nombre: file.name,
+        tamano: file.size,
+        tipo: file.type || 'image',
+        duracion: 0,
+        ancho: img.naturalWidth,
+        alto: img.naturalHeight,
+        url,
+        miniatura,
+      })
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('No se pudo leer la imagen.'))
+    }
+    img.src = url
+  })
+}
+
 // captura un fotograma de un video en el segundo pedido y lo devuelve como
 // dataURL. sirve para armar la portada de un proyecto a partir del instante que
 // toque, sin depender de la miniatura ya guardada del medio. si algo falla
@@ -70,6 +150,7 @@ export function analizarVideo(file: File): Promise<Omit<MediaAsset, 'id'>> {
 
     const terminar = (miniatura: string) => {
       resolve({
+        clase: 'video',
         file,
         nombre: file.name,
         tamano: file.size,

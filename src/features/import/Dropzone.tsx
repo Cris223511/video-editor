@@ -1,6 +1,6 @@
 import { DragEvent, useRef, useState } from 'react'
 import Icon from '../../components/ui/Icon'
-import { VIDEO_EXTENSIONS } from '../../config/constants'
+import { ACEPTA_MEDIOS } from '../../lib/validation/validateVideo'
 
 interface Props {
   onArchivos: (files: FileList) => void
@@ -42,15 +42,15 @@ export default function Dropzone({ onArchivos, ocupado }: Props) {
         <Icon name="subir" size={30} />
       </span>
       <div>
-        <p className="font-display text-base font-bold">Arrastra tus videos aquí o haz clic para elegir</p>
+        <p className="font-display text-base font-bold">Arrastra videos, audio o imágenes aquí o haz clic para elegir</p>
         <p className="mt-1 text-sm text-[color:var(--muted)]">
-          {VIDEO_EXTENSIONS.map((e) => e.toUpperCase()).join(', ')} · hasta 1.5 GB por archivo
+          Formatos corrientes de video, audio e imagen · hasta 1.5 GB por archivo
         </p>
       </div>
       <input
         ref={input}
         type="file"
-        accept="video/*"
+        accept={ACEPTA_MEDIOS}
         multiple
         hidden
         onChange={(e) => e.target.files && onArchivos(e.target.files)}

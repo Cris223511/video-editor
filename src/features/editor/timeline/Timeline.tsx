@@ -527,7 +527,15 @@ export default function Timeline({
                 {/* la onda tenue de relleno arranca pasado el rótulo, así las
                     líneas empiezan después del texto y no lo tapan */}
                 <div className="absolute inset-y-0 right-0" style={{ left: ANCHO_ROTULO_AUDIO }}>
-                  <OndaAudio semilla="fondo-audio" color="rgb(var(--border) / 0.5)" opacidad={0.35} barras={110} />
+                  {/* el número de líneas se calcula sobre el ancho real del carril,
+                      una cada dos píxeles, para que la onda se vea igual de densa
+                      que la de una región con sonido y no queden líneas sueltas */}
+                  <OndaAudio
+                    semilla="fondo-audio"
+                    color="rgb(var(--border) / 0.5)"
+                    opacidad={0.35}
+                    barras={Math.max(80, Math.floor((anchoContenido - ANCHO_ROTULO_AUDIO) / 2))}
+                  />
                 </div>
               </>
             ) : (
