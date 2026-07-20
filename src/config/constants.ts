@@ -1,13 +1,16 @@
 // versión de la aplicación. se muestra en la barra superior y en los ajustes,
 // y acompaña a la del package.json
-export const VERSION = '2.9.0'
+export const VERSION = '2.9.1'
 
 // límites y formatos aceptados al importar medios. el tope por archivo es de
 // 1.5 GB; a nivel de proyecto no hay límite de cantidad, igual que en un
 // editor de escritorio
 export const MAX_VIDEO_BYTES = 1.5 * 1024 * 1024 * 1024
 
-export const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'mkv', 'avi', 'm4v', 'ogv'] as const
+// avi queda fuera a propósito: comprobado que el navegador no decodifica ese
+// contenedor en un elemento de video, así que aceptarlo solo llevaba a un error
+// al procesar. mkv sí funciona cuando lleva un códec web dentro (h.264, vp8/vp9)
+export const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'mkv', 'm4v', 'ogv'] as const
 
 // extensiones conocidas de audio e imagen. no se trata de una lista corta: la
 // idea es aceptar cualquier archivo corriente de cada familia, no solo dos o

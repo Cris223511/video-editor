@@ -66,6 +66,12 @@ export async function validarMedio(file: File): Promise<ResultadoValidacion> {
   if (file.size > MAX_VIDEO_BYTES) {
     return { ok: false, motivo: 'Cada archivo puede pesar como máximo 1.5 GB.' }
   }
+  // el avi se rechaza a conciencia: el navegador no decodifica ese contenedor,
+  // así que dejarlo pasar solo acababa en un error al procesarlo. mejor avisar
+  // desde el principio y sugerir convertirlo
+  if (clase === 'video' && (extension(file.name) === 'avi' || /avi|msvideo/.test(file.type))) {
+    return { ok: false, motivo: 'El navegador no puede reproducir archivos AVI. Conviértelo a MP4.' }
+  }
   // el audio y la imagen se fían del tipo o de la extensión: no se decodifican a
   // mano, así que no hace falta la barrera binaria. el video sí, porque de él se
   // leen fotogramas y un archivo disfrazado daría problemas
