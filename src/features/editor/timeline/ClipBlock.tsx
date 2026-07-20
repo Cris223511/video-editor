@@ -5,6 +5,7 @@ import { useTira } from './useTira'
 import FrameStrip from './FrameStrip'
 import MedioNoDisponible from '../../../components/ui/MedioNoDisponible'
 import TransicionBlock from './TransicionBlock'
+import { resolverDestinoVertical } from './destinoVertical'
 
 interface Props {
   clip: Clip
@@ -84,68 +85,13 @@ export default function ClipBlock({
     let pistaActual = clip.pista
     let insercionActual: number | null = null
 
-    // franja superior e inferior de cada fila que ya no cuenta como «soltar
-    // encima» sino como «abrir un nivel en esta separación». deja el centro de la
-    // fila para el cambio de pista de siempre y los bordes para insertar
-    const BORDE = 0.3
-
-    // decide, a partir de la posición del cursor, si el gesto apunta al centro de
-    // una fila (mover el clip a ese nivel) o a una separación (crear uno nuevo).
-    // devuelve un destino de pista o un índice de inserción, nunca ambos
+    // el criterio de a qué nivel o separación apunta el gesto vive en un ayudante
+    // compartido: el mismo que usa el arrastre de un medio desde el panel, para
+    // que soltar un clip o traer un video se comporten igual. sin filas medibles
+    // (por ejemplo si aún no montó el dom) no hay destino que decidir
     const decidirVertical = (clientY: number) => {
       if (!stack) return
-      const numPistas = useEditorStore.getState().numPistas
-      const filas = [...stack.children]
-        .map((el) => ({ p: Number((el as HTMLElement).dataset.filaPista), r: el.getBoundingClientRect() }))
-        .filter((f) => Number.isFinite(f.p))
-      if (filas.length === 0) return
-      // las filas vienen dibujadas de arriba (pista mayor) hacia abajo (pista 0)
-      const arriba = filas[0]
-      const abajo = filas[filas.length - 1]
-      const topeAlcanzado = numPistas >= 6
-
-      let destino: number | null = null
-      let insercion: number | null = null
-
-      if (clientY < arriba.r.top) {
-        // por encima de todo: nace una pista en la cima
-        insercion = numPistas
-      } else if (clientY > abajo.r.bottom) {
-        // por debajo de todo: nace una pista en el suelo
-        insercion = 0
-      } else {
-        const dentro = filas.find((f) => clientY >= f.r.top && clientY <= f.r.bottom)
-        if (dentro) {
-          const frac = (clientY - dentro.r.top) / dentro.r.height
-          if (frac < BORDE) insercion = dentro.p + 1 // pegado al borde de arriba
-          else if (frac > 1 - BORDE) insercion = dentro.p // pegado al borde de abajo
-          else destino = dentro.p // en el cuerpo de la fila: mover aquí
-        } else {
-          // el cursor cayó en el hueco entre dos filas: la de arriba marca dónde
-          // se inserta, porque el nuevo nivel se acomoda justo debajo de ella
-          for (let i = 0; i < filas.length - 1; i++) {
-            if (clientY > filas[i].r.bottom && clientY < filas[i + 1].r.top) {
-              insercion = filas[i].p
-              break
-            }
-          }
-        }
-      }
-
-      // con el máximo de niveles ocupado no se ofrece insertar: la separación
-      // señalada se reinterpreta como mover a la fila más cercana, y así el
-      // arrastre vertical sigue respondiendo
-      if (insercion !== null && topeAlcanzado) {
-        insercion = null
-        let mejor = filas[0]
-        for (const f of filas) {
-          const c = f.r.top + f.r.height / 2
-          if (Math.abs(clientY - c) < Math.abs(clientY - (mejor.r.top + mejor.r.height / 2))) mejor = f
-        }
-        destino = mejor.p
-      }
-
-      return { destino, insercion }
+      return resolverDestinoVertical(stack, clientY, useEditorStore.getState().numPistas)
     }
 
     const mover = (ev: globalThis.MouseEvent) => {

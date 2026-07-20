@@ -90,7 +90,11 @@ interface EstadoEditor {
   volumenGlobal: number
   audioRegiones: RegionAudio[]
 
-  agregarDesdeAsset: (asset: MediaAsset) => void
+  // trae un medio a la línea de tiempo. sin destino aterriza al final de la pista
+  // base, como siempre; con destino se puede pedir un nivel concreto (pista) o
+  // abrir uno nuevo en una separación (insertarEn), que es lo que necesita el
+  // arrastre desde el panel para soltar justo donde la guía prometió
+  agregarDesdeAsset: (asset: MediaAsset, destino?: { pista?: number; insertarEn?: number }) => void
   quitarClip: (id: string) => void
   // crea otra instancia del mismo clip (nuevo id, mismo assetId, recortes, tono y
   // efectos). no toca los medios del proyecto: es otra aparición del mismo asset
@@ -473,16 +477,44 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   dibujandoMascara: false,
   insercionPista: null,
 
-  agregarDesdeAsset: (asset) =>
+  agregarDesdeAsset: (asset, destino) =>
     set((s) => {
-      // el medio nuevo entra al final de la pista base, no del proyecto entero,
-      // para que lo apilado en niveles superiores no lo empuje hacia adelante
-      const inicio = duracionTotal(s.pista.clips.filter((c) => c.pista === 0))
+      // por defecto los tres arrays de niveles se quedan como están; solo cambian
+      // si el arrastre pidió abrir una pista nueva en una separación
+      let numPistas = s.numPistas
+      let altosPista = s.altosPista
+      let pistasMeta = s.pistasMeta
+      let clipsPrevios = s.pista.clips
+      let pistaDestino = destino?.pista ?? 0
+
+      // cuando se suelta sobre una separación se abre allí un nivel, empujando
+      // hacia arriba lo que ya vivía en ese índice o por encima, igual que hace
+      // insertarPistaEn al soltar un clip. si no queda cupo, el medio cae en la
+      // pista base y no se crea nada
+      const quiereInsertar = destino?.insertarEn != null && s.numPistas < MAX_PISTAS
+      if (quiereInsertar) {
+        const k = Math.max(0, Math.min(s.numPistas, destino!.insertarEn!))
+        clipsPrevios = clipsPrevios.map((c) => (c.pista >= k ? { ...c, pista: c.pista + 1 } : c))
+        altosPista = [...altosPista]
+        altosPista.splice(k, 0, ALTO_PISTA_BASE)
+        pistasMeta = [...pistasMeta]
+        pistasMeta.splice(k, 0, metaPista(s.numPistas + 1))
+        numPistas = s.numPistas + 1
+        pistaDestino = k
+      } else {
+        // sin inserción, el destino se sujeta al rango de niveles existentes
+        pistaDestino = Math.max(0, Math.min(s.numPistas - 1, pistaDestino))
+      }
+
+      // el medio entra al final de SU nivel de destino, no del proyecto entero,
+      // para que lo apilado en otros niveles no lo empuje hacia adelante y para
+      // que aterrice pegado a lo que ya hubiera en esa misma pista
+      const inicio = duracionTotal(clipsPrevios.filter((c) => c.pista === pistaDestino))
       const clip = {
         id: crypto.randomUUID(),
         assetId: asset.id,
         inicio,
-        pista: 0,
+        pista: pistaDestino,
         duracion: asset.duracion,
         recorteInicio: 0,
         duracionFuente: asset.duracion,
@@ -499,9 +531,12 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       // al colocar el video se reajusta el zoom para que su duración entera quepa
       // en el ancho visible; así no hace falta alejar a mano para ver el clip
       // completo. si todavía no se conoce el ancho, el zoom se queda como estaba
-      const nuevosClips = [...s.pista.clips, clip]
+      const nuevosClips = [...clipsPrevios, clip]
       const encaje = zoomParaEncuadrar(duracionTotal(nuevosClips), s.anchoTimeline)
       return {
+        numPistas,
+        altosPista,
+        pistasMeta,
         pista: { ...s.pista, clips: nuevosClips },
         clipSeleccionado: clip.id,
         capaSeleccionada: null,

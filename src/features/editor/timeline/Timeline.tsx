@@ -17,6 +17,7 @@ import CapaBlock from './CapaBlock'
 import AudioBlock from './AudioBlock'
 import CarrilHeader from './CarrilHeader'
 import AgregarNivelGuia from './AgregarNivelGuia'
+import { resolverDestinoVertical } from './destinoVertical'
 
 const MIN = 0.1
 // ancho de la columna fija de cabeceras (w-44) y el hueco que la separa de las
@@ -63,7 +64,10 @@ export default function Timeline({
 }) {
   const clips = useEditorStore((s) => s.pista.clips)
   const agregarDesdeAsset = useEditorStore((s) => s.agregarDesdeAsset)
-  const [recibiendo, setRecibiendo] = useState(false)
+  // nivel resaltado mientras se arrastra un medio desde el panel: se ilumina solo
+  // esa fila para señalar dónde caería el video. si el cursor está sobre una
+  // separación no hay fila resaltada y en su lugar aparece la guía de pista nueva
+  const [pistaResaltada, setPistaResaltada] = useState<number | null>(null)
   const capas = useEditorStore((s) => s.capas)
   const audioRegiones = useEditorStore((s) => s.audioRegiones)
   const playhead = useEditorStore((s) => s.playhead)
@@ -79,6 +83,7 @@ export default function Timeline({
   // separación entre dos niveles marcada mientras se arrastra un clip: si no es
   // null, ahí se dibuja la guía celeste que promete crear una pista al soltar
   const insercionPista = useEditorStore((s) => s.insercionPista)
+  const setInsercionPista = useEditorStore((s) => s.setInsercionPista)
   const medios = useProjectStore((s) => s.medios)
 
   // único contenedor con desplazamiento: lleva el scroll horizontal y, cuando
@@ -261,14 +266,50 @@ export default function Timeline({
     return base + arriba + altosPista[k] + HUECO_PISTA / 2
   }
 
-  // al soltar un medio arrastrado desde el panel, se añade a la pista
+  // mientras se pasea un medio por encima de la línea de tiempo se resuelve, con
+  // la misma lógica que el arrastre de un clip, si el cursor apunta a una fila (se
+  // ilumina ese nivel) o a una separación (se enciende la guía de pista nueva).
+  // así el destino queda claro antes de soltar, en lugar de sombrear toda la zona
+  function alArrastrarMedioEncima(e: React.DragEvent) {
+    if (!e.dataTransfer.types.includes(TIPO_ARRASTRE)) return
+    e.preventDefault()
+    const stack = filasRef.current
+    if (!stack) return
+    const { destino, insercion } = resolverDestinoVertical(stack, e.clientY, numPistas)
+    if (insercion !== null) {
+      if (insercion !== insercionPista) setInsercionPista(insercion)
+      if (pistaResaltada !== null) setPistaResaltada(null)
+    } else {
+      if (insercionPista !== null) setInsercionPista(null)
+      const d = destino ?? 0
+      if (pistaResaltada !== d) setPistaResaltada(d)
+    }
+  }
+
+  // se apaga el resalte solo cuando el cursor abandona de verdad la zona, no al
+  // cruzar por encima de un clip o una fila hija (que también disparan dragleave)
+  function alSalirMedio(e: React.DragEvent) {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return
+    setInsercionPista(null)
+    setPistaResaltada(null)
+  }
+
+  // al soltar el medio aterriza donde la señal prometía: en la fila bajo el cursor
+  // o, si se apuntaba a una separación, en una pista nueva abierta ahí mismo
   function alSoltar(e: React.DragEvent) {
     e.preventDefault()
-    setRecibiendo(false)
+    const stack = filasRef.current
+    const v = stack
+      ? resolverDestinoVertical(stack, e.clientY, numPistas)
+      : { destino: 0, insercion: null }
+    setInsercionPista(null)
+    setPistaResaltada(null)
     const id = e.dataTransfer.getData(TIPO_ARRASTRE)
     if (!id) return
     const asset = medios.find((m) => m.id === id)
-    if (asset) agregarDesdeAsset(asset)
+    if (!asset) return
+    if (v.insercion !== null) agregarDesdeAsset(asset, { insertarEn: v.insercion })
+    else agregarDesdeAsset(asset, { pista: v.destino ?? 0 })
   }
 
   return (
@@ -362,21 +403,13 @@ export default function Timeline({
 
           <div
             ref={contenidoRef}
-            onDragOver={(e) => {
-              if (e.dataTransfer.types.includes(TIPO_ARRASTRE)) {
-                e.preventDefault()
-                setRecibiendo(true)
-              }
-            }}
-            onDragLeave={() => setRecibiendo(false)}
+            onDragOver={alArrastrarMedioEncima}
+            onDragLeave={alSalirMedio}
             onDrop={alSoltar}
             onMouseDown={deseleccionarFondo}
             onMouseMove={seguirScrubber}
             onMouseLeave={() => setHoverSeg(null)}
-            className={[
-              'relative shrink-0 rounded-lg transition-colors duration-200',
-              recibiendo ? 'bg-brand/10 ring-2 ring-inset ring-brand/40' : '',
-            ].join(' ')}
+            className="relative shrink-0 rounded-lg"
             style={{ width: anchoContenido }}
           >
           <div onMouseDown={alPresionarRegla}>
@@ -389,16 +422,28 @@ export default function Timeline({
               const fila = porPista.get(p)
               const vacio = !fila || fila.clips.length === 0
               const oculta = pistasMeta[p]?.oculta
+              // esta fila es la que recibiría el medio que se arrastra ahora mismo
+              const resaltada = pistaResaltada === p
               return (
                 <motion.div
                   key={pistasMeta[p]?.id ?? p}
                   layout="position"
                   transition={DESLIZA}
                   data-fila-pista={p}
-                  className="relative rounded-lg transition-opacity duration-200"
+                  className="relative rounded-lg transition-[opacity,box-shadow,background-color] duration-150"
                   style={{
                     height: altosPista[p],
-                    background: vacio ? 'rgb(var(--border) / 0.05)' : undefined,
+                    // el azul de marca va literal (rgb del #1861ff) porque el resto
+                    // del tema no expone --brand como variable; así el tinte de la
+                    // fila objetivo se ve de verdad en lugar de quedar transparente
+                    background: resaltada
+                      ? 'rgb(24 97 255 / 0.12)'
+                      : vacio
+                        ? 'rgb(var(--border) / 0.05)'
+                        : undefined,
+                    // el resalte va con un aro interior de esquinas redondeadas, sin
+                    // desplazar nada, para que se lea claro sobre qué fila se suelta
+                    boxShadow: resaltada ? 'inset 0 0 0 2px rgb(24 97 255 / 0.55)' : undefined,
                     // un nivel oculto no se pinta en el visor; en la pista se
                     // atenúa para recordarlo sin sacarlo de en medio
                     opacity: oculta ? 0.4 : 1,
