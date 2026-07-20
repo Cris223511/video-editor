@@ -122,6 +122,28 @@ html.tema-en-transicion * {
     border-radius: var(--radius);
   }
 
+  /* el panel de la herramienta de lienzo reparte su contenido en dos zonas: por
+     un lado la maqueta del proyecto y por otro sus ajustes. el contenedor mide
+     su propio ancho para decidir la forma. cuando hay espacio de sobra las pone
+     lado a lado; en un panel estrecho, que es lo normal en el editor, se apilan
+     pero con bastante aire entre ellas para que no queden pegadas */
+  .lienzo-caja {
+    container-type: inline-size;
+  }
+
+  .lienzo-reparto {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  @container (min-width: 27rem) {
+    .lienzo-reparto {
+      grid-template-columns: minmax(0, 0.82fr) minmax(0, 1fr);
+      gap: 1.25rem;
+      align-items: start;
+    }
+  }
+
   /* todo lo pulsable comparte la misma reacción al pasar el cursor */
   .interactivo {
     transition: background-color 0.18s ease, color 0.18s ease,

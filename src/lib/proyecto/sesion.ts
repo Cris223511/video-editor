@@ -16,13 +16,24 @@ export function capturarProyecto(id: string, creado: number): ProyectoGuardado {
   const pr = useProjectStore.getState()
   const medios = pr.medios.map(medioAGuardado)
 
+  // la portada de la lista sale del video que abre la línea de tiempo (el clip
+  // que empieza antes), y si la pista está vacía, del último medio importado.
+  // como la miniatura ya es un fotograma de la mitad del video, reutilizarla
+  // basta para que la tarjeta nunca aparezca en negro habiendo material
+  const clips = ed.pista.clips ?? []
+  const primerClip = clips.length
+    ? clips.reduce((a, b) => (b.inicio < a.inicio ? b : a))
+    : null
+  const idPortada = primerClip?.assetId ?? pr.medios[pr.medios.length - 1]?.id
+  const medioPortada = pr.medios.find((m) => m.id === idPortada) ?? pr.medios[pr.medios.length - 1]
+
   return {
     version: VERSION_FORMATO,
     id,
     titulo: pr.titulo,
     creado,
     modificado: Date.now(),
-    portada: medios[0]?.miniatura ?? '',
+    portada: medioPortada?.miniatura ?? '',
     medios,
     edicion: {
       clips: ed.pista.clips,

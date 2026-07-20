@@ -45,7 +45,7 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-2.5">
         {medios.length > 0 && (
-          <ul className="mb-2.5 flex flex-col gap-2">
+          <ul className="mb-2.5 grid grid-cols-2 gap-2">
             {medios.map((m) => (
               <li key={m.id}>
                 <div
@@ -65,7 +65,7 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
                   />
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2 py-1.5">
                     <p className="truncate text-[12px] font-medium text-white">{m.nombre}</p>
-                    <p className="text-[10px] text-white/70">
+                    <p className="truncate text-[10px] text-white/70">
                       {formatearDuracion(m.duracion)} · {m.ancho}×{m.alto}
                     </p>
                   </div>

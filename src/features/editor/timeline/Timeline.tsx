@@ -1,6 +1,8 @@
 import { MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 import Icon from '../../../components/ui/Icon'
 import Tooltip from '../../../components/ui/Tooltip'
+import { OndaAudio } from './AudioBlock'
 import { TIPO_ARRASTRE } from '../MediaLibrary'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
@@ -25,6 +27,11 @@ const ALTO_REGLA = 29
 // columna de cabeceras y en las filas del lado derecho para que no se
 // desalineen. el hueco entre niveles de video vive en HUECO_PISTA
 const SEP_SECCION = 12
+
+// transición del deslizamiento de las filas al reordenarlas: corta y con una
+// curva de salida suave, para que una pista que cambia de sitio se vea resbalar
+// hasta su nueva posición en vez de saltar de golpe
+const DESLIZA = { duration: 0.24, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }
 
 // espacios vacíos entre clips consecutivos de un mismo nivel, incluido el que
 // pueda quedar antes del primero
@@ -58,6 +65,8 @@ export default function Timeline({
   const pxPorSegundo = useEditorStore((s) => s.pxPorSegundo)
   const irA = useEditorStore((s) => s.irA)
   const aplicarZoom = useEditorStore((s) => s.aplicarZoom)
+  const setAnchoTimeline = useEditorStore((s) => s.setAnchoTimeline)
+  const limpiarSeleccion = useEditorStore((s) => s.limpiarSeleccion)
   const dividirEnCabezal = useEditorStore((s) => s.dividirEnCabezal)
   const numPistas = useEditorStore((s) => s.numPistas)
   const altosPista = useEditorStore((s) => s.altosPista)
@@ -75,6 +84,13 @@ export default function Timeline({
   // regla y las filas cubran todo el ancho disponible aunque el proyecto sea
   // corto o esté vacío, y no se corten a media pista
   const [anchoVisible, setAnchoVisible] = useState(0)
+  // segundo bajo el cursor mientras se pasea por la línea de tiempo, para dibujar
+  // el scrubber (una línea fina de previsualización) y su etiqueta de tiempo. es
+  // null cuando el cursor está fuera de la zona
+  const [hoverSeg, setHoverSeg] = useState<number | null>(null)
+  // se enciende mientras se arrastra el cabezal para mostrar su etiqueta de
+  // tiempo junto a la manija
+  const [cabezalActivo, setCabezalActivo] = useState(false)
   const total = duracionTotal(clips)
   const anchoContenido = Math.max(total * pxPorSegundo + 200, anchoVisible || 600)
 
@@ -142,11 +158,17 @@ export default function Timeline({
   useEffect(() => {
     const cont = scrollRef.current
     if (!cont) return
-    const ro = new ResizeObserver(() => setAnchoVisible(cont.clientWidth))
+    const medir = () => {
+      setAnchoVisible(cont.clientWidth)
+      // el mismo ancho se comparte con el store, que lo usa para encuadrar el
+      // zoom al soltar un video
+      setAnchoTimeline(cont.clientWidth)
+    }
+    const ro = new ResizeObserver(medir)
     ro.observe(cont)
-    setAnchoVisible(cont.clientWidth)
+    medir()
     return () => ro.disconnect()
-  }, [])
+  }, [setAnchoTimeline])
 
   function moverCabezal(clientX: number) {
     const cont = scrollRef.current
@@ -162,9 +184,11 @@ export default function Timeline({
   function arrastrarCabezal(e: MouseEvent) {
     e.stopPropagation()
     e.preventDefault()
+    setCabezalActivo(true)
     moverCabezal(e.clientX)
     const mover = (ev: globalThis.MouseEvent) => moverCabezal(ev.clientX)
     const soltar = () => {
+      setCabezalActivo(false)
       document.body.style.cursor = ''
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
@@ -175,14 +199,37 @@ export default function Timeline({
   }
 
   function alPresionarRegla(e: MouseEvent) {
+    // la regla mueve el cabezal, no cambia la selección: por eso corta la
+    // propagación antes de que el clic llegue al deseleccionado del fondo
+    e.stopPropagation()
+    setCabezalActivo(true)
     moverCabezal(e.clientX)
     const mover = (ev: globalThis.MouseEvent) => moverCabezal(ev.clientX)
     const soltar = () => {
+      setCabezalActivo(false)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
     window.addEventListener('mousemove', mover)
     window.addEventListener('mouseup', soltar)
+  }
+
+  // sigue el cursor por la zona de la línea de tiempo y guarda el segundo bajo
+  // él para pintar el scrubber. el cálculo replica el de mover el cabezal, pero
+  // sin tocar el estado del reproductor: es solo una previsualización
+  function seguirScrubber(e: MouseEvent) {
+    const cont = scrollRef.current
+    if (!cont) return
+    const rect = cont.getBoundingClientRect()
+    const x = e.clientX - rect.left + cont.scrollLeft
+    setHoverSeg(Math.max(0, x / pxPorSegundo))
+  }
+
+  // punto donde el fondo vacío suelta la selección. los clips, capas y regiones
+  // cortan la propagación en su propio mousedown, así que solo llega aquí el
+  // clic en una zona libre
+  function deseleccionarFondo() {
+    limpiarSeleccion()
   }
 
   // altura, dentro del contenido de la pista, de la separación donde nacería el
@@ -257,21 +304,23 @@ export default function Timeline({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 overflow-y-auto">
+      {/* las dos columnas comparten un único desplazamiento vertical (el de este
+          contenedor) para que cabeceras y filas suban y bajen juntas sin
+          desalinearse. entre ambas queda un hueco limpio, sin línea divisoria */}
+      <div className="flex min-h-0 flex-1 gap-2 overflow-y-auto overflow-x-hidden">
         {/* columna fija con la cabecera de cada nivel, alineada con sus filas.
             el grupo permite que el «+» de agregar nivel asome solo al pasar el
             cursor por encima, en vez de ocupar sitio siempre */}
-        <div
-          className="group/cols w-44 shrink-0"
-          style={{ borderRight: '1px solid rgb(var(--border) / 0.1)' }}
-        >
+        <div className="group/cols w-44 shrink-0">
           <div style={{ height: ALTO_REGLA }} />
           {/* el bloque de niveles de video es relativo para colgar de su borde
               inferior el «+» de agregar, que asoma al pasar el cursor sin ocupar
               sitio en el flujo y, por tanto, sin descuadrar los carriles */}
           <div className="relative mt-2 flex flex-col" style={{ gap: HUECO_PISTA }}>
             {filas.map((p) => (
-              <PistaHeader key={p} indice={p} alto={altosPista[p]} />
+              <motion.div key={pistasMeta[p]?.id ?? p} layout="position" transition={DESLIZA}>
+                <PistaHeader indice={p} alto={altosPista[p]} />
+              </motion.div>
             ))}
             <AgregarNivelMenu />
           </div>
@@ -283,7 +332,7 @@ export default function Timeline({
             <CarrilHeader icono="texto" titulo="Texto y figuras" acento="#f59e0b" alto={36} />
           </div>
           <div style={{ marginTop: SEP_SECCION }}>
-            <CarrilHeader icono="audio" titulo="Audio" acento="#10b981" alto={32} />
+            <CarrilHeader icono="musica" titulo="Audio" acento="#10b981" alto={32} />
           </div>
         </div>
 
@@ -297,14 +346,17 @@ export default function Timeline({
         }}
         onDragLeave={() => setRecibiendo(false)}
         onDrop={alSoltar}
+        onMouseDown={deseleccionarFondo}
+        onMouseMove={seguirScrubber}
+        onMouseLeave={() => setHoverSeg(null)}
         className={[
           'relative min-h-0 flex-1 overflow-x-auto overflow-y-auto transition-colors duration-200',
           recibiendo ? 'bg-brand/10 ring-2 ring-inset ring-brand/40' : '',
         ].join(' ')}
       >
-        <div className="relative h-full" style={{ width: anchoContenido }}>
+        <div className="relative" style={{ width: anchoContenido }}>
           <div onMouseDown={alPresionarRegla}>
-            <TimeRuler total={total} pxPorSegundo={pxPorSegundo} ancho={anchoContenido} />
+            <TimeRuler total={total} pxPorSegundo={pxPorSegundo} ancho={anchoContenido} alto={ALTO_REGLA} />
           </div>
 
           {/* niveles de video, del más alto al más bajo */}
@@ -314,10 +366,12 @@ export default function Timeline({
               const vacio = !fila || fila.clips.length === 0
               const oculta = pistasMeta[p]?.oculta
               return (
-                <div
-                  key={p}
+                <motion.div
+                  key={pistasMeta[p]?.id ?? p}
+                  layout="position"
+                  transition={DESLIZA}
                   data-fila-pista={p}
-                  className="relative rounded-md transition-opacity duration-200"
+                  className="relative rounded-lg transition-opacity duration-200"
                   style={{
                     height: altosPista[p],
                     background: vacio ? 'rgb(var(--border) / 0.05)' : undefined,
@@ -358,21 +412,42 @@ export default function Timeline({
                       />
                     )
                   })}
-                </div>
+                </motion.div>
               )
             })}
           </div>
 
-          {/* pista de capas. el margen superior es el mismo SEP_SECCION que separa
-              las cabeceras del lado izquierdo, para que ambas columnas cuadren */}
-          <div className="relative h-9" style={{ marginTop: SEP_SECCION }}>
+          {/* carril de capas (texto y figuras). el margen superior es el mismo
+              SEP_SECCION que separa las cabeceras del lado izquierdo, para que
+              ambas columnas cuadren. vacío enseña su placeholder con icono */}
+          <div
+            className="relative h-9 overflow-hidden rounded-lg"
+            style={{ marginTop: SEP_SECCION, background: 'rgb(var(--border) / 0.05)' }}
+          >
+            {capas.length === 0 && (
+              <div className="pointer-events-none flex h-full items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
+                <Icon name="texto" size={13} />
+                <span>Añadir texto</span>
+              </div>
+            )}
             {capas.map((c) => (
               <CapaBlock key={c.id} capa={c} pxPorSegundo={pxPorSegundo} puntos={puntos} />
             ))}
           </div>
 
-          {/* pista de audio */}
-          <div className="relative h-8" style={{ marginTop: SEP_SECCION }}>
+          {/* carril de audio. de fondo lleva una onda muy tenue para que no se vea
+              plano aunque esté vacío; encima van las regiones con su propia onda */}
+          <div
+            className="relative h-8 overflow-hidden rounded-lg"
+            style={{ marginTop: SEP_SECCION, background: 'rgb(var(--border) / 0.05)' }}
+          >
+            <OndaAudio semilla="fondo-audio" color="rgb(var(--border) / 0.5)" opacidad={0.35} barras={120} />
+            {audioRegiones.length === 0 && (
+              <div className="pointer-events-none relative flex h-full items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
+                <Icon name="musica" size={13} />
+                <span>Añadir audio</span>
+              </div>
+            )}
             {audioRegiones.map((r) => (
               <AudioBlock key={r.id} region={r} pxPorSegundo={pxPorSegundo} puntos={puntos} />
             ))}
@@ -387,7 +462,7 @@ export default function Timeline({
               className="pointer-events-none absolute z-30 flex items-center"
               style={{ top: yInsercion(insercionPista) - 1, left: 0, width: anchoContenido }}
             >
-              <span className="h-0.5 w-full" style={{ background: '#38bdf8', boxShadow: '0 0 6px rgba(56,189,248,0.9)' }} />
+              <span className="h-0.5 w-full rounded-full" style={{ background: '#38bdf8', boxShadow: '0 0 6px rgba(56,189,248,0.9)' }} />
               <span
                 className="absolute left-2 -translate-y-px rounded px-1.5 py-0.5 text-[10px] font-medium text-white"
                 style={{ background: '#38bdf8' }}
@@ -397,10 +472,35 @@ export default function Timeline({
             </div>
           )}
 
+          {/* scrubber: línea fina de previsualización que sigue al cursor, más
+              delgada y tenue que el cabezal, con la etiqueta del segundo sobre la
+              regla. no intercepta el ratón para no estorbar a clips ni cabezal */}
+          {hoverSeg !== null && (
+            <div
+              className="pointer-events-none absolute bottom-0 top-0 z-10"
+              style={{ left: hoverSeg * pxPorSegundo }}
+            >
+              <span className="absolute bottom-0 top-0 w-px" style={{ background: 'rgb(var(--brand) / 0.45)' }} />
+              <span
+                className="absolute top-0 -translate-x-1/2 rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white shadow-sm"
+                style={{ background: 'rgb(var(--brand) / 0.85)' }}
+              >
+                {formatearDuracion(hoverSeg)}
+              </span>
+            </div>
+          )}
+
           <div
-            className="pointer-events-none absolute bottom-0 top-0 z-20 w-px bg-brand"
+            className="pointer-events-none absolute bottom-0 top-0 z-20 w-0.5 -translate-x-px bg-brand"
             style={{ left: playhead * pxPorSegundo }}
           >
+            {/* etiqueta del tiempo del cabezal, visible mientras se arrastra para
+                seguir el segundo exacto al que se mueve */}
+            {cabezalActivo && (
+              <span className="absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full rounded bg-brand px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white shadow">
+                {formatearDuracion(playhead)}
+              </span>
+            )}
             {/* manija superior: se puede agarrar y arrastrar a lo largo de la
                 pista para mover el cabezal. es lo único con eventos activos de
                 esta capa, el resto de la línea azul no intercepta el ratón */}

@@ -27,8 +27,18 @@ export type BaseRecorte = {
 }
 
 const PX_POR_SEGUNDO_DEFECTO = 60
-const PX_MIN = 12
+const PX_MIN = 8
 const PX_MAX = 400
+
+// escala en píxeles por segundo que hace caber toda la duración dentro del ancho
+// útil de la pista, dejando un pequeño margen a la derecha para que el último
+// clip no quede pegado al borde. devuelve null cuando aún no se conoce el ancho
+// o no hay nada que encuadrar, y en ese caso el zoom se deja como estaba
+function zoomParaEncuadrar(total: number, anchoUtil: number): number | null {
+  if (anchoUtil <= 0 || total <= 0) return null
+  const px = (anchoUtil - 40) / total
+  return Math.max(PX_MIN, Math.min(PX_MAX, px))
+}
 const DURACION_MINIMA = 0.1
 const DURACION_MINIMA_CAPA = 0.2
 
@@ -63,6 +73,11 @@ interface EstadoEditor {
   regionSeleccionada: string | null
   herramienta: Herramienta
   pxPorSegundo: number
+  // ancho útil en píxeles del área de clips, medido en vivo desde la interfaz.
+  // sirve para calcular el zoom que encuadra un video recién soltado sin que el
+  // usuario tenga que alejar a mano
+  anchoTimeline: number
+  setAnchoTimeline: (px: number) => void
   resolucion: { ancho: number; alto: number }
   resolucionAuto: { ancho: number; alto: number }
   lienzoManual: boolean
@@ -101,6 +116,9 @@ interface EstadoEditor {
   dividirEnCabezal: () => void
   cerrarHueco: (desde: number, pista: number) => void
   seleccionar: (id: string | null) => void
+  // deja sin selección cualquier clip, capa o región a la vez. la usa el clic en
+  // una zona vacía de la línea de tiempo para soltar lo que estuviera marcado
+  limpiarSeleccion: () => void
 
   agregarPista: () => void
   // crea un nivel nuevo en la posición indicada empujando hacia arriba los que ya
@@ -349,6 +367,7 @@ const entre01 = (v: number) => Math.max(0, Math.min(1, v))
 // metadatos de partida para un nivel recién nacido: rótulo con su número y los
 // tres interruptores en reposo
 const metaPista = (n: number): PistaMeta => ({
+  id: crypto.randomUUID(),
   nombre: `Video ${n}`,
   silenciada: false,
   oculta: false,
@@ -426,6 +445,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   regionSeleccionada: null,
   herramienta: 'propiedades',
   pxPorSegundo: PX_POR_SEGUNDO_DEFECTO,
+  anchoTimeline: 0,
+  setAnchoTimeline: (px) => set({ anchoTimeline: px }),
   resolucion: { ancho: 1920, alto: 1080 },
   resolucionAuto: { ancho: 1920, alto: 1080 },
   lienzoManual: false,
@@ -462,11 +483,17 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       const primero = s.pista.clips.length === 0 && asset.ancho > 0
       const resolucionAuto = primero ? { ancho: asset.ancho, alto: asset.alto } : s.resolucionAuto
       const resolucion = primero && !s.lienzoManual ? resolucionAuto : s.resolucion
+      // al colocar el video se reajusta el zoom para que su duración entera quepa
+      // en el ancho visible; así no hace falta alejar a mano para ver el clip
+      // completo. si todavía no se conoce el ancho, el zoom se queda como estaba
+      const nuevosClips = [...s.pista.clips, clip]
+      const encaje = zoomParaEncuadrar(duracionTotal(nuevosClips), s.anchoTimeline)
       return {
-        pista: { ...s.pista, clips: [...s.pista.clips, clip] },
+        pista: { ...s.pista, clips: nuevosClips },
         clipSeleccionado: clip.id,
         capaSeleccionada: null,
         herramienta: 'propiedades',
+        pxPorSegundo: encaje ?? s.pxPorSegundo,
         resolucion,
         resolucionAuto,
       }
@@ -703,6 +730,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       regionSeleccionada: id ? null : s.regionSeleccionada,
       herramienta: id ? 'propiedades' : s.herramienta,
     })),
+
+  limpiarSeleccion: () =>
+    set({ clipSeleccionado: null, capaSeleccionada: null, regionSeleccionada: null }),
 
   // el nivel nuevo aparece encima de los demás, vacío y con el alto estándar y
   // sus metadatos en reposo

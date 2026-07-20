@@ -19,17 +19,16 @@ export default function CarrilHeader({
 }) {
   return (
     <div
-      className="relative flex items-center gap-2 overflow-hidden rounded-l-md pl-3 pr-2"
+      className="relative flex items-center gap-2 overflow-hidden rounded-lg pl-3 pr-2"
       style={{
         height: alto,
         background: 'rgb(var(--border) / 0.06)',
-        borderRight: '1px solid rgb(var(--border) / 0.14)',
       }}
     >
       {/* la franja vertical del color propio del carril es la marca que lo
           diferencia de las pistas de video, que no la llevan */}
       <span
-        className="absolute inset-y-0 left-0 w-1 rounded-l-md"
+        className="absolute inset-y-0 left-0 w-1 rounded-l-lg"
         style={{ background: acento }}
       />
       <span

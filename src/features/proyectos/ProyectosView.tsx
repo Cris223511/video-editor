@@ -303,17 +303,42 @@ export default function ProyectosView() {
           >
             {/* la miniatura pasa de ser un botón a un contenedor: dentro van dos
                 acciones y un botón no puede llevar otros botones dentro */}
-            <div className="relative block aspect-video w-full overflow-hidden bg-black/70">
+            <div className="relative block aspect-video w-full overflow-hidden">
               {p.portada ? (
                 <img
                   src={p.portada}
                   alt=""
-                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  className="h-full w-full bg-black/70 object-cover transition-transform duration-300 group-hover:scale-105"
                 />
               ) : (
-                <span className="grid h-full w-full place-items-center text-[color:var(--muted)]">
-                  <Icon name="pelicula" size={26} />
-                </span>
+                // sin material del que sacar un fotograma, un rectángulo negro se
+                // ve como un error. en su lugar va un marcador tranquilo: un
+                // degradado suave con la marca y un icono de película centrado
+                <div className="relative grid h-full w-full place-items-center overflow-hidden">
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background:
+                        'linear-gradient(135deg, rgb(var(--brand) / 0.14), rgb(var(--surface)) 55%, rgb(var(--brand) / 0.08))',
+                    }}
+                  />
+                  {/* una retícula tenue de puntos le quita la sensación de vacío
+                      sin robar protagonismo al icono */}
+                  <div
+                    className="absolute inset-0 opacity-60"
+                    style={{
+                      backgroundImage:
+                        'radial-gradient(rgb(var(--border) / 0.35) 1px, transparent 1px)',
+                      backgroundSize: '14px 14px',
+                    }}
+                  />
+                  <div className="relative flex flex-col items-center gap-1.5 text-[color:var(--muted)]">
+                    <span className="grid h-11 w-11 place-items-center rounded-full bg-brand/12 text-brand ring-1 ring-brand/20">
+                      <Icon name="pelicula" size={20} />
+                    </span>
+                    <span className="text-[11px] font-medium">Proyecto sin medios</span>
+                  </div>
+                </div>
               )}
               <span className="absolute bottom-2 right-2 rounded-md bg-black/75 px-1.5 py-0.5 text-[13px] font-medium text-white">
                 {formatearDuracion(p.duracion)}

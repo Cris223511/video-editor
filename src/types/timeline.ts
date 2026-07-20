@@ -67,6 +67,10 @@ export interface Track {
 // nivel i. guardan el rótulo del nivel y sus tres interruptores, más el orden
 // que el usuario le haya dado al subirlo o bajarlo
 export interface PistaMeta {
+  // identificador estable del nivel, independiente de su posición. viaja con la
+  // pista cuando se reordena, y es lo que deja animar el deslizamiento de las
+  // filas al permutarlas en lugar de que salten de golpe
+  id: string
   nombre: string
   silenciada: boolean
   oculta: boolean

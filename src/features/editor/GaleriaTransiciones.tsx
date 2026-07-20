@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 import { TipoTransicion } from '../../types/timeline'
 import {
@@ -12,7 +12,8 @@ import { pintarTransicion } from '../../lib/transiciones/pintar'
 import { Clip } from '../../types/timeline'
 
 // las mismas dos fotos en todas las muestras: así lo único que cambia entre una
-// tarjeta y otra es la transición, y se pueden comparar de verdad
+// tarjeta y otra es la transición, y se pueden comparar de verdad. son las mismas
+// que usa la prueba de la portada, ya sabemos que cargan bien con COEP activo
 const PLANO_A =
   'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=400&q=60'
 const PLANO_B =
@@ -20,6 +21,7 @@ const PLANO_B =
 
 const ANCHO = 240
 const ALTO = 135
+const PERIODO = 1800
 
 // clips de mentira para poder reutilizar el mismo motor que dibuja de verdad.
 // así la muestra no es una imitación: es la transición real ejecutada sobre dos
@@ -42,33 +44,60 @@ function clipFalso(id: string, tipo: TipoTransicion, inicio: number): Clip {
 
 // muestra de una transición. dibuja en su propio lienzo y solo se anima cuando
 // el cursor está encima: con todas las tarjetas moviéndose a la vez el panel se
-// vuelve ilegible
-function Demo({ t, imagenes }: { t: Transicion; imagenes: HTMLImageElement[] }) {
+// vuelve ilegible. el gris del reposo y el color del hover no se pintan aquí, los
+// pone una clase css sobre el propio lienzo, así el dibujo va siempre en color y
+// el paso a blanco y negro es una simple transición de css
+function Demo({
+  t,
+  imagenes,
+  listo,
+}: {
+  t: Transicion
+  imagenes: React.MutableRefObject<HTMLImageElement[]>
+  listo: boolean
+}) {
   const ref = useRef<HTMLCanvasElement>(null)
   const bucle = useRef(0)
+
+  // recorta la foto para cubrir el lienzo sin deformarla, igual que en la portada.
+  // dibujando a lo ancho y alto la imagen se estiraba y dejaba franjas
+  function pintarFoto(ctx: CanvasRenderingContext2D, img: HTMLImageElement, alfa: number) {
+    const e = Math.max(ANCHO / img.naturalWidth, ALTO / img.naturalHeight)
+    const w = img.naturalWidth * e
+    const h = img.naturalHeight * e
+    ctx.save()
+    ctx.globalAlpha = alfa
+    ctx.drawImage(img, (ANCHO - w) / 2, (ALTO - h) / 2, w, h)
+    ctx.restore()
+  }
 
   function dibujar(p: number) {
     const lienzo = ref.current
     const ctx = lienzo?.getContext('2d')
-    if (!lienzo || !ctx || imagenes.length < 2) return
+    const imgs = imagenes.current
+    if (!lienzo || !ctx || imgs.length < 2) return
     ctx.clearRect(0, 0, ANCHO, ALTO)
     const entrante = clipFalso('b', t.id, 1)
     const saliente = clipFalso('a', 'ninguna', 0)
     const pintar = (clip: Clip, alfa: number) => {
-      const img = clip.id === 'b' ? imagenes[1] : imagenes[0]
-      ctx.save()
-      ctx.globalAlpha = alfa
-      ctx.drawImage(img, 0, 0, ANCHO, ALTO)
-      ctx.restore()
+      pintarFoto(ctx, clip.id === 'b' ? imgs[1] : imgs[0], alfa)
     }
     pintarTransicion(ctx, ANCHO, ALTO, entrante, saliente, p, pintar)
   }
 
+  // en cuanto las dos fotos están cargadas se pinta el primer plano quieto, que
+  // es lo que se ve en reposo. antes el lienzo quedaba en negro porque nada lo
+  // llegaba a dibujar tras la carga
+  useEffect(() => {
+    if (listo) dibujar(0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listo])
+
   function arrancar() {
+    cancelAnimationFrame(bucle.current)
     const inicio = performance.now()
     const paso = () => {
-      const transcurrido = ((performance.now() - inicio) % 1800) / 1800
-      dibujar(transcurrido)
+      dibujar(((performance.now() - inicio) % PERIODO) / PERIODO)
       bucle.current = requestAnimationFrame(paso)
     }
     bucle.current = requestAnimationFrame(paso)
@@ -76,22 +105,20 @@ function Demo({ t, imagenes }: { t: Transicion; imagenes: HTMLImageElement[] }) 
 
   function parar() {
     cancelAnimationFrame(bucle.current)
-    // al soltar se queda el primer plano quieto, que es el estado en reposo
+    // al soltar vuelve al primer plano quieto, el estado de reposo
     dibujar(0)
   }
 
+  useEffect(() => () => cancelAnimationFrame(bucle.current), [])
+
   return (
     <canvas
-      ref={(el) => {
-        if (el && imagenes.length >= 2) {
-          el.width = ANCHO
-          el.height = ALTO
-          setTimeout(() => dibujar(0), 0)
-        }
-      }}
+      ref={ref}
+      width={ANCHO}
+      height={ALTO}
       onMouseEnter={arrancar}
       onMouseLeave={parar}
-      className="aspect-video w-full rounded-md bg-black"
+      className="aspect-video w-full rounded-md bg-black grayscale transition-[filter] duration-300 group-hover/muestra:grayscale-0"
     />
   )
 }
@@ -106,10 +133,15 @@ export default function GaleriaTransiciones({
   onElegir: (t: TipoTransicion) => void
 }) {
   const [busqueda, setBusqueda] = useState('')
-  const [imagenes, setImagenes] = useState<HTMLImageElement[]>([])
+  const imagenes = useRef<HTMLImageElement[]>([])
+  const [listo, setListo] = useState(false)
 
-  // las dos fotos se cargan una sola vez y las comparten todas las muestras
-  useMemo(() => {
+  // las dos fotos se cargan una sola vez y las comparten todas las muestras. van
+  // en un ref porque el motor las lee al vuelo al pintar; el estado listo solo
+  // sirve para avisar a cada muestra de que ya puede dibujarse. el crossOrigin es
+  // imprescindible: con COEP activo una imagen de otro dominio sin él ni siquiera
+  // carga, y el lienzo se quedaría en negro
+  useEffect(() => {
     let vivas = 0
     const cargadas: HTMLImageElement[] = []
     ;[PLANO_A, PLANO_B].forEach((src, i) => {
@@ -117,7 +149,10 @@ export default function GaleriaTransiciones({
       img.crossOrigin = 'anonymous'
       img.onload = () => {
         cargadas[i] = img
-        if (++vivas === 2) setImagenes([cargadas[0], cargadas[1]])
+        if (++vivas === 2) {
+          imagenes.current = [cargadas[0], cargadas[1]]
+          setListo(true)
+        }
       }
       img.src = src
     })
@@ -173,14 +208,14 @@ export default function GaleriaTransiciones({
                   onClick={() => onElegir(t.id)}
                   title={t.descripcion}
                   className={[
-                    'flex flex-col gap-1.5 rounded-xl p-1.5 text-left transition-all duration-200',
+                    'group/muestra flex flex-col gap-1.5 rounded-xl p-1.5 text-left transition-all duration-200',
                     elegida
                       ? 'ring-2 ring-brand'
                       : 'ring-1 ring-black/10 hover:ring-brand/50 dark:ring-white/10',
                   ].join(' ')}
                   style={{ background: 'rgb(var(--border) / 0.05)' }}
                 >
-                  <Demo t={t} imagenes={imagenes} />
+                  <Demo t={t} imagenes={imagenes} listo={listo} />
                   <span
                     className={[
                       'truncate px-0.5 text-[13px] font-medium',

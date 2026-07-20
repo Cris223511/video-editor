@@ -12,10 +12,11 @@ export function analizarVideo(file: File): Promise<Omit<MediaAsset, 'id'>> {
     video.src = url
 
     video.onloadedmetadata = () => {
-      // se salta un instante para no capturar el primer frame, que a veces
-      // sale en negro
-      const objetivo = Math.min(0.1, (video.duration || 0) / 2)
-      video.currentTime = isFinite(objetivo) ? objetivo : 0
+      // la portada sale de la mitad exacta del video, no del arranque. el primer
+      // fotograma suele venir en negro o con un rótulo, y un punto al azar no
+      // representa el clip; la mitad da una imagen bastante fiel de lo que hay
+      const dur = isFinite(video.duration) ? video.duration : 0
+      video.currentTime = dur > 0 ? dur / 2 : 0
     }
 
     video.onseeked = () => {

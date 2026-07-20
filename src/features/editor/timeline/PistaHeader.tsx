@@ -143,16 +143,16 @@ export default function PistaHeader({ indice, alto }: { indice: number; alto: nu
     <div
       onMouseDown={iniciarReordenar}
       className={[
-        'group relative flex flex-col justify-center gap-1 rounded-l-md px-2 py-1 transition-shadow',
+        'group relative flex flex-col justify-center gap-1 rounded-lg px-2 py-1 transition-shadow',
         reordenable ? 'cursor-grab' : '',
         arrastrando ? 'z-30 cursor-grabbing shadow-lg ring-1 ring-brand/60' : '',
       ].join(' ')}
-      // el borde de la derecha marca dónde acaba la columna de nombres, para que
-      // el rótulo no quede pegado al primer clip
+      // la cabecera va sin línea a la derecha: lo que la separa del área de clips
+      // es el hueco entre columnas, no un borde. el fondo suave con esquinas
+      // redondeadas es lo que la delimita
       style={{
         height: alto,
         background: arrastrando ? 'rgb(var(--border) / 0.12)' : 'rgb(var(--border) / 0.06)',
-        borderRight: '1px solid rgb(var(--border) / 0.14)',
       }}
     >
       <div className="flex items-center gap-1">
