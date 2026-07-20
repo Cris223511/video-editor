@@ -1,9 +1,12 @@
 import { useState } from 'react'
+import { Info } from 'lucide-react'
 import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
 import { useProjectStore } from '../../store/useProjectStore'
 import { useImportarMedios } from '../import/useImportarMedios'
 import { formatearDuracion } from '../../lib/format/duracion'
+import FichaMedio from './FichaMedio'
+import { MediaAsset } from '../../types/media'
 
 // tipo de dato que viaja al arrastrar un medio hacia la línea de tiempo
 export const TIPO_ARRASTRE = 'application/x-video-editor-asset'
@@ -16,6 +19,8 @@ export default function MediaLibrary() {
   const quitar = useProjectStore((s) => s.quitar)
   const { procesar, ocupado } = useImportarMedios()
   const [encima, setEncima] = useState(false)
+  // qué medio tiene la ficha de detalles abierta
+  const [detalle, setDetalle] = useState<MediaAsset | null>(null)
 
   const soltarArchivos = (e: React.DragEvent) => {
     e.preventDefault()
@@ -33,36 +38,53 @@ export default function MediaLibrary() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-2.5">
         {medios.length > 0 && (
-          <ul className="mb-2.5 grid grid-cols-2 gap-2">
+          <ul className="mb-2.5 flex flex-col gap-2">
             {medios.map((m) => (
               <li key={m.id}>
-                <Tooltip texto={`${m.nombre} · arrastra a la pista`}>
-                  <div
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData(TIPO_ARRASTRE, m.id)
-                      e.dataTransfer.effectAllowed = 'copy'
-                    }}
-                    className="group relative w-full cursor-grab overflow-hidden rounded-lg ring-1 ring-[rgb(var(--border)/0.12)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:ring-brand/50 active:cursor-grabbing"
-                  >
-                    <img
-                      src={m.miniatura}
-                      alt=""
-                      className="h-16 w-full bg-black/30 object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-1.5 py-1">
-                      <p className="truncate text-[10px] font-medium text-white">{m.nombre}</p>
-                      <p className="text-[9px] text-white/70">{formatearDuracion(m.duracion)}</p>
-                    </div>
-                    <button
-                      onClick={() => quitar(m.id)}
-                      title="Quitar del proyecto"
-                      className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-md bg-black/60 text-white opacity-0 backdrop-blur transition-all duration-200 hover:bg-red-500 group-hover:opacity-100"
-                    >
-                      <Icon name="papelera" size={12} />
-                    </button>
+                <div
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(TIPO_ARRASTRE, m.id)
+                    e.dataTransfer.effectAllowed = 'copy'
+                  }}
+                  // la miniatura ocupa toda la proporción del video, así se ve el
+                  // encuadre de verdad en lugar de una franja recortada
+                  className="group relative w-full cursor-grab overflow-hidden rounded-lg bg-black/40 ring-1 ring-[rgb(var(--border)/0.12)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:ring-brand/50 active:cursor-grabbing"
+                >
+                  <img
+                    src={m.miniatura}
+                    alt=""
+                    className="aspect-video w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2 py-1.5">
+                    <p className="truncate text-[12px] font-medium text-white">{m.nombre}</p>
+                    <p className="text-[10px] text-white/70">
+                      {formatearDuracion(m.duracion)} · {m.ancho}×{m.alto}
+                    </p>
                   </div>
-                </Tooltip>
+                  {/* los dos botones salen al pasar el cursor: ver la ficha del
+                      medio o quitarlo del proyecto */}
+                  <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                    <Tooltip texto="Ver detalles">
+                      <button
+                        onClick={() => setDetalle(m)}
+                        aria-label="Ver detalles"
+                        className="grid h-7 w-7 place-items-center rounded-md bg-black/60 text-white backdrop-blur transition-colors hover:bg-brand"
+                      >
+                        <Info size={14} />
+                      </button>
+                    </Tooltip>
+                    <Tooltip texto="Quitar del proyecto">
+                      <button
+                        onClick={() => quitar(m.id)}
+                        aria-label="Quitar del proyecto"
+                        className="grid h-7 w-7 place-items-center rounded-md bg-black/60 text-white backdrop-blur transition-colors hover:bg-red-500"
+                      >
+                        <Icon name="papelera" size={13} />
+                      </button>
+                    </Tooltip>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>
@@ -106,6 +128,8 @@ export default function MediaLibrary() {
           />
         </label>
       </div>
+
+      <FichaMedio medio={detalle} onCerrar={() => setDetalle(null)} />
     </aside>
   )
 }

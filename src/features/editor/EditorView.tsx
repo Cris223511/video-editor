@@ -54,14 +54,14 @@ export default function EditorView() {
 
   return (
     <div className="h-[calc(100dvh-3.5rem)] p-1.5">
-      <PanelGroup direction="vertical" autoSaveId="ve-vertical-2">
+      <PanelGroup direction="vertical" autoSaveId="ve-vertical-3">
         {/* fila superior: herramientas, opciones y visor */}
         <Panel defaultSize={64} minSize={35}>
           <div className="flex h-full gap-1.5">
             <RielHerramientas onElegir={() => !verOpciones && alternar(opciones, false)} />
 
             <div className="min-w-0 flex-1">
-              <PanelGroup direction="horizontal" autoSaveId="ve-horizontal-2">
+              <PanelGroup direction="horizontal" autoSaveId="ve-horizontal-3">
                 <Panel
                   ref={opciones}
                   id="opciones"
@@ -95,7 +95,7 @@ export default function EditorView() {
 
         {/* fila inferior: medios a la izquierda y línea de tiempo al lado */}
         <Panel defaultSize={36} minSize={18}>
-          <PanelGroup direction="horizontal" autoSaveId="ve-inferior-2">
+          <PanelGroup direction="horizontal" autoSaveId="ve-inferior-3">
             <Panel
               ref={medios}
               id="medios"
