@@ -12,7 +12,7 @@ import { encuadreDe, encuadreNeutro, rectClip } from '../../lib/timeline/encuadr
 import { gananciaEn } from '../../lib/audio/ganancia'
 import { rectContenido } from '../../lib/layers/rect'
 import { posicionCapa } from '../../lib/layers/motion'
-import { CapaCensura } from '../../types/layers'
+import { CapaCensura, CapaFigura } from '../../types/layers'
 import { Clip } from '../../types/timeline'
 import {
   esTonoNeutro,
@@ -25,6 +25,7 @@ import {
 } from '../../lib/color/tono'
 import { anterior, pintarTransicion, progreso } from '../../lib/transiciones/pintar'
 import { buscarTransicion } from '../../lib/transiciones/catalogo'
+import { TIPO_FIGURA } from './panels/FiguraPanel'
 
 // visor central. monta un video por clip y solo deja visible y sonando el que
 // corresponde al cabezal. la reproducción se apoya en el tiempo nativo de cada
@@ -36,6 +37,7 @@ export default function Preview() {
   const irA = useEditorStore((s) => s.irA)
   const pausar = useEditorStore((s) => s.pausar)
   const seleccionar = useEditorStore((s) => s.seleccionar)
+  const agregarFigura = useEditorStore((s) => s.agregarFigura)
   const hayCapas = useEditorStore((s) => s.capas.length > 0)
   const hayCensura = useEditorStore((s) => s.capas.some((c) => c.tipo === 'censura'))
   const resolucion = useEditorStore((s) => s.resolucion)
@@ -606,6 +608,23 @@ export default function Preview() {
             // propagación, así que solo llega aquí el clic en el propio video
             onMouseDown={() => {
               if (activo) seleccionar(activo.id)
+            }}
+            // aceptar el soltar de una forma arrastrada desde el panel de figuras.
+            // solo se admite si el arrastre trae ese tipo, para no interferir con
+            // otros arrastres del editor
+            onDragOver={(e) => {
+              if (e.dataTransfer.types.includes(TIPO_FIGURA)) e.preventDefault()
+            }}
+            onDrop={(e) => {
+              const forma = e.dataTransfer.getData(TIPO_FIGURA) as CapaFigura['forma']
+              if (!forma) return
+              e.preventDefault()
+              // el propio div del lienzo ya tiene la proporción exacta, así que su
+              // rectángulo basta para pasar el cursor a fracción 0..1 acotada
+              const r = e.currentTarget.getBoundingClientRect()
+              const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width))
+              const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))
+              agregarFigura(forma, x, y)
             }}
           >
             {/* capa recortada: aquí vive todo lo que es imagen del video. el

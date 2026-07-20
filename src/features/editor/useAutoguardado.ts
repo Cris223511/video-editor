@@ -22,10 +22,14 @@ function huella() {
     e.altosPista,
     e.capas,
     e.audioRegiones,
+    e.audios,
     e.volumenGlobal,
     e.resolucion,
     e.colorFondo,
     e.marco,
+    // el acercamiento de la línea de tiempo también se recuerda: al cambiarlo se
+    // guarda solo, para reabrir el proyecto con el mismo zoom con que se dejó
+    e.pxPorSegundo,
   ])
 }
 

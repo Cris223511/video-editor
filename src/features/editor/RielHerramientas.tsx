@@ -24,8 +24,8 @@ const CLAVE_EXPANDIDO = 've-riel-expandido'
 
 // anchos del riel en cada estado. el estrecho deja hueco para el icono centrado;
 // el ancho suma el espacio del nombre que se revela al lado
-const ANCHO_COLAPSADO = 56
-const ANCHO_EXPANDIDO = 176
+const ANCHO_COLAPSADO = 62
+const ANCHO_EXPANDIDO = 182
 
 // margen lateral de cada fila. el panel gasta 1px de borde por lado, así que del
 // ancho colapsado quedan 54px útiles; con 5px de aire a cada costado la fila mide
@@ -35,7 +35,7 @@ const ANCHO_EXPANDIDO = 176
 // al abrir. antes la fila usaba 6px de margen (42px de ancho) contra un icono de
 // 44px: el cuadro asomaba 2px y empujaba el dibujo 1px a la derecha, ese era el
 // descuadre que se veía plegado
-const AIRE_LATERAL = 5
+const AIRE_LATERAL = 8
 
 // envuelve una fila en su tooltip solo cuando hace falta. plegado el riel el
 // nombre no se ve y el tooltip lo aclara; desplegado el texto ya está a la vista
@@ -88,7 +88,10 @@ export default function RielHerramientas({ onElegir }: { onElegir?: () => void }
       style={{ width: expandido ? ANCHO_EXPANDIDO : ANCHO_COLAPSADO }}
     >
       <div
-        className="flex flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden"
+        // la barra de desplazamiento se oculta a propósito: cuando asomaba, robaba
+        // ancho a la columna y descentraba los iconos, que es lo que se veía
+        // aplastado. el desplazamiento con la rueda sigue funcionando igual
+        className="flex flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ paddingLeft: AIRE_LATERAL, paddingRight: AIRE_LATERAL }}
       >
         {herramientas.map((h) => (

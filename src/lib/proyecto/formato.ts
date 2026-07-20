@@ -44,6 +44,9 @@ export interface ProyectoGuardado {
     audioRegiones: RegionAudio[]
     audios?: ClipAudio[]
     volumenGlobal: number
+    // zoom de la línea de tiempo (píxeles por segundo), para reabrir el proyecto
+    // con el mismo acercamiento con que se dejó
+    pxPorSegundo?: number
     resolucion: { ancho: number; alto: number }
     resolucionAuto: { ancho: number; alto: number }
     lienzoManual: boolean

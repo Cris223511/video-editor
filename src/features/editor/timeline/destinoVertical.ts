@@ -14,10 +14,12 @@ export interface DestinoVertical {
   insercion: number | null
 }
 
-// franja superior e inferior de cada fila que deja de contar como «soltar encima»
-// para pasar a «abrir un nivel en esta separación». el centro queda para el
-// destino de siempre y los bordes para insertar
-const BORDE = 0.3
+// tolerancia en píxeles para apuntar a la separación entre dos filas. estar dentro
+// del cuerpo de una fila cuenta como «soltar aquí»; solo el hueco entre filas (más
+// esta pequeña holgura) o quedar por fuera de la pila abren un nivel nuevo. antes
+// se reservaba un tercio de cada fila para insertar, y por eso salía la guía de
+// pista nueva con el cursor aún dentro de la fila, que es lo que molestaba
+const TOLERANCIA = 7
 
 // tope de niveles: más allá no se ofrece insertar, así que la separación señalada
 // se reinterpreta como mover a la fila más cercana. debe coincidir con MAX_PISTAS
@@ -52,21 +54,20 @@ export function resolverDestinoVertical(
     // por debajo de todo: nace una pista en el suelo
     insercion = 0
   } else {
-    const dentro = filas.find((f) => clientY >= f.r.top && clientY <= f.r.bottom)
-    if (dentro) {
-      const frac = (clientY - dentro.r.top) / dentro.r.height
-      if (frac < BORDE) insercion = dentro.p + 1 // pegado al borde de arriba
-      else if (frac > 1 - BORDE) insercion = dentro.p // pegado al borde de abajo
-      else destino = dentro.p // en el cuerpo de la fila: soltar aquí
-    } else {
-      // el cursor cayó en el hueco entre dos filas: la de arriba marca dónde se
-      // inserta, porque el nuevo nivel se acomoda justo debajo de ella
-      for (let i = 0; i < filas.length - 1; i++) {
-        if (clientY > filas[i].r.bottom && clientY < filas[i + 1].r.top) {
-          insercion = filas[i].p
-          break
-        }
+    // primero se mira si el cursor está en la separación entre dos filas, con algo
+    // de holgura hacia dentro de cada una para que sea cómodo apuntar al hueco. la
+    // de arriba marca dónde nace el nivel, porque se acomoda justo debajo de ella
+    for (let i = 0; i < filas.length - 1; i++) {
+      if (clientY > filas[i].r.bottom - TOLERANCIA && clientY < filas[i + 1].r.top + TOLERANCIA) {
+        insercion = filas[i].p
+        break
       }
+    }
+    // si no cae en ninguna separación, está dentro del cuerpo de una fila y ahí se
+    // suelta, sin ofrecer pista nueva mientras el cursor siga sobre la fila
+    if (insercion === null) {
+      const dentro = filas.find((f) => clientY >= f.r.top && clientY <= f.r.bottom)
+      destino = dentro ? dentro.p : null
     }
   }
 
@@ -85,3 +86,4 @@ export function resolverDestinoVertical(
 
   return { destino, insercion }
 }
+

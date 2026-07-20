@@ -84,18 +84,25 @@ export function crearCapaCensura(inicio: number): CapaCensura {
   }
 }
 
-// crea una figura por defecto: un rectángulo azul relleno, centrado
-export function crearCapaFigura(inicio: number): CapaFigura {
+// crea una figura relleno azul, centrada por defecto. admite una forma concreta
+// (si no llega, nace como rectángulo) y una posición en fracción del lienzo, para
+// que al soltarla en el visor caiga justo donde apuntó el cursor
+export function crearCapaFigura(
+  inicio: number,
+  forma: CapaFigura['forma'] = 'rectangulo',
+  x = 0.5,
+  y = 0.5,
+): CapaFigura {
   return {
     id: crypto.randomUUID(),
     tipo: 'figura',
     inicio,
     duracion: 3,
-    x: 0.5,
-    y: 0.5,
+    x,
+    y,
     opacidad: 100,
     keyframes: [],
-    forma: 'rectangulo',
+    forma,
     anchoRel: 0.3,
     altoRel: 0.2,
     relleno: true,

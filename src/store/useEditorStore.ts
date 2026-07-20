@@ -176,7 +176,7 @@ interface EstadoEditor {
   agregarTexto: () => void
   agregarImagen: (src: string, anchoNatural: number, altoNatural: number) => void
   agregarCensura: () => void
-  agregarFigura: () => void
+  agregarFigura: (forma?: CapaFigura['forma'], x?: number, y?: number) => void
   actualizarCapa: (
     id: string,
     cambios:
@@ -1090,9 +1090,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       }
     }),
 
-  agregarFigura: () =>
+  agregarFigura: (forma, x, y) =>
     set((s) => {
-      const capa = crearCapaFigura(s.playhead)
+      const capa = crearCapaFigura(s.playhead, forma, x, y)
       return {
         capas: [...s.capas, capa],
         capaSeleccionada: capa.id,
