@@ -17,10 +17,34 @@ interface EstadoProyecto {
   limpiar: () => void
 }
 
+// clave donde se recuerda cuál es el proyecto abierto entre recargas de la
+// página. sin esto, cada refresco estrenaba un id nuevo y la sesión guardada
+// quedaba huérfana, así que el editor volvía en blanco aunque el trabajo seguía
+// a salvo en el almacén
+export const CLAVE_SESION = 've-sesion-activa'
+
+// el id se recupera de la última sesión si la hay, para que al refrescar se
+// pueda volver a cargar ese mismo proyecto en lugar de empezar de cero
+function idInicial(): string {
+  try {
+    const guardado = localStorage.getItem(CLAVE_SESION)
+    if (guardado) return guardado
+  } catch {
+    // sin acceso al almacenamiento se cae a un id nuevo
+  }
+  const nuevo = crypto.randomUUID()
+  try {
+    localStorage.setItem(CLAVE_SESION, nuevo)
+  } catch {
+    // idem
+  }
+  return nuevo
+}
+
 // guarda el nombre del proyecto y sus medios importados. al quitar uno se
 // libera su object url para no dejar memoria colgando
 export const useProjectStore = create<EstadoProyecto>((set) => ({
-  idProyecto: crypto.randomUUID(),
+  idProyecto: idInicial(),
   creado: Date.now(),
   guardadoEn: null,
   sinGuardar: false,

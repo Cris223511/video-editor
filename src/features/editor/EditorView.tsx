@@ -9,6 +9,7 @@ import Timeline from './timeline/Timeline'
 import ExportDialog from './ExportDialog'
 import { useAtajos } from './useAtajos'
 import { useAutoguardado } from './useAutoguardado'
+import { useRestaurarSesion } from './useRestaurarSesion'
 
 // disposición al estilo de un editor de escritorio: opciones a la izquierda,
 // visor al centro, y abajo los medios junto a la línea de tiempo. el reparto lo
@@ -29,6 +30,11 @@ export default function EditorView() {
   useAtajos()
   // el proyecto se guarda solo unos segundos después de cada cambio
   useAutoguardado(true)
+  // al entrar al editor, si no se está trabajando en nada y hay una sesión
+  // guardada, se recarga. eso es lo que evita que un refresco deje el editor en
+  // blanco con el trabajo aparentemente perdido. la guarda de vacío impide pisar
+  // un proyecto recién abierto desde la lista, que ya trae sus medios
+  useRestaurarSesion()
 
   // el plegado se pide al propio panel en lugar de sacarlo del árbol. antes se
   // dejaba de dibujar y react-resizable-panels perdía la correspondencia entre

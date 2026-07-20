@@ -1,5 +1,5 @@
 import { useEditorStore } from '../../store/useEditorStore'
-import { useProjectStore } from '../../store/useProjectStore'
+import { useProjectStore, CLAVE_SESION } from '../../store/useProjectStore'
 import { guardarProyecto, leerProyecto } from './almacen'
 import {
   guardadoAMedio,
@@ -44,6 +44,12 @@ export function capturarProyecto(id: string, creado: number): ProyectoGuardado {
 
 export async function guardarSesion(id: string, creado: number): Promise<void> {
   await guardarProyecto(capturarProyecto(id, creado))
+  // se recuerda cuál es el proyecto abierto, para poder recargarlo al refrescar
+  try {
+    localStorage.setItem(CLAVE_SESION, id)
+  } catch {
+    // sin almacenamiento no se recuerda, pero el guardado en sí ya se hizo
+  }
 }
 
 // deja el editor exactamente como estaba al guardar. las direcciones temporales
@@ -60,6 +66,11 @@ export async function abrirSesion(id: string): Promise<boolean> {
   // al abrir se adopta la identidad del proyecto guardado, para que los
   // siguientes guardados actualicen este mismo y no creen uno nuevo
   useProjectStore.setState({ idProyecto: p.id, creado: p.creado, titulo: p.titulo, medios })
+  try {
+    localStorage.setItem(CLAVE_SESION, p.id)
+  } catch {
+    // sin almacenamiento se pierde solo el recuerdo de cuál está abierto
+  }
 
   const e = p.edicion
   useEditorStore.setState({
