@@ -1,4 +1,17 @@
-import { Crosshair, Maximize2, MoveHorizontal, MoveVertical } from 'lucide-react'
+import {
+  AlignCenterHorizontal,
+  AlignCenterVertical,
+  AlignEndHorizontal,
+  AlignEndVertical,
+  AlignHorizontalDistributeCenter,
+  AlignStartHorizontal,
+  AlignStartVertical,
+  AlignVerticalDistributeCenter,
+  Crosshair,
+  Maximize2,
+  MoveHorizontal,
+  MoveVertical,
+} from 'lucide-react'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
 import Tooltip from '../../../components/ui/Tooltip'
@@ -75,6 +88,13 @@ export default function LienzoPanel() {
   const clip = clips.find((c) => c.id === clipSeleccionado) ?? null
   const asset = clip ? medios.find((m) => m.id === clip.assetId) ?? null : null
   const hayVideo = !!clip && !!asset
+
+  // alinear y distribuir operan sobre las capas marcadas (imágenes, textos,
+  // figuras). los botones se apagan sin selección, y distribuir pide tres o más
+  const capasSeleccionadas = useEditorStore((s) => s.capasSeleccionadas)
+  const alinearCapas = useEditorStore((s) => s.alinearCapas)
+  const distribuirCapas = useEditorStore((s) => s.distribuirCapas)
+  const nSel = capasSeleccionadas.length
 
   // el factor con el que el video cabe "contenido" en el lienzo actual. de ahí
   // salen las escalas de cada ajuste: al ancho, al alto o llenando del todo
@@ -277,6 +297,46 @@ export default function LienzoPanel() {
             {!hayVideo && (
               <p className="text-[11px] leading-relaxed text-[color:var(--muted)]">
                 Selecciona un video en el visor o en la línea de tiempo para acomodarlo.
+              </p>
+            )}
+          </div>
+
+          {/* alinear y distribuir las capas del lienzo (imágenes, textos,
+              figuras), al estilo de un editor vectorial. con shift y clic en el
+              visor se marcan varias; sin ninguna marcada los botones van apagados */}
+          <div className="flex flex-col gap-2 border-t border-black/10 pt-4 dark:border-white/10">
+            <span className="text-xs font-medium text-[color:var(--muted)]">Alinear objetos</span>
+            <div className="grid grid-cols-6 gap-2">
+              <BotonEncuadre etiqueta="Alinear a la izquierda" descripcion="Pega los objetos al borde izquierdo del lienzo" disabled={nSel === 0} onClick={() => alinearCapas('izquierda')}>
+                <AlignStartVertical size={16} />
+              </BotonEncuadre>
+              <BotonEncuadre etiqueta="Centrar en horizontal" descripcion="Lleva los objetos al centro, de lado a lado" disabled={nSel === 0} onClick={() => alinearCapas('centro-h')}>
+                <AlignCenterVertical size={16} />
+              </BotonEncuadre>
+              <BotonEncuadre etiqueta="Alinear a la derecha" descripcion="Pega los objetos al borde derecho del lienzo" disabled={nSel === 0} onClick={() => alinearCapas('derecha')}>
+                <AlignEndVertical size={16} />
+              </BotonEncuadre>
+              <BotonEncuadre etiqueta="Alinear arriba" descripcion="Pega los objetos al borde de arriba del lienzo" disabled={nSel === 0} onClick={() => alinearCapas('arriba')}>
+                <AlignStartHorizontal size={16} />
+              </BotonEncuadre>
+              <BotonEncuadre etiqueta="Centrar en vertical" descripcion="Lleva los objetos al centro, de arriba a abajo" disabled={nSel === 0} onClick={() => alinearCapas('centro-v')}>
+                <AlignCenterHorizontal size={16} />
+              </BotonEncuadre>
+              <BotonEncuadre etiqueta="Alinear abajo" descripcion="Pega los objetos al borde de abajo del lienzo" disabled={nSel === 0} onClick={() => alinearCapas('abajo')}>
+                <AlignEndHorizontal size={16} />
+              </BotonEncuadre>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <BotonEncuadre etiqueta="Distribuir en horizontal" descripcion="Reparte el espacio entre los objetos, de lado a lado (hacen falta tres o más)" disabled={nSel < 3} onClick={() => distribuirCapas('horizontal')}>
+                <AlignHorizontalDistributeCenter size={16} />
+              </BotonEncuadre>
+              <BotonEncuadre etiqueta="Distribuir en vertical" descripcion="Reparte el espacio entre los objetos, de arriba a abajo (hacen falta tres o más)" disabled={nSel < 3} onClick={() => distribuirCapas('vertical')}>
+                <AlignVerticalDistributeCenter size={16} />
+              </BotonEncuadre>
+            </div>
+            {nSel === 0 && (
+              <p className="text-[11px] leading-relaxed text-[color:var(--muted)]">
+                Marca una o varias capas en el visor (con Shift y clic para varias) para alinearlas.
               </p>
             )}
           </div>

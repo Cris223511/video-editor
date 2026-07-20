@@ -68,6 +68,7 @@ export default function CapasOverlay() {
   const playhead = useEditorStore((s) => s.playhead)
   const resolucion = useEditorStore((s) => s.resolucion)
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
+  const capasSeleccionadas = useEditorStore((s) => s.capasSeleccionadas)
   const seleccionarCapa = useEditorStore((s) => s.seleccionarCapa)
   const moverCapaLienzo = useEditorStore((s) => s.moverCapaLienzo)
   const actualizarCapa = useEditorStore((s) => s.actualizarCapa)
@@ -106,6 +107,12 @@ export default function CapasOverlay() {
   // desplaza todo; y sin recorrido mueve la posición fija
   function iniciarArrastre(e: ReactMouseEvent, capa: Capa) {
     e.stopPropagation()
+    // con shift la capa solo se suma o se quita del conjunto para alinear varias,
+    // sin arrastrar; sin shift se elige esta y empieza el movimiento normal
+    if (e.shiftKey) {
+      seleccionarCapa(capa.id, true)
+      return
+    }
     seleccionarCapa(capa.id)
     let ultima = normalizar(e.nativeEvent)
     const propia = cajaDe(capa, (e.currentTarget as HTMLElement) ?? null)
@@ -286,7 +293,9 @@ export default function CapasOverlay() {
       ))}
 
       {visibles.map((c) => {
-        const seleccion = c.id === capaSeleccionada
+        // una capa se resalta si es la principal o si está en el conjunto de
+        // seleccionadas, para que al marcar varias se vean todas a la vez
+        const seleccion = c.id === capaSeleccionada || capasSeleccionadas.includes(c.id)
         const pos = posicionCapa(c, playhead)
         const centroX = rect.ox + pos.x * rect.w
         const centroY = rect.oy + pos.y * rect.h

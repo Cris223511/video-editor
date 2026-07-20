@@ -42,6 +42,22 @@ function zoomParaEncuadrar(total: number, anchoUtil: number): number | null {
 const DURACION_MINIMA = 0.1
 const DURACION_MINIMA_CAPA = 0.2
 
+// ancho y alto de una capa en fracción del lienzo, para poder alinearla por sus
+// bordes. las de caja lo llevan directo; la imagen deduce su alto de la
+// proporción si no se deformó a mano; el texto no guarda medidas, así que se le
+// da una aproximación cómoda que basta para colocarlo
+function medidaCapa(c: Capa, aspecto: number): { w: number; h: number } {
+  if (c.tipo === 'censura' || c.tipo === 'figura') return { w: c.anchoRel, h: c.altoRel }
+  if (c.tipo === 'imagen') {
+    const w = c.anchoRel
+    const h =
+      c.altoRel ??
+      (c.anchoNatural > 0 ? (c.anchoRel * aspecto * c.altoNatural) / c.anchoNatural : c.anchoRel)
+    return { w, h }
+  }
+  return { w: 0.25, h: 0.12 }
+}
+
 export type Herramienta =
   | 'proyecto'
   | 'transiciones'
@@ -173,7 +189,16 @@ interface EstadoEditor {
   // clona una capa completa con nuevo id y los mismos datos (texto, estilo,
   // recorrido y trazos incluidos). devuelve el id de la copia para arrastrarla
   duplicarCapa: (id: string) => string | null
-  seleccionarCapa: (id: string | null) => void
+  // conjunto de capas marcadas a la vez, para alinearlas o distribuirlas. la
+  // capaSeleccionada es la principal (la última tocada); este array las lleva
+  // todas. seleccionar con aditivo (shift) suma o quita del conjunto
+  capasSeleccionadas: string[]
+  seleccionarCapa: (id: string | null, aditivo?: boolean) => void
+  // alinea las capas seleccionadas respecto al lienzo, por un borde o por el
+  // centro, al estilo de un editor vectorial
+  alinearCapas: (modo: 'izquierda' | 'centro-h' | 'derecha' | 'arriba' | 'centro-v' | 'abajo') => void
+  // reparte el espacio entre las capas seleccionadas (hacen falta tres o más)
+  distribuirCapas: (eje: 'horizontal' | 'vertical') => void
   moverCapaLienzo: (id: string, x: number, y: number) => void
   moverCapaTiempo: (id: string, nuevoInicio: number) => void
   recortarCapaTiempo: (id: string, lado: 'inicio' | 'fin', deltaSegundos: number) => void
@@ -368,6 +393,8 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'actualizarCapa',
   'quitarCapa',
   'duplicarCapa',
+  'alinearCapas',
+  'distribuirCapas',
   'moverCapaLienzo',
   'moverCapaTiempo',
   'recortarCapaTiempo',
@@ -488,6 +515,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   reproduciendo: false,
   clipSeleccionado: null,
   capaSeleccionada: null,
+  capasSeleccionadas: [],
   regionSeleccionada: null,
   herramienta: 'transiciones',
   pxPorSegundo: PX_POR_SEGUNDO_DEFECTO,
@@ -879,11 +907,12 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     set((s) => ({
       clipSeleccionado: id,
       capaSeleccionada: id ? null : s.capaSeleccionada,
+      capasSeleccionadas: id ? [] : s.capasSeleccionadas,
       regionSeleccionada: id ? null : s.regionSeleccionada,
     })),
 
   limpiarSeleccion: () =>
-    set({ clipSeleccionado: null, capaSeleccionada: null, regionSeleccionada: null }),
+    set({ clipSeleccionado: null, capaSeleccionada: null, capasSeleccionadas: [], regionSeleccionada: null }),
 
   // el nivel nuevo aparece encima de los demás, vacío y con el alto estándar y
   // sus metadatos en reposo
@@ -1008,6 +1037,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       return {
         capas: [...s.capas, capa],
         capaSeleccionada: capa.id,
+        capasSeleccionadas: [capa.id],
         clipSeleccionado: null,
         herramienta: 'texto',
       }
@@ -1026,6 +1056,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       return {
         capas: [...s.capas, capa],
         capaSeleccionada: capa.id,
+        capasSeleccionadas: [capa.id],
         clipSeleccionado: null,
         herramienta: 'imagen',
       }
@@ -1037,6 +1068,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       return {
         capas: [...s.capas, capa],
         capaSeleccionada: capa.id,
+        capasSeleccionadas: [capa.id],
         clipSeleccionado: null,
         herramienta: 'censura',
       }
@@ -1048,6 +1080,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       return {
         capas: [...s.capas, capa],
         capaSeleccionada: capa.id,
+        capasSeleccionadas: [capa.id],
         clipSeleccionado: null,
         herramienta: 'figura',
       }
@@ -1075,22 +1108,72 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     set({
       capas: [...s.capas, copia],
       capaSeleccionada: copia.id,
+      capasSeleccionadas: [copia.id],
       clipSeleccionado: null,
       regionSeleccionada: null,
     })
     return copia.id
   },
 
-  seleccionarCapa: (id) =>
+  seleccionarCapa: (id, aditivo) =>
     set((s) => {
-      const capa = id ? s.capas.find((c) => c.id === id) : null
-      return {
-        capaSeleccionada: id,
-        clipSeleccionado: id ? null : s.clipSeleccionado,
-        regionSeleccionada: id ? null : s.regionSeleccionada,
-        // al seleccionar una capa se abre su herramienta según el tipo
-        herramienta: capa ? capa.tipo : s.herramienta,
+      if (!id) {
+        return { capaSeleccionada: null, capasSeleccionadas: [], clipSeleccionado: s.clipSeleccionado }
       }
+      const capa = s.capas.find((c) => c.id === id)
+      // con aditivo (shift) la capa entra o sale del conjunto sin borrar el
+      // resto; sin aditivo la selección se reduce a esta sola
+      const conjunto = aditivo
+        ? s.capasSeleccionadas.includes(id)
+          ? s.capasSeleccionadas.filter((x) => x !== id)
+          : [...s.capasSeleccionadas, id]
+        : [id]
+      return {
+        capaSeleccionada: conjunto[conjunto.length - 1] ?? null,
+        capasSeleccionadas: conjunto,
+        clipSeleccionado: null,
+        regionSeleccionada: null,
+        // al elegir una sola capa se abre su herramienta; sumando al conjunto no
+        // se cambia de panel, para no sacar al usuario de donde estaba
+        herramienta: !aditivo && capa ? capa.tipo : s.herramienta,
+      }
+    }),
+
+  alinearCapas: (modo) =>
+    set((s) => {
+      const aspecto = s.resolucion.ancho / s.resolucion.alto
+      const marcadas = new Set(s.capasSeleccionadas)
+      const capas = s.capas.map((c) => {
+        if (!marcadas.has(c.id)) return c
+        const { w, h } = medidaCapa(c, aspecto)
+        let { x, y } = c
+        if (modo === 'izquierda') x = w / 2
+        else if (modo === 'centro-h') x = 0.5
+        else if (modo === 'derecha') x = 1 - w / 2
+        else if (modo === 'arriba') y = h / 2
+        else if (modo === 'centro-v') y = 0.5
+        else if (modo === 'abajo') y = 1 - h / 2
+        return { ...c, x, y }
+      })
+      return { capas }
+    }),
+
+  distribuirCapas: (eje) =>
+    set((s) => {
+      const marcadas = s.capas.filter((c) => s.capasSeleccionadas.includes(c.id))
+      // repartir solo tiene sentido con tres o más: los extremos quedan fijos y
+      // los de en medio se separan a distancias iguales
+      if (marcadas.length < 3) return {}
+      const clave = eje === 'horizontal' ? 'x' : 'y'
+      const orden = [...marcadas].sort((a, b) => a[clave] - b[clave])
+      const min = orden[0][clave]
+      const max = orden[orden.length - 1][clave]
+      const paso = (max - min) / (orden.length - 1)
+      const destino = new Map(orden.map((c, i) => [c.id, min + paso * i]))
+      const capas = s.capas.map((c) =>
+        destino.has(c.id) ? { ...c, [clave]: destino.get(c.id)! } : c,
+      )
+      return { capas }
     }),
 
   moverCapaLienzo: (id, x, y) =>
