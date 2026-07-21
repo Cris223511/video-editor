@@ -141,11 +141,12 @@ export default function NavSitio() {
         </div>
       </header>
 
-      {/* menú desplegado en pantallas estrechas. la caja de fuera reproduce el
-          ancho de la barra y su sangrado, que antes faltaba: el menú se iba de
-          lado a lado de la pantalla mientras la barra se quedaba dentro */}
+      {/* menú desplegado en pantallas estrechas. va en posición absoluta, colgado
+          bajo la barra, para FLOTAR por encima del contenido en vez de empujarlo
+          hacia abajo. la caja de fuera reproduce el ancho de la barra y su
+          sangrado, para que el menú no se vaya de lado a lado de la pantalla */}
       <div
-        className={`mx-auto w-full lg:hidden ${ANCHO_BARRA}`}
+        className={`absolute left-0 right-0 top-full mx-auto w-full lg:hidden ${ANCHO_BARRA}`}
         style={{ paddingLeft: SANGRADO_BARRA, paddingRight: SANGRADO_BARRA }}
       >
         <AnimatePresence initial={false}>
@@ -163,9 +164,11 @@ export default function NavSitio() {
               }}
               className="overflow-hidden"
             >
+              {/* mismo cristal translúcido y desenfocado que la barra flotante, para
+                  que se vea a través el contenido de detrás en vez de un bloque opaco */}
               <nav
                 className="mt-2 flex flex-col gap-1 rounded-3xl p-3 shadow-lg"
-                style={cristal()}
+                style={cristal(0.72, 0.13)}
               >
                 {[...ENLACES, ...INFORMACION].map((e) => (
                   <Link

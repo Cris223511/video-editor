@@ -1,5 +1,6 @@
 import { CSSProperties, ReactNode, useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
+import { cristal } from '../sitio/cristal'
 
 interface Opcion {
   valor: string
@@ -82,10 +83,9 @@ export default function Selector({
       >
         <div
           className="flex max-h-60 flex-col gap-0.5 overflow-y-auto rounded-xl p-1.5 shadow-xl"
-          style={{
-            background: 'rgb(var(--surface))',
-            border: '1px solid rgb(var(--border) / 0.14)',
-          }}
+          // cristal translúcido y desenfocado, el mismo aire de la barra de
+          // navegación, para que los desplegables se sientan parte de la misma casa
+          style={cristal(0.82, 0.14)}
         >
           {opciones.map((o, i) => {
             // la entrada escalonada lleva su retardo, pero ese retardo NO debe caer

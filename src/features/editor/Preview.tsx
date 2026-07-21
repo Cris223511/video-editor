@@ -25,6 +25,7 @@ import {
 } from '../../lib/color/tono'
 import { anterior, pintarTransicion, progreso } from '../../lib/transiciones/pintar'
 import { buscarTransicion } from '../../lib/transiciones/catalogo'
+import { sufijoTransformCss, aplicarTransformCanvas } from '../../lib/layers/transform'
 import { TIPO_FIGURA } from './panels/FiguraPanel'
 
 // visor central. monta un video por clip y solo deja visible y sonando el que
@@ -562,9 +563,13 @@ export default function Preview() {
         if (!v || !v.videoWidth) return
         // durante una transición geométrica el video también respeta su encuadre,
         // para que reencuadrar un clip se vea igual dentro y fuera de la transición
-        const { dx, dy, dw, dh } = rectClip(v.videoWidth, v.videoHeight, lienzo.width, lienzo.height, encuadreDe(clip))
+        const enc = encuadreDe(clip)
+        const { dx, dy, dw, dh } = rectClip(v.videoWidth, v.videoHeight, lienzo.width, lienzo.height, enc)
         ctx.save()
         ctx.globalAlpha = alfa
+        // el espejo se aplica alrededor del centro del clip, para que voltear un
+        // video se vea también mientras dura la transición
+        aplicarTransformCanvas(ctx, dx + dw / 2, dy + dh / 2, { espejoH: enc.espejoH, espejoV: enc.espejoV })
         ctx.drawImage(v, dx, dy, dw, dh)
         ctx.restore()
       }
@@ -689,9 +694,14 @@ export default function Preview() {
                 // escala respecto al centro y luego se lleva a su posición, en
                 // fracción del lienzo. coincide con lo que dibuja el compositor
                 const enc = encuadreDe(c)
-                const transform = encuadreNeutro(enc)
-                  ? undefined
+                // el reencuadre da el translate y la escala; el espejo se anexa
+                // aparte, porque un clip solo volteado (sin mover ni escalar) tiene
+                // el encuadre "neutro" y aun así debe voltearse
+                const base = encuadreNeutro(enc)
+                  ? ''
                   : `translate(${(enc.x - 0.5) * 100}%, ${(enc.y - 0.5) * 100}%) scale(${enc.escala})`
+                const flip = sufijoTransformCss({ espejoH: enc.espejoH, espejoV: enc.espejoV })
+                const transform = `${base} ${flip}`.trim() || undefined
                 return (
                   <video
                     key={c.id}

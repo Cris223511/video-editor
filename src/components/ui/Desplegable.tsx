@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
+import { cristal } from '../sitio/cristal'
 
 interface Opcion {
   texto: string
@@ -72,39 +73,34 @@ export default function Desplegable({
       >
         <div
           className="flex flex-col gap-0.5 rounded-2xl p-2 shadow-xl"
-          style={{
-            background: 'rgb(var(--surface))',
-            border: '1px solid rgb(var(--border) / 0.1)',
-          }}
+          // mismo cristal difuminado de la barra, para que el menú se vea del mismo
+          // material y deje entrever lo que hay detrás
+          style={cristal(0.82, 0.14)}
         >
-          {opciones.map((o, i) =>
-            o.a ? (
-              <Link
-                key={o.texto}
-                to={o.a}
-                // cada opción entra escalonada, de arriba abajo
-                style={{ transitionDelay: abierto ? `${i * 35}ms` : '0ms' }}
-                className={[
-                  'interactivo rounded-full px-3.5 py-2 text-sm text-[color:var(--muted)] transition-all duration-200',
-                  abierto ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0',
-                ].join(' ')}
-              >
+          {opciones.map((o, i) => {
+            // el retardo escalonado va solo en la entrada; el color del hover
+            // responde al instante en vez de heredar ese retraso
+            const retardo = abierto ? `${i * 35}ms` : '0ms'
+            const trans = `opacity 200ms ease ${retardo}, transform 200ms ease ${retardo}, background-color 110ms ease, color 110ms ease`
+            const clase = [
+              'rounded-full px-3.5 py-2 text-sm text-[color:var(--muted)] hover:bg-brand/10 hover:text-brand',
+              abierto ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0',
+            ].join(' ')
+            return o.a ? (
+              <Link key={o.texto} to={o.a} style={{ transition: trans }} className={clase}>
                 {o.texto}
               </Link>
             ) : (
               <button
                 key={o.texto}
                 onClick={o.al}
-                style={{ transitionDelay: abierto ? `${i * 35}ms` : '0ms' }}
-                className={[
-                  'interactivo rounded-full px-3.5 py-2 text-left text-sm text-[color:var(--muted)] transition-all duration-200',
-                  abierto ? 'translate-x-0 opacity-100' : '-translate-x-1 opacity-0',
-                ].join(' ')}
+                style={{ transition: trans }}
+                className={`text-left ${clase}`}
               >
                 {o.texto}
               </button>
-            ),
-          )}
+            )
+          })}
         </div>
       </div>
     </div>

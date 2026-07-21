@@ -39,6 +39,10 @@ export interface Encuadre {
   x: number
   y: number
   escala: number
+  // espejo del video sobre cada eje, opcionales para no alterar lo ya guardado.
+  // el volteo se ve igual en el visor y en el archivo exportado
+  espejoH?: boolean
+  espejoV?: boolean
 }
 
 // el identificador sale del catálogo de transiciones. es una cadena libre para

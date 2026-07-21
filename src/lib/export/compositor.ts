@@ -7,6 +7,7 @@ import { esTonoNeutro, filtroCss, hayEfectoFiltro } from '../color/tono'
 import { REPETICIONES_BRILLO, desenfoqueBrillo } from '../layers/defaults'
 import { anterior, pintarTransicion, progreso } from '../transiciones/pintar'
 import { encuadreDe, rectClip } from '../timeline/encuadre'
+import { aplicarTransformCanvas } from '../layers/transform'
 
 export interface Escena {
   ancho: number
@@ -54,6 +55,8 @@ function dibujarTexto(ctx: CanvasRenderingContext2D, c: CapaTexto, ancho: number
   ctx.save()
   ctx.globalAlpha = c.opacidad / 100
   ctx.translate(pos.x * ancho, pos.y * alto)
+  // ya en el centro del texto: girar y voltear desde aquí sale idéntico al visor
+  aplicarTransformCanvas(ctx, 0, 0, c)
   ctx.font = `${c.cursiva ? 'italic ' : ''}${c.negrita ? '700' : '400'} ${c.tamano}px '${c.fuente}', sans-serif`
   ctx.textAlign = c.alineacion
   ctx.textBaseline = 'middle'
@@ -148,14 +151,18 @@ function dibujarImagen(
   const h = c.altoRel !== undefined ? c.altoRel * alto : w * (sh / sw)
   ctx.save()
   ctx.globalAlpha = c.opacidad / 100
+  // se lleva el origen al centro de la imagen para girar y voltear desde ahí, y
+  // luego se dibuja alrededor de ese centro
+  ctx.translate(pos.x * ancho, pos.y * alto)
+  aplicarTransformCanvas(ctx, 0, 0, c)
   ctx.drawImage(
     img,
     rec.izq * c.anchoNatural,
     rec.arr * c.altoNatural,
     sw,
     sh,
-    pos.x * ancho - w / 2,
-    pos.y * alto - h / 2,
+    -w / 2,
+    -h / 2,
     w,
     h,
   )
@@ -167,12 +174,14 @@ function dibujarFigura(ctx: CanvasRenderingContext2D, c: CapaFigura, ancho: numb
   const w = c.anchoRel * ancho
   const h = c.altoRel * alto
   const g = c.grosorBorde * escala
-  const x = pos.x * ancho - w / 2
-  const y = pos.y * alto - h / 2
 
   ctx.save()
   ctx.globalAlpha = c.opacidad / 100
-  ctx.translate(x, y)
+  // origen al centro para girar y voltear, y de ahí a la esquina superior
+  // izquierda: así las figuras se siguen trazando en coordenadas 0..w como antes
+  ctx.translate(pos.x * ancho, pos.y * alto)
+  aplicarTransformCanvas(ctx, 0, 0, c)
+  ctx.translate(-w / 2, -h / 2)
   const fill = c.relleno ? c.colorRelleno : null
   const stroke = c.borde ? c.colorBorde : null
   ctx.lineJoin = 'round'
@@ -466,7 +475,8 @@ export function dibujarFotograma(
       if (!video || !video.videoWidth) return
       // el rect donde va el video sale del encuadre del clip; sin encuadre queda
       // centrado y a tamaño "contener", igual que antes
-      const { dx, dy, dw, dh } = rectClip(video.videoWidth, video.videoHeight, ancho, alto, encuadreDe(clip))
+      const enc = encuadreDe(clip)
+      const { dx, dy, dw, dh } = rectClip(video.videoWidth, video.videoHeight, ancho, alto, enc)
       ctx.save()
       ctx.globalAlpha = alfa
 
@@ -483,6 +493,12 @@ export function dibujarFotograma(
         ctx.drawImage(video, (ancho - bw) / 2, (alto - bh) / 2, bw, bh)
         ctx.restore()
       }
+
+      // el espejo del clip se aplica solo al video en sí, no al relleno de fondo,
+      // igual que en el visor. va en su propio save para que la escala negativa no
+      // se filtre a lo que se dibuje después
+      ctx.save()
+      aplicarTransformCanvas(ctx, dx + dw / 2, dy + dh / 2, { espejoH: enc.espejoH, espejoV: enc.espejoV })
 
       // el color se resuelve como en el visor: funciones nativas más, si hay
       // temperatura o ruedas, el filtro svg de color. el desenfoque de movimiento
@@ -511,6 +527,8 @@ export function dibujarFotograma(
         ctx.drawImage(video, dx, dy, dw, dh)
         ctx.filter = 'none'
       }
+      // cierra el espejo del video
+      ctx.restore()
       ctx.restore()
     }
 

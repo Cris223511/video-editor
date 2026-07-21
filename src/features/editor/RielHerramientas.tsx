@@ -11,6 +11,7 @@ export const herramientas: { id: Herramienta; icono: NombreIcono; etiqueta: stri
   { id: 'texto', icono: 'texto', etiqueta: 'Texto' },
   { id: 'imagen', icono: 'imagen', etiqueta: 'Imagen' },
   { id: 'figura', icono: 'figura', etiqueta: 'Figura' },
+  { id: 'transformar', icono: 'transformar', etiqueta: 'Transformar' },
   { id: 'audio', icono: 'audio', etiqueta: 'Audio' },
   { id: 'censura', icono: 'censura', etiqueta: 'Censura' },
   { id: 'velocidad', icono: 'velocidad', etiqueta: 'Velocidad' },

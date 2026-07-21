@@ -17,6 +17,7 @@ import ProyectoPanel from './panels/ProyectoPanel'
 import LienzoPanel from './panels/LienzoPanel'
 import MarcoPanel from './panels/MarcoPanel'
 import FiguraPanel from './panels/FiguraPanel'
+import TransformarPanel from './panels/TransformarPanel'
 
 // transiciones del clip seleccionado. los datos del medio (dimensiones, formato)
 // se consultan desde el panel de Medios, así que aquí va solo lo de las
@@ -96,6 +97,7 @@ export default function OptionsPanel({
     velocidad: <SpeedPanel />,
     tono: <TonePanel />,
     efectos: <EffectsPanel />,
+    transformar: <TransformarPanel />,
   }
 
   const actual = herramientas.find((h) => h.id === herramienta)

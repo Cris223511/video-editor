@@ -9,6 +9,7 @@ import {
   Download,
   EyeOff,
   Film,
+  FlipHorizontal2,
   Frame,
   Gauge,
   Image as ImagenIcono,
@@ -74,6 +75,7 @@ const iconos = {
   lienzo: LayoutDashboard,
   marco: Frame,
   figura: Shapes,
+  transformar: FlipHorizontal2,
 } as const
 
 export type NombreIcono = keyof typeof iconos

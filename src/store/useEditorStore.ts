@@ -71,6 +71,7 @@ export type Herramienta =
   | 'lienzo'
   | 'marco'
   | 'figura'
+  | 'transformar'
 
 interface EstadoEditor {
   pista: Track

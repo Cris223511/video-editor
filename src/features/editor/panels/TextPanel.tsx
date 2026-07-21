@@ -5,6 +5,7 @@ import { CapaTexto } from '../../../types/layers'
 import { Campo, Deslizador, ColorCampo, Interruptor, Segmentado } from '../../../components/ui/Controls'
 import Selector from '../../../components/ui/Selector'
 import MotionControls from './MotionControls'
+import { cristal } from '../../../components/sitio/cristal'
 
 // tipografías ofrecidas. las dos primeras van empaquetadas con la aplicación; el
 // resto son fuentes corrientes del sistema (en windows están casi todas), así que
@@ -155,7 +156,7 @@ export default function TextPanel() {
                 </button>
                 <div
                   className="invisible absolute bottom-full right-0 z-30 mb-2 w-44 translate-y-1 rounded-xl p-1.5 opacity-0 shadow-xl transition-all duration-200 group-hover/il:visible group-hover/il:translate-y-0 group-hover/il:opacity-100"
-                  style={{ background: 'rgb(var(--surface))', border: '1px solid rgb(var(--border) / 0.14)' }}
+                  style={cristal(0.85, 0.14)}
                 >
                   <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
                     Separación entre líneas

@@ -22,6 +22,11 @@ export interface CapaBase {
   y: number // centro vertical sobre el lienzo, de 0 a 1
   opacidad: number // 0 a 100
   keyframes: KeyframePos[] // vacío = fija en x,y; con puntos = en movimiento
+  // transformaciones generales, todas opcionales para no tocar lo ya guardado.
+  // rotacion en grados (se usa en pasos de 90), y espejo horizontal o vertical
+  rotacion?: number
+  espejoH?: boolean
+  espejoV?: boolean
 }
 
 export interface CapaTexto extends CapaBase {

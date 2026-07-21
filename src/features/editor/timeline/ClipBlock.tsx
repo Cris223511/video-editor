@@ -1,9 +1,11 @@
 import { MouseEvent as ReactMouseEvent, useState } from 'react'
+import { Info } from 'lucide-react'
 import { Clip } from '../../../types/timeline'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useTira } from './useTira'
 import FrameStrip from './FrameStrip'
 import MedioNoDisponible from '../../../components/ui/MedioNoDisponible'
+import PropiedadesClip from './PropiedadesClip'
 import TransicionBlock from './TransicionBlock'
 import { TIPO_TRANSICION } from '../GaleriaTransiciones'
 import { resolverDestinoVertical } from './destinoVertical'
@@ -62,6 +64,9 @@ export default function ClipBlock({
   // se enciende mientras se arrastra una transición de la galería sobre el clip,
   // para señalar que al soltar se aplicará en su borde de entrada
   const [transicionEncima, setTransicionEncima] = useState(false)
+  // controla la ventana de propiedades del clip, que enseña un resumen de solo
+  // lectura de todo lo que se le aplicó (velocidad, color, efectos, transición)
+  const [verPropiedades, setVerPropiedades] = useState(false)
 
   const ancho = Math.max(clip.duracion * pxPorSegundo, 8)
 
@@ -314,6 +319,35 @@ export default function ClipBlock({
             {Number(clip.velocidad.toFixed(2))}x
           </span>
         </span>
+      )}
+
+      {/* botón discreto para abrir las propiedades del clip. va arriba a la
+          derecha y solo asoma al pasar el cursor o cuando el clip está
+          seleccionado, para no tapar la miniatura. lleva su propio stopPropagation
+          en el mousedown y en el click, así que ni arranca el arrastre del cuerpo
+          ni interfiere con los tiradores de recorte */}
+      <button
+        type="button"
+        title="Ver propiedades del clip"
+        aria-label="Ver propiedades del clip"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation()
+          setVerPropiedades(true)
+        }}
+        className={[
+          'absolute top-1 z-30 grid h-5 w-5 place-items-center rounded-md bg-black/60 text-white transition-opacity duration-200 hover:bg-black/80',
+          // cuando el clip lleva su etiqueta de velocidad, que también va arriba a
+          // la derecha, el botón se corre a la izquierda para no montarse encima
+          clip.velocidad !== 1 ? 'right-9' : 'right-1',
+          verPropiedades || seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+        ].join(' ')}
+      >
+        <Info size={12} />
+      </button>
+
+      {verPropiedades && (
+        <PropiedadesClip clip={clip} onCerrar={() => setVerPropiedades(false)} />
       )}
 
       {/* los tiradores de recorte solo tienen sentido si la pista deja tocar el

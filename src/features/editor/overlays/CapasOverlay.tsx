@@ -6,6 +6,7 @@ import { rectContenido } from '../../../lib/layers/rect'
 import { posicionCapa } from '../../../lib/layers/motion'
 import { Ancla, Caja, redimensionar } from '../../../lib/layers/resize'
 import { CajaGuia, Guia, imantar } from '../../../lib/layers/guias'
+import { sufijoTransformCss } from '../../../lib/layers/transform'
 import Tiradores from './Tiradores'
 import RecorridoOverlay from './RecorridoOverlay'
 
@@ -323,6 +324,10 @@ export default function CapasOverlay() {
         const pos = posicionCapa(c, playhead)
         const centroX = rect.ox + pos.x * rect.w
         const centroY = rect.oy + pos.y * rect.h
+        // giro y espejo de la capa, que se anexan al translate de centrado. la
+        // censura queda fuera: su efecto muestrea el video y girarla descuadraría
+        // la zona tapada, así que ahí no se ofrece transformar
+        const extra = c.tipo === 'censura' ? '' : sufijoTransformCss(c)
 
         if (c.tipo === 'censura' && c.forma === 'pincel') {
           // superficie para dibujar o mover la máscara de pincel; solo activa
@@ -380,7 +385,7 @@ export default function CapasOverlay() {
                 top: centroY,
                 width: ancho,
                 height: alto,
-                transform: 'translate(-50%, -50%)',
+                transform: `translate(-50%, -50%) ${extra}`.trim(),
                 opacity: c.opacidad / 100,
               }}
             >
@@ -418,7 +423,7 @@ export default function CapasOverlay() {
                 top: centroY,
                 width: ancho,
                 height: alto,
-                transform: 'translate(-50%, -50%)',
+                transform: `translate(-50%, -50%) ${extra}`.trim(),
                 opacity: c.opacidad / 100,
               }}
             >
@@ -460,7 +465,7 @@ export default function CapasOverlay() {
         const estilo: CSSProperties = {
           left: centroX,
           top: centroY,
-          transform: 'translate(-50%, -50%)',
+          transform: `translate(-50%, -50%) ${extra}`.trim(),
           fontFamily: `'${c.fuente}', sans-serif`,
           fontSize: c.tamano * escala,
           fontWeight: c.negrita ? 700 : 400,
