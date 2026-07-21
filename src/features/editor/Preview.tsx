@@ -585,9 +585,13 @@ export default function Preview() {
         const { dx, dy, dw, dh } = rectClip(v.videoWidth, v.videoHeight, lienzo.width, lienzo.height, enc)
         ctx.save()
         ctx.globalAlpha = alfa
-        // el espejo se aplica alrededor del centro del clip, para que voltear un
-        // video se vea también mientras dura la transición
-        aplicarTransformCanvas(ctx, dx + dw / 2, dy + dh / 2, { espejoH: enc.espejoH, espejoV: enc.espejoV })
+        // giro y espejo alrededor del centro del clip, para que se vean también
+        // mientras dura la transición
+        aplicarTransformCanvas(ctx, dx + dw / 2, dy + dh / 2, {
+          rotacion: enc.rotacion,
+          espejoH: enc.espejoH,
+          espejoV: enc.espejoV,
+        })
         ctx.drawImage(v, dx, dy, dw, dh)
         ctx.restore()
       }
@@ -718,8 +722,12 @@ export default function Preview() {
                 const base = encuadreNeutro(enc)
                   ? ''
                   : `translate(${(enc.x - 0.5) * 100}%, ${(enc.y - 0.5) * 100}%) scale(${enc.escala})`
-                const flip = sufijoTransformCss({ espejoH: enc.espejoH, espejoV: enc.espejoV })
-                const transform = `${base} ${flip}`.trim() || undefined
+                const giro = sufijoTransformCss({
+                  rotacion: enc.rotacion,
+                  espejoH: enc.espejoH,
+                  espejoV: enc.espejoV,
+                })
+                const transform = `${base} ${giro}`.trim() || undefined
                 return (
                   <video
                     key={c.id}

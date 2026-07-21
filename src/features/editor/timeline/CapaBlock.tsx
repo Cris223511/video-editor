@@ -1,4 +1,4 @@
-import { MouseEvent as ReactMouseEvent } from 'react'
+import { MouseEvent as ReactMouseEvent, useState } from 'react'
 import { Capa } from '../../../types/layers'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
@@ -19,8 +19,14 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   const recortarCapaTiempo = useEditorStore((s) => s.recortarCapaTiempo)
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
 
+  // durante un gesto propio (mover o recortar) el bloque sigue al cursor sin
+  // suavizado, para no ir por detrás del ratón; en reposo se anima su posición
+  // para que, al cerrar un hueco o acomodarse, se deslice en vez de saltar
+  const [interactuando, setInteractuando] = useState(false)
+
   function iniciarMover(e: ReactMouseEvent) {
     e.stopPropagation()
+    setInteractuando(true)
     // con alt pulsado el arrastre no mueve la capa sino que suelta una copia que
     // sigue al cursor, con la original intacta. sin alt es el movimiento de siempre
     let idGesto = capa.id
@@ -44,6 +50,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     }
     const soltar = () => {
       setGuiaImantado(null)
+      setInteractuando(false)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
@@ -55,6 +62,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     e.stopPropagation()
     e.preventDefault()
     seleccionarCapa(capa.id)
+    setInteractuando(true)
     const startX = e.clientX
     const inicioBase = capa.inicio
     const finBase = capa.inicio + capa.duracion
@@ -74,6 +82,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     }
     const soltar = () => {
       setGuiaImantado(null)
+      setInteractuando(false)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
@@ -101,6 +110,9 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
         left: capa.inicio * pxPorSegundo,
         width: Math.max(capa.duracion * pxPorSegundo, 8),
         backgroundColor: 'rgba(245, 158, 11, 0.25)',
+        // en reposo la posición se anima con una curva suave; durante el arrastre
+        // el suavizado se apaga para que el bloque no vaya por detrás del cursor
+        transition: interactuando ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       <span className="pointer-events-none truncate text-[10px] text-white">{etiqueta}</span>

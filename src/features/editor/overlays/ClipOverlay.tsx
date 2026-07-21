@@ -7,6 +7,7 @@ import { clipEnTiempo } from '../../../lib/timeline/clips'
 import { Ancla, redimensionar } from '../../../lib/layers/resize'
 import { Guia, imantar } from '../../../lib/layers/guias'
 import Tiradores from './Tiradores'
+import ManijaGiro, { anguloGiro } from './ManijaGiro'
 
 // caja de selección del clip activo sobre el visor. arrastrando el cuerpo se
 // recoloca el video dentro del lienzo, y por los tiradores se agranda o achica
@@ -121,6 +122,27 @@ export default function ClipOverlay() {
     window.addEventListener('mouseup', soltar)
   }
 
+  // giro del video por la manija: el mismo cálculo que las capas, guardando el
+  // ángulo en el encuadre del clip
+  function iniciarGiroClip(e: ReactMouseEvent, id: string) {
+    e.stopPropagation()
+    e.preventDefault()
+    const cajaEl = (e.currentTarget as HTMLElement).parentElement
+    if (!cajaEl) return
+    const cr = cajaEl.getBoundingClientRect()
+    const cx = cr.left + cr.width / 2
+    const cy = cr.top + cr.height / 2
+    const mover = (ev: globalThis.MouseEvent) => {
+      actualizarEncuadre(id, { rotacion: anguloGiro(cx, cy, ev) })
+    }
+    const soltar = () => {
+      window.removeEventListener('mousemove', mover)
+      window.removeEventListener('mouseup', soltar)
+    }
+    window.addEventListener('mousemove', mover)
+    window.addEventListener('mouseup', soltar)
+  }
+
   // la caja solo aparece cuando el clip bajo el cabezal es el que está elegido
   if (!activo || activo.id !== clipSeleccionado) {
     return <div ref={rootRef} className="pointer-events-none absolute inset-0" />
@@ -161,9 +183,13 @@ export default function ClipOverlay() {
           top: rect.oy + r.dy,
           width: r.dw,
           height: r.dh,
+          // la caja gira con el video alrededor de su centro, para que la selección
+          // acompañe a la imagen rotada
+          transform: enc.rotacion ? `rotate(${enc.rotacion}deg)` : undefined,
         }}
       >
         <Tiradores onAgarrar={(a, e) => iniciarRedimension(e, activo.id, a, caja, enc.escala)} />
+        <ManijaGiro onAgarrar={(e) => iniciarGiroClip(e, activo.id)} />
       </div>
     </div>
   )

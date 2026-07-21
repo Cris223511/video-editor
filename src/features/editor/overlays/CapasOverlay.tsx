@@ -8,6 +8,7 @@ import { Ancla, Caja, redimensionar } from '../../../lib/layers/resize'
 import { CajaGuia, Guia, imantar } from '../../../lib/layers/guias'
 import { sufijoTransformCss } from '../../../lib/layers/transform'
 import Tiradores from './Tiradores'
+import ManijaGiro, { anguloGiro } from './ManijaGiro'
 import RecorridoOverlay from './RecorridoOverlay'
 
 const entre = (min: number, max: number, v: number) => Math.max(min, Math.min(max, v))
@@ -287,6 +288,29 @@ export default function CapasOverlay() {
     window.addEventListener('mouseup', soltar)
   }
 
+  // giro por la manija: se toma el centro del elemento en pantalla y se sigue el
+  // ángulo del cursor respecto de él. la caja se rota alrededor de su centro, así
+  // que su rectángulo envolvente sigue centrado ahí y sirve para el cálculo
+  function iniciarGiro(e: ReactMouseEvent, capa: Capa) {
+    e.stopPropagation()
+    e.preventDefault()
+    seleccionarCapa(capa.id)
+    const cajaEl = (e.currentTarget as HTMLElement).parentElement
+    if (!cajaEl) return
+    const cr = cajaEl.getBoundingClientRect()
+    const cx = cr.left + cr.width / 2
+    const cy = cr.top + cr.height / 2
+    const mover = (ev: globalThis.MouseEvent) => {
+      actualizarCapa(capa.id, { rotacion: anguloGiro(cx, cy, ev) })
+    }
+    const soltar = () => {
+      window.removeEventListener('mousemove', mover)
+      window.removeEventListener('mouseup', soltar)
+    }
+    window.addEventListener('mousemove', mover)
+    window.addEventListener('mouseup', soltar)
+  }
+
   const visibles = capas.filter((c) => playhead >= c.inicio && playhead < c.inicio + c.duracion)
 
   return (
@@ -406,7 +430,10 @@ export default function CapasOverlay() {
                 {dibujoFigura(c, ancho, alto, g)}
               </svg>
               {seleccion && (
-                <Tiradores onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
+                <>
+                  <Tiradores onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
+                  <ManijaGiro onAgarrar={(e) => iniciarGiro(e, c)} />
+                </>
               )}
             </div>
           )
@@ -452,7 +479,10 @@ export default function CapasOverlay() {
                 />
               </div>
               {seleccion && (
-                <Tiradores onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
+                <>
+                  <Tiradores onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
+                  <ManijaGiro onAgarrar={(e) => iniciarGiro(e, c)} />
+                </>
               )}
             </div>
           )
@@ -555,7 +585,10 @@ export default function CapasOverlay() {
             {/* el texto solo escala por las esquinas: estirarlo por un lado lo
                 deformaría y dejaría de leerse bien */}
             {seleccion && !enEdicion && (
-              <Tiradores soloEsquinas onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
+              <>
+                <Tiradores soloEsquinas onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
+                <ManijaGiro onAgarrar={(e) => iniciarGiro(e, c)} />
+              </>
             )}
           </div>
         )

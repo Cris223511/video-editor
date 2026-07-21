@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import SinSeleccion from '../../../components/ui/SinSeleccion'
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
@@ -10,10 +9,10 @@ import { PuntoRueda, RUEDAS_NEUTRAS, Ruedas } from '../../../lib/color/ruedas'
 import { Curvas, CURVAS_NEUTRAS, PuntoCurva } from '../../../lib/color/curvas'
 
 const CANALES: { campo: keyof Curvas; etiqueta: string; color: string }[] = [
-  { campo: 'maestra', etiqueta: 'Luz', color: '#8ea4c4' },
-  { campo: 'r', etiqueta: 'Rojo', color: '#ff5a5a' },
-  { campo: 'g', etiqueta: 'Verde', color: '#3ddc84' },
-  { campo: 'b', etiqueta: 'Azul', color: '#4c8dff' },
+  { campo: 'maestra', etiqueta: 'Curva de luz', color: '#8ea4c4' },
+  { campo: 'r', etiqueta: 'Curva de rojo', color: '#ff5a5a' },
+  { campo: 'g', etiqueta: 'Curva de verde', color: '#3ddc84' },
+  { campo: 'b', etiqueta: 'Curva de azul', color: '#4c8dff' },
 ]
 
 const ZONAS: { campo: keyof Ruedas; etiqueta: string }[] = [
@@ -36,8 +35,6 @@ const CONTROLES: { campo: CampoNumerico; etiqueta: string }[] = [
 // panel de tono del clip seleccionado, al estilo Lumetri. los ajustes se ven en
 // vivo en el visor sin perder fluidez
 export default function TonePanel() {
-  // canal de curva que se está editando; se conserva al cambiar de clip
-  const [canal, setCanal] = useState<keyof Curvas>('maestra')
   const clips = useEditorStore((s) => s.pista.clips)
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
   const setTono = useEditorStore((s) => s.setTono)
@@ -62,6 +59,20 @@ export default function TonePanel() {
 
   function cambiarCurva(c: keyof Curvas, p: PuntoCurva[]) {
     setTono(clip!.id, { curvas: { ...curvas, [c]: p } })
+  }
+
+  // devuelve solo las cuatro curvas a la diagonal, con copias frescas de cada
+  // punto para no compartir referencia con la constante neutra. el resto de la
+  // corrección de color (exposición, contraste, ruedas...) queda intacto
+  function restablecerCurvas() {
+    setTono(clip!.id, {
+      curvas: {
+        maestra: CURVAS_NEUTRAS.maestra.map((p) => ({ ...p })),
+        r: CURVAS_NEUTRAS.r.map((p) => ({ ...p })),
+        g: CURVAS_NEUTRAS.g.map((p) => ({ ...p })),
+        b: CURVAS_NEUTRAS.b.map((p) => ({ ...p })),
+      },
+    })
   }
 
   return (
@@ -92,27 +103,31 @@ export default function TonePanel() {
       <div>
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="text-xs font-medium text-[color:var(--muted)]">Curvas</span>
-          <div className="flex gap-1">
-            {CANALES.map((c) => (
-              <button
-                key={c.campo}
-                onClick={() => setCanal(c.campo)}
-                className={[
-                  'rounded-md px-2 py-1 text-[13px] font-medium transition-colors duration-200',
-                  canal === c.campo ? 'text-white' : 'interactivo text-[color:var(--muted)]',
-                ].join(' ')}
-                style={canal === c.campo ? { background: c.color } : undefined}
-              >
-                {c.etiqueta}
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={restablecerCurvas}
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-[color:var(--muted)] transition-colors hover:text-brand"
+          >
+            <Icon name="restablecer" size={14} /> Restablecer curvas
+          </button>
         </div>
-        <EditorCurva
-          puntos={curvas[canal]}
-          color={CANALES.find((c) => c.campo === canal)!.color}
-          onChange={(p) => cambiarCurva(canal, p)}
-        />
+        {/* las cuatro curvas se muestran a la vez, cada una con su editor. en un
+            panel estrecho se apilan y cuando hay ancho de sobra pasan a dos
+            columnas gracias al auto-fit de la rejilla */}
+        <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
+          {CANALES.map((c) => (
+            <div key={c.campo} className="flex flex-col gap-1.5">
+              <span className="flex items-center gap-1.5 text-[13px] font-medium text-[color:var(--muted)]">
+                <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: c.color }} />
+                {c.etiqueta}
+              </span>
+              <EditorCurva
+                puntos={curvas[c.campo]}
+                color={c.color}
+                onChange={(p) => cambiarCurva(c.campo, p)}
+              />
+            </div>
+          ))}
+        </div>
         <p className="mt-2 text-[13px] italic leading-relaxed text-[color:var(--muted)]">
           Haz clic para añadir un punto, arrástralo para doblar la curva y dale{' '}
           <b>doble clic</b> para quitarlo.

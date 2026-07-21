@@ -173,8 +173,13 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
   const recortarRegionAudio = useEditorStore((s) => s.recortarRegionAudio)
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
 
+  // mientras dura un gesto propio el bloque sigue al cursor sin suavizado; en
+  // reposo se anima su posición para que se deslice al acomodarse en vez de saltar
+  const [interactuando, setInteractuando] = useState(false)
+
   function iniciarMover(e: ReactMouseEvent) {
     e.stopPropagation()
+    setInteractuando(true)
     // alt + arrastrar el cuerpo saca una copia de la franja y la lleva al soltar;
     // sin alt es el desplazamiento normal con imantado
     let idGesto = region.id
@@ -198,6 +203,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     }
     const soltar = () => {
       setGuiaImantado(null)
+      setInteractuando(false)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
@@ -209,6 +215,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     e.stopPropagation()
     e.preventDefault()
     seleccionarRegion(region.id)
+    setInteractuando(true)
     const startX = e.clientX
     const inicioBase = region.inicio
     const finBase = region.inicio + region.duracion
@@ -227,6 +234,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     }
     const soltar = () => {
       setGuiaImantado(null)
+      setInteractuando(false)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
@@ -253,6 +261,9 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
         left: region.inicio * pxPorSegundo,
         width: ancho,
         backgroundColor: 'rgba(16, 185, 129, 0.25)',
+        // suavizado de la posición en reposo; se apaga durante el arrastre para
+        // seguir al cursor sin retraso
+        transition: interactuando ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       {/* la onda ocupa el fondo del bloque; encima va el porcentaje de ganancia.

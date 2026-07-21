@@ -39,6 +39,9 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
   const ancho = Math.max(audio.duracion * pxPorSegundo, 8)
   const barras = Math.max(12, Math.min(600, Math.floor(ancho / 2)))
   const [alturas, setAlturas] = useState<number[] | null>(null)
+  // en reposo la posición se anima con una curva suave; durante el arrastre el
+  // suavizado se apaga para que el bloque no vaya por detrás del cursor
+  const [interactuando, setInteractuando] = useState(false)
 
   // onda real leída del propio archivo. mientras se decodifica, o si no se puede,
   // queda null y se cae a una onda sintética estable a partir del id
@@ -70,6 +73,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
 
   function iniciarMover(e: ReactMouseEvent) {
     e.stopPropagation()
+    setInteractuando(true)
     seleccionarRegion(audio.id)
     const startX = e.clientX
     const inicioOriginal = audio.inicio
@@ -84,6 +88,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
     }
     const soltar = () => {
       setGuiaImantado(null)
+      setInteractuando(false)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
@@ -95,6 +100,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
     e.stopPropagation()
     e.preventDefault()
     seleccionarRegion(audio.id)
+    setInteractuando(true)
     const startX = e.clientX
     const inicioBase = audio.inicio
     const finBase = audio.inicio + audio.duracion
@@ -113,6 +119,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
     }
     const soltar = () => {
       setGuiaImantado(null)
+      setInteractuando(false)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
@@ -133,6 +140,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
         left: audio.inicio * pxPorSegundo,
         width: ancho,
         backgroundColor: 'rgba(56, 189, 248, 0.22)',
+        transition: interactuando ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       <Lineas alturas={onda} color="rgba(56, 189, 248, 0.7)" />

@@ -72,7 +72,7 @@ function RejillaFormas({
             }}
             title={`${f.etiqueta} · haz clic o arrástrala al visor`}
             className={[
-              'group flex cursor-grab flex-col items-center gap-1.5 rounded-xl p-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:cursor-grabbing',
+              'group flex aspect-square cursor-grab flex-col items-center justify-center gap-1.5 rounded-xl p-2 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:cursor-grabbing',
               activa
                 ? 'bg-brand/10 text-brand ring-2 ring-brand'
                 : 'text-[color:var(--muted)] ring-1 ring-black/10 hover:text-brand hover:ring-brand/50 dark:ring-white/10',

@@ -128,7 +128,9 @@ export default function OptionsPanel({
             </Tooltip>
           )}
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">{paneles[herramienta]}</div>
+        {/* barra de desplazamiento fina, no la gruesa general: en un panel estrecho
+            la ancha se veía tosca */}
+        <div className="scroll-modal min-h-0 flex-1 overflow-y-auto p-3">{paneles[herramienta]}</div>
       </div>
     </aside>
   )

@@ -21,6 +21,17 @@ export function useImportarMedios() {
         mostrar('error', `${file.name}: ${validacion.motivo}`)
         continue
       }
+      // si el mismo archivo ya está en los medios (mismo nombre y mismo peso), no
+      // se vuelve a añadir: para reutilizarlo basta arrastrarlo otra vez a la
+      // pista. así una importación repetida por descuido no llena la biblioteca de
+      // copias idénticas, que era lo que dejaba dos veces el mismo video
+      const yaEsta = useProjectStore
+        .getState()
+        .medios.some((m) => m.nombre === file.name && m.tamano === file.size)
+      if (yaEsta) {
+        mostrar('info', `${file.name} ya está en tus medios.`)
+        continue
+      }
       try {
         const datos =
           validacion.clase === 'audio'

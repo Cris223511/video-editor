@@ -39,8 +39,9 @@ export interface Encuadre {
   x: number
   y: number
   escala: number
-  // espejo del video sobre cada eje, opcionales para no alterar lo ya guardado.
-  // el volteo se ve igual en el visor y en el archivo exportado
+  // giro en grados y espejo por eje, opcionales para no alterar lo ya guardado.
+  // ambos se ven igual en el visor y en el archivo exportado
+  rotacion?: number
   espejoH?: boolean
   espejoV?: boolean
 }

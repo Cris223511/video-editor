@@ -25,7 +25,7 @@ const MIN = 0.1
 // filas (gap-2), en píxeles. se restan del ancho visible para saber cuánto
 // espacio real les queda a las filas y así llenarlo sin dejar franjas muertas
 const ANCHO_CABECERAS = 176
-const HUECO_COLUMNAS = 8
+const HUECO_COLUMNAS = 12
 // alto de la regla de tiempo, replicado en la columna de cabeceras para que las
 // filas de ambas columnas queden a la misma altura
 const ALTO_REGLA = 29
@@ -384,15 +384,23 @@ export default function Timeline({
           descuadraba las columnas; ahora la columna de cabeceras va pegada a la
           izquierda y acompaña el mismo scroll, así que nunca se desalinean */}
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
-        <div className="flex w-max gap-2">
+        <div className="flex w-max gap-3">
           {/* columna de cabeceras anclada a la izquierda: sube y baja con las
               filas al desplazar en vertical, pero se queda fija al desplazar en
               horizontal. el fondo sólido tapa las filas que resbalan por debajo.
               el grupo deja que las guías de «insertar nivel» asomen al pasar el
               cursor por las separaciones */}
           <div
-            className="group/cols sticky left-0 z-20 w-44 shrink-0"
-            style={{ background: 'rgb(var(--surface))' }}
+            className="group/cols sticky left-0 z-40 w-44 shrink-0"
+            style={{
+              background: 'rgb(var(--surface))',
+              // la columna va por encima de las capas del área de pistas (cabezal,
+              // guías, scrubber) con un z alto, para que ninguna de esas líneas se
+              // pinte sobre los rótulos cuando el contenido se desplaza por debajo.
+              // el borde derecho, con el gap que ya la separa, marca dónde acaban
+              // las cabeceras y empiezan las pistas
+              borderRight: '1px solid rgb(var(--border) / 0.16)',
+            }}
           >
             <div style={{ height: ALTO_REGLA }} />
             {/* bloque de niveles de video, relativo para colgar de él las guías
@@ -488,7 +496,6 @@ export default function Timeline({
                       <ClipBlock
                         key={c.id}
                         clip={c}
-                        miniatura={asset?.miniatura}
                         nombre={asset?.nombre ?? 'clip'}
                         url={asset?.url}
                         altoPista={altosPista[p]}

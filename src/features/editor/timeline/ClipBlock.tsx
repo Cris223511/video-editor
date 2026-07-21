@@ -1,9 +1,10 @@
-import { MouseEvent as ReactMouseEvent, useState } from 'react'
+import { MouseEvent as ReactMouseEvent, useEffect, useState } from 'react'
 import { Info } from 'lucide-react'
 import { Clip } from '../../../types/timeline'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useTira } from './useTira'
 import FrameStrip from './FrameStrip'
+import Tooltip from '../../../components/ui/Tooltip'
 import MedioNoDisponible from '../../../components/ui/MedioNoDisponible'
 import PropiedadesClip from './PropiedadesClip'
 import TransicionBlock from './TransicionBlock'
@@ -13,7 +14,6 @@ import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timelin
 
 interface Props {
   clip: Clip
-  miniatura?: string
   nombre: string
   url?: string
   altoPista?: number
@@ -29,7 +29,6 @@ export const HUECO_PISTA = 10
 // recortar por sus bordes con los tiradores laterales
 export default function ClipBlock({
   clip,
-  miniatura,
   nombre,
   url,
   altoPista = 64,
@@ -67,6 +66,20 @@ export default function ClipBlock({
   // controla la ventana de propiedades del clip, que enseña un resumen de solo
   // lectura de todo lo que se le aplicó (velocidad, color, efectos, transición)
   const [verPropiedades, setVerPropiedades] = useState(false)
+  // enciende el fundido de la tira de fotogramas. la extracción tarda unos
+  // segundos y antes se veía la miniatura estirada y borrosa como relleno; ahora
+  // el clip espera con un fondo sólido tenue y, cuando la tira llega, se pasa a
+  // opacidad plena en un solo cuadro de retraso para que el fundido arranque
+  // desde cero en vez de aparecer de golpe con el estado roto intermedio
+  const [tiraLista, setTiraLista] = useState(false)
+  useEffect(() => {
+    if (!tira) {
+      setTiraLista(false)
+      return
+    }
+    const id = requestAnimationFrame(() => setTiraLista(true))
+    return () => cancelAnimationFrame(id)
+  }, [tira])
 
   const ancho = Math.max(clip.duracion * pxPorSegundo, 8)
 
@@ -259,10 +272,9 @@ export default function ClipBlock({
         // cerrar un hueco los clips se deslizan hasta su nuevo sitio; durante un
         // arrastre propio el suavizado se apaga para no ir por detrás del cursor
         transition: interactuando ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
-        // mientras la tira se extrae, el clip se ve con su miniatura muy
-        // atenuada y el azul de fondo, sin saltos bruscos al llegar
-        backgroundImage: !tira && miniatura ? `url(${miniatura})` : undefined,
-        backgroundSize: 'cover',
+        // mientras la tira se extrae, el clip descansa sobre un azul sólido tenue,
+        // sin la miniatura estirada que antes se veía borrosa y rota hasta que
+        // llegaban los fotogramas de verdad
         backgroundColor: 'rgb(24 97 255 / 0.22)',
       }}
     >
@@ -275,14 +287,19 @@ export default function ClipBlock({
       )}
 
       {tira && (
-        <FrameStrip
-          tira={tira}
-          ancho={ancho}
-          alto={altoPista}
-          recorteInicio={clip.recorteInicio}
-          velocidad={clip.velocidad}
-          pxPorSegundo={pxPorSegundo}
-        />
+        <div
+          className="absolute inset-0 transition-opacity duration-500 ease-out"
+          style={{ opacity: tiraLista ? 1 : 0 }}
+        >
+          <FrameStrip
+            tira={tira}
+            ancho={ancho}
+            alto={altoPista}
+            recorteInicio={clip.recorteInicio}
+            velocidad={clip.velocidad}
+            pxPorSegundo={pxPorSegundo}
+          />
+        </div>
       )}
 
       <TransicionBlock clip={clip} pxPorSegundo={pxPorSegundo} />
@@ -321,30 +338,29 @@ export default function ClipBlock({
         </span>
       )}
 
-      {/* botón discreto para abrir las propiedades del clip. va arriba a la
-          derecha y solo asoma al pasar el cursor o cuando el clip está
-          seleccionado, para no tapar la miniatura. lleva su propio stopPropagation
-          en el mousedown y en el click, así que ni arranca el arrastre del cuerpo
-          ni interfiere con los tiradores de recorte */}
-      <button
-        type="button"
-        title="Ver propiedades del clip"
-        aria-label="Ver propiedades del clip"
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation()
-          setVerPropiedades(true)
-        }}
-        className={[
-          'absolute top-1 z-30 grid h-5 w-5 place-items-center rounded-md bg-black/60 text-white transition-opacity duration-200 hover:bg-black/80',
-          // cuando el clip lleva su etiqueta de velocidad, que también va arriba a
-          // la derecha, el botón se corre a la izquierda para no montarse encima
-          clip.velocidad !== 1 ? 'right-9' : 'right-1',
-          verPropiedades || seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-        ].join(' ')}
-      >
-        <Info size={12} />
-      </button>
+      {/* botón discreto para abrir las propiedades del clip. va al inicio del
+          bloque, arriba a la izquierda, y solo asoma al pasar el cursor o cuando
+          el clip está seleccionado, para no tapar la tira. lleva su propio
+          stopPropagation en el mousedown y en el click, así que ni arranca el
+          arrastre del cuerpo ni interfiere con los tiradores de recorte. el
+          tooltip explica qué hace sin necesidad de abrirlo */}
+      <Tooltip texto="Ver propiedades del clip">
+        <button
+          type="button"
+          aria-label="Ver propiedades del clip"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            setVerPropiedades(true)
+          }}
+          className={[
+            'absolute left-1 top-1 z-30 grid h-5 w-5 place-items-center rounded-md bg-black/60 text-white transition-opacity duration-200 hover:bg-black/80',
+            verPropiedades || seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          ].join(' ')}
+        >
+          <Info size={12} />
+        </button>
+      </Tooltip>
 
       {verPropiedades && (
         <PropiedadesClip clip={clip} onCerrar={() => setVerPropiedades(false)} />

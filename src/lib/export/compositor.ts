@@ -494,11 +494,15 @@ export function dibujarFotograma(
         ctx.restore()
       }
 
-      // el espejo del clip se aplica solo al video en sí, no al relleno de fondo,
-      // igual que en el visor. va en su propio save para que la escala negativa no
-      // se filtre a lo que se dibuje después
+      // el giro y el espejo del clip se aplican solo al video en sí, no al relleno
+      // de fondo, igual que en el visor. va en su propio save para que la
+      // transformación no se filtre a lo que se dibuje después
       ctx.save()
-      aplicarTransformCanvas(ctx, dx + dw / 2, dy + dh / 2, { espejoH: enc.espejoH, espejoV: enc.espejoV })
+      aplicarTransformCanvas(ctx, dx + dw / 2, dy + dh / 2, {
+        rotacion: enc.rotacion,
+        espejoH: enc.espejoH,
+        espejoV: enc.espejoV,
+      })
 
       // el color se resuelve como en el visor: funciones nativas más, si hay
       // temperatura o ruedas, el filtro svg de color. el desenfoque de movimiento

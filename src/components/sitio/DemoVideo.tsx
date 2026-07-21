@@ -9,8 +9,8 @@ import { Pause, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react'
 // así que todavía pueden no describir lo que se ve en pantalla
 const CLIPS = [
   {
-    id: 'laboratorio',
-    nombre: 'Laboratorio',
+    id: 'cascada',
+    nombre: 'Cascada',
     src: 'https://videos.pexels.com/video-files/2098988/2098988-hd_1920_1080_30fps.mp4',
   },
   {
@@ -19,8 +19,8 @@ const CLIPS = [
     src: 'https://videos.pexels.com/video-files/1409899/1409899-hd_1920_1080_25fps.mp4',
   },
   {
-    id: 'teclado',
-    nombre: 'Manos en el teclado',
+    id: 'equipo',
+    nombre: 'Equipo en la oficina',
     src: 'https://videos.pexels.com/video-files/6774633/6774633-hd_1920_1080_30fps.mp4',
   },
 ]
