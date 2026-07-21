@@ -444,6 +444,10 @@ export default function Preview() {
       ctx.restore()
     }
 
+    // se recuerda lo último dibujado para no repetir el trabajo caro (muestrear el
+    // video y aplicar pixelado o desenfoque) cuando nada ha cambiado
+    let firmaPrev = ''
+    let capasPrev: unknown = null
     const render = () => {
       if (cancelado) return
       const canvas = censuraCanvasRef.current
@@ -453,16 +457,9 @@ export default function Preview() {
         const dpr = window.devicePixelRatio || 1
         const w = stage.clientWidth
         const h = stage.clientHeight
-        if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
-          canvas.width = Math.round(w * dpr)
-          canvas.height = Math.round(h * dpr)
-        }
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-        ctx.clearRect(0, 0, w, h)
 
         const st = useEditorStore.getState()
         const ph = st.playhead
-        const rect = rectContenido(w, h, st.resolucion.ancho / st.resolucion.alto)
         const ordenados = [...st.pista.clips].sort((a, b) => a.inicio - b.inicio)
         const ocultasSt = new Set<number>()
         st.pistasMeta.forEach((m, i) => {
@@ -470,6 +467,27 @@ export default function Preview() {
         })
         const activoClip = clipEnTiempo(ordenados, ph, ocultasSt)
         const video = activoClip ? videosRef.current.get(activoClip.id) : null
+
+        // en reproducción se redibuja siempre, porque el fotograma del video cambia.
+        // en pausa solo se rehace si algo se movió: el cabezal, el fotograma, las
+        // capas o el tamaño del lienzo. así una censura quieta no quema gpu sin
+        // parar, que es lo que pasaba antes al dejar el editor detenido
+        const firma = [ph, video ? Math.round(video.currentTime * 1000) : -1, w, h, dpr].join('|')
+        if (!st.reproduciendo && firma === firmaPrev && st.capas === capasPrev) {
+          raf = requestAnimationFrame(render)
+          return
+        }
+        firmaPrev = firma
+        capasPrev = st.capas
+
+        if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+          canvas.width = Math.round(w * dpr)
+          canvas.height = Math.round(h * dpr)
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        ctx.clearRect(0, 0, w, h)
+
+        const rect = rectContenido(w, h, st.resolucion.ancho / st.resolucion.alto)
         if (video && video.videoWidth > 0) {
           for (const capa of st.capas) {
             if (capa.tipo !== 'censura') continue

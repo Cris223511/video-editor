@@ -175,7 +175,9 @@ export default function NavSitio() {
                     key={e.a}
                     to={e.a}
                     className={[
-                      'rounded-full px-4 py-2.5 text-sm font-medium transition-colors duration-200',
+                      // mismo resaltado al pasar el cursor que el resto de opciones
+                      // de menú de la aplicación, para que reaccionen igual
+                      'rounded-full px-4 py-2.5 text-sm font-medium transition-colors duration-100 hover:bg-brand/10 hover:text-brand',
                       activo(e.a) ? 'text-brand' : 'text-[color:var(--muted)]',
                     ].join(' ')}
                   >

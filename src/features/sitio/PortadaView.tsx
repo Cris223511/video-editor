@@ -253,7 +253,7 @@ export default function PortadaView() {
               {CAPACIDADES.map((c) => (
                 <Tarjeta key={c.titulo} hover className="h-full">
                   <IconoCirculo>{c.icono}</IconoCirculo>
-                  <h3 className="mt-4 font-display text-titulo-md">{c.titulo}</h3>
+                  <h3 className="mt-4 text-[15px] font-semibold">{c.titulo}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-[color:var(--muted)]">{c.texto}</p>
                 </Tarjeta>
               ))}

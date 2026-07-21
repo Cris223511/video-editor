@@ -14,13 +14,24 @@ const CLAVE = 've-theme'
 // declarada en la hoja de estilos, que es de 350 milisegundos
 const FUNDIDO = 400
 
-// refleja el tema en el html y lo recuerda entre sesiones. durante un instante
-// se marca la raíz para que los colores se fundan en lugar de saltar de golpe
+// refleja el tema en el html y lo recuerda entre sesiones. el fundido se hace,
+// cuando el navegador lo permite, con la API de transiciones de vista: captura la
+// página antes y después y las cruza en el compositor, un solo fundido suave por
+// hardware en lugar de animar el color de cada elemento por separado, que en una
+// interfaz cargada como el editor se notaba a tirones. donde esa API no existe se
+// cae a la transición por clase de siempre
 function aplicar(tema: Tema) {
   const raiz = document.documentElement
-  raiz.classList.add('tema-en-transicion')
-  raiz.classList.toggle('dark', tema === 'dark')
-  window.setTimeout(() => raiz.classList.remove('tema-en-transicion'), 400)
+  const conmutar = () => raiz.classList.toggle('dark', tema === 'dark')
+  const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown }
+  const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  if (typeof doc.startViewTransition === 'function' && !reducido) {
+    doc.startViewTransition(conmutar)
+  } else {
+    raiz.classList.add('tema-en-transicion')
+    conmutar()
+    window.setTimeout(() => raiz.classList.remove('tema-en-transicion'), 400)
+  }
   try {
     localStorage.setItem(CLAVE, tema)
   } catch {

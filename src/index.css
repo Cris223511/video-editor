@@ -114,10 +114,20 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* el cambio de tema no salta de golpe, se funde */
+/* respaldo para navegadores sin la API de transiciones de vista: el cambio de
+   tema se funde animando el color, aunque en páginas cargadas eso puede notarse.
+   donde la API existe, este camino no se usa */
 html.tema-en-transicion,
 html.tema-en-transicion * {
   transition: background-color 0.35s ease, border-color 0.35s ease, color 0.35s ease;
+}
+
+/* duración del fundido de la transición de vista al cambiar de tema. es un cruce
+   suave de toda la página hecho en el compositor, sin animar elemento por elemento */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.32s;
+  animation-timing-function: ease;
 }
 
 @layer components {
@@ -243,21 +253,33 @@ html.tema-en-transicion * {
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
 }
 
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
+/* barra azul con forma de píldora. el borde transparente con recorte al relleno
+   deja un pequeño aire alrededor, de modo que la barra se ve como una cápsula
+   redondeada separada del filo en lugar de un bloque pegado al borde */
 ::-webkit-scrollbar-thumb {
-  background: rgb(var(--border) / 0.22);
-  border-radius: 8px;
+  background: rgb(var(--accent) / 0.5);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--accent) / 0.45);
+  background: rgb(var(--accent) / 0.78);
+  background-clip: padding-box;
+}
+
+/* firefox toma su propia vía: barra fina y del mismo azul */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--accent) / 0.5) transparent;
 }
 
 /* barra de desplazamiento del cuerpo de los modales: más delgada y discreta que

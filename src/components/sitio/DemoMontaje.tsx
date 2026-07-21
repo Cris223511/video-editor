@@ -85,8 +85,8 @@ const ATAJOS_AJUSTE = [
 // escena: escena_y = 2 + (panel_y / 100) * 63
 const MEDIOS = [
   { x: 17.5, y: 42.3 },
-  { x: 17.5, y: 51.8 },
-  { x: 17.5, y: 60 },
+  { x: 17.5, y: 51.5 },
+  { x: 17.5, y: 60.6 },
 ]
 
 // el recorrido del cursor. la gracia está en que cada archivo se recoge de su
@@ -321,11 +321,12 @@ export default function DemoMontaje() {
               key={i}
               className="absolute inset-x-[8%] flex flex-col gap-0.5 rounded-md p-1 transition-all duration-300"
               style={{
-                // los topes y las alturas son los mismos que se usaron para
-                // calcular el centro de cada cajita en MEDIOS: caja 1 va de
-                // 58% a 70%, la 2 de 73% a 85% y la 3 de 87% a 97% del panel
-                top: `${[58, 73, 87][i]}%`,
-                height: `${[12, 12, 10][i]}%`,
+                // las tres cajitas miden lo mismo y guardan la misma separación,
+                // así el panel se ve parejo. los topes y la altura coinciden con
+                // el centro que se usó para calcular MEDIOS: caja 1 de 58% a 70%,
+                // la 2 de 72.5% a 84.5% y la 3 de 87% a 99% del panel
+                top: `${[58, 72.5, 87][i]}%`,
+                height: '12%',
                 background:
                   medioTocado === i ? 'rgb(var(--accent) / 0.18)' : 'rgb(var(--border) / 0.12)',
                 outline: medioTocado === i ? '1px solid rgb(var(--accent))' : 'none',

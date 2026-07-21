@@ -1,4 +1,10 @@
-import { MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react'
+import {
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import { Circle, Droplet, Grid2x2, Move, Square } from 'lucide-react'
 import { Deslizador } from '../ui/Controls'
 
@@ -150,6 +156,39 @@ export default function DemoCensura() {
 
   const MINIMO = 0.06
 
+  // afinado con teclado sobre el recuadro, el mismo gesto que ofrece el editor:
+  // las flechas lo desplazan y, sujetando un modificador, cambian su tamaño. los
+  // pasos son cortos para que el movimiento se sienta suave y todo se mantiene
+  // dentro del lienzo. el scroll de la página solo se frena cuando la demo tiene
+  // el foco y se pulsa una flecha, así el resto del teclado no queda atrapado
+  function teclado(e: ReactKeyboardEvent) {
+    const flechas = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']
+    if (!flechas.includes(e.key)) return
+    e.preventDefault()
+    const paso = 0.02
+    setCaja((prev) => {
+      let { x, y, w, h } = prev
+      if (e.altKey) {
+        // el ancho: la izquierda lo recorta y la derecha lo agranda, sin que el
+        // recuadro se salga por el lado derecho del lienzo
+        if (e.key === 'ArrowLeft') w = Math.max(MINIMO, w - paso)
+        else if (e.key === 'ArrowRight') w = Math.min(1 - x, w + paso)
+      } else if (e.ctrlKey) {
+        // el alto: arriba lo agranda y abajo lo recorta, topando en el borde
+        // inferior para no rebasar el lienzo
+        if (e.key === 'ArrowUp') h = Math.min(1 - y, h + paso)
+        else if (e.key === 'ArrowDown') h = Math.max(MINIMO, h - paso)
+      } else {
+        // desplazamiento simple de la caja, frenado contra cada borde
+        if (e.key === 'ArrowLeft') x = Math.max(0, x - paso)
+        else if (e.key === 'ArrowRight') x = Math.min(1 - w, x + paso)
+        else if (e.key === 'ArrowUp') y = Math.max(0, y - paso)
+        else if (e.key === 'ArrowDown') y = Math.min(1 - h, y + paso)
+      }
+      return { x, y, w, h }
+    })
+  }
+
   // arrastre de la caja entera
   function mover(e: ReactMouseEvent) {
     e.preventDefault()
@@ -274,7 +313,13 @@ export default function DemoCensura() {
         </div>
       </div>
 
-      <div className="relative overflow-hidden rounded-xl bg-black">
+      {/* el área es enfocable para que responda al teclado; el anillo de foco,
+          discreto, avisa de que la demo acepta flechas para afinar el recuadro */}
+      <div
+        tabIndex={0}
+        onKeyDown={teclado}
+        className="relative overflow-hidden rounded-xl bg-black outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-brand/50"
+      >
         {/* la fuente del clip vive fuera de la vista: lo que se enseña es el
             lienzo, que es donde ocurre la censura. queda dentro del documento en
             vez de creado a mano porque así el navegador lo decodifica con
