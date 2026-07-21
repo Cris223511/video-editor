@@ -97,6 +97,26 @@ html {
   height: 100%;
 }
 
+/* estilos que Lenis necesita para tomar el control del desplazamiento del sitio.
+   sin ellos, la inercia no llegaba a aplicarse y el scroll seguía siendo el del
+   navegador. lenis marca la raíz con estas clases al arrancar */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
 /* aquí estaba el salto de los modales. el body valía height 100%, o sea justo el
    alto de una pantalla. al abrir un modal, radix bloquea el scroll del fondo
    poniéndole overflow hidden al body, y con el alto clavado en una pantalla ese

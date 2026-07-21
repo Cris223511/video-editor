@@ -21,7 +21,7 @@ const CLIPS = [
   {
     id: 'teclado',
     nombre: 'Manos en el teclado',
-    src: 'https://videos.pexels.com/video-files/3129671/3129671-hd_1920_1080_30fps.mp4',
+    src: 'https://videos.pexels.com/video-files/6774633/6774633-hd_1920_1080_30fps.mp4',
   },
 ]
 

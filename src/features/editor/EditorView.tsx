@@ -73,32 +73,38 @@ export default function EditorView() {
     // de escritura vuelven a permitir selección con una regla aparte en el css
     <div className="editor-noselect h-[calc(100dvh-3.5rem)] p-1.5">
       {preparando && <Loader texto="Preparando tu proyecto..." />}
-      <PanelGroup direction="vertical" autoSaveId="ve-vertical-3">
-        {/* fila superior: herramientas, opciones y visor */}
+      {/* el riel de herramientas va a la izquierda de todo y de altura completa,
+          como una barra lateral. gracias a eso las dos filas arrancan en la misma
+          x y los paneles de la izquierda, opciones arriba y medios abajo, quedan
+          del mismo ancho y con el mismo mínimo, alineados sea cual sea el tamaño
+          de la ventana, que era el descuadre que se venía arrastrando */}
+      <div className="flex h-full gap-1.5">
+        <RielHerramientas onElegir={() => !verOpciones && alternar(opciones, false)} />
+        <div className="min-w-0 flex-1">
+      <PanelGroup direction="vertical" autoSaveId="ve-vertical-4">
+        {/* fila superior: opciones y visor */}
         <Panel defaultSize={64} minSize={35}>
           <div className="flex h-full gap-1.5">
-            <RielHerramientas onElegir={() => !verOpciones && alternar(opciones, false)} />
 
             {/* con el panel plegado queda esta pestaña fina en su sitio para
-                volver a abrirlo; sin ella solo el riel serviría de reapertura */}
+                volver a abrirlo */}
             {!verOpciones && (
               <BarraReabrir titulo="Mostrar el panel" onClick={() => alternar(opciones, false)} />
             )}
 
             <div className="min-w-0 flex-1">
-              <PanelGroup direction="horizontal" autoSaveId="ve-horizontal-3">
+              <PanelGroup direction="horizontal" autoSaveId="ve-horizontal-4">
                 <Panel
                   ref={opciones}
                   id="opciones"
                   order={1}
                   collapsible
                   collapsedSize={0}
-                  // el panel de arriba no debe poder encogerse más que el de medios
-                  // de abajo, o los dos bordes derechos dejan de estar a la par y se
-                  // ve descuadrado. por eso comparte el mismo mínimo que medios
-                  defaultSize={22}
-                  minSize={22}
-                  maxSize={40}
+                  // mismo default y mismo mínimo que el panel de medios de abajo;
+                  // al compartir grupo y ancho, sus bordes coinciden siempre
+                  defaultSize={24}
+                  minSize={20}
+                  maxSize={42}
                   onCollapse={() => setVerOpciones(false)}
                   onExpand={() => setVerOpciones(true)}
                   className={`flex ${suave}`}
@@ -130,20 +136,17 @@ export default function EditorView() {
             )}
 
             <div className="min-w-0 flex-1">
-              <PanelGroup direction="horizontal" autoSaveId="ve-inferior-3">
+              <PanelGroup direction="horizontal" autoSaveId="ve-inferior-4">
                 <Panel
                   ref={medios}
                   id="medios"
                   order={1}
                   collapsible
                   collapsedSize={0}
-                  // el grupo de abajo no tiene el riel de herramientas delante, así
-                  // que arranca más a la izquierda que el de arriba. para que el
-                  // borde derecho de medios quede a la altura del de opciones hace
-                  // falta darle algo más de ancho de salida; de ahí este valor
-                  defaultSize={26}
-                  minSize={22}
-                  maxSize={40}
+                  // mismo default y mínimo que el panel de opciones de arriba
+                  defaultSize={24}
+                  minSize={20}
+                  maxSize={42}
                   onCollapse={() => setVerMedios(false)}
                   onExpand={() => setVerMedios(true)}
                   className={`flex ${suave}`}
@@ -166,6 +169,8 @@ export default function EditorView() {
           </div>
         </Panel>
       </PanelGroup>
+        </div>
+      </div>
 
       <ExportDialog />
     </div>

@@ -27,7 +27,9 @@ export type BaseRecorte = {
 }
 
 const PX_POR_SEGUNDO_DEFECTO = 60
-const PX_MIN = 8
+// mínimo muy bajo para poder alejar mucho: así un clip largo se encoge hasta caber
+// de sobra en la línea de tiempo. la regla adapta sola la separación de sus marcas
+const PX_MIN = 2
 const PX_MAX = 400
 
 // escala en píxeles por segundo que hace caber toda la duración dentro del ancho

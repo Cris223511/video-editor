@@ -28,8 +28,8 @@ const CLAVE_EXPANDIDO = 've-riel-expandido'
 // espacio del nombre que se revela al lado. se ensanchó un poco respecto de antes
 // para que, al reservar el carril simétrico de la barra, el icono siga cabiendo
 // justo sin quedar apretado
-const ANCHO_COLAPSADO = 70
-const ANCHO_EXPANDIDO = 190
+const ANCHO_COLAPSADO = 76
+const ANCHO_EXPANDIDO = 196
 
 // margen lateral de cada fila. el panel gasta 1px de borde por lado, así que del
 // ancho colapsado quedan 54px útiles; con 5px de aire a cada costado la fila mide
@@ -126,9 +126,11 @@ export default function RielHerramientas({ onElegir }: { onElegir?: () => void }
               <span className="grid w-11 shrink-0 place-items-center">
                 <Icon name={h.icono} size={19} />
               </span>
-              {/* nombre en una sola línea: al no poder envolver, el recorte lo va
-                  descubriendo sin reflow al abrir ni al cerrar */}
-              <span className="whitespace-nowrap pr-3 text-sm font-medium">{h.etiqueta}</span>
+              {/* el nombre solo se pinta con el riel desplegado. plegado no se
+                  dibuja en absoluto, así ni la primera letra asoma por el borde */}
+              {expandido && (
+                <span className="whitespace-nowrap pr-3 text-sm font-medium">{h.etiqueta}</span>
+              )}
             </button>
           </ConTooltip>
         ))}
@@ -152,7 +154,9 @@ export default function RielHerramientas({ onElegir }: { onElegir?: () => void }
               style={{ transform: expandido ? 'rotate(180deg)' : 'none' }}
             />
           </span>
-          <span className="whitespace-nowrap pr-3 text-sm font-medium">Contraer</span>
+          {expandido && (
+            <span className="whitespace-nowrap pr-3 text-sm font-medium">Contraer</span>
+          )}
         </button>
       </div>
     </div>

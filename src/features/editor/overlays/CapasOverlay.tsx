@@ -140,6 +140,10 @@ export default function CapasOverlay() {
     let ultima = normalizar(e.nativeEvent)
     const propia = cajaDe(capa, (e.currentTarget as HTMLElement) ?? null)
     const vecinas = cajasVecinas(capa.id)
+    // desfase entre donde se agarró y el centro del elemento. sin esto, al mover
+    // un elemento tomándolo por una esquina, su centro saltaba de golpe bajo el
+    // cursor; conservando este desfase, el elemento se desliza desde donde estaba
+    const agarre = propia ? { x: ultima.x - propia.x, y: ultima.y - propia.y } : { x: 0, y: 0 }
 
     const mover = (ev: globalThis.MouseEvent) => {
       const p = normalizar(ev)
@@ -149,13 +153,17 @@ export default function CapasOverlay() {
       } else if (capa.keyframes.length > 0) {
         desplazarCapa(capa.id, p.x - ultima.x, p.y - ultima.y)
       } else {
+        // el centro objetivo es el cursor menos el desfase de agarre, de modo que
+        // el punto por el que se sujeta el elemento se mantiene bajo el ratón
+        const cx = p.x - agarre.x
+        const cy = p.y - agarre.y
         // con Alt el imantado se desactiva, por si hace falta colocar algo justo
         // al lado de una guía sin que salte
         if (ev.altKey || !propia) {
-          moverCapaLienzo(capa.id, p.x, p.y)
+          moverCapaLienzo(capa.id, cx, cy)
           setGuias([])
         } else {
-          const r = imantar({ x: p.x, y: p.y, w: propia.w, h: propia.h }, vecinas)
+          const r = imantar({ x: cx, y: cy, w: propia.w, h: propia.h }, vecinas)
           moverCapaLienzo(capa.id, r.x, r.y)
           setGuias(r.guias)
         }

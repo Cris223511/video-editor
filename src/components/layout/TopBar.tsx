@@ -85,9 +85,9 @@ export default function TopBar() {
     >
       <div className="flex min-w-0 items-center gap-3">
         {enEditor && (
-          <Tooltip texto="Volver a los medios" lado="abajo">
+          <Tooltip texto="Volver a mis proyectos" lado="abajo">
             <button
-              onClick={() => navegar(RUTAS.medios)}
+              onClick={() => navegar(RUTAS.proyectos)}
               className="interactivo grid h-9 w-9 place-items-center rounded-full text-[color:var(--muted)]"
             >
               <Icon name="atras" size={18} />
