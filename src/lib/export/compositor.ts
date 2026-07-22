@@ -143,29 +143,31 @@ function dibujarImagen(
   if (!img) return
   const pos = posicionCapa(c, t)
   const rec = c.recorte
-  const sw = Math.max(1, (1 - rec.izq - rec.der) * c.anchoNatural)
-  const sh = Math.max(1, (1 - rec.arr - rec.aba) * c.altoNatural)
   const w = c.anchoRel * ancho
-  // si la imagen se deformó a mano manda su alto guardado; si no, se respeta la
-  // proporción del trozo visible tras el recorte
-  const h = c.altoRel !== undefined ? c.altoRel * alto : w * (sh / sw)
+  // la caja abarca la imagen entera con su proporción natural; si se deformó a
+  // mano manda el alto guardado. el recorte ya no cambia este tamaño, sino que
+  // limita luego el dibujo, tapando los lados como hace el recorte del video
+  const asp = c.anchoNatural > 0 ? c.anchoNatural / c.altoNatural : 1
+  const h = c.altoRel !== undefined ? c.altoRel * alto : w / (asp || 1)
   ctx.save()
   ctx.globalAlpha = c.opacidad / 100
   // se lleva el origen al centro de la imagen para girar y voltear desde ahí, y
   // luego se dibuja alrededor de ese centro
   ctx.translate(pos.x * ancho, pos.y * alto)
   aplicarTransformCanvas(ctx, 0, 0, c)
-  ctx.drawImage(
-    img,
-    rec.izq * c.anchoNatural,
-    rec.arr * c.altoNatural,
-    sw,
-    sh,
-    -w / 2,
-    -h / 2,
-    w,
-    h,
-  )
+  // recorte: se acota el dibujo al recuadro que queda, dentro de la misma
+  // transformación para que gire y voltee con la imagen. lo de fuera no se pinta
+  // y deja ver el fondo, igual que el inset del visor
+  if (rec.izq || rec.der || rec.arr || rec.aba) {
+    ctx.beginPath()
+    ctx.rect(-w / 2 + rec.izq * w, -h / 2 + rec.arr * h, w * (1 - rec.izq - rec.der), h * (1 - rec.arr - rec.aba))
+    ctx.clip()
+  }
+  // el color se resuelve como en el visor: funciones nativas más, si hay
+  // temperatura, tinte, ruedas o curvas, el filtro svg de color referenciado
+  if (c.tono && !esTonoNeutro(c.tono)) ctx.filter = filtroCss(c.tono, `tono-img-exp-${c.id}`, [])
+  ctx.drawImage(img, -w / 2, -h / 2, w, h)
+  ctx.filter = 'none'
   ctx.restore()
 }
 

@@ -4,8 +4,23 @@ import { useProjectStore } from '../../../store/useProjectStore'
 import { rectContenido } from '../../../lib/layers/rect'
 import { rectClip, encuadreDe } from '../../../lib/timeline/encuadre'
 import { clipEnTiempo } from '../../../lib/timeline/clips'
+import { posicionCapa } from '../../../lib/layers/motion'
+import { CapaImagen } from '../../../types/layers'
 
 const CERO = { izq: 0, der: 0, arr: 0, aba: 0 }
+
+// acota cada lado del recorte al rango válido, sin cruzar al de enfrente, para
+// que quede al menos un mínimo de imagen a la vista. es el mismo criterio que
+// aplica el store al recorte del video
+function acotarRecorte(base: typeof CERO, cambios: Partial<typeof CERO>): typeof CERO {
+  const n = { ...base, ...cambios }
+  const MIN = 0.05
+  n.izq = Math.max(0, Math.min(1 - MIN - n.der, n.izq))
+  n.der = Math.max(0, Math.min(1 - MIN - n.izq, n.der))
+  n.arr = Math.max(0, Math.min(1 - MIN - n.aba, n.arr))
+  n.aba = Math.max(0, Math.min(1 - MIN - n.arr, n.aba))
+  return n
+}
 
 // los ocho agarres del recuadro de recorte y qué lados mueve cada uno. las
 // esquinas tocan dos lados a la vez; los del medio, solo el suyo
@@ -28,11 +43,14 @@ const AGARRES: { id: string; lados: Lado[]; x: number; y: number; cursor: string
 export default function RecorteOverlay() {
   const herramienta = useEditorStore((s) => s.herramienta)
   const clips = useEditorStore((s) => s.pista.clips)
+  const capas = useEditorStore((s) => s.capas)
   const playhead = useEditorStore((s) => s.playhead)
   const resolucion = useEditorStore((s) => s.resolucion)
   const pistasMeta = useEditorStore((s) => s.pistasMeta)
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
+  const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const recortarClipImagen = useEditorStore((s) => s.recortarClipImagen)
+  const actualizarCapa = useEditorStore((s) => s.actualizarCapa)
   const medios = useProjectStore((s) => s.medios)
 
   const rootRef = useRef<HTMLDivElement>(null)
@@ -60,20 +78,48 @@ export default function RecorteOverlay() {
   const ordenados = useMemo(() => [...clips].sort((a, b) => a.inicio - b.inicio), [clips])
   const activo = clipEnTiempo(ordenados, playhead, ocultas)
 
+  // la herramienta recorta o bien una imagen elegida, o bien el clip de video
+  // bajo el cabezal. la imagen manda si está seleccionada, porque al elegirla se
+  // suelta cualquier clip
+  const capaImagen = capas.find(
+    (c): c is CapaImagen =>
+      c.id === capaSeleccionada &&
+      c.tipo === 'imagen' &&
+      playhead >= c.inicio &&
+      playhead < c.inicio + c.duracion,
+  )
   // solo se recorta el clip que está elegido y además bajo el cabezal, para que el
   // recuadro caiga sobre el video que de verdad se ve
-  const objetivo = activo && activo.id === clipSeleccionado ? activo : null
+  const objetivo = !capaImagen && activo && activo.id === clipSeleccionado ? activo : null
   const asset = objetivo ? medios.find((a) => a.id === objetivo.assetId) : null
 
-  if (herramienta !== 'recortar' || !objetivo || !asset || rect.w === 0) {
+  const activa = herramienta === 'recortar' && rect.w > 0 && (capaImagen || (objetivo && asset))
+  if (!activa) {
     return <div ref={rootRef} className="pointer-events-none absolute inset-0" />
   }
 
-  const enc = encuadreDe(objetivo)
-  const r = rectClip(asset.ancho, asset.alto, rect.w, rect.h, enc)
-  // caja del video en píxeles del visor, sobre la que se mide el recorte
-  const caja = { x: rect.ox + r.dx, y: rect.oy + r.dy, w: r.dw, h: r.dh }
-  const rec = objetivo.recorte ?? CERO
+  // caja del objetivo en píxeles del visor, sobre la que se mide el recorte, y el
+  // recorte vigente. el video sale de su encuadre; la imagen, de su posición y su
+  // tamaño con la proporción natural completa
+  let caja: { x: number; y: number; w: number; h: number }
+  let rec: typeof CERO
+  if (capaImagen) {
+    const pos = posicionCapa(capaImagen, playhead)
+    const w = capaImagen.anchoRel * rect.w
+    // alto con la proporción natural entera, igual que lo pinta el visor
+    const asp = capaImagen.anchoNatural > 0 ? capaImagen.anchoNatural / capaImagen.altoNatural : 1
+    const h =
+      capaImagen.altoRel !== undefined
+        ? capaImagen.altoRel * rect.h
+        : (capaImagen.anchoRel * aspecto) / (asp || 1) * rect.h
+    caja = { x: rect.ox + pos.x * rect.w - w / 2, y: rect.oy + pos.y * rect.h - h / 2, w, h }
+    rec = capaImagen.recorte ?? CERO
+  } else {
+    const enc = encuadreDe(objetivo!)
+    const r = rectClip(asset!.ancho, asset!.alto, rect.w, rect.h, enc)
+    caja = { x: rect.ox + r.dx, y: rect.oy + r.dy, w: r.dw, h: r.dh }
+    rec = objetivo!.recorte ?? CERO
+  }
 
   const crop = {
     x: caja.x + rec.izq * caja.w,
@@ -82,8 +128,15 @@ export default function RecorteOverlay() {
     h: caja.h * (1 - rec.arr - rec.aba),
   }
 
+  // guarda el recorte en el objetivo que corresponda: la imagen lo lleva como un
+  // campo de la capa (acotado aquí); el clip usa su acción del store, que ya acota
+  function aplicarRecorte(cambios: Partial<typeof CERO>) {
+    if (capaImagen) actualizarCapa(capaImagen.id, { recorte: acotarRecorte(rec, cambios) })
+    else if (objetivo) recortarClipImagen(objetivo.id, cambios)
+  }
+
   // arrastre de un agarre: la posición del cursor en fracción de la caja marca
-  // dónde queda el lado que se mueve. el store se encarga de acotar cada valor
+  // dónde queda el lado que se mueve
   function iniciar(e: ReactMouseEvent, lados: Lado[]) {
     e.stopPropagation()
     e.preventDefault()
@@ -100,7 +153,7 @@ export default function RecorteOverlay() {
         if (lado === 'arr') cambios.arr = fy
         if (lado === 'aba') cambios.aba = 1 - fy
       }
-      recortarClipImagen(objetivo!.id, cambios)
+      aplicarRecorte(cambios)
     }
     const soltar = () => {
       window.removeEventListener('mousemove', mover)

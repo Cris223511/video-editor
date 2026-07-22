@@ -82,7 +82,6 @@ export type Herramienta =
   | 'proyecto'
   | 'transiciones'
   | 'texto'
-  | 'imagen'
   | 'audio'
   | 'censura'
   | 'velocidad'
@@ -1290,7 +1289,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         capaSeleccionada: capa.id,
         capasSeleccionadas: [capa.id],
         clipSeleccionado: null,
-        herramienta: 'imagen',
+        // sus opciones generales viven en Transformar; el color va a Tono y el
+        // recorte a Recortar, ya que la imagen dejó de tener panel propio
+        herramienta: 'transformar',
       }
     }),
 
@@ -1389,9 +1390,17 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
           ? s.capasSeleccionadas.filter((x) => x !== id)
           : [...s.capasSeleccionadas, id]
         : [id]
-      // el tipo de capa coincide con el nombre de su herramienta salvo el dibujo,
-      // cuyo panel se llama 'dibujar'
-      const herrCapa = capa ? (capa.tipo === 'trazo' ? 'dibujar' : capa.tipo) : s.herramienta
+      // el tipo de capa coincide con el nombre de su herramienta salvo dos casos:
+      // el dibujo abre el panel 'dibujar', y la imagen abre 'transformar' (sus
+      // opciones generales), porque su color se ajusta en Tono y el recorte en
+      // Recortar, no en un panel propio
+      const herrCapa: Herramienta = capa
+        ? capa.tipo === 'trazo'
+          ? 'dibujar'
+          : capa.tipo === 'imagen'
+            ? 'transformar'
+            : capa.tipo
+        : s.herramienta
       return {
         capaSeleccionada: conjunto[conjunto.length - 1] ?? null,
         capasSeleccionadas: conjunto,

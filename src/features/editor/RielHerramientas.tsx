@@ -9,7 +9,6 @@ export const herramientas: { id: Herramienta; icono: NombreIcono; etiqueta: stri
   { id: 'lienzo', icono: 'lienzo', etiqueta: 'Lienzo' },
   { id: 'marco', icono: 'marco', etiqueta: 'Marco' },
   { id: 'texto', icono: 'texto', etiqueta: 'Texto' },
-  { id: 'imagen', icono: 'imagen', etiqueta: 'Imagen' },
   { id: 'figura', icono: 'figura', etiqueta: 'Figura' },
   { id: 'dibujar', icono: 'dibujar', etiqueta: 'Dibujar' },
   { id: 'transformar', icono: 'transformar', etiqueta: 'Transformar' },

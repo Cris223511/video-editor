@@ -180,6 +180,35 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
           defs.appendChild(filtroB)
         }
       })
+      // las imágenes de capa también corrigen color por el mismo camino que los
+      // clips: si usan temperatura, tinte, ruedas o curvas, arman su propio
+      // filtro svg con la matriz y las tablas por canal, referenciado por el id
+      // que espera el compositor
+      datos.capas.forEach((c) => {
+        if (c.tipo !== 'imagen' || !c.tono || !usaMatriz(c.tono)) return
+        const filtro = document.createElementNS('http://www.w3.org/2000/svg', 'filter')
+        filtro.setAttribute('id', `tono-img-exp-${c.id}`)
+        filtro.setAttribute('color-interpolation-filters', 'sRGB')
+
+        const fe = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix')
+        fe.setAttribute('type', 'matrix')
+        fe.setAttribute('values', matrizTono(c.tono))
+        filtro.appendChild(fe)
+
+        const tablas = tablasColor(c.tono)
+        if (tablas) {
+          const trans = document.createElementNS('http://www.w3.org/2000/svg', 'feComponentTransfer')
+          ;(['feFuncR', 'feFuncG', 'feFuncB'] as const).forEach((nombre, i) => {
+            const fn = document.createElementNS('http://www.w3.org/2000/svg', nombre)
+            fn.setAttribute('type', 'table')
+            fn.setAttribute('tableValues', tablas[i])
+            trans.appendChild(fn)
+          })
+          filtro.appendChild(trans)
+        }
+        defs.appendChild(filtro)
+      })
+
       svg.appendChild(defs)
       document.body.appendChild(svg)
       limpiezas.push(() => svg.remove())

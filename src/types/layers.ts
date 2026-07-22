@@ -1,3 +1,5 @@
+import { AjusteTono } from './timeline'
+
 // un punto del recorrido de una capa en movimiento. t es el segundo relativo al
 // inicio de la capa; x e y, el centro en ese instante
 export interface KeyframePos {
@@ -69,6 +71,9 @@ export interface CapaImagen extends CapaBase {
   altoRel?: number
   // recorte en fracciones desde cada borde de la imagen original
   recorte: { izq: number; der: number; arr: number; aba: number }
+  // corrección de color, la misma que llevan los clips de video. queda sin
+  // definir mientras no se toque, para no arrastrar datos en imágenes sin corregir
+  tono?: AjusteTono
 }
 
 export interface CapaCensura extends CapaBase {

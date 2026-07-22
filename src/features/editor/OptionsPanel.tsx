@@ -11,7 +11,6 @@ import { bufferAWav } from '../../lib/audio/wav'
 import { herramientas } from './RielHerramientas'
 import { Campo, Deslizador } from '../../components/ui/Controls'
 import TextPanel from './panels/TextPanel'
-import ImagePanel from './panels/ImagePanel'
 import AudioPanel from './panels/AudioPanel'
 import SpeedPanel from './panels/SpeedPanel'
 import CensuraPanel from './panels/CensuraPanel'
@@ -173,7 +172,6 @@ export default function OptionsPanel({
     lienzo: <LienzoPanel />,
     marco: <MarcoPanel />,
     texto: <TextPanel />,
-    imagen: <ImagePanel />,
     figura: <FiguraPanel />,
     dibujar: <DibujarPanel />,
     audio: <AudioPanel />,

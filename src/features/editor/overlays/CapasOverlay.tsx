@@ -7,6 +7,7 @@ import { posicionCapa } from '../../../lib/layers/motion'
 import { Ancla, Caja, redimensionar } from '../../../lib/layers/resize'
 import { CajaGuia, Guia, imantar } from '../../../lib/layers/guias'
 import { sufijoTransformCss } from '../../../lib/layers/transform'
+import { esTonoNeutro, filtroCss, usaMatriz, matrizTono, tablasColor } from '../../../lib/color/tono'
 import Tiradores from './Tiradores'
 import ManijaGiro, { anguloGiro } from './ManijaGiro'
 import RecorridoOverlay from './RecorridoOverlay'
@@ -242,14 +243,12 @@ export default function CapasOverlay() {
     window.addEventListener('mouseup', soltar)
   }
 
-  // alto que ocupa una imagen en unidades del lienzo. mientras no se haya
-  // deformado a mano sale de su proporción natural y del recorte aplicado
+  // alto que ocupa una imagen en unidades del lienzo. la caja abarca la imagen
+  // entera con su proporción natural; el recorte ya no encoge la caja, sino que
+  // se pinta encima tapando los lados, igual que hace el recorte del video
   function altoImagen(c: CapaImagen) {
     if (c.altoRel !== undefined) return c.altoRel
-    const rec = c.recorte
-    const fw = Math.max(0.05, 1 - rec.izq - rec.der)
-    const fh = Math.max(0.05, 1 - rec.arr - rec.aba)
-    const asp = c.anchoNatural > 0 ? (fw * c.anchoNatural) / (fh * c.altoNatural) : 1
+    const asp = c.anchoNatural > 0 ? c.anchoNatural / c.altoNatural : 1
     return (c.anchoRel * aspecto) / (asp || 1)
   }
 
@@ -367,6 +366,13 @@ export default function CapasOverlay() {
   }
 
   const visibles = capas.filter((c) => playhead >= c.inicio && playhead < c.inicio + c.duracion)
+
+  // imágenes cuyo color necesita el filtro svg (temperatura, tinte, ruedas o
+  // curvas). el brillo, el contraste y la saturación salen de funciones nativas
+  // y no requieren esta parte
+  const imagenesColor = capas.filter(
+    (c): c is CapaImagen => c.tipo === 'imagen' && !!c.tono && usaMatriz(c.tono),
+  )
 
   return (
     <div ref={rootRef} className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -580,10 +586,18 @@ export default function CapasOverlay() {
 
         if (c.tipo === 'imagen') {
           const rec = c.recorte
-          const fw = Math.max(0.05, 1 - rec.izq - rec.der)
-          const fh = Math.max(0.05, 1 - rec.arr - rec.aba)
           const ancho = c.anchoRel * rect.w
           const alto = altoImagen(c) * rect.h
+          // el recorte tapa los lados con un clip-path inset, igual que el video;
+          // el orden de inset es arriba, derecha, abajo, izquierda
+          const hayRecorte = rec.izq || rec.der || rec.arr || rec.aba
+          const clipPath = hayRecorte
+            ? `inset(${rec.arr * 100}% ${rec.der * 100}% ${rec.aba * 100}% ${rec.izq * 100}%)`
+            : undefined
+          // el color se resuelve por el mismo camino que los clips: filtro nativo
+          // más, si hay temperatura, ruedas o curvas, el filtro svg referenciado
+          const filtroImagen =
+            c.tono && !esTonoNeutro(c.tono) ? filtroCss(c.tono, `tono-img-${c.id}`, []) : undefined
           return (
             <div
               key={c.id}
@@ -602,20 +616,15 @@ export default function CapasOverlay() {
                 opacity: c.opacidad / 100,
               }}
             >
-              {/* el recorte se aplica en esta capa interior; si estuviera en el
-                  contenedor recortaría también los tiradores de la selección */}
+              {/* la imagen entera llena la caja; el recorte se aplica como inset
+                  sobre ella, no encogiendo la caja, para dejar ver el fondo */}
               <div className="absolute inset-0 overflow-hidden">
                 <img
                   src={c.src}
                   alt=""
                   draggable={false}
-                  className="absolute max-w-none select-none"
-                  style={{
-                    width: ancho / fw,
-                    height: alto / fh,
-                    left: -rec.izq * (ancho / fw),
-                    top: -rec.arr * (alto / fh),
-                  }}
+                  className="absolute inset-0 h-full w-full select-none"
+                  style={{ clipPath, filter: filtroImagen }}
                 />
               </div>
               {seleccion && (
@@ -734,6 +743,31 @@ export default function CapasOverlay() {
           </div>
         )
       })}
+
+      {/* filtros svg del color de las imágenes, con la misma forma que los de los
+          clips: la matriz de temperatura y tinte, y las tablas por canal de las
+          ruedas y curvas. se referencian por su id desde el filter de cada imagen */}
+      {imagenesColor.length > 0 && (
+        <svg className="absolute h-0 w-0">
+          <defs>
+            {imagenesColor.map((c) => {
+              const tablas = tablasColor(c.tono!)
+              return (
+                <filter key={c.id} id={`tono-img-${c.id}`} colorInterpolationFilters="sRGB">
+                  <feColorMatrix type="matrix" values={matrizTono(c.tono!)} />
+                  {tablas && (
+                    <feComponentTransfer>
+                      <feFuncR type="table" tableValues={tablas[0]} />
+                      <feFuncG type="table" tableValues={tablas[1]} />
+                      <feFuncB type="table" tableValues={tablas[2]} />
+                    </feComponentTransfer>
+                  )}
+                </filter>
+              )
+            })}
+          </defs>
+        </svg>
+      )}
 
       {/* superficie de dibujo: con la herramienta de lápiz activa cubre el lienzo
           y convierte el arrastre en un trazo a mano alzada. va por encima de todo

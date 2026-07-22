@@ -2,6 +2,8 @@ import SinSeleccion from '../../../components/ui/SinSeleccion'
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { AjusteTono } from '../../../types/timeline'
+import { CapaImagen } from '../../../types/layers'
+import { tonoNeutro } from '../../../lib/color/tono'
 import { Campo, Deslizador } from '../../../components/ui/Controls'
 import RuedaColor from '../../../components/ui/RuedaColor'
 import EditorCurva from '../../../components/ui/EditorCurva'
@@ -32,40 +34,64 @@ const CONTROLES: { campo: CampoNumerico; etiqueta: string }[] = [
   { campo: 'tinte', etiqueta: 'Tinte' },
 ]
 
-// panel de tono del clip seleccionado, al estilo Lumetri. los ajustes se ven en
-// vivo en el visor sin perder fluidez
+// panel de tono, al estilo Lumetri. corrige el color tanto de un clip de video
+// como de una capa de imagen; los ajustes se ven en vivo en el visor sin perder
+// fluidez. el texto y los trazos no llevan color, así que no entran aquí
 export default function TonePanel() {
   const clips = useEditorStore((s) => s.pista.clips)
+  const capas = useEditorStore((s) => s.capas)
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
+  const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const setTono = useEditorStore((s) => s.setTono)
   const resetTono = useEditorStore((s) => s.resetTono)
+  const actualizarCapa = useEditorStore((s) => s.actualizarCapa)
 
   const clip = clips.find((c) => c.id === clipSeleccionado)
+  const capaImagen = capas.find((c) => c.id === capaSeleccionada && c.tipo === 'imagen') as
+    | CapaImagen
+    | undefined
 
-  if (!clip) {
+  // el tono con el que se trabaja sale del clip o de la imagen, lo que esté
+  // elegido. una imagen sin tocar aún no guarda tono, así que se parte del neutro
+  const tono: AjusteTono | null = clip ? clip.tono : capaImagen ? capaImagen.tono ?? tonoNeutro : null
+
+  if (!tono) {
     return (
-      <SinSeleccion icono="tono" titulo="Ningún clip seleccionado">
-        Pulsa un clip en la línea de tiempo para corregir su color con las ruedas y las curvas.
+      <SinSeleccion icono="tono" titulo="Nada que corregir">
+        Pulsa un clip en la línea de tiempo o una imagen en el visor para corregir su color con las
+        ruedas y las curvas.
       </SinSeleccion>
     )
   }
 
-  const ruedas = clip.tono.ruedas ?? RUEDAS_NEUTRAS
-  const curvas = clip.tono.curvas ?? CURVAS_NEUTRAS
+  // aplica los cambios de tono a lo que esté seleccionado. la imagen guarda su
+  // tono como un campo más de la capa; el clip usa su propia acción del store
+  function aplicar(cambios: Partial<AjusteTono>) {
+    if (clip) setTono(clip.id, cambios)
+    else if (capaImagen) actualizarCapa(capaImagen.id, { tono: { ...(capaImagen.tono ?? tonoNeutro), ...cambios } })
+  }
+
+  function restablecerTono() {
+    if (clip) resetTono(clip.id)
+    else if (capaImagen) actualizarCapa(capaImagen.id, { tono: { ...tonoNeutro } })
+  }
+
+  const ruedas = tono.ruedas ?? RUEDAS_NEUTRAS
+  const curvas = tono.curvas ?? CURVAS_NEUTRAS
 
   function cambiarRueda(zona: keyof Ruedas, p: PuntoRueda) {
-    setTono(clip!.id, { ruedas: { ...ruedas, [zona]: p } })
+    aplicar({ ruedas: { ...ruedas, [zona]: p } })
   }
 
   function cambiarCurva(c: keyof Curvas, p: PuntoCurva[]) {
-    setTono(clip!.id, { curvas: { ...curvas, [c]: p } })
+    aplicar({ curvas: { ...curvas, [c]: p } })
   }
 
   // devuelve solo las cuatro curvas a la diagonal, con copias frescas de cada
   // punto para no compartir referencia con la constante neutra. el resto de la
   // corrección de color (exposición, contraste, ruedas...) queda intacto
   function restablecerCurvas() {
-    setTono(clip!.id, {
+    aplicar({
       curvas: {
         maestra: CURVAS_NEUTRAS.maestra.map((p) => ({ ...p })),
         r: CURVAS_NEUTRAS.r.map((p) => ({ ...p })),
@@ -137,18 +163,18 @@ export default function TonePanel() {
       <div className="h-px" style={{ background: 'rgb(var(--border) / 0.12)' }} />
 
       {CONTROLES.map((c) => (
-        <Campo key={c.campo} etiqueta={`${c.etiqueta} (${clip.tono[c.campo]})`}>
+        <Campo key={c.campo} etiqueta={`${c.etiqueta} (${tono[c.campo]})`}>
           <Deslizador
-            valor={clip.tono[c.campo]}
+            valor={tono[c.campo]}
             min={-100}
             max={100}
-            onChange={(v) => setTono(clip.id, { [c.campo]: v } as Partial<AjusteTono>)}
+            onChange={(v) => aplicar({ [c.campo]: v } as Partial<AjusteTono>)}
           />
         </Campo>
       ))}
 
       <button
-        onClick={() => resetTono(clip.id)}
+        onClick={restablecerTono}
         className="mt-1 inline-flex items-center justify-center gap-2 rounded-lg border border-black/10 py-2 text-sm font-medium transition-colors hover:border-brand hover:text-brand dark:border-white/10"
       >
         <Icon name="ajustes" size={16} /> Restablecer tono

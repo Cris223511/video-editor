@@ -96,25 +96,6 @@ export default function ImagePanel() {
             />
           </Campo>
 
-          <div className="flex flex-col gap-3 border-t border-black/10 pt-3 dark:border-white/10">
-            <span className="text-sm font-medium">Recorte</span>
-            {(['izq', 'der', 'arr', 'aba'] as const).map((lado) => {
-              const etiquetas = { izq: 'Izquierda', der: 'Derecha', arr: 'Arriba', aba: 'Abajo' }
-              return (
-                <Campo key={lado} etiqueta={`${etiquetas[lado]} (${Math.round(capa.recorte[lado] * 100)}%)`}>
-                  <Deslizador
-                    valor={Math.round(capa.recorte[lado] * 100)}
-                    min={0}
-                    max={45}
-                    onChange={(v) =>
-                      actualizarCapa(capa.id, { recorte: { ...capa.recorte, [lado]: v / 100 } })
-                    }
-                  />
-                </Campo>
-              )
-            })}
-          </div>
-
           <button
             onClick={() => quitarCapa(capa.id)}
             className="mt-1 inline-flex items-center justify-center gap-2 rounded-lg border border-rose-500/40 py-2 text-sm font-medium text-rose-500 transition-colors hover:bg-rose-500/10"
