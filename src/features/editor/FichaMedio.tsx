@@ -52,6 +52,9 @@ function descargar(medio: MediaAsset) {
 function ReproductorMedio({ medio, onCerrar }: { medio: MediaAsset; onCerrar: () => void }) {
   const principal = useRef<HTMLVideoElement>(null)
   const fondo = useRef<HTMLVideoElement>(null)
+  // solo cierra un clic que nace y termina en el fondo. si el clic empezó dentro
+  // (arrastrar y soltar fuera), no se cierra
+  const abajoEnFondo = useRef(false)
 
   // esc cierra sin tener que apuntar a la equis, como en cualquier visor
   useEffect(() => {
@@ -85,7 +88,12 @@ function ReproductorMedio({ medio, onCerrar }: { medio: MediaAsset; onCerrar: ()
         // puntero fuera de su contenido. el visor vive en el body, así que hay
         // que devolverle los clics a mano o no respondería ni la equis
         style={{ pointerEvents: 'auto' }}
-        onClick={onCerrar}
+        onMouseDown={() => {
+          abajoEnFondo.current = true
+        }}
+        onClick={() => {
+          if (abajoEnFondo.current) onCerrar()
+        }}
       >
         {/* el mismo video de fondo, agrandado y difuminado. va oscurecido para
             que los controles y el video de delante resalten por encima */}
@@ -109,6 +117,11 @@ function ReproductorMedio({ medio, onCerrar }: { medio: MediaAsset; onCerrar: ()
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
           transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
           className="relative z-10 w-full max-w-4xl"
+          onMouseDown={(e) => {
+            // un clic que empieza dentro no debe contar como clic en el fondo
+            abajoEnFondo.current = false
+            e.stopPropagation()
+          }}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-3 flex items-center justify-end gap-2">

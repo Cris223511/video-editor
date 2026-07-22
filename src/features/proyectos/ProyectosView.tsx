@@ -25,7 +25,7 @@ import { ArrowLeft } from 'lucide-react'
 import { RUTAS } from '../../rutasDef'
 import { borrarProyecto, espacio, guardarProyecto, leerProyecto, listarProyectos } from '../../lib/proyecto/almacen'
 import { desempaquetar, empaquetar, nombreArchivo } from '../../lib/proyecto/archivo'
-import { abrirSesion, duplicarProyecto, nuevoProyecto } from '../../lib/proyecto/sesion'
+import { abrirSesion, duplicarProyecto, nuevoProyecto, renombrarProyecto } from '../../lib/proyecto/sesion'
 import { ResumenProyecto } from '../../lib/proyecto/formato'
 import { formatearDuracion } from '../../lib/format/duracion'
 import { formatearBytes } from '../../lib/format/bytes'
@@ -67,6 +67,8 @@ export default function ProyectosView() {
   // proyecto que se está por duplicar, con el nombre propuesto para la copia. al
   // pulsar duplicar no se copia de una: primero se pregunta cómo llamarla
   const [duplicando, setDuplicando] = useState<{ id: string; nombre: string } | null>(null)
+  // proyecto que se está renombrando, con su nombre actual para editarlo
+  const [renombrando, setRenombrando] = useState<{ id: string; nombre: string } | null>(null)
   // qué proyecto tiene la ficha abierta. null cuando no hay ninguna
   const [detalles, setDetalles] = useState<string | null>(null)
   const entrada = useRef<HTMLInputElement>(null)
@@ -116,6 +118,17 @@ export default function ProyectosView() {
       refrescar()
     } catch {
       mostrar('error', 'No se pudo duplicar.')
+    }
+  }
+
+  async function renombrar(id: string, nombre: string) {
+    try {
+      await renombrarProyecto(id, nombre)
+      setRenombrando(null)
+      mostrar('success', 'Nombre cambiado.')
+      refrescar()
+    } catch {
+      mostrar('error', 'No se pudo cambiar el nombre.')
     }
   }
 
@@ -399,6 +412,15 @@ export default function ProyectosView() {
               {/* el botón de abrir que había aquí sobraba: la miniatura entera ya
                   ofrece abrir el proyecto al pasar el cursor por encima */}
               <div className="mt-3 flex justify-end gap-1">
+                <Tooltip texto="Cambiar el nombre">
+                  <button
+                    onClick={() => setRenombrando({ id: p.id, nombre: p.titulo })}
+                    aria-label="Cambiar el nombre"
+                    className="grid h-8 w-8 place-items-center rounded-lg text-[color:var(--muted)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand/10 hover:text-brand"
+                  >
+                    <PencilLine size={14} />
+                  </button>
+                </Tooltip>
                 <Tooltip texto="Duplicar">
                   <button
                     onClick={() => setDuplicando({ id: p.id, nombre: `Copia de ${p.titulo}` })}
@@ -457,11 +479,25 @@ export default function ProyectosView() {
 
       {/* al duplicar se pregunta el nombre de la copia en la misma clase de
           ventana que el resto de la aplicación, con el campo ya enfocado */}
-      <ModalDuplicar
+      <ModalNombre
         abierto={duplicando !== null}
         nombre={duplicando?.nombre ?? ''}
+        titulo="Duplicar proyecto"
+        etiqueta="Nombre de la copia"
+        aceptar="Duplicar"
         onCancelar={() => setDuplicando(null)}
         onAceptar={(nombre) => duplicando && duplicar(duplicando.id, nombre)}
+      />
+
+      {/* renombrar reutiliza la misma ventana, con el nombre actual ya cargado */}
+      <ModalNombre
+        abierto={renombrando !== null}
+        nombre={renombrando?.nombre ?? ''}
+        titulo="Cambiar el nombre"
+        etiqueta="Nombre del proyecto"
+        aceptar="Guardar"
+        onCancelar={() => setRenombrando(null)}
+        onAceptar={(nombre) => renombrando && renombrar(renombrando.id, nombre)}
       />
 
       {/* borrar un proyecto se lleva también sus videos y no tiene vuelta atrás,
@@ -479,17 +515,23 @@ export default function ProyectosView() {
   )
 }
 
-// ventana para nombrar la copia antes de duplicar. arranca con el nombre
-// propuesto ("Copia de ...") ya seleccionado, así que se puede escribir encima o
-// pulsar aceptar sin más. enter confirma y esc cierra, como en cualquier campo
-function ModalDuplicar({
+// ventana para escribir un nombre: sirve para duplicar (nombre de la copia) y para
+// renombrar. arranca con el nombre propuesto ya seleccionado, así que se escribe
+// encima o se acepta sin más. enter confirma y esc cierra, como en cualquier campo
+function ModalNombre({
   abierto,
   nombre,
+  titulo,
+  etiqueta,
+  aceptar,
   onCancelar,
   onAceptar,
 }: {
   abierto: boolean
   nombre: string
+  titulo: string
+  etiqueta: string
+  aceptar: string
   onCancelar: () => void
   onAceptar: (nombre: string) => void
 }) {
@@ -516,9 +558,9 @@ function ModalDuplicar({
   }
 
   return (
-    <Modal titulo="Duplicar proyecto" abierto={abierto} onCerrar={onCancelar} ancho="max-w-sm">
+    <Modal titulo={titulo} abierto={abierto} onCerrar={onCancelar} ancho="max-w-sm">
       <label className="mb-1.5 block text-[13px] font-medium text-[color:var(--muted)]">
-        Nombre de la copia
+        {etiqueta}
       </label>
       <input
         ref={campo}
@@ -552,7 +594,7 @@ function ModalDuplicar({
           className="rounded-lg px-4 py-2 text-[13px] font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 disabled:pointer-events-none disabled:opacity-50"
           style={{ background: 'rgb(var(--accent-boton))' }}
         >
-          Duplicar
+          {aceptar}
         </button>
       </div>
     </Modal>

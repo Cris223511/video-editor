@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { CalendarPlus, ChevronDown, Download, PencilLine, Play, X } from 'lucide-react'
@@ -75,6 +75,9 @@ function Reproductor({
   alto: number
   onCerrar: () => void
 }) {
+  // solo cierra un clic que nace y termina en el fondo, no un arrastre desde dentro
+  const abajoEnFondo = useRef(false)
+
   // esc cierra sin tener que apuntar a la equis, como en cualquier visor
   useEffect(() => {
     const alPulsar = (e: KeyboardEvent) => {
@@ -92,7 +95,12 @@ function Reproductor({
       transition={{ duration: 0.25, ease: 'easeOut' }}
       className="fixed inset-0 z-[70] flex items-center justify-center p-6"
       style={{ pointerEvents: 'auto' }}
-      onClick={onCerrar}
+      onMouseDown={() => {
+        abajoEnFondo.current = true
+      }}
+      onClick={() => {
+        if (abajoEnFondo.current) onCerrar()
+      }}
     >
       {/* el mismo material de fondo, agrandado y difuminado, oscurecido para que
           el video de delante y los controles resalten */}
@@ -113,6 +121,10 @@ function Reproductor({
         exit={{ opacity: 0, scale: 0.96, y: 8 }}
         transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
         className="relative z-10 w-full max-w-3xl"
+        onMouseDown={(e) => {
+          abajoEnFondo.current = false
+          e.stopPropagation()
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-end gap-2">

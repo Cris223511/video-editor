@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import { ReactNode, useRef } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { AnimatePresence, motion } from 'framer-motion'
 import Icon from './Icon'
@@ -22,6 +22,11 @@ export default function Modal({
   ancho?: string
   children: ReactNode
 }) {
+  // recuerda si el clic empezó en el fondo (fuera de la tarjeta). así, arrastrar
+  // desde dentro del modal y soltar fuera no lo cierra: solo cierra un clic que
+  // nace y termina en el fondo
+  const abajoEnFondo = useRef(false)
+
   return (
     <Dialog.Root open={abierto} onOpenChange={(v) => !v && onCerrar()}>
       <AnimatePresence>
@@ -53,6 +58,10 @@ export default function Modal({
               // que puede haber quedado fuera de la pantalla y provocar otro
               // salto. cancelándolo, el fondo tampoco se mueve al cerrar
               onCloseAutoFocus={(e) => e.preventDefault()}
+              // el cierre al pulsar fuera lo controla el contenedor de abajo con su
+              // guardia de arrastre, no radix, para que soltar el ratón fuera tras
+              // arrastrar desde dentro no cierre la ventana sin querer
+              onInteractOutside={(e) => e.preventDefault()}
             >
               {/* El centrado lo hace este contenedor y no la animación.
                   Antes la ventana se colocaba con posición absoluta al centro y
@@ -62,7 +71,15 @@ export default function Modal({
                   ventana asomaba abajo a la derecha antes de saltar a su sitio.
                   Con un contenedor que centra por sí mismo no hay nada que
                   corregir, y a la animación solo le queda aparecer y crecer. */}
-              <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4">
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4"
+                onMouseDown={(e) => {
+                  abajoEnFondo.current = e.target === e.currentTarget
+                }}
+                onClick={(e) => {
+                  if (e.target === e.currentTarget && abajoEnFondo.current) onCerrar()
+                }}
+              >
                 <motion.div
                   initial={{ opacity: 0, y: 10, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}

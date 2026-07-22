@@ -193,6 +193,19 @@ export function nuevoProyecto(): void {
   }
 }
 
+// cambia el nombre de un proyecto guardado. si además es el que está abierto ahora
+// mismo, se actualiza también el título en vivo para que la barra lo refleje
+export async function renombrarProyecto(id: string, nombre: string): Promise<void> {
+  const limpio = nombre.trim()
+  if (!limpio) return
+  const p = await leerProyecto(id)
+  if (!p) return
+  await guardarProyecto({ ...p, titulo: limpio, modificado: Date.now() })
+  if (useProjectStore.getState().idProyecto === id) {
+    useProjectStore.setState({ titulo: limpio })
+  }
+}
+
 // duplicar copia el proyecto entero con otro id, incluidos los archivos, para
 // que tocar la copia no afecte al original. el nombre lo elige quien duplica; si
 // no llega ninguno, se cae al viejo "(copia)" para no dejar la copia sin título
