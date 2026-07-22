@@ -29,7 +29,12 @@ const MONTAJE: Paso[] = [
   {
     clave: 'Apila',
     texto:
-      'clips en varios niveles de video. Lo que esté en un nivel superior tapa a lo que haya debajo, y cada nivel tiene su propia altura ajustable.',
+      'clips en varios niveles de video, y reparte los textos, las figuras y los audios en varias filas cuando se solapan en el tiempo. Lo que esté en un nivel superior tapa a lo que haya debajo, y cada nivel tiene su propia altura ajustable.',
+  },
+  {
+    clave: 'Duplica',
+    texto:
+      'o copia cualquier elemento manteniendo Alt mientras lo arrastras, o con Ctrl+C y Ctrl+V. Todo el montaje se deshace y se rehace con Ctrl+Z y Ctrl+Y.',
   },
   {
     clave: 'Divide',
@@ -45,6 +50,11 @@ const MONTAJE: Paso[] = [
     clave: 'Cierra',
     texto:
       'los espacios vacíos que queden entre planos con el botón que aparece sobre ellos. Todo lo que viene después se adelanta lo que medía el hueco.',
+  },
+  {
+    clave: 'Separa el audio',
+    texto:
+      'de un clip de video para llevarlo a su propia pista y ajustarlo aparte, con su volumen propio o recortándolo sin tocar la imagen. También añades franjas de volumen para bajar la música justo donde alguien habla.',
   },
 ]
 
@@ -69,6 +79,16 @@ const EFECTOS: Paso[] = [
     texto:
       'de un clip para acelerarlo o ralentizarlo. La duración en la línea de tiempo se recalcula sola y el audio acompaña al cambio.',
   },
+  {
+    clave: 'Transforma',
+    texto:
+      'el elemento seleccionado girándolo en pasos de noventa grados, volteándolo en espejo o cambiando su opacidad, y decide con traer al frente o enviar atrás cuál queda encima cuando dos se pisan.',
+  },
+  {
+    clave: 'Aplica efectos',
+    texto:
+      'sobre el clip, como el desenfoque de movimiento, con la intensidad que decidas.',
+  },
 ]
 
 const CAPAS: Paso[] = [
@@ -80,12 +100,17 @@ const CAPAS: Paso[] = [
   {
     clave: 'Coloca imágenes',
     texto:
-      'o tu logo sobre el video, con opacidad, recorte por cada lado y la posibilidad de deformarlas libremente o devolverles su proporción original.',
+      'o tu logo sobre el video, con opacidad, corrección de color propia y un recorte que ajustas arrastrando un recuadro sobre el visor. Puedes deformarlas libremente o devolverles su proporción original.',
   },
   {
     clave: 'Inserta figuras',
     texto:
-      'geométricas: rectángulo, redondeado, elipse, triángulo, estrella, línea y flecha, con relleno y borde configurables.',
+      'geométricas como rectángulo, redondeado, elipse, triángulo, estrella, línea y flecha, con relleno y borde configurables.',
+  },
+  {
+    clave: 'Dibuja',
+    texto:
+      'a mano alzada sobre el video con el pincel, eligiendo color y grosor. El trazo se comporta como una capa más, así que se mueve y se anima igual que el resto.',
   },
   {
     clave: 'Censura',
@@ -131,6 +156,8 @@ const ATAJOS: [string, string][] = [
   ['Espacio', 'Reproducir o pausar'],
   ['S', 'Dividir en el cabezal'],
   ['Supr', 'Eliminar lo seleccionado'],
+  ['Ctrl + C y Ctrl + V', 'Copiar y pegar'],
+  ['Ctrl + Z y Ctrl + Y', 'Deshacer y rehacer'],
   ['Flechas', 'Mover el cabezal un fotograma'],
   ['Shift + flechas', 'Mover el cabezal un segundo'],
   ['Inicio y Fin', 'Ir al principio o al final'],
