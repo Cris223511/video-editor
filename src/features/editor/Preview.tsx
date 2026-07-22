@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../components/ui/Icon'
 import CapasOverlay from './overlays/CapasOverlay'
 import ClipOverlay from './overlays/ClipOverlay'
+import RecorteOverlay from './overlays/RecorteOverlay'
 import Vacio from '../../components/ui/Vacio'
 import MarcoOverlay from './overlays/MarcoOverlay'
 import { useEditorStore } from '../../store/useEditorStore'
@@ -728,6 +729,14 @@ export default function Preview() {
                   espejoV: enc.espejoV,
                 })
                 const transform = `${base} ${giro}`.trim() || undefined
+                // el recorte se aplica como inset del propio elemento, antes de la
+                // transformación, igual que lo hace el lienzo de exportación: lo que
+                // queda fuera del recuadro no se ve y deja pasar el fondo
+                const rec = c.recorte
+                const clipPath =
+                  rec && (rec.izq || rec.der || rec.arr || rec.aba)
+                    ? `inset(${rec.arr * 100}% ${rec.der * 100}% ${rec.aba * 100}% ${rec.izq * 100}%)`
+                    : undefined
                 return (
                   <video
                     key={c.id}
@@ -749,6 +758,7 @@ export default function Preview() {
                       opacity: conLienzo ? 0 : opacidadDe(c),
                       transform,
                       transformOrigin: 'center',
+                      clipPath,
                       filter:
                         esTonoNeutro(c.tono) && !hayEfectoFiltro(c.efectos ?? [])
                           ? undefined
@@ -806,6 +816,7 @@ export default function Preview() {
                 tirador aunque el clip esté medio fuera del lienzo */}
             <ClipOverlay />
             <CapasOverlay />
+            <RecorteOverlay />
             <MarcoOverlay alturaLienzo={lienzoRect.h} />
 
             {/* elementos de sonido de los audios importados. no se ven; solo

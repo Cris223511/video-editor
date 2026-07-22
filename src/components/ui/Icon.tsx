@@ -6,6 +6,7 @@ import {
   Check,
   ChevronRight,
   Clapperboard,
+  Crop,
   Download,
   EyeOff,
   Film,
@@ -78,6 +79,7 @@ const iconos = {
   marco: Frame,
   figura: Shapes,
   transformar: FlipHorizontal2,
+  recortar: Crop,
 } as const
 
 export type NombreIcono = keyof typeof iconos

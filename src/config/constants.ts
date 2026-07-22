@@ -1,6 +1,6 @@
 // versión de la aplicación. se muestra en la barra superior y en los ajustes,
 // y acompaña a la del package.json
-export const VERSION = '2.14.1'
+export const VERSION = '2.15.0'
 
 // límites y formatos aceptados al importar medios. el tope por archivo es de
 // 1.5 GB; a nivel de proyecto no hay límite de cantidad, igual que en un

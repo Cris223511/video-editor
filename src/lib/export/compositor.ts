@@ -504,6 +504,16 @@ export function dibujarFotograma(
         espejoV: enc.espejoV,
       })
 
+      // recorte de la imagen: se limita el dibujo al recuadro que queda, dentro del
+      // mismo bloque de la transformación para que gire y voltee con el video. lo de
+      // fuera no se pinta y deja ver el fondo, igual que el inset del visor
+      const rec = clip.recorte
+      if (rec && (rec.izq || rec.der || rec.arr || rec.aba)) {
+        ctx.beginPath()
+        ctx.rect(dx + rec.izq * dw, dy + rec.arr * dh, dw * (1 - rec.izq - rec.der), dh * (1 - rec.arr - rec.aba))
+        ctx.clip()
+      }
+
       // el color se resuelve como en el visor: funciones nativas más, si hay
       // temperatura o ruedas, el filtro svg de color. el desenfoque de movimiento
       // no puede ir en la misma cadena de ctx.filter (dejaría el canvas negro),

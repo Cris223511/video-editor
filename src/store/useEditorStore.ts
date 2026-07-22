@@ -74,6 +74,7 @@ export type Herramienta =
   | 'marco'
   | 'figura'
   | 'transformar'
+  | 'recortar'
 
 interface EstadoEditor {
   pista: Track
@@ -139,6 +140,11 @@ interface EstadoEditor {
   // recibe cambios sueltos y reset lo devuelve al centrado de siempre
   actualizarEncuadre: (id: string, cambios: Partial<Encuadre>) => void
   resetEncuadre: (id: string) => void
+  // recorte de la IMAGEN del clip por lados, en fracción (distinto de recortarClip,
+  // que recorta el clip en el tiempo). actualizar recibe cambios sueltos y reset lo
+  // quita del todo
+  recortarClipImagen: (id: string, cambios: Partial<import('../types/timeline').RecorteRel>) => void
+  resetRecorteClipImagen: (id: string) => void
   // cadena de efectos del clip: se suman, se ajustan y se quitan por su id
   agregarEfecto: (id: string, efecto: EfectoClip) => void
   actualizarEfecto: (id: string, efectoId: string, cambios: Partial<EfectoClip>) => void
@@ -381,6 +387,8 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'resetTono',
   'actualizarEncuadre',
   'resetEncuadre',
+  'recortarClipImagen',
+  'resetRecorteClipImagen',
   'agregarEfecto',
   'actualizarEfecto',
   'quitarEfecto',
@@ -883,6 +891,34 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         ...s.pista,
         // quitar el encuadre por completo devuelve el clip al centrado natural
         clips: s.pista.clips.map((c) => (c.id === id ? { ...c, encuadre: undefined } : c)),
+      },
+    })),
+
+  recortarClipImagen: (id, cambios) =>
+    set((s) => ({
+      pista: {
+        ...s.pista,
+        clips: s.pista.clips.map((c) => {
+          if (c.id !== id) return c
+          const base = c.recorte ?? { izq: 0, der: 0, arr: 0, aba: 0 }
+          // cada lado se mantiene dentro de rango y sin cruzar al de enfrente, para
+          // que el recuadro conserve al menos un mínimo de imagen visible
+          const n = { ...base, ...cambios }
+          const MIN = 0.05
+          n.izq = Math.max(0, Math.min(1 - MIN - n.der, n.izq))
+          n.der = Math.max(0, Math.min(1 - MIN - n.izq, n.der))
+          n.arr = Math.max(0, Math.min(1 - MIN - n.aba, n.arr))
+          n.aba = Math.max(0, Math.min(1 - MIN - n.arr, n.aba))
+          return { ...c, recorte: n }
+        }),
+      },
+    })),
+
+  resetRecorteClipImagen: (id) =>
+    set((s) => ({
+      pista: {
+        ...s.pista,
+        clips: s.pista.clips.map((c) => (c.id === id ? { ...c, recorte: undefined } : c)),
       },
     })),
 

@@ -72,6 +72,19 @@ export interface Clip {
   efectos: EfectoClip[] // cadena de efectos, vacía mientras no se aplique ninguno
   transicion: Transicion // cómo entra el clip respecto al anterior
   encuadre?: Encuadre // posición y tamaño del video en el lienzo; ausente = centrado a escala 1
+  // recorte de la imagen del video, en fracción de cada lado (0 a 1). ausente o
+  // todo en cero significa sin recortar. lo que queda fuera del recuadro no se ve
+  // ni se exporta, dejando ver el fondo o las capas de debajo
+  recorte?: RecorteRel
+}
+
+// recorte por lados, como fracción del ancho o alto (0 a 1). lo comparten el clip
+// de video y la capa de imagen, para recortarse con la misma herramienta
+export interface RecorteRel {
+  izq: number
+  der: number
+  arr: number
+  aba: number
 }
 
 export interface Track {
