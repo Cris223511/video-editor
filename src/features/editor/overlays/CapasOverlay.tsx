@@ -1,6 +1,6 @@
 import { CSSProperties, MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react'
 import { useEditorStore } from '../../../store/useEditorStore'
-import { Capa, CapaCensura, CapaFigura, CapaImagen } from '../../../types/layers'
+import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTrazo } from '../../../types/layers'
 import { REPETICIONES_BRILLO, desenfoqueBrillo, hexAOpacidad } from '../../../lib/layers/defaults'
 import { rectContenido } from '../../../lib/layers/rect'
 import { posicionCapa } from '../../../lib/layers/motion'
@@ -68,6 +68,7 @@ function dibujoFigura(c: CapaFigura, w: number, h: number, g: number) {
 export default function CapasOverlay() {
   const capas = useEditorStore((s) => s.capas)
   const playhead = useEditorStore((s) => s.playhead)
+  const herramienta = useEditorStore((s) => s.herramienta)
   const resolucion = useEditorStore((s) => s.resolucion)
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const capasSeleccionadas = useEditorStore((s) => s.capasSeleccionadas)
@@ -79,6 +80,10 @@ export default function CapasOverlay() {
   const dibujandoMascara = useEditorStore((s) => s.dibujandoMascara)
   const grabandoMovimiento = useEditorStore((s) => s.grabandoMovimiento)
   const anadirTrazo = useEditorStore((s) => s.anadirTrazo)
+  const agregarTrazo = useEditorStore((s) => s.agregarTrazo)
+  const anadirTrazoDibujo = useEditorStore((s) => s.anadirTrazoDibujo)
+  const abrirGesto = useEditorStore((s) => s.abrirGesto)
+  const finGesto = useEditorStore((s) => s.finGesto)
 
   const rootRef = useRef<HTMLDivElement>(null)
   const [tam, setTam] = useState({ w: 0, h: 0 })
@@ -206,6 +211,37 @@ export default function CapasOverlay() {
     window.addEventListener('mouseup', soltar)
   }
 
+  // lápiz libre: la superficie de dibujo captura un trazo a mano alzada y lo
+  // guarda en la capa de dibujo activa. si la seleccionada no es un dibujo, se
+  // crea una nueva al vuelo. el gesto se abre y se cierra a mano para que crear la
+  // capa y añadirle el trazo cuenten como un solo paso de deshacer
+  function iniciarDibujo(e: ReactMouseEvent) {
+    e.stopPropagation()
+    const st = useEditorStore.getState()
+    const actual = st.capas.find((c) => c.id === st.capaSeleccionada && c.tipo === 'trazo')
+    abrirGesto()
+    const id = actual ? actual.id : agregarTrazo()
+    // el centro contra el que se miden los puntos: el de la capa donde se dibuja,
+    // igual que hace la máscara de pincel, para que el trazo se mueva con ella
+    const capa = useEditorStore.getState().capas.find((c) => c.id === id) as CapaTrazo
+    const centro = posicionCapa(capa, useEditorStore.getState().playhead)
+    const puntos: { x: number; y: number }[] = []
+    const agregar = (ev: globalThis.MouseEvent) => {
+      const p = normalizar(ev)
+      puntos.push({ x: p.x - centro.x, y: p.y - centro.y })
+    }
+    agregar(e.nativeEvent)
+    const mover = (ev: globalThis.MouseEvent) => agregar(ev)
+    const soltar = () => {
+      window.removeEventListener('mousemove', mover)
+      window.removeEventListener('mouseup', soltar)
+      if (puntos.length) anadirTrazoDibujo(id, puntos)
+      finGesto()
+    }
+    window.addEventListener('mousemove', mover)
+    window.addEventListener('mouseup', soltar)
+  }
+
   // alto que ocupa una imagen en unidades del lienzo. mientras no se haya
   // deformado a mano sale de su proporción natural y del recorte aplicado
   function altoImagen(c: CapaImagen) {
@@ -225,6 +261,25 @@ export default function CapasOverlay() {
       return { x: pos.x, y: pos.y, w: capa.anchoRel, h: capa.altoRel }
     if (capa.tipo === 'imagen')
       return { x: pos.x, y: pos.y, w: capa.anchoRel, h: altoImagen(capa) }
+    if (capa.tipo === 'trazo') {
+      // el centro sigue siendo el de la capa (los puntos van relativos a él), y el
+      // ancho y alto salen de la caja que abarcan los trazos, para dar una medida
+      // razonable al arrastre y a las guías
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+      for (const tr of capa.trazos)
+        for (const p of tr) {
+          if (p.x < minX) minX = p.x
+          if (p.x > maxX) maxX = p.x
+          if (p.y < minY) minY = p.y
+          if (p.y > maxY) maxY = p.y
+        }
+      const w = isFinite(minX) ? maxX - minX : 0
+      const h = isFinite(minY) ? maxY - minY : 0
+      return { x: pos.x, y: pos.y, w, h }
+    }
     if (!caja) return { x: pos.x, y: pos.y, w: 0, h: 0 }
     const r = caja.getBoundingClientRect()
     return { x: pos.x, y: pos.y, w: r.width / rect.w, h: r.height / rect.h }
@@ -379,6 +434,7 @@ export default function CapasOverlay() {
           return (
             <div
               key={c.id}
+              data-capa-id={c.id}
               onMouseDown={(e) => iniciarArrastre(e, c)}
               className="pointer-events-auto absolute cursor-move"
               style={{
@@ -407,6 +463,7 @@ export default function CapasOverlay() {
           return (
             <div
               key={c.id}
+              data-capa-id={c.id}
               onMouseDown={(e) => iniciarArrastre(e, c)}
               className={[
                 'pointer-events-auto absolute cursor-move',
@@ -439,6 +496,88 @@ export default function CapasOverlay() {
           )
         }
 
+        if (c.tipo === 'trazo') {
+          const g = Math.max(1, c.grosor * escala)
+          // el svg cubre todo el lienzo; cada trazo se pinta en coordenadas del
+          // lienzo sumándole la posición de la capa. el giro y el volteo se aplican
+          // con transform-origin en el centro de la capa, igual que el resto
+          const origen = `${pos.x * rect.w}px ${pos.y * rect.h}px`
+          // mientras la herramienta dibujar está activa el arrastre pinta (lo
+          // gestiona la superficie de dibujo), así que aquí no se captura nada; con
+          // la herramienta en otra cosa, un dibujo seleccionado se puede mover
+          const movible = seleccion && herramienta !== 'dibujar'
+          return (
+            <div
+              key={c.id}
+              data-capa-id={c.id}
+              className="pointer-events-none absolute"
+              style={{ left: rect.ox, top: rect.oy, width: rect.w, height: rect.h, opacity: c.opacidad / 100 }}
+            >
+              <svg
+                width={rect.w}
+                height={rect.h}
+                className={movible ? 'overflow-visible' : 'pointer-events-none overflow-visible'}
+                style={{ transform: extra || undefined, transformOrigin: origen }}
+              >
+                {c.trazos.map((tr, i) => {
+                  if (tr.length === 1) {
+                    const p = tr[0]
+                    return (
+                      <circle
+                        key={i}
+                        cx={(pos.x + p.x) * rect.w}
+                        cy={(pos.y + p.y) * rect.h}
+                        r={g / 2}
+                        fill={c.color}
+                      />
+                    )
+                  }
+                  return (
+                    <polyline
+                      key={i}
+                      points={tr.map((p) => `${(pos.x + p.x) * rect.w},${(pos.y + p.y) * rect.h}`).join(' ')}
+                      fill="none"
+                      stroke={c.color}
+                      strokeWidth={g}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  )
+                })}
+                {/* copia gruesa e invisible de cada trazo, solo para poder agarrarlo
+                    y moverlo cuando el dibujo está seleccionado y no se está pintando */}
+                {movible &&
+                  c.trazos.map((tr, i) =>
+                    tr.length === 1 ? (
+                      <circle
+                        key={`hit-${i}`}
+                        cx={(pos.x + tr[0].x) * rect.w}
+                        cy={(pos.y + tr[0].y) * rect.h}
+                        r={Math.max(g, 14) / 2}
+                        fill="transparent"
+                        className="pointer-events-auto cursor-move"
+                        onMouseDown={(e) => iniciarArrastre(e, c)}
+                      />
+                    ) : (
+                      <polyline
+                        key={`hit-${i}`}
+                        points={tr.map((p) => `${(pos.x + p.x) * rect.w},${(pos.y + p.y) * rect.h}`).join(' ')}
+                        fill="none"
+                        stroke="transparent"
+                        strokeWidth={Math.max(g, 14)}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ pointerEvents: 'stroke' }}
+                        className="pointer-events-auto cursor-move"
+                        onMouseDown={(e) => iniciarArrastre(e, c)}
+                      />
+                    ),
+                  )}
+              </svg>
+            </div>
+          )
+        }
+
         if (c.tipo === 'imagen') {
           const rec = c.recorte
           const fw = Math.max(0.05, 1 - rec.izq - rec.der)
@@ -448,6 +587,7 @@ export default function CapasOverlay() {
           return (
             <div
               key={c.id}
+              data-capa-id={c.id}
               onMouseDown={(e) => iniciarArrastre(e, c)}
               className={[
                 'pointer-events-auto absolute cursor-move',
@@ -530,6 +670,7 @@ export default function CapasOverlay() {
             // nodo desde cero. sin esto, al cerrar quedaba el texto que tecleó el
             // usuario en el dom más el que react vuelve a pintar, y salía duplicado
             key={enEdicion ? `${c.id}-edit` : c.id}
+            data-capa-id={c.id}
             ref={enEdicion ? editRef : undefined}
             // con doble clic se entra a escribir el texto directamente sobre el
             // video, sin ir al panel; el arrastre queda en pausa mientras se edita
@@ -593,6 +734,17 @@ export default function CapasOverlay() {
           </div>
         )
       })}
+
+      {/* superficie de dibujo: con la herramienta de lápiz activa cubre el lienzo
+          y convierte el arrastre en un trazo a mano alzada. va por encima de todo
+          para que pintar no mueva las capas de debajo */}
+      {herramienta === 'dibujar' && (
+        <div
+          onMouseDown={iniciarDibujo}
+          className="pointer-events-auto absolute z-20"
+          style={{ left: rect.ox, top: rect.oy, width: rect.w, height: rect.h, cursor: 'crosshair' }}
+        />
+      )}
     </div>
   )
 }

@@ -76,6 +76,9 @@ export interface Clip {
   // todo en cero significa sin recortar. lo que queda fuera del recuadro no se ve
   // ni se exporta, dejando ver el fondo o las capas de debajo
   recorte?: RecorteRel
+  // cuando su audio se ha separado a la pista de sonido, el video queda mudo para
+  // no sonar dos veces; el sonido pasa a llevarlo el clip de audio vinculado
+  mudo?: boolean
 }
 
 // recorte por lados, como fracción del ancho o alto (0 a 1). lo comparten el clip

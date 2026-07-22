@@ -20,6 +20,7 @@ import {
   Music,
   Palette,
   Pause,
+  Pencil,
   Play,
   Plus,
   RotateCcw,
@@ -78,6 +79,7 @@ const iconos = {
   lienzo: LayoutDashboard,
   marco: Frame,
   figura: Shapes,
+  dibujar: Pencil,
   transformar: FlipHorizontal2,
   recortar: Crop,
 } as const

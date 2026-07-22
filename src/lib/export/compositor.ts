@@ -1,5 +1,5 @@
 import { Clip } from '../../types/timeline'
-import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto } from '../../types/layers'
+import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto, CapaTrazo } from '../../types/layers'
 import { Marco } from '../../types/marco'
 import { clipEnTiempo } from '../timeline/clips'
 import { posicionCapa } from '../layers/motion'
@@ -257,6 +257,48 @@ function dibujarFigura(ctx: CanvasRenderingContext2D, c: CapaFigura, ancho: numb
     ctx.lineTo(w - cabeza, y + cabeza / 1.6)
     ctx.closePath()
     ctx.fill()
+  }
+  ctx.restore()
+}
+
+// pinta un dibujo a mano alzada: cada trazo es una polilínea del mismo color y
+// grosor que en el visor. los puntos van relativos al centro de la capa, así que
+// se llevan a coordenadas del lienzo sumándoles la posición, y el giro o volteo se
+// aplican alrededor de ese centro para que el archivo salga idéntico a lo editado
+function dibujarTrazo(ctx: CanvasRenderingContext2D, c: CapaTrazo, ancho: number, alto: number, t: number) {
+  if (!c.trazos.length) return
+  const pos = posicionCapa(c, t)
+  ctx.save()
+  ctx.globalAlpha = c.opacidad / 100
+  aplicarTransformCanvas(ctx, pos.x * ancho, pos.y * alto, c)
+  // el grosor está en píxeles de la resolución del proyecto, que es la del lienzo
+  // de exportación, así que se usa tal cual; en el visor se escala al tamaño en
+  // pantalla, de modo que el trazo se ve del mismo grueso al editar y al exportar
+  const g = Math.max(1, c.grosor)
+  ctx.strokeStyle = c.color
+  ctx.fillStyle = c.color
+  ctx.lineWidth = g
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  for (const tr of c.trazos) {
+    if (tr.length === 0) continue
+    // un clic suelto deja un único punto: se pinta como un puntito redondo, que es
+    // lo que muestra el visor en ese caso
+    if (tr.length === 1) {
+      const p = tr[0]
+      ctx.beginPath()
+      ctx.arc((pos.x + p.x) * ancho, (pos.y + p.y) * alto, g / 2, 0, Math.PI * 2)
+      ctx.fill()
+      continue
+    }
+    ctx.beginPath()
+    tr.forEach((p, i) => {
+      const x = (pos.x + p.x) * ancho
+      const y = (pos.y + p.y) * alto
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    })
+    ctx.stroke()
   }
   ctx.restore()
 }
@@ -564,6 +606,7 @@ export function dibujarFotograma(
     if (c.tipo === 'texto') dibujarTexto(ctx, c, ancho, alto, t)
     else if (c.tipo === 'imagen') dibujarImagen(ctx, c, ancho, alto, t, imagenDe(c.id))
     else if (c.tipo === 'figura') dibujarFigura(ctx, c, ancho, alto, t, escala)
+    else if (c.tipo === 'trazo') dibujarTrazo(ctx, c, ancho, alto, t)
   }
 
   dibujarMarco(ctx, marco, ancho, alto, escala)

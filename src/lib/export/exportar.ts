@@ -312,7 +312,8 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
             if (id !== act.id && !otro.paused) otro.pause()
           })
           cablear(act.id, v)
-          const silenciada = datos.pistasMeta[act.pista]?.silenciada ?? false
+          // un nivel silenciado, o un clip con su audio separado, no aporta sonido
+          const silenciada = (datos.pistasMeta[act.pista]?.silenciada ?? false) || !!act.mudo
           ganancia.gain.value = silenciada
             ? 0
             : gananciaEn(datos.audioRegiones, datos.volumenGlobal, t)

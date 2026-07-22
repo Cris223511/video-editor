@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../components/ui/Icon'
 import CapasOverlay from './overlays/CapasOverlay'
 import ClipOverlay from './overlays/ClipOverlay'
@@ -40,6 +40,7 @@ export default function Preview() {
   const pausar = useEditorStore((s) => s.pausar)
   const seleccionar = useEditorStore((s) => s.seleccionar)
   const limpiarSeleccion = useEditorStore((s) => s.limpiarSeleccion)
+  const seleccionarCapa = useEditorStore((s) => s.seleccionarCapa)
   const agregarFigura = useEditorStore((s) => s.agregarFigura)
   const hayCapas = useEditorStore((s) => s.capas.length > 0)
   const hayCensura = useEditorStore((s) => s.capas.some((c) => c.tipo === 'censura'))
@@ -64,6 +65,56 @@ export default function Preview() {
   const audiosRef = useRef<Map<string, HTMLAudioElement>>(new Map())
   const areaRef = useRef<HTMLDivElement>(null)
   const [areaTam, setAreaTam] = useState({ w: 0, h: 0 })
+  // contenedor del visor y el recuadro de selección que se dibuja al arrastrar por
+  // una zona vacía (incluidas las bandas de los lados), al estilo del escritorio
+  const visorRef = useRef<HTMLDivElement>(null)
+  const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+
+  // arrastrar desde una zona vacía dibuja un recuadro azul; al soltar, se
+  // seleccionan todas las capas que toca. si no se arrastra (un clic seco), se
+  // suelta lo que hubiera seleccionado, como antes
+  function iniciarMarquee(e: ReactMouseEvent) {
+    const cont = visorRef.current
+    if (!cont) return
+    const r = cont.getBoundingClientRect()
+    const x0 = e.clientX
+    const y0 = e.clientY
+    let movido = false
+    const mover = (ev: globalThis.MouseEvent) => {
+      if (Math.abs(ev.clientX - x0) > 3 || Math.abs(ev.clientY - y0) > 3) movido = true
+      setMarquee({
+        x: Math.min(x0, ev.clientX) - r.left,
+        y: Math.min(y0, ev.clientY) - r.top,
+        w: Math.abs(ev.clientX - x0),
+        h: Math.abs(ev.clientY - y0),
+      })
+    }
+    const soltar = (ev: globalThis.MouseEvent) => {
+      window.removeEventListener('mousemove', mover)
+      window.removeEventListener('mouseup', soltar)
+      setMarquee(null)
+      if (!movido) {
+        limpiarSeleccion()
+        return
+      }
+      // caja del recuadro en pantalla, contra la que se cruzan las capas visibles
+      const mx0 = Math.min(x0, ev.clientX)
+      const my0 = Math.min(y0, ev.clientY)
+      const mx1 = Math.max(x0, ev.clientX)
+      const my1 = Math.max(y0, ev.clientY)
+      const ids: string[] = []
+      cont.querySelectorAll('[data-capa-id]').forEach((el) => {
+        const b = el.getBoundingClientRect()
+        const cruza = !(b.right < mx0 || b.left > mx1 || b.bottom < my0 || b.top > my1)
+        const id = el.getAttribute('data-capa-id')
+        if (cruza && id && !ids.includes(id)) ids.push(id)
+      })
+      limpiarSeleccion()
+      ids.forEach((id) => seleccionarCapa(id, true))
+    }
+    window.addEventListener('mousemove', mover)
+    window.addEventListener('mouseup', soltar)
+  }
 
   // grafo de audio: cada video se enruta por un nodo de ganancia común para
   // poder controlar el volumen general y por franjas con Web Audio
@@ -268,7 +319,9 @@ export default function Preview() {
       // un nivel silenciado no aporta sonido: su clip se ve pero la ganancia baja
       // a cero, igual que hará la exportación
       if (nodo) {
-        nodo.gain.value = metas[act.pista]?.silenciada
+        // un nivel silenciado o un clip con su audio ya separado no suena: el
+        // sonido de un clip separado lo lleva su clip de audio vinculado
+        nodo.gain.value = metas[act.pista]?.silenciada || act.mudo
           ? 0
           : gananciaEn(audioRef.current.regiones, audioRef.current.general, ph)
       }
@@ -632,11 +685,26 @@ export default function Preview() {
       // las bandas alrededor del lienzo toman el color del marco del visor, claro en
       // modo claro y casi negro en oscuro; sin contenido se usa la superficie suave
       style={{ background: hayContenido ? 'rgb(var(--marco-visor))' : 'rgb(var(--surface-2))' }}
-      // un clic en el fondo del visor, por fuera del lienzo, suelta lo que hubiera
-      // seleccionado. el propio lienzo corta la propagación, así que este deseleccionar
-      // solo se dispara cuando de verdad se pulsa fuera de la imagen
-      onMouseDown={() => limpiarSeleccion()}
+      ref={visorRef}
+      // arrastrar por el fondo del visor (o las bandas de los lados) dibuja un
+      // recuadro de selección; un clic seco suelta lo que hubiera seleccionado. el
+      // lienzo y las capas cortan la propagación, así que esto solo salta fuera de
+      // la imagen
+      onMouseDown={iniciarMarquee}
     >
+      {/* recuadro azul de selección múltiple */}
+      {marquee && marquee.w > 2 && marquee.h > 2 && (
+        <div
+          className="pointer-events-none absolute z-50 rounded-[2px] border border-brand"
+          style={{
+            left: marquee.x,
+            top: marquee.y,
+            width: marquee.w,
+            height: marquee.h,
+            background: 'rgb(24 97 255 / 0.14)',
+          }}
+        />
+      )}
       {!hayContenido ? (
         <div className="w-full max-w-sm">
           <Vacio compacto icono={<Icon name="video" size={24} />} titulo="Aún no hay nada en el lienzo">

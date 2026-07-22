@@ -97,7 +97,9 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
         ? 'Imagen'
         : capa.tipo === 'censura'
           ? 'Censura'
-          : 'Figura'
+          : capa.tipo === 'trazo'
+            ? 'Dibujo'
+            : 'Figura'
 
   return (
     <div

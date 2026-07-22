@@ -1,4 +1,4 @@
-import { CapaCensura, CapaFigura, CapaImagen, CapaTexto } from '../../types/layers'
+import { CapaCensura, CapaFigura, CapaImagen, CapaTexto, CapaTrazo } from '../../types/layers'
 
 // crea una capa de texto con valores de partida sensatos. el tamaño se calcula
 // a partir de la altura del proyecto para que se vea proporcionado en cualquier
@@ -110,6 +110,25 @@ export function crearCapaFigura(
     borde: false,
     colorBorde: '#000000',
     grosorBorde: 6,
+  }
+}
+
+// crea una capa de dibujo vacía, centrada y fija, lista para recibir los trazos
+// que el usuario pinte sobre el visor. nace sin puntos: el primer trazo llega en
+// cuanto se arrastra el cursor con la herramienta activa
+export function crearCapaTrazo(inicio: number, color = '#ff3b30', grosor = 6): CapaTrazo {
+  return {
+    id: crypto.randomUUID(),
+    tipo: 'trazo',
+    inicio,
+    duracion: 4,
+    x: 0.5,
+    y: 0.5,
+    opacidad: 100,
+    keyframes: [],
+    trazos: [],
+    color,
+    grosor,
   }
 }
 

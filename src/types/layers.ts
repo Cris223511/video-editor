@@ -96,4 +96,15 @@ export interface CapaFigura extends CapaBase {
   grosorBorde: number // px a una altura de lienzo de 1080; se escala al mostrar
 }
 
-export type Capa = CapaTexto | CapaImagen | CapaCensura | CapaFigura
+// dibujo a mano alzada sobre el video. cada trazo es una polilínea de puntos
+// guardados relativos al centro de la capa (igual que la máscara de pincel de la
+// censura), en fracción del lienzo, para que el dibujo entero se mueva, gire y
+// voltee con la capa. una misma capa puede tener varios trazos sueltos
+export interface CapaTrazo extends CapaBase {
+  tipo: 'trazo'
+  trazos: { x: number; y: number }[][]
+  color: string
+  grosor: number // px a la resolución del proyecto; se escala al mostrar y al exportar
+}
+
+export type Capa = CapaTexto | CapaImagen | CapaCensura | CapaFigura | CapaTrazo

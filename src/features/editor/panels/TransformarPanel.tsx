@@ -2,11 +2,11 @@ import { ReactNode } from 'react'
 import { FlipHorizontal2, FlipVertical2, RotateCcw, RotateCw, Undo2 } from 'lucide-react'
 import SinSeleccion from '../../../components/ui/SinSeleccion'
 import { useEditorStore } from '../../../store/useEditorStore'
-import { CapaTexto, CapaImagen, CapaFigura } from '../../../types/layers'
+import { CapaTexto, CapaImagen, CapaFigura, CapaTrazo } from '../../../types/layers'
 
 // capas que admiten girar y voltear. la censura queda fuera a propósito: su
 // efecto muestrea el video y girarla dejaría la zona tapada descuadrada
-type CapaTransformable = CapaTexto | CapaImagen | CapaFigura
+type CapaTransformable = CapaTexto | CapaImagen | CapaFigura | CapaTrazo
 
 // deja el ángulo siempre entre 0 y 359, para que sumar y restar giros no acumule
 // vueltas enteras que no aportan nada
@@ -58,8 +58,11 @@ export default function TransformarPanel() {
   const capa = capas.find((c) => c.id === capaSeleccionada)
   const clip = clips.find((c) => c.id === clipSeleccionado)
 
-  // una capa de texto, imagen o figura se puede girar y voltear
-  if (capa && (capa.tipo === 'texto' || capa.tipo === 'imagen' || capa.tipo === 'figura')) {
+  // una capa de texto, imagen, figura o dibujo se puede girar y voltear
+  if (
+    capa &&
+    (capa.tipo === 'texto' || capa.tipo === 'imagen' || capa.tipo === 'figura' || capa.tipo === 'trazo')
+  ) {
     const t = capa as CapaTransformable
     const girar = (delta: number) =>
       actualizarCapa(t.id, { rotacion: normalizarAngulo((t.rotacion ?? 0) + delta) })
@@ -111,8 +114,8 @@ export default function TransformarPanel() {
   )
 }
 
-function etiquetaCapa(tipo: 'texto' | 'imagen' | 'figura'): string {
-  return tipo === 'texto' ? 'texto' : tipo === 'imagen' ? 'imagen' : 'figura'
+function etiquetaCapa(tipo: 'texto' | 'imagen' | 'figura' | 'trazo'): string {
+  return tipo === 'texto' ? 'texto' : tipo === 'imagen' ? 'imagen' : tipo === 'trazo' ? 'dibujo' : 'figura'
 }
 
 // cuerpo común del panel. quien lo usa decide si muestra los botones de girar

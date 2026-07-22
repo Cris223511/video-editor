@@ -19,4 +19,7 @@ export interface ClipAudio {
   recorteInicio: number
   duracionFuente: number
   volumen: number // 0 es silencio, 1 es 100%
+  // si nació de separar el audio de un clip de video, guarda su id: así se mueven
+  // juntos y borrar el video se lleva también este audio
+  vinculadoA?: string
 }

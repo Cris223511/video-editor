@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { Track, AjusteTono, Transicion, PistaMeta, EfectoClip, Encuadre } from '../types/timeline'
 import { MediaAsset } from '../types/media'
-import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto } from '../types/layers'
+import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto, CapaTrazo } from '../types/layers'
 import { RegionAudio, ClipAudio } from '../types/audio'
 import { Marco } from '../types/marco'
 import { tonoNeutro } from '../lib/color/tono'
@@ -10,6 +10,7 @@ import {
   crearCapaFigura,
   crearCapaImagen,
   crearCapaTexto,
+  crearCapaTrazo,
 } from '../lib/layers/defaults'
 import { simplificarRecorrido } from '../lib/layers/motion'
 import { duracionTotal } from '../lib/timeline/clips'
@@ -50,6 +51,23 @@ const DURACION_MINIMA_CAPA = 0.2
 // da una aproximación cómoda que basta para colocarlo
 function medidaCapa(c: Capa, aspecto: number): { w: number; h: number } {
   if (c.tipo === 'censura' || c.tipo === 'figura') return { w: c.anchoRel, h: c.altoRel }
+  if (c.tipo === 'trazo') {
+    // el dibujo no guarda medidas propias, así que se mide la caja que abarcan
+    // sus trazos (relativos al centro) para poder alinearlo por sus bordes
+    let min = Infinity
+    let max = -Infinity
+    let minY = Infinity
+    let maxY = -Infinity
+    for (const tr of c.trazos)
+      for (const p of tr) {
+        if (p.x < min) min = p.x
+        if (p.x > max) max = p.x
+        if (p.y < minY) minY = p.y
+        if (p.y > maxY) maxY = p.y
+      }
+    if (min === Infinity) return { w: 0, h: 0 }
+    return { w: max - min, h: maxY - minY }
+  }
   if (c.tipo === 'imagen') {
     const w = c.anchoRel
     const h =
@@ -73,6 +91,7 @@ export type Herramienta =
   | 'lienzo'
   | 'marco'
   | 'figura'
+  | 'dibujar'
   | 'transformar'
   | 'recortar'
 
@@ -116,6 +135,9 @@ interface EstadoEditor {
   // arrastre desde el panel para soltar justo donde la guía prometió
   agregarDesdeAsset: (asset: MediaAsset, destino?: { pista?: number; insertarEn?: number }) => void
   quitarClip: (id: string) => void
+  // separa el audio de un clip de video: lo deja mudo y añade el clip de audio ya
+  // decodificado, vinculado a él. el decodificado va fuera del store, en el panel
+  separarAudio: (clipId: string, audio: import('../types/audio').ClipAudio) => void
   // crea otra instancia del mismo clip (nuevo id, mismo assetId, recortes, tono y
   // efectos). no toca los medios del proyecto: es otra aparición del mismo asset
   // en la línea de tiempo. devuelve el id de la copia para poder arrastrarla
@@ -190,13 +212,17 @@ interface EstadoEditor {
   agregarImagen: (src: string, anchoNatural: number, altoNatural: number) => void
   agregarCensura: () => void
   agregarFigura: (forma?: CapaFigura['forma'], x?: number, y?: number) => void
+  // crea una capa de dibujo nueva desde el cabezal y devuelve su id, para poder
+  // encadenar el primer trazo en el mismo gesto
+  agregarTrazo: () => string
   actualizarCapa: (
     id: string,
     cambios:
       | Partial<CapaTexto>
       | Partial<CapaImagen>
       | Partial<CapaCensura>
-      | Partial<CapaFigura>,
+      | Partial<CapaFigura>
+      | Partial<CapaTrazo>,
   ) => void
   quitarCapa: (id: string) => void
   // clona una capa completa con nuevo id y los mismos datos (texto, estilo,
@@ -248,6 +274,12 @@ interface EstadoEditor {
   setDibujandoMascara: (v: boolean) => void
   anadirTrazo: (id: string, puntos: { x: number; y: number }[]) => void
   limpiarTrazos: (id: string) => void
+
+  // trazos del lápiz libre sobre una capa de dibujo: añadir uno nuevo, deshacer
+  // el último o vaciar la capa por completo
+  anadirTrazoDibujo: (id: string, puntos: { x: number; y: number }[]) => void
+  deshacerTrazoDibujo: (id: string) => void
+  limpiarDibujo: (id: string) => void
 
   setVolumenGlobal: (v: number) => void
   agregarRegionAudio: () => void
@@ -378,6 +410,7 @@ const MAX_HISTORIAL = 50
 const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'agregarDesdeAsset',
   'quitarClip',
+  'separarAudio',
   'duplicarClip',
   'moverClip',
   'recortarClip',
@@ -408,6 +441,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'agregarImagen',
   'agregarCensura',
   'agregarFigura',
+  'agregarTrazo',
   'actualizarCapa',
   'quitarCapa',
   'duplicarCapa',
@@ -425,6 +459,9 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'simplificarCapa',
   'anadirTrazo',
   'limpiarTrazos',
+  'anadirTrazoDibujo',
+  'deshacerTrazoDibujo',
+  'limpiarDibujo',
   'setVolumenGlobal',
   'agregarRegionAudio',
   'actualizarRegionAudio',
@@ -705,10 +742,24 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       const clips = s.pista.clips.filter((c) => c.id !== id)
       return {
         pista: { ...s.pista, clips },
+        // borrar el video se lleva también el audio que se había separado de él
+        audios: s.audios.filter((a) => a.vinculadoA !== id),
         clipSeleccionado: s.clipSeleccionado === id ? null : s.clipSeleccionado,
         playhead: Math.min(s.playhead, duracionTotal(clips)),
       }
     }),
+
+  // separa el audio del video: marca el clip como mudo (su sonido ya no viene del
+  // propio video) y suma a la pista de sonido el clip de audio decodificado, que
+  // llega ya vinculado a este clip para moverse y borrarse junto a él
+  separarAudio: (clipId, audio) =>
+    set((s) => ({
+      pista: {
+        ...s.pista,
+        clips: s.pista.clips.map((c) => (c.id === clipId ? { ...c, mudo: true } : c)),
+      },
+      audios: [...s.audios, audio],
+    })),
 
   duplicarClip: (id) => {
     const s = get()
@@ -732,14 +783,24 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   },
 
   moverClip: (id, nuevoInicio) =>
-    set((s) => ({
-      pista: {
-        ...s.pista,
-        clips: s.pista.clips.map((c) =>
-          c.id === id ? { ...c, inicio: Math.max(0, nuevoInicio) } : c,
-        ),
-      },
-    })),
+    set((s) => {
+      const clip = s.pista.clips.find((c) => c.id === id)
+      const inicio = Math.max(0, nuevoInicio)
+      const delta = clip ? inicio - clip.inicio : 0
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) => (c.id === id ? { ...c, inicio } : c)),
+        },
+        // el audio separado de este clip se desplaza lo mismo, para que no se
+        // despegue del video con el que va acoplado
+        audios: delta
+          ? s.audios.map((a) =>
+              a.vinculadoA === id ? { ...a, inicio: Math.max(0, a.inicio + delta) } : a,
+            )
+          : s.audios,
+      }
+    }),
 
   // cierra el hueco que empieza en `desde` dentro de un nivel concreto: lo que
   // venga después en esa misma pista se adelanta justo lo que medía el espacio
@@ -1181,6 +1242,19 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       }
     }),
 
+  agregarTrazo: () => {
+    const s = get()
+    const capa = crearCapaTrazo(s.playhead)
+    set({
+      capas: [...s.capas, capa],
+      capaSeleccionada: capa.id,
+      capasSeleccionadas: [capa.id],
+      clipSeleccionado: null,
+      herramienta: 'dibujar',
+    })
+    return capa.id
+  },
+
   actualizarCapa: (id, cambios) =>
     set((s) => ({
       capas: s.capas.map((c) => (c.id === id ? ({ ...c, ...cambios } as Capa) : c)),
@@ -1223,6 +1297,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
           ? s.capasSeleccionadas.filter((x) => x !== id)
           : [...s.capasSeleccionadas, id]
         : [id]
+      // el tipo de capa coincide con el nombre de su herramienta salvo el dibujo,
+      // cuyo panel se llama 'dibujar'
+      const herrCapa = capa ? (capa.tipo === 'trazo' ? 'dibujar' : capa.tipo) : s.herramienta
       return {
         capaSeleccionada: conjunto[conjunto.length - 1] ?? null,
         capasSeleccionadas: conjunto,
@@ -1230,7 +1307,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         regionSeleccionada: null,
         // al elegir una sola capa se abre su herramienta; sumando al conjunto no
         // se cambia de panel, para no sacar al usuario de donde estaba
-        herramienta: !aditivo && capa ? capa.tipo : s.herramienta,
+        herramienta: !aditivo && capa ? herrCapa : s.herramienta,
       }
     }),
 
@@ -1426,6 +1503,27 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     set((s) => ({
       capas: s.capas.map((c) =>
         c.id === id && c.tipo === 'censura' ? { ...c, trazos: [] } : c,
+      ),
+    })),
+
+  anadirTrazoDibujo: (id, puntos) =>
+    set((s) => ({
+      capas: s.capas.map((c) =>
+        c.id === id && c.tipo === 'trazo' ? { ...c, trazos: [...c.trazos, puntos] } : c,
+      ),
+    })),
+
+  deshacerTrazoDibujo: (id) =>
+    set((s) => ({
+      capas: s.capas.map((c) =>
+        c.id === id && c.tipo === 'trazo' ? { ...c, trazos: c.trazos.slice(0, -1) } : c,
+      ),
+    })),
+
+  limpiarDibujo: (id) =>
+    set((s) => ({
+      capas: s.capas.map((c) =>
+        c.id === id && c.tipo === 'trazo' ? { ...c, trazos: [] } : c,
       ),
     })),
 

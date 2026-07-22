@@ -1,9 +1,13 @@
+import { useState } from 'react'
 import GaleriaTransiciones from './GaleriaTransiciones'
 import SinSeleccion from '../../components/ui/SinSeleccion'
 import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
+import { useToast } from '../../components/ui/ToastProvider'
 import { useCongelarAncho } from './useCongelarAncho'
 import { useEditorStore, Herramienta } from '../../store/useEditorStore'
+import { useProjectStore } from '../../store/useProjectStore'
+import { bufferAWav } from '../../lib/audio/wav'
 import { herramientas } from './RielHerramientas'
 import { Campo, Deslizador } from '../../components/ui/Controls'
 import TextPanel from './panels/TextPanel'
@@ -17,6 +21,7 @@ import ProyectoPanel from './panels/ProyectoPanel'
 import LienzoPanel from './panels/LienzoPanel'
 import MarcoPanel from './panels/MarcoPanel'
 import FiguraPanel from './panels/FiguraPanel'
+import DibujarPanel from './panels/DibujarPanel'
 import TransformarPanel from './panels/TransformarPanel'
 import RecortarPanel from './panels/RecortarPanel'
 
@@ -29,8 +34,64 @@ function Transiciones() {
   const clips = useEditorStore((s) => s.pista.clips)
   const quitarClip = useEditorStore((s) => s.quitarClip)
   const setTransicion = useEditorStore((s) => s.setTransicion)
+  const separarAudio = useEditorStore((s) => s.separarAudio)
+  const medios = useProjectStore((s) => s.medios)
+  const agregarMedio = useProjectStore((s) => s.agregar)
+  const { mostrar } = useToast()
+  const [separando, setSeparando] = useState(false)
 
   const clip = clips.find((c) => c.id === clipSeleccionado) ?? null
+
+  // saca el audio del video a un clip propio en la pista de sonido. el navegador
+  // decodifica la pista de sonido del archivo, se empaqueta en WAV y se coloca
+  // debajo, vinculado al video (se mueven juntos y borrar el video se lo lleva).
+  // mientras dura la decodificación se enciende el cargador, que puede tardar
+  async function separar() {
+    if (!clip || separando) return
+    const asset = medios.find((m) => m.id === clip.assetId)
+    if (!asset) return
+    setSeparando(true)
+    useProjectStore.setState({ preparando: true })
+    try {
+      const datos = await asset.file.arrayBuffer()
+      const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      const ctx = new Ctor()
+      const buffer = await ctx.decodeAudioData(datos)
+      ctx.close().catch(() => {})
+      const wav = bufferAWav(buffer)
+      const url = URL.createObjectURL(wav)
+      const idAudioAsset = crypto.randomUUID()
+      agregarMedio({
+        id: idAudioAsset,
+        clase: 'audio',
+        file: new File([wav], `audio-${asset.nombre}.wav`, { type: 'audio/wav' }),
+        nombre: `Audio de ${asset.nombre}`,
+        tamano: wav.size,
+        tipo: 'audio/wav',
+        duracion: buffer.duration,
+        ancho: 0,
+        alto: 0,
+        url,
+        miniatura: '',
+      })
+      separarAudio(clip.id, {
+        id: crypto.randomUUID(),
+        assetId: idAudioAsset,
+        inicio: clip.inicio,
+        duracion: clip.duracion,
+        recorteInicio: clip.recorteInicio,
+        duracionFuente: buffer.duration,
+        volumen: 1,
+        vinculadoA: clip.id,
+      })
+      mostrar('success', 'Audio separado a la pista de sonido.')
+    } catch {
+      mostrar('error', 'Este video no tiene audio o no se pudo separar.')
+    } finally {
+      setSeparando(false)
+      useProjectStore.setState({ preparando: false })
+    }
+  }
 
   if (!clip) {
     return (
@@ -57,6 +118,27 @@ function Transiciones() {
               onChange={(v) => setTransicion(clip.id, { duracion: v / 10 })}
             />
           </Campo>
+        )}
+      </div>
+
+      {/* separar el audio del video a la pista de sonido. una vez separado, el
+          video queda mudo y el botón deja de ofrecerse */}
+      <div className="flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/10">
+        <span className="text-sm font-medium">Audio del video</span>
+        {clip.mudo ? (
+          <p className="text-[13px] leading-relaxed text-[color:var(--muted)]">
+            El audio de este video ya está separado en la pista de sonido, abajo. Muévelo o bórralo
+            desde ahí; si borras el video, su audio se va con él.
+          </p>
+        ) : (
+          <button
+            onClick={separar}
+            disabled={separando}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-black/10 py-2 text-sm font-medium transition-colors hover:border-brand hover:text-brand disabled:opacity-50 dark:border-white/10"
+          >
+            <Icon name="musica" size={16} />
+            {separando ? 'Separando...' : 'Separar audio'}
+          </button>
         )}
       </div>
 
@@ -93,6 +175,7 @@ export default function OptionsPanel({
     texto: <TextPanel />,
     imagen: <ImagePanel />,
     figura: <FiguraPanel />,
+    dibujar: <DibujarPanel />,
     audio: <AudioPanel />,
     censura: <CensuraPanel />,
     velocidad: <SpeedPanel />,
