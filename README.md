@@ -138,7 +138,7 @@ Cada capa se mueve y se redimensiona con ocho tiradores en el visor, manteniendo
 ### Proyectos guardados
 
 - **Guardado en el propio navegador.** Los proyectos viven en IndexedDB con sus videos incluidos, no como texto, así que no se pierden al cerrar la pestaña. El proyecto conserva su identidad entre guardados, de modo que volver a guardar actualiza el mismo en lugar de ir dejando copias.
-- **Autoguardado** a los cuatro segundos del último cambio que importe, con un aviso en la barra superior cuando quedan cambios pendientes y otro antes de cerrar la pestaña. Mover el cabezal o cambiar de herramienta no dispara un guardado.
+- **Autoguardado con cualquier cambio.** Cualquier acción que toque el montaje, por pequeña que sea, guarda el proyecto alrededor de un segundo después. Borrar un clip, silenciar o reordenar una pista, sumar un nivel, mover una capa, cambiar el fondo o el volumen, todo queda a salvo sin acordarse de guardar. Hay un aviso en la barra superior mientras el guardado está en curso y otro antes de cerrar la pestaña con trabajo pendiente. Lo único que no dispara un guardado es mover el cabezal o cambiar de herramienta, porque ahí no se edita nada.
 - **Descarga e importación.** Un proyecto se empaqueta en un archivo `.veproj` con sus medios dentro, listo para llevarlo a otro equipo y volver a abrirlo. Al importarlo recibe una identidad nueva, así traerlo dos veces no pisa lo que ya tenías.
 - **Listado con buscador,** que ignora mayúsculas y tildes, cuatro criterios de orden y paginación de seis en seis. Cada tarjeta muestra portada, duración, número de medios y las fechas de creación y última edición.
 - **Duplicar, descargar y borrar** desde la propia tarjeta, con confirmación antes de eliminar porque se van también los videos guardados.
@@ -159,7 +159,7 @@ La aplicación no arranca en el editor, sino en un sitio que explica lo que hace
 ### Interfaz
 
 - **Tema claro y oscuro,** con el claro por defecto y un fundido entre ambos en lugar de un salto seco.
-- **Catorce herramientas** en un riel lateral fijo: proyecto, transiciones, lienzo, marco, texto, figura, dibujar, transformar, recortar, audio, censura, velocidad, tono y efectos. Sigue visible aunque pliegues el panel. Las imágenes no ocupan una herramienta propia porque se añaden arrastrándolas desde la biblioteca de medios.
+- **Catorce herramientas** en un riel lateral fijo, que son proyecto, transiciones, lienzo, marco, texto, figura, dibujar, transformar, recortar, audio, censura, velocidad, tono y efectos. El riel sigue visible aunque pliegues el panel. Las imágenes no ocupan una herramienta propia porque se añaden arrastrándolas desde la biblioteca de medios.
 - **Panel de opciones contextual.** Cada herramienta muestra solo sus controles, y lo que ajustas se ve en el visor mientras lo mueves. Seleccionar un clip, una capa o una franja abre directamente su herramienta.
 - **Paneles ajustables,** para dar más sitio al visor o a la línea de tiempo según lo que estés haciendo.
 - **Todo local,** sin cuentas, sin marcas de agua y sin funciones de pago.

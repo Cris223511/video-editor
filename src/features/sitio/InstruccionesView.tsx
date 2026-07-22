@@ -72,7 +72,7 @@ const EFECTOS: Paso[] = [
   {
     clave: 'Elige la transición',
     texto:
-      'de entrada de cada clip entre veintiuna disponibles: fundidos, barridos direccionales, persianas, puertas, círculo, rombo, empujes y zooms. Pasa el cursor por una muestra para verla funcionando antes de aplicarla.',
+      'de entrada de cada clip, con veintiuna para elegir entre fundidos, barridos direccionales, persianas, puertas, círculo, rombo, empujes y zooms. Pasa el cursor por una muestra para verla funcionando antes de aplicarla.',
   },
   {
     clave: 'Cambia la velocidad',
@@ -138,7 +138,7 @@ const SALIDA: Paso[] = [
   {
     clave: 'Guarda el proyecto',
     texto:
-      'con Ctrl+S o desde el botón de la barra. Se guarda también solo unos segundos después de cada cambio, con los videos incluidos.',
+      'con Ctrl+S o desde el botón de la barra, aunque casi no hace falta porque el editor se guarda solo cada vez que tocas algo, por pequeño que sea el cambio, y con los videos ya dentro.',
   },
   {
     clave: 'Descarga el proyecto',
@@ -213,12 +213,13 @@ export default function InstruccionesView() {
         </Titulo>
 
         <p className="mt-5 max-w-3xl text-entrada text-[color:var(--muted)]">
-          Todo lo que puedes hacer, explicado herramienta por herramienta. No hace falta crear
-          ninguna cuenta ni instalar nada: abres{' '}
+          Aquí tienes cada herramienta del editor explicada con calma, para que sepas qué esperar
+          antes de tocarla. No necesitas una cuenta ni descargar ningún programa. Abre{' '}
           <Link to={RUTAS.medios} className="text-brand hover:underline">
             el editor
           </Link>
-          , arrastras un video y empiezas. Si prefieres retomar algo que ya tenías, entra en{' '}
+          , arrastra un video y ponte a trabajar. Y cuando quieras seguir con un montaje que dejaste
+          a medias, lo encuentras guardado en{' '}
           <Link to={RUTAS.proyectos} className="text-brand hover:underline">
             mis proyectos
           </Link>

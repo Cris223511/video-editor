@@ -14,9 +14,14 @@ const ESPERA = 1200
 // parpadearían tan rápido que ni se verían
 const VISIBLE_MIN = 1600
 
-// campos cuyo cambio significa que el montaje se ha tocado de verdad. mover el
-// cabezal o cambiar de herramienta no cuenta, o estaría guardando cada segundo
-// mientras solo se está mirando el video
+// firma de todo lo que compone el proyecto guardado. cualquier acción que toque
+// el montaje, por mínima que sea, cambia esta firma y dispara el autoguardado:
+// borrar un clip, silenciar o reordenar una pista, sumar un nivel de texto,
+// mover una capa, cambiar el fondo o el marco, ajustar el volumen, todo. lo único
+// que queda fuera a propósito es lo que no forma parte del documento, como mover
+// el cabezal o cambiar de herramienta, que solo es mirar el video sin editarlo.
+// hay que mantener esta lista al día: si mañana se suma un campo editable nuevo
+// al proyecto, va también aquí para que no se escape del guardado
 function huella() {
   const e = useEditorStore.getState()
   const p = useProjectStore.getState()
@@ -26,12 +31,19 @@ function huella() {
     e.pista.clips,
     e.numPistas,
     e.altosPista,
+    e.pistasMeta,
+    e.nivelesTexto,
+    e.nivelesAudio,
     e.capas,
     e.audioRegiones,
     e.audios,
     e.volumenGlobal,
     e.resolucion,
+    e.resolucionAuto,
+    e.lienzoManual,
     e.colorFondo,
+    e.fondo,
+    e.desenfoqueFondo,
     e.marco,
     // el acercamiento de la línea de tiempo también se recuerda: al cambiarlo se
     // guarda solo, para reabrir el proyecto con el mismo zoom con que se dejó
@@ -58,32 +70,51 @@ export function useAutoguardado(activo: boolean) {
       useProjectStore.setState({ sinGuardar: true })
 
       if (temporizador.current) window.clearTimeout(temporizador.current)
-      temporizador.current = window.setTimeout(async () => {
-        if (guardando.current) return
-        // no tiene sentido guardar un proyecto que aún no tiene nada dentro
-        if (useProjectStore.getState().medios.length === 0) return
-        guardando.current = true
-        // se enciende el aviso visible y se anota el instante para no apagarlo
-        // antes del mínimo, aunque el guardado en sí sea casi instantáneo
-        const desde = Date.now()
-        useProjectStore.setState({ guardando: true })
-        try {
-          const p = useProjectStore.getState()
-          await guardarSesion(p.idProyecto, p.creado)
-          useProjectStore.setState({ sinGuardar: false, guardadoEn: Date.now() })
-        } catch {
-          // si falla se deja marcado como pendiente y se reintenta al siguiente
-          // cambio; avisar aquí con un mensaje sería ruido constante
-        } finally {
-          const resto = VISIBLE_MIN - (Date.now() - desde)
-          const apagar = () => {
-            guardando.current = false
-            useProjectStore.setState({ guardando: false })
-          }
-          if (resto > 0) window.setTimeout(apagar, resto)
-          else apagar()
+      temporizador.current = window.setTimeout(intentarGuardar, ESPERA)
+    }
+
+    // guarda de verdad. si justo hay otro guardado en curso no se pierde el
+    // cambio: se reintenta enseguida en lugar de descartarlo, así el último estado
+    // siempre acaba en disco aunque lleguen cambios encimados
+    const intentarGuardar = async () => {
+      if (guardando.current) {
+        temporizador.current = window.setTimeout(intentarGuardar, 300)
+        return
+      }
+      // solo se salta cuando el proyecto está de verdad en blanco, sin medios ni
+      // nada en la línea de tiempo. en cuanto hay un clip, una capa o un audio ya
+      // se guarda, aunque no se haya importado ningún archivo a la biblioteca
+      const ed = useEditorStore.getState()
+      const pr = useProjectStore.getState()
+      const vacio =
+        pr.medios.length === 0 &&
+        ed.pista.clips.length === 0 &&
+        ed.capas.length === 0 &&
+        ed.audios.length === 0 &&
+        ed.audioRegiones.length === 0
+      if (vacio) return
+
+      guardando.current = true
+      // se enciende el aviso visible y se anota el instante para no apagarlo
+      // antes del mínimo, aunque el guardado en sí sea casi instantáneo
+      const desde = Date.now()
+      useProjectStore.setState({ guardando: true })
+      try {
+        const p = useProjectStore.getState()
+        await guardarSesion(p.idProyecto, p.creado)
+        useProjectStore.setState({ sinGuardar: false, guardadoEn: Date.now() })
+      } catch {
+        // si falla se deja marcado como pendiente y se reintenta al siguiente
+        // cambio; avisar aquí con un mensaje sería ruido constante
+      } finally {
+        const resto = VISIBLE_MIN - (Date.now() - desde)
+        const apagar = () => {
+          guardando.current = false
+          useProjectStore.setState({ guardando: false })
         }
-      }, ESPERA)
+        if (resto > 0) window.setTimeout(apagar, resto)
+        else apagar()
+      }
     }
 
     const quitarEditor = useEditorStore.subscribe(revisar)
