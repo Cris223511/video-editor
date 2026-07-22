@@ -151,6 +151,10 @@ interface EstadoEditor {
   // una zona vacía de la línea de tiempo para soltar lo que estuviera marcado
   limpiarSeleccion: () => void
 
+  // vacía el documento por completo y borra el historial, para estrenar un
+  // proyecto en blanco sin que quede nada del anterior
+  reiniciar: () => void
+
   agregarPista: () => void
   // crea un nivel nuevo en la posición indicada empujando hacia arriba los que ya
   // estaban en ese índice o por encima. si se pasa un clip, aterriza en el nivel
@@ -555,6 +559,41 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   insercionPista: null,
   guiaImantado: null,
 
+  // devuelve el documento a su estado de estreno. se usa al crear un proyecto
+  // nuevo, para que no arrastre nada del que estaba abierto antes: ni clips, ni
+  // capas, ni audios, ni el historial de deshacer
+  reiniciar: () =>
+    set({
+      pista: { id: 'video-1', tipo: 'video', clips: [] },
+      numPistas: 1,
+      altosPista: [64],
+      pistasMeta: [metaPista(1)],
+      capas: [],
+      playhead: 0,
+      reproduciendo: false,
+      clipSeleccionado: null,
+      capaSeleccionada: null,
+      capasSeleccionadas: [],
+      regionSeleccionada: null,
+      pxPorSegundo: PX_POR_SEGUNDO_DEFECTO,
+      resolucion: { ancho: 1920, alto: 1080 },
+      resolucionAuto: { ancho: 1920, alto: 1080 },
+      lienzoManual: false,
+      colorFondo: '#000000',
+      fondo: 'color',
+      desenfoqueFondo: 45,
+      marco: { tipo: 'ninguno', color: '#ffffff', grosor: 30, radio: 40 },
+      volumenGlobal: 1,
+      audioRegiones: [],
+      audios: [],
+      grabandoMovimiento: false,
+      dibujandoMascara: false,
+      insercionPista: null,
+      guiaImantado: null,
+      pasado: [],
+      futuro: [],
+    }),
+
   agregarDesdeAsset: (asset, destino) =>
     set((s) => {
       // una imagen no ocupa un nivel de video: entra como capa desde el cabezal,
@@ -565,7 +604,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         const DUR_IMAGEN = 5
         const fin = duracionTotal(s.pista.clips)
         const disponible = fin > s.playhead ? fin - s.playhead : DUR_IMAGEN
-        capa.duracion = Math.max(1, Math.min(DUR_IMAGEN, disponible))
+        // nunca por debajo de cuatro segundos, aunque el montaje termine antes
+        capa.duracion = Math.max(4, Math.min(DUR_IMAGEN, disponible))
         return { capas: [...s.capas, capa], capaSeleccionada: capa.id, clipSeleccionado: null }
       }
 

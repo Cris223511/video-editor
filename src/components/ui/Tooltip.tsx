@@ -57,7 +57,9 @@ export default function Tooltip({
             boxShadow: '0 8px 24px rgb(6 12 24 / 0.18)',
           }}
         >
-          <span className="truncate">{texto}</span>
+          {/* hasta dos líneas antes de recortar: un texto largo en una sola línea
+              se cortaba con "..." y no se llegaba a leer entero */}
+          <span className="line-clamp-2">{texto}</span>
           {atajo && (
             <span
               className="rounded px-1.5 py-0.5 text-[10px] tracking-wide"

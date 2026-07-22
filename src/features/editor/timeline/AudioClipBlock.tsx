@@ -133,7 +133,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
     <div
       onMouseDown={iniciarMover}
       className={[
-        'group absolute top-0 flex h-full cursor-grab items-center overflow-hidden rounded-lg border-2 px-2 transition-[border-color]',
+        'group absolute top-0 flex h-full cursor-grab items-center overflow-hidden rounded-lg border px-2 transition-[border-color]',
         seleccionado ? 'border-sky-400' : 'border-transparent hover:border-white/30',
       ].join(' ')}
       style={{

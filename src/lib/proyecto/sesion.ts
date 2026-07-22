@@ -165,6 +165,34 @@ function regenerarMiniaturas(medios: MediaAsset[]): void {
   }
 }
 
+// estrena un proyecto en blanco. libera los medios del que estuviera abierto,
+// reinicia el editor y le da una identidad nueva, además de apuntar esa identidad
+// como la sesión activa. gracias a esto un proyecto nuevo no arrastra NADA del
+// anterior: ni medios, ni clips, ni capas, ni audio. dos proyectos no se pisan
+// aunque se llamen igual, porque cada uno tiene su propio id
+export function nuevoProyecto(): void {
+  // limpiar libera las direcciones temporales de los medios y vacía la lista
+  useProjectStore.getState().limpiar()
+  const id = crypto.randomUUID()
+  useProjectStore.setState({
+    idProyecto: id,
+    creado: Date.now(),
+    titulo: 'Proyecto sin título',
+    guardadoEn: null,
+    sinGuardar: false,
+    guardando: false,
+  })
+  useEditorStore.getState().reiniciar()
+  try {
+    // se marca como la sesión activa para que al refrescar no se recargue el
+    // proyecto anterior encima de este. al no estar guardado todavía, un intento
+    // de restaurar esta sesión no encuentra nada y deja el editor en blanco
+    localStorage.setItem(CLAVE_SESION, id)
+  } catch {
+    // sin almacenamiento no se recuerda cuál es el nuevo, no es grave
+  }
+}
+
 // duplicar copia el proyecto entero con otro id, incluidos los archivos, para
 // que tocar la copia no afecte al original. el nombre lo elige quien duplica; si
 // no llega ninguno, se cae al viejo "(copia)" para no dejar la copia sin título

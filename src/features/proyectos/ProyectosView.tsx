@@ -25,7 +25,7 @@ import { ArrowLeft } from 'lucide-react'
 import { RUTAS } from '../../rutasDef'
 import { borrarProyecto, espacio, guardarProyecto, leerProyecto, listarProyectos } from '../../lib/proyecto/almacen'
 import { desempaquetar, empaquetar, nombreArchivo } from '../../lib/proyecto/archivo'
-import { abrirSesion, duplicarProyecto } from '../../lib/proyecto/sesion'
+import { abrirSesion, duplicarProyecto, nuevoProyecto } from '../../lib/proyecto/sesion'
 import { ResumenProyecto } from '../../lib/proyecto/formato'
 import { formatearDuracion } from '../../lib/format/duracion'
 import { formatearBytes } from '../../lib/format/bytes'
@@ -53,7 +53,12 @@ export default function ProyectosView() {
   const navegar = useNavigate()
   // si la dirección trae un identificador, ese proyecto se abre solo al entrar
   const { id: idEnRuta } = useParams()
-  const irAImportar = () => navegar(RUTAS.medios)
+  // crear uno nuevo estrena un proyecto en blanco antes de ir a importar: así no
+  // se cuela nada del que estaba abierto (era el error de ver medios ajenos)
+  const irAImportar = () => {
+    nuevoProyecto()
+    navegar(RUTAS.medios)
+  }
   const { mostrar } = useToast()
 
   const [lista, setLista] = useState<ResumenProyecto[] | null>(null)

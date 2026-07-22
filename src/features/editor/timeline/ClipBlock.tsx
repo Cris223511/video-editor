@@ -261,7 +261,7 @@ export default function ClipBlock({
       }}
       onDrop={alSoltarTransicion}
       className={[
-        'group absolute top-0 flex h-full items-end overflow-hidden rounded-lg border-2 transition-[border-color]',
+        'group absolute top-0 flex h-full items-end overflow-hidden rounded-lg border transition-[border-color]',
         bloqueada ? 'cursor-default' : 'cursor-grab',
         seleccionado ? 'border-brand' : 'border-transparent hover:border-white/30',
       ].join(' ')}
