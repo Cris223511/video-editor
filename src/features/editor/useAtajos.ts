@@ -32,6 +32,20 @@ export function useAtajos() {
       const total = duracionTotal(st.pista.clips)
       const largo = e.shiftKey ? PASO_LARGO : PASO
 
+      // copiar y pegar el elemento elegido (clip, capa o audio). al estar fuera de
+      // un campo de texto, no pisa la copia de texto del navegador. al pegar, la
+      // copia cae en el cabezal con todas sus propiedades
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+        e.preventDefault()
+        st.copiar()
+        return
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+        e.preventDefault()
+        st.pegar()
+        return
+      }
+
       // con una censura seleccionada, las flechas dejan de mover el cabezal y pasan
       // a gobernar la caja: solas la mueven, con Alt cambian el ancho y con Ctrl el
       // alto. es lo mismo que anuncia la ayuda de atajos de la herramienta

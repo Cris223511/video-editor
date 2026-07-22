@@ -34,6 +34,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
   const seleccionarRegion = useEditorStore((s) => s.seleccionarRegion)
   const moverAudio = useEditorStore((s) => s.moverAudio)
   const recortarAudio = useEditorStore((s) => s.recortarAudio)
+  const duplicarAudio = useEditorStore((s) => s.duplicarAudio)
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
 
   const ancho = Math.max(audio.duracion * pxPorSegundo, 8)
@@ -74,7 +75,15 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
   function iniciarMover(e: ReactMouseEvent) {
     e.stopPropagation()
     setInteractuando(true)
-    seleccionarRegion(audio.id)
+    // con alt pulsado el arrastre suelta una copia que sigue al cursor y deja el
+    // audio original quieto, igual que con los clips de video y las capas
+    let idGesto = audio.id
+    if (e.altKey) {
+      const nuevo = duplicarAudio(audio.id)
+      if (nuevo) idGesto = nuevo
+    } else {
+      seleccionarRegion(audio.id)
+    }
     const startX = e.clientX
     const inicioOriginal = audio.inicio
     const umbral = UMBRAL_IMAN_PX / pxPorSegundo
@@ -84,7 +93,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
       const bruto = Math.max(0, inicioOriginal + dx)
       const { inicio, guia } = imantarMover(bruto, audio.duracion, puntos, umbral, propios)
       setGuiaImantado(guia)
-      moverAudio(audio.id, inicio)
+      moverAudio(idGesto, inicio)
     }
     const soltar = () => {
       setGuiaImantado(null)

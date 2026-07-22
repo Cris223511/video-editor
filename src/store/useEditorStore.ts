@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Track, AjusteTono, Transicion, PistaMeta, EfectoClip, Encuadre } from '../types/timeline'
+import { Track, Clip, AjusteTono, Transicion, PistaMeta, EfectoClip, Encuadre } from '../types/timeline'
 import { MediaAsset } from '../types/media'
 import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto, CapaTrazo } from '../types/layers'
 import { RegionAudio, ClipAudio } from '../types/audio'
@@ -228,6 +228,18 @@ interface EstadoEditor {
   // clona una capa completa con nuevo id y los mismos datos (texto, estilo,
   // recorrido y trazos incluidos). devuelve el id de la copia para arrastrarla
   duplicarCapa: (id: string) => string | null
+  // clona un clip de audio como uno independiente (nuevo id, sin vínculo). devuelve
+  // el id de la copia para arrastrarla siguiendo el cursor
+  duplicarAudio: (id: string) => string | null
+  // portapapeles del editor: guarda una copia de lo que se copió con Ctrl+C, para
+  // pegarlo con Ctrl+V. es transitorio, no entra en el guardado ni en el historial
+  portapapeles:
+    | { tipo: 'clip'; dato: Clip }
+    | { tipo: 'capa'; dato: Capa }
+    | { tipo: 'audio'; dato: ClipAudio }
+    | null
+  copiar: () => void
+  pegar: () => void
   // conjunto de capas marcadas a la vez, para alinearlas o distribuirlas. la
   // capaSeleccionada es la principal (la última tocada); este array las lleva
   // todas. seleccionar con aditivo (shift) suma o quita del conjunto
@@ -445,6 +457,8 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'actualizarCapa',
   'quitarCapa',
   'duplicarCapa',
+  'duplicarAudio',
+  'pegar',
   'alinearCapas',
   'distribuirCapas',
   'moverCapaLienzo',
@@ -603,6 +617,68 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   dibujandoMascara: false,
   insercionPista: null,
   guiaImantado: null,
+  portapapeles: null,
+
+  // guarda una copia de lo seleccionado (clip, capa o audio) para pegarla luego
+  copiar: () =>
+    set((s) => {
+      if (s.clipSeleccionado) {
+        const c = s.pista.clips.find((x) => x.id === s.clipSeleccionado)
+        return c ? { portapapeles: { tipo: 'clip', dato: structuredClone(c) } } : {}
+      }
+      if (s.capaSeleccionada) {
+        const c = s.capas.find((x) => x.id === s.capaSeleccionada)
+        return c ? { portapapeles: { tipo: 'capa', dato: structuredClone(c) } } : {}
+      }
+      if (s.regionSeleccionada) {
+        const a = s.audios.find((x) => x.id === s.regionSeleccionada)
+        return a ? { portapapeles: { tipo: 'audio', dato: structuredClone(a) } } : {}
+      }
+      return {}
+    }),
+
+  // pega lo copiado en el cabezal, con todas sus propiedades, y lo deja elegido.
+  // los clips y las capas nuevas se ponen al final (delante del resto)
+  pegar: () =>
+    set((s) => {
+      const p = s.portapapeles
+      if (!p) return {}
+      const ph = s.playhead
+      if (p.tipo === 'clip') {
+        const c = structuredClone(p.dato)
+        c.id = crypto.randomUUID()
+        c.inicio = ph
+        c.efectos = c.efectos.map((e) => ({ ...e, id: crypto.randomUUID() }))
+        return {
+          pista: { ...s.pista, clips: [...s.pista.clips, c] },
+          clipSeleccionado: c.id,
+          capaSeleccionada: null,
+          regionSeleccionada: null,
+        }
+      }
+      if (p.tipo === 'capa') {
+        const c = structuredClone(p.dato)
+        c.id = crypto.randomUUID()
+        c.inicio = ph
+        return {
+          capas: [...s.capas, c],
+          capaSeleccionada: c.id,
+          capasSeleccionadas: [c.id],
+          clipSeleccionado: null,
+          regionSeleccionada: null,
+        }
+      }
+      const a = structuredClone(p.dato)
+      a.id = crypto.randomUUID()
+      a.inicio = ph
+      a.vinculadoA = undefined
+      return {
+        audios: [...s.audios, a],
+        regionSeleccionada: a.id,
+        clipSeleccionado: null,
+        capaSeleccionada: null,
+      }
+    }),
 
   // devuelve el documento a su estado de estreno. se usa al crear un proyecto
   // nuevo, para que no arrastre nada del que estaba abierto antes: ni clips, ni
@@ -1280,6 +1356,22 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       capasSeleccionadas: [copia.id],
       clipSeleccionado: null,
       regionSeleccionada: null,
+    })
+    return copia.id
+  },
+
+  duplicarAudio: (id) => {
+    const s = get()
+    const orig = s.audios.find((a) => a.id === id)
+    if (!orig) return null
+    // la copia es un audio independiente: estrena id y suelta el vínculo con el
+    // video del que pudiera haber salido, para que se mueva por su cuenta
+    const copia = { ...structuredClone(orig), id: crypto.randomUUID(), vinculadoA: undefined }
+    set({
+      audios: [...s.audios, copia],
+      regionSeleccionada: copia.id,
+      clipSeleccionado: null,
+      capaSeleccionada: null,
     })
     return copia.id
   },

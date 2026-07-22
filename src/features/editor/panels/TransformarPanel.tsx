@@ -1,6 +1,7 @@
 import { ReactNode } from 'react'
 import { FlipHorizontal2, FlipVertical2, RotateCcw, RotateCw, Undo2 } from 'lucide-react'
 import SinSeleccion from '../../../components/ui/SinSeleccion'
+import { Campo, Deslizador } from '../../../components/ui/Controls'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { CapaTexto, CapaImagen, CapaFigura, CapaTrazo } from '../../../types/layers'
 
@@ -77,6 +78,8 @@ export default function TransformarPanel() {
         onEspejoH={() => actualizarCapa(t.id, { espejoH: !t.espejoH })}
         onEspejoV={() => actualizarCapa(t.id, { espejoV: !t.espejoV })}
         onReiniciar={() => actualizarCapa(t.id, { rotacion: 0, espejoH: false, espejoV: false })}
+        opacidad={t.opacidad}
+        onOpacidad={(v) => actualizarCapa(t.id, { opacidad: v })}
       />
     )
   }
@@ -130,6 +133,8 @@ function Contenido({
   onEspejoH,
   onEspejoV,
   onReiniciar,
+  opacidad,
+  onOpacidad,
 }: {
   titulo: string
   rotacion?: number
@@ -140,6 +145,9 @@ function Contenido({
   onEspejoH: () => void
   onEspejoV: () => void
   onReiniciar: () => void
+  // opacidad general, disponible en los elementos que la admiten (las capas)
+  opacidad?: number
+  onOpacidad?: (v: number) => void
 }) {
   const hayGiro = onGirarIzq && onGirarDer
   const tocado = espejoH || espejoV || (rotacion ?? 0) !== 0
@@ -176,6 +184,12 @@ function Contenido({
         <p className="text-[11px] text-[color:var(--muted)]">
           Rotación actual: <b className="text-brand">{rotacion ?? 0}°</b>
         </p>
+      )}
+
+      {onOpacidad && (
+        <Campo etiqueta={`Opacidad (${opacidad ?? 100}%)`}>
+          <Deslizador valor={opacidad ?? 100} min={0} max={100} onChange={onOpacidad} />
+        </Campo>
       )}
 
       {tocado && (
