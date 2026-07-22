@@ -162,9 +162,8 @@ The application does not start in the editor, but on a site that explains what i
 | Go to the start or the end | `Home` and `End` |
 | Zoom the timeline in or out | `+` and `-`, or `Ctrl` + mouse wheel |
 | Drop the selection | `Esc` |
-| Save the project | `Ctrl+S` |
 
-While you are typing in a text field the shortcuts do not fire, so the spacebar writes a space instead of splitting the video.
+There is no save shortcut because you do not need one: the project saves itself on every change. While you are typing in a text field the shortcuts do not fire, so the spacebar writes a space instead of splitting the video.
 
 ## Requirements
 

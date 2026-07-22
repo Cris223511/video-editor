@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { FolderOpen, Loader2, Moon, Redo2, Save, Sun, Undo2 } from 'lucide-react'
 import Icon from '../ui/Icon'
 import Tooltip from '../ui/Tooltip'
@@ -58,18 +58,6 @@ export default function TopBar() {
     }
   }
 
-  // Ctrl+S guarda, que es lo que espera cualquiera al pulsarlo
-  useEffect(() => {
-    if (!enEditor) return
-    const alPulsar = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
-        e.preventDefault()
-        guardar()
-      }
-    }
-    window.addEventListener('keydown', alPulsar)
-    return () => window.removeEventListener('keydown', alPulsar)
-  })
 
   return (
     <header
@@ -193,7 +181,7 @@ export default function TopBar() {
 
         {enEditor && (
           <>
-            <Tooltip texto="Guardar el proyecto en este equipo" atajo="Ctrl+S" lado="abajo">
+            <Tooltip texto="Guardar el proyecto en este equipo" lado="abajo">
               <button
                 onClick={guardar}
                 disabled={guardando}

@@ -105,7 +105,13 @@ export function useAtajos() {
 
         case 's':
         case 'S':
-          if (e.ctrlKey || e.metaKey) return
+          // el proyecto se guarda solo con cada cambio, así que Ctrl+S ya no hace
+          // nada; aun así se corta para que el navegador no abra su diálogo de
+          // "guardar página". la S a secas sigue dividiendo por el cabezal
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            return
+          }
           e.preventDefault()
           st.dividirEnCabezal()
           return

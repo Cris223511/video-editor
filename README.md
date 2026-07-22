@@ -178,9 +178,8 @@ La aplicación no arranca en el editor, sino en un sitio que explica lo que hace
 | Ir al principio o al final | `Inicio` y `Fin` |
 | Acercar o alejar la línea de tiempo | `+` y `-`, o `Ctrl` + rueda del ratón |
 | Soltar la selección | `Esc` |
-| Guardar el proyecto | `Ctrl+S` |
 
-Mientras escribes en un campo de texto los atajos no se disparan, así que la barra espaciadora escribe un espacio en lugar de partir el video. Con una censura seleccionada, las flechas dejan de mover el cabezal y ajustan su caja.
+No hay atajo para guardar porque no hace falta: el proyecto se guarda solo con cada cambio. Mientras escribes en un campo de texto los atajos no se disparan, así que la barra espaciadora escribe un espacio en lugar de partir el video. Con una censura seleccionada, las flechas dejan de mover el cabezal y ajustan su caja.
 
 ## Requisitos
 

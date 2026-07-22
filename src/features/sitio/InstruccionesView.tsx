@@ -136,9 +136,9 @@ const SALIDA: Paso[] = [
       'a la proporción que necesites. Si el video no la cubre, rellena las bandas con un color o con el propio video ampliado y desenfocado, que es lo habitual para colocar una toma vertical en un formato cuadrado.',
   },
   {
-    clave: 'Guarda el proyecto',
+    clave: 'Olvídate de guardar',
     texto:
-      'con Ctrl+S o desde el botón de la barra, aunque casi no hace falta porque el editor se guarda solo cada vez que tocas algo, por pequeño que sea el cambio, y con los videos ya dentro.',
+      'porque el editor lo hace solo cada vez que tocas algo, por pequeño que sea el cambio, con los videos ya dentro. Si aun así quieres forzarlo, tienes el botón de guardar en la barra superior.',
   },
   {
     clave: 'Descarga el proyecto',
@@ -162,7 +162,6 @@ const ATAJOS: [string, string][] = [
   ['Shift + flechas', 'Mover el cabezal un segundo'],
   ['Inicio y Fin', 'Ir al principio o al final'],
   ['Más y menos', 'Acercar y alejar la línea de tiempo'],
-  ['Ctrl + S', 'Guardar el proyecto'],
   ['Esc', 'Soltar la selección'],
 ]
 

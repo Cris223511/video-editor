@@ -948,10 +948,9 @@ function EscenaAtajos({ t }: { t: number }) {
     { tecla: 'S', accion: 'Dividir por el cabezal', x: 16, y: 30 },
     { tecla: 'Espacio', accion: 'Reproducir o pausar', x: 38, y: 30 },
     { tecla: '← →', accion: 'Mover el cabezal', x: 16, y: 52 },
-    { tecla: 'Ctrl S', accion: 'Guardar el proyecto', x: 38, y: 52 },
-    { tecla: 'Ctrl E', accion: 'Exportar el video', x: 27, y: 74 },
+    { tecla: 'Ctrl E', accion: 'Exportar el video', x: 38, y: 52 },
   ]
-  const ORDEN = [0, 1, 2, 3, 4, 0]
+  const ORDEN = [0, 1, 2, 3, 0]
   const paso = ACCION / ORDEN.length
   const slot = Math.min(ORDEN.length - 1, Math.floor(t / paso))
   const local = t - slot * paso
