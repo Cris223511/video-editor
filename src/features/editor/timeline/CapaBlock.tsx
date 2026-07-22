@@ -2,6 +2,7 @@ import { MouseEvent as ReactMouseEvent, useState } from 'react'
 import { Capa } from '../../../types/layers'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
+import { nivelBajoCursor } from './nivelCursor'
 
 interface Props {
   capa: Capa
@@ -15,6 +16,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   const seleccionado = useEditorStore((s) => s.capaSeleccionada === capa.id)
   const seleccionarCapa = useEditorStore((s) => s.seleccionarCapa)
   const moverCapaTiempo = useEditorStore((s) => s.moverCapaTiempo)
+  const moverCapaNivel = useEditorStore((s) => s.moverCapaNivel)
   const duplicarCapa = useEditorStore((s) => s.duplicarCapa)
   const recortarCapaTiempo = useEditorStore((s) => s.recortarCapaTiempo)
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
@@ -40,8 +42,14 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     const inicioOriginal = capa.inicio
     const umbral = UMBRAL_IMAN_PX / pxPorSegundo
     const propios = [inicioOriginal, inicioOriginal + capa.duracion]
+    // se recuerda la última posición del cursor para, al soltar, saber sobre qué
+    // fila del carril de texto cayó y reubicar la capa en ese nivel
+    let ultimoX = e.clientX
+    let ultimoY = e.clientY
 
     const mover = (ev: globalThis.MouseEvent) => {
+      ultimoX = ev.clientX
+      ultimoY = ev.clientY
       const dx = (ev.clientX - startX) / pxPorSegundo
       const bruto = Math.max(0, inicioOriginal + dx)
       const { inicio, guia } = imantarMover(bruto, capa.duracion, puntos, umbral, propios)
@@ -51,6 +59,8 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     const soltar = () => {
       setGuiaImantado(null)
       setInteractuando(false)
+      const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelTexto')
+      if (destino !== null) moverCapaNivel(idGesto, destino)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }

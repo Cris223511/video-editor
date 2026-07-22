@@ -37,6 +37,18 @@ const SEP_SECCION = 12
 // ancho que se reserva para el rótulo «Añadir audio» del carril vacío. la onda
 // tenue de relleno arranca pasado ese punto para no quedar por debajo del texto
 const ANCHO_ROTULO_AUDIO = 120
+// alto de cada fila de los carriles de texto y de audio, y el hueco entre filas
+// de un mismo carril. la cabecera de la columna izquierda se dibuja a la altura
+// total de su bloque de filas para que ambas columnas cuadren
+const ALTO_FILA_TEXTO = 36
+const ALTO_FILA_AUDIO = 32
+const GAP_FILAS = 4
+
+// alto total que ocupa un carril con varias filas: la suma de las filas más los
+// huecos que quedan entre ellas
+function altoCarril(filas: number, altoFila: number): number {
+  return filas * altoFila + Math.max(0, filas - 1) * GAP_FILAS
+}
 
 // transición del deslizamiento de las filas al reordenarlas: corta y con una
 // curva de salida suave, para que una pista que cambia de sitio se vea resbalar
@@ -75,6 +87,10 @@ export default function Timeline({
   const capas = useEditorStore((s) => s.capas)
   const audioRegiones = useEditorStore((s) => s.audioRegiones)
   const audios = useEditorStore((s) => s.audios)
+  const nivelesTexto = useEditorStore((s) => s.nivelesTexto)
+  const nivelesAudio = useEditorStore((s) => s.nivelesAudio)
+  const agregarNivelTexto = useEditorStore((s) => s.agregarNivelTexto)
+  const agregarNivelAudio = useEditorStore((s) => s.agregarNivelAudio)
   const playhead = useEditorStore((s) => s.playhead)
   const pxPorSegundo = useEditorStore((s) => s.pxPorSegundo)
   const irA = useEditorStore((s) => s.irA)
@@ -418,10 +434,24 @@ export default function Timeline({
                 aunque el carril esté vacío, para que se entienda que ese espacio
                 existe y qué le corresponde */}
             <div style={{ marginTop: SEP_SECCION }}>
-              <CarrilHeader icono="texto" titulo="Texto y figuras" acento="#f59e0b" alto={36} />
+              <CarrilHeader
+                icono="texto"
+                titulo="Texto y figuras"
+                acento="#f59e0b"
+                alto={altoCarril(nivelesTexto, ALTO_FILA_TEXTO)}
+                onAgregar={agregarNivelTexto}
+                puedeAgregar={nivelesTexto < 6}
+              />
             </div>
             <div style={{ marginTop: SEP_SECCION }}>
-              <CarrilHeader icono="musica" titulo="Audio" acento="#10b981" alto={32} />
+              <CarrilHeader
+                icono="musica"
+                titulo="Audio"
+                acento="#10b981"
+                alto={altoCarril(nivelesAudio, ALTO_FILA_AUDIO)}
+                onAgregar={agregarNivelAudio}
+                puedeAgregar={nivelesAudio < 6}
+              />
             </div>
           </div>
 
@@ -509,70 +539,92 @@ export default function Timeline({
             })}
           </div>
 
-          {/* carril de capas (texto y figuras). el margen superior es el mismo
-              SEP_SECCION que separa las cabeceras del lado izquierdo, para que
-              ambas columnas cuadren. vacío enseña su placeholder con icono */}
-          <div
-            className="relative h-9 overflow-hidden rounded-lg"
-            style={{ marginTop: SEP_SECCION, background: 'rgb(var(--border) / 0.05)' }}
-          >
-            {capas.length === 0 && (
-              <div className="pointer-events-none flex h-full items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
-                <Icon name="texto" size={13} />
-                <span>Añadir texto</span>
-              </div>
-            )}
-            {capas.map((c) => (
-              <CapaBlock key={c.id} capa={c} pxPorSegundo={pxPorSegundo} puntos={puntos} />
-            ))}
+          {/* carril de capas (texto y figuras), ahora con varias filas para
+              separar bloques que se solapan en el tiempo. cada fila lleva su
+              data-nivel-texto, que es lo que leen los bloques al soltarlos para
+              saber a qué fila mudarse. la fila más alta encabeza la pila. el
+              margen superior es el mismo SEP_SECCION que en la columna izquierda
+              para que ambas cuadren */}
+          <div className="flex flex-col" style={{ marginTop: SEP_SECCION, gap: GAP_FILAS }}>
+            {Array.from({ length: nivelesTexto }, (_, i) => nivelesTexto - 1 - i).map((n) => {
+              const propias = capas.filter((c) => (c.nivel ?? 0) === n)
+              return (
+                <div
+                  key={`texto-${n}`}
+                  data-nivel-texto={n}
+                  className="relative overflow-hidden rounded-lg"
+                  style={{ height: ALTO_FILA_TEXTO, background: 'rgb(var(--border) / 0.05)' }}
+                >
+                  {n === 0 && capas.length === 0 && (
+                    <div className="pointer-events-none flex h-full items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
+                      <Icon name="texto" size={13} />
+                      <span>Añadir texto</span>
+                    </div>
+                  )}
+                  {propias.map((c) => (
+                    <CapaBlock key={c.id} capa={c} pxPorSegundo={pxPorSegundo} puntos={puntos} />
+                  ))}
+                </div>
+              )
+            })}
           </div>
 
-          {/* carril de audio. de fondo lleva una onda muy tenue para que no se vea
-              plano aunque esté vacío; encima van las regiones con su propia onda */}
-          <div
-            className="relative h-8 overflow-hidden rounded-lg"
-            style={{ marginTop: SEP_SECCION, background: 'rgb(var(--border) / 0.05)' }}
-          >
-            {audioRegiones.length === 0 && audios.length === 0 ? (
-              <>
-                {/* el rótulo del carril va a la izquierda y limpio; ninguna onda
-                    pasa por debajo para que se lea sin ruido */}
-                <div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
-                  <Icon name="musica" size={13} />
-                  <span>Añadir audio</span>
+          {/* carril de audio, con varias filas igual que el de texto. la fila 0,
+              cuando el carril entero está vacío, enseña el rótulo y una onda muy
+              tenue de fondo para que no se vea plano. cada fila lleva su
+              data-nivel-audio para recibir el bloque que se suelte encima */}
+          <div className="flex flex-col" style={{ marginTop: SEP_SECCION, gap: GAP_FILAS }}>
+            {Array.from({ length: nivelesAudio }, (_, i) => nivelesAudio - 1 - i).map((n) => {
+              const regionesFila = audioRegiones.filter((r) => (r.nivel ?? 0) === n)
+              const audiosFila = audios.filter((a) => (a.nivel ?? 0) === n)
+              const carrilVacio = audioRegiones.length === 0 && audios.length === 0
+              return (
+                <div
+                  key={`audio-${n}`}
+                  data-nivel-audio={n}
+                  className="relative overflow-hidden rounded-lg"
+                  style={{ height: ALTO_FILA_AUDIO, background: 'rgb(var(--border) / 0.05)' }}
+                >
+                  {n === 0 && carrilVacio ? (
+                    <>
+                      {/* el rótulo del carril va a la izquierda y limpio; ninguna
+                          onda pasa por debajo para que se lea sin ruido */}
+                      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
+                        <Icon name="musica" size={13} />
+                        <span>Añadir audio</span>
+                      </div>
+                      {/* la onda tenue de relleno arranca pasado el rótulo, así las
+                          líneas empiezan después del texto y no lo tapan */}
+                      <div className="absolute inset-y-0 right-0" style={{ left: ANCHO_ROTULO_AUDIO }}>
+                        <OndaAudio
+                          semilla="fondo-audio"
+                          color="rgb(var(--border) / 0.5)"
+                          opacidad={0.35}
+                          barras={Math.max(80, Math.floor((anchoContenido - ANCHO_ROTULO_AUDIO) / 2))}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* franjas de ganancia (verdes) y audios importados (azules)
+                          conviven en la misma fila, cada uno con su color */}
+                      {regionesFila.map((r) => (
+                        <AudioBlock key={r.id} region={r} pxPorSegundo={pxPorSegundo} puntos={puntos} />
+                      ))}
+                      {audiosFila.map((a) => (
+                        <AudioClipBlock
+                          key={a.id}
+                          audio={a}
+                          asset={medios.find((m) => m.id === a.assetId)}
+                          pxPorSegundo={pxPorSegundo}
+                          puntos={puntos}
+                        />
+                      ))}
+                    </>
+                  )}
                 </div>
-                {/* la onda tenue de relleno arranca pasado el rótulo, así las
-                    líneas empiezan después del texto y no lo tapan */}
-                <div className="absolute inset-y-0 right-0" style={{ left: ANCHO_ROTULO_AUDIO }}>
-                  {/* el número de líneas se calcula sobre el ancho real del carril,
-                      una cada dos píxeles, para que la onda se vea igual de densa
-                      que la de una región con sonido y no queden líneas sueltas */}
-                  <OndaAudio
-                    semilla="fondo-audio"
-                    color="rgb(var(--border) / 0.5)"
-                    opacidad={0.35}
-                    barras={Math.max(80, Math.floor((anchoContenido - ANCHO_ROTULO_AUDIO) / 2))}
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                {/* franjas de ganancia (verdes) y audios importados (azules)
-                    conviven en el mismo carril, cada uno con su color */}
-                {audioRegiones.map((r) => (
-                  <AudioBlock key={r.id} region={r} pxPorSegundo={pxPorSegundo} puntos={puntos} />
-                ))}
-                {audios.map((a) => (
-                  <AudioClipBlock
-                    key={a.id}
-                    audio={a}
-                    asset={medios.find((m) => m.id === a.assetId)}
-                    pxPorSegundo={pxPorSegundo}
-                    puntos={puntos}
-                  />
-                ))}
-              </>
-            )}
+              )
+            })}
           </div>
 
           {/* guía de inserción: la línea celeste que cruza la pista mientras se

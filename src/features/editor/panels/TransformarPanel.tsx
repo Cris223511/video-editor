@@ -1,5 +1,5 @@
 import { ReactNode } from 'react'
-import { FlipHorizontal2, FlipVertical2, RotateCcw, RotateCw, Undo2 } from 'lucide-react'
+import { BringToFront, FlipHorizontal2, FlipVertical2, RotateCcw, RotateCw, SendToBack, Undo2 } from 'lucide-react'
 import SinSeleccion from '../../../components/ui/SinSeleccion'
 import { Campo, Deslizador } from '../../../components/ui/Controls'
 import { useEditorStore } from '../../../store/useEditorStore'
@@ -55,6 +55,8 @@ export default function TransformarPanel() {
   const clips = useEditorStore((s) => s.pista.clips)
   const actualizarCapa = useEditorStore((s) => s.actualizarCapa)
   const actualizarEncuadre = useEditorStore((s) => s.actualizarEncuadre)
+  const traerAlFrente = useEditorStore((s) => s.traerAlFrente)
+  const enviarAtras = useEditorStore((s) => s.enviarAtras)
 
   const capa = capas.find((c) => c.id === capaSeleccionada)
   const clip = clips.find((c) => c.id === clipSeleccionado)
@@ -80,6 +82,8 @@ export default function TransformarPanel() {
         onReiniciar={() => actualizarCapa(t.id, { rotacion: 0, espejoH: false, espejoV: false })}
         opacidad={t.opacidad}
         onOpacidad={(v) => actualizarCapa(t.id, { opacidad: v })}
+        onTraerFrente={() => traerAlFrente(t.id)}
+        onEnviarAtras={() => enviarAtras(t.id)}
       />
     )
   }
@@ -135,6 +139,8 @@ function Contenido({
   onReiniciar,
   opacidad,
   onOpacidad,
+  onTraerFrente,
+  onEnviarAtras,
 }: {
   titulo: string
   rotacion?: number
@@ -148,6 +154,9 @@ function Contenido({
   // opacidad general, disponible en los elementos que la admiten (las capas)
   opacidad?: number
   onOpacidad?: (v: number) => void
+  // orden de apilado: solo las capas lo traen, porque el video vive por debajo
+  onTraerFrente?: () => void
+  onEnviarAtras?: () => void
 }) {
   const hayGiro = onGirarIzq && onGirarDer
   const tocado = espejoH || espejoV || (rotacion ?? 0) !== 0
@@ -190,6 +199,18 @@ function Contenido({
         <Campo etiqueta={`Opacidad (${opacidad ?? 100}%)`}>
           <Deslizador valor={opacidad ?? 100} min={0} max={100} onChange={onOpacidad} />
         </Campo>
+      )}
+
+      {onTraerFrente && onEnviarAtras && (
+        <div className="flex flex-col gap-2">
+          <p className="text-[11px] text-[color:var(--muted)]">
+            Cuando dos elementos se pisan, decide cuál queda encima.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Boton icono={<BringToFront size={18} />} texto="Traer al frente" onClick={onTraerFrente} />
+            <Boton icono={<SendToBack size={18} />} texto="Enviar atrás" onClick={onEnviarAtras} />
+          </div>
+        </div>
       )}
 
       {tocado && (

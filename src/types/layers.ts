@@ -29,6 +29,11 @@ export interface CapaBase {
   rotacion?: number
   espejoH?: boolean
   espejoV?: boolean
+  // fila del carril de texto y figuras en la que se dibuja el bloque. es solo una
+  // ayuda visual de la línea de tiempo para separar elementos que se solapan en el
+  // tiempo; no cambia qué queda delante de qué (eso lo deciden el orden y los
+  // botones de traer al frente o enviar atrás). sin definir equivale a la fila 0
+  nivel?: number
 }
 
 export interface CapaTexto extends CapaBase {

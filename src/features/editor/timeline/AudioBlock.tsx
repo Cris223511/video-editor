@@ -4,6 +4,7 @@ import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
 import { amplitudEn, picosDeMedio, PerfilPicos } from '../../../lib/audio/picos'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
+import { nivelBajoCursor } from './nivelCursor'
 
 interface Props {
   region: RegionAudio
@@ -169,6 +170,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
   const seleccionado = useEditorStore((s) => s.regionSeleccionada === region.id)
   const seleccionarRegion = useEditorStore((s) => s.seleccionarRegion)
   const moverRegionAudio = useEditorStore((s) => s.moverRegionAudio)
+  const moverAudioNivel = useEditorStore((s) => s.moverAudioNivel)
   const duplicarRegionAudio = useEditorStore((s) => s.duplicarRegionAudio)
   const recortarRegionAudio = useEditorStore((s) => s.recortarRegionAudio)
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
@@ -193,8 +195,14 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     const inicioOriginal = region.inicio
     const umbral = UMBRAL_IMAN_PX / pxPorSegundo
     const propios = [inicioOriginal, inicioOriginal + region.duracion]
+    // se guarda la última posición del cursor para soltar la franja en la fila del
+    // carril de audio sobre la que quede
+    let ultimoX = e.clientX
+    let ultimoY = e.clientY
 
     const mover = (ev: globalThis.MouseEvent) => {
+      ultimoX = ev.clientX
+      ultimoY = ev.clientY
       const dx = (ev.clientX - startX) / pxPorSegundo
       const bruto = Math.max(0, inicioOriginal + dx)
       const { inicio, guia } = imantarMover(bruto, region.duracion, puntos, umbral, propios)
@@ -204,6 +212,8 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     const soltar = () => {
       setGuiaImantado(null)
       setInteractuando(false)
+      const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelAudio')
+      if (destino !== null) moverAudioNivel(idGesto, destino)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }

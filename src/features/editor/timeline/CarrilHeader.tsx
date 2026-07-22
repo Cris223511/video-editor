@@ -1,21 +1,26 @@
 import Icon, { NombreIcono } from '../../../components/ui/Icon'
+import Tooltip from '../../../components/ui/Tooltip'
 
 // cabecera de un carril que no es de video (el de texto y figuras, y el de
 // audio). vive en la misma columna izquierda que las cabeceras de las pistas,
-// alineada con su fila. a diferencia de las pistas de video no lleva controles
-// de silencio ni reordenamiento, porque hoy es un carril único; su papel es
-// dejar claro qué tipo de contenido ocupa esa fila. el acento de color en la
-// franja y en el icono es lo que la separa de un vistazo de las pistas de video
+// alineada con sus filas. su papel es dejar claro qué tipo de contenido ocupa
+// esa sección; el acento de color en la franja y en el icono es lo que la separa
+// de un vistazo de las pistas de video. cuando el carril admite varias filas lleva
+// además un botón para añadir una más, hasta el tope
 export default function CarrilHeader({
   icono,
   titulo,
   acento,
   alto,
+  onAgregar,
+  puedeAgregar = false,
 }: {
   icono: NombreIcono
   titulo: string
   acento: string
   alto: number
+  onAgregar?: () => void
+  puedeAgregar?: boolean
 }) {
   return (
     <div
@@ -38,6 +43,18 @@ export default function CarrilHeader({
         <Icon name={icono} size={14} />
       </span>
       <span className="truncate text-[12px] font-medium text-[color:var(--muted)]">{titulo}</span>
+      {onAgregar && (
+        <Tooltip texto={puedeAgregar ? 'Añadir una fila' : 'Máximo de filas alcanzado'} lado="derecha">
+          <button
+            onClick={onAgregar}
+            disabled={!puedeAgregar}
+            aria-label="Añadir una fila a este carril"
+            className="interactivo ml-auto grid h-6 w-6 shrink-0 place-items-center rounded-md text-[color:var(--muted)] disabled:pointer-events-none disabled:opacity-40"
+          >
+            <Icon name="mas" size={15} />
+          </button>
+        </Tooltip>
+      )}
     </div>
   )
 }

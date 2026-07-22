@@ -103,6 +103,12 @@ interface EstadoEditor {
   // metadatos de cada nivel, en el mismo orden que altosPista. lo que decide si
   // un nivel suena, se ve o se puede tocar vive aquí
   pistasMeta: PistaMeta[]
+  // cuántas filas muestra el carril de texto y figuras y cuántas el de audio.
+  // arrancan en 1 y crecen cuando el usuario añade una, para repartir en varias
+  // alturas los bloques que se pisan en el tiempo. cada capa, región o audio
+  // guarda en su campo nivel en qué fila cae
+  nivelesTexto: number
+  nivelesAudio: number
   capas: Capa[]
   playhead: number
   reproduciendo: boolean
@@ -191,6 +197,16 @@ interface EstadoEditor {
   quitarPista: (indice: number) => void
   setAltoPista: (indice: number, alto: number) => void
   moverClipAPista: (id: string, pista: number) => void
+  // añade una fila al carril de texto o al de audio. la última fila siempre queda
+  // libre para recibir un bloque, así que se puede seguir subiendo mientras haga
+  // falta hasta el tope
+  agregarNivelTexto: () => void
+  agregarNivelAudio: () => void
+  // lleva una capa a otra fila del carril de texto, o un audio o región a otra del
+  // de audio. si la fila destino es la última vacía, el carril crece solo para
+  // dejar de nuevo una libre encima
+  moverCapaNivel: (id: string, nivel: number) => void
+  moverAudioNivel: (id: string, nivel: number) => void
   // guía celeste que aparece mientras se arrastra un clip sobre la separación
   // entre dos niveles: guarda el índice donde nacería la pista nueva, o null si
   // ahora mismo no se está apuntando a ninguna separación
@@ -230,6 +246,10 @@ interface EstadoEditor {
   // clona un clip de audio como uno independiente (nuevo id, sin vínculo). devuelve
   // el id de la copia para arrastrarla siguiendo el cursor
   duplicarAudio: (id: string) => string | null
+  // orden de apilado de las capas: las capas se dibujan en el orden del array, así
+  // que llevar una al final la pone delante de todo y al principio, detrás de todo
+  traerAlFrente: (id: string) => void
+  enviarAtras: (id: string) => void
   // portapapeles del editor: guarda una copia de lo que se copió con Ctrl+C, para
   // pegarlo con Ctrl+V. es transitorio, no entra en el guardado ni en el historial
   portapapeles:
@@ -354,6 +374,8 @@ type Documento = Pick<
   | 'numPistas'
   | 'altosPista'
   | 'pistasMeta'
+  | 'nivelesTexto'
+  | 'nivelesAudio'
   | 'capas'
   | 'marco'
   | 'volumenGlobal'
@@ -376,6 +398,8 @@ function tomarDocumento(s: EstadoEditor): Documento {
     numPistas: s.numPistas,
     altosPista: s.altosPista,
     pistasMeta: s.pistasMeta,
+    nivelesTexto: s.nivelesTexto,
+    nivelesAudio: s.nivelesAudio,
     audios: s.audios,
     capas: s.capas,
     marco: s.marco,
@@ -444,6 +468,10 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'quitarPista',
   'setAltoPista',
   'moverClipAPista',
+  'agregarNivelTexto',
+  'agregarNivelAudio',
+  'moverCapaNivel',
+  'moverAudioNivel',
   'alternarSilencioPista',
   'alternarOcultarPista',
   'alternarBloquearPista',
@@ -457,6 +485,8 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'quitarCapa',
   'duplicarCapa',
   'duplicarAudio',
+  'traerAlFrente',
+  'enviarAtras',
   'pegar',
   'alinearCapas',
   'distribuirCapas',
@@ -500,6 +530,9 @@ const pistaVacia: Track = { id: 'video-1', tipo: 'video', clips: [] }
 // límites de la multipista: cuántos niveles se permiten y hasta dónde puede
 // crecer o encogerse cada uno al estirar su borde inferior
 const MAX_PISTAS = 6
+// tope de filas para los carriles de texto y de audio. seis basta de sobra para
+// repartir bloques solapados sin que la línea de tiempo crezca de forma absurda
+const MAX_NIVELES = 6
 const ALTO_PISTA_BASE = 64
 const ALTO_PISTA_MIN = 40
 const ALTO_PISTA_MAX = 160
@@ -591,6 +624,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   numPistas: 1,
   altosPista: [64],
   pistasMeta: [metaPista(1)],
+  nivelesTexto: 1,
+  nivelesAudio: 1,
   capas: [],
   playhead: 0,
   reproduciendo: false,
@@ -688,6 +723,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       numPistas: 1,
       altosPista: [64],
       pistasMeta: [metaPista(1)],
+      nivelesTexto: 1,
+      nivelesAudio: 1,
       capas: [],
       playhead: 0,
       reproduciendo: false,
@@ -1262,6 +1299,33 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       }
     }),
 
+  agregarNivelTexto: () =>
+    set((s) => (s.nivelesTexto >= MAX_NIVELES ? {} : { nivelesTexto: s.nivelesTexto + 1 })),
+
+  agregarNivelAudio: () =>
+    set((s) => (s.nivelesAudio >= MAX_NIVELES ? {} : { nivelesAudio: s.nivelesAudio + 1 })),
+
+  moverCapaNivel: (id, nivel) =>
+    set((s) => {
+      const destino = Math.max(0, Math.min(MAX_NIVELES - 1, nivel))
+      const capas = s.capas.map((c) => (c.id === id ? { ...c, nivel: destino } : c))
+      // si el bloque sube a la última fila libre, el carril crece para que siempre
+      // quede una vacía encima donde seguir separando
+      const nivelesTexto = Math.max(s.nivelesTexto, Math.min(MAX_NIVELES, destino + 1))
+      return { capas, nivelesTexto }
+    }),
+
+  moverAudioNivel: (id, nivel) =>
+    set((s) => {
+      const destino = Math.max(0, Math.min(MAX_NIVELES - 1, nivel))
+      // el carril de audio comparte filas entre audios importados y regiones de
+      // ganancia, así que se busca el id en ambas listas y se reubica donde toque
+      const audios = s.audios.map((a) => (a.id === id ? { ...a, nivel: destino } : a))
+      const audioRegiones = s.audioRegiones.map((r) => (r.id === id ? { ...r, nivel: destino } : r))
+      const nivelesAudio = Math.max(s.nivelesAudio, Math.min(MAX_NIVELES, destino + 1))
+      return { audios, audioRegiones, nivelesAudio }
+    }),
+
   agregarTexto: () =>
     set((s) => {
       const capa = crearCapaTexto(s.playhead, s.resolucion.alto)
@@ -1376,6 +1440,26 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     })
     return copia.id
   },
+
+  traerAlFrente: (id) =>
+    set((s) => {
+      const capa = s.capas.find((c) => c.id === id)
+      if (!capa) return {}
+      // sacamos la capa de su sitio y la volvemos a poner al final: como el
+      // dibujado recorre el array en orden, quedar de última la deja encima
+      const resto = s.capas.filter((c) => c.id !== id)
+      return { capas: [...resto, capa] }
+    }),
+
+  enviarAtras: (id) =>
+    set((s) => {
+      const capa = s.capas.find((c) => c.id === id)
+      if (!capa) return {}
+      // el movimiento inverso: al principio del array se dibuja primero y todo
+      // lo demás le pasa por encima
+      const resto = s.capas.filter((c) => c.id !== id)
+      return { capas: [capa, ...resto] }
+    }),
 
   seleccionarCapa: (id, aditivo) =>
     set((s) => {

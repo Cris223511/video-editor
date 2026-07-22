@@ -56,11 +56,12 @@ export default function ExportDialog() {
   // formato probable de salida, deducido del mismo mime que elegirá la grabadora
   const formatoSalida = elegirMime().includes('mp4') ? 'MP4' : 'WebM'
 
-  // peso aproximado del archivo: el bitrate de video por la duración, más el
-  // margen del audio. es una estimación, no un tamaño exacto, porque la
-  // grabadora ajusta la calidad según el movimiento de cada fotograma
+  // peso aproximado del archivo: el bitrate de video (que ahora depende del fps
+  // elegido) por la duración, más el margen del audio. es una estimación, no un
+  // tamaño exacto, porque la grabadora ajusta la calidad según el movimiento. al
+  // depender del fps, el peso cambia al elegir 24, 30 o 60
   const bytesEstimados =
-    total > 0 ? ((bitrateVideo(ancho, alto) + BITRATE_AUDIO) * total) / 8 : 0
+    total > 0 ? ((bitrateVideo(ancho, alto, fps) + BITRATE_AUDIO) * total) / 8 : 0
 
   function cerrarTodo() {
     controlRef.current?.cancelar()

@@ -5,6 +5,10 @@ export interface RegionAudio {
   inicio: number
   duracion: number
   ganancia: number
+  // fila del carril de audio donde se dibuja. igual que en las capas, solo ordena
+  // la vista de la línea de tiempo para no amontonar bloques que coinciden en el
+  // tiempo; el sonido se mezcla igual sin importar la fila. sin definir es la 0
+  nivel?: number
 }
 
 // un audio importado colocado en la pista de sonido. a diferencia de la región
@@ -22,4 +26,7 @@ export interface ClipAudio {
   // si nació de separar el audio de un clip de video, guarda su id: así se mueven
   // juntos y borrar el video se lleva también este audio
   vinculadoA?: string
+  // fila del carril de audio donde se muestra. mismo criterio que la región: es
+  // orden visual, no afecta la mezcla. sin definir cae en la fila 0
+  nivel?: number
 }

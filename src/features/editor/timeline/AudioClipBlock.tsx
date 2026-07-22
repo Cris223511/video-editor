@@ -5,6 +5,7 @@ import { useEditorStore } from '../../../store/useEditorStore'
 import { amplitudEn, picosDeMedio } from '../../../lib/audio/picos'
 import { alturasOnda } from './AudioBlock'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
+import { nivelBajoCursor } from './nivelCursor'
 
 interface Props {
   audio: ClipAudio
@@ -33,6 +34,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
   const seleccionado = useEditorStore((s) => s.regionSeleccionada === audio.id)
   const seleccionarRegion = useEditorStore((s) => s.seleccionarRegion)
   const moverAudio = useEditorStore((s) => s.moverAudio)
+  const moverAudioNivel = useEditorStore((s) => s.moverAudioNivel)
   const recortarAudio = useEditorStore((s) => s.recortarAudio)
   const duplicarAudio = useEditorStore((s) => s.duplicarAudio)
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
@@ -88,7 +90,13 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
     const inicioOriginal = audio.inicio
     const umbral = UMBRAL_IMAN_PX / pxPorSegundo
     const propios = [inicioOriginal, inicioOriginal + audio.duracion]
+    // última posición del cursor, para reubicar el audio en la fila del carril
+    // sobre la que se suelte
+    let ultimoX = e.clientX
+    let ultimoY = e.clientY
     const mover = (ev: globalThis.MouseEvent) => {
+      ultimoX = ev.clientX
+      ultimoY = ev.clientY
       const dx = (ev.clientX - startX) / pxPorSegundo
       const bruto = Math.max(0, inicioOriginal + dx)
       const { inicio, guia } = imantarMover(bruto, audio.duracion, puntos, umbral, propios)
@@ -98,6 +106,8 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
     const soltar = () => {
       setGuiaImantado(null)
       setInteractuando(false)
+      const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelAudio')
+      if (destino !== null) moverAudioNivel(idGesto, destino)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
