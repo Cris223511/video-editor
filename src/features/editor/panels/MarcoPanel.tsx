@@ -1,6 +1,7 @@
 import { useEditorStore } from '../../../store/useEditorStore'
 import { TipoMarco } from '../../../types/marco'
 import { Campo, Deslizador, ColorCampo } from '../../../components/ui/Controls'
+import { estiloMarco } from '../overlays/MarcoOverlay'
 
 const TIPOS: { tipo: TipoMarco; etiqueta: string }[] = [
   { tipo: 'ninguno', etiqueta: 'Ninguno' },
@@ -27,21 +28,55 @@ export default function MarcoPanel() {
   return (
     <div className="flex flex-col gap-4">
       <Campo etiqueta="Tipo de marco">
-        <div className="grid grid-cols-2 gap-2">
-          {TIPOS.map((t) => (
-            <button
-              key={t.tipo}
-              onClick={() => setMarco({ tipo: t.tipo })}
-              className={[
-                'rounded-lg border py-2 text-sm font-medium transition-colors',
-                marco.tipo === t.tipo
-                  ? 'border-brand bg-brand/10 text-brand'
-                  : 'border-black/10 text-[color:var(--muted)] hover:text-[color:var(--text)] dark:border-white/10',
-              ].join(' ')}
-            >
-              {t.etiqueta}
-            </button>
-          ))}
+        {/* cada tipo se enseña con su propia muestra en lugar de solo su nombre.
+            la muestra usa la misma función que pinta el marco de verdad sobre el
+            visor, con el grosor y el radio a escala de la miniatura, así que lo que
+            se ve acá es exactamente lo que va a caer sobre el video */}
+        <div className="grid grid-cols-3 gap-2">
+          {TIPOS.map((t) => {
+            const elegido = marco.tipo === t.tipo
+            return (
+              <button
+                key={t.tipo}
+                onClick={() => setMarco({ tipo: t.tipo })}
+                title={t.etiqueta}
+                className="group flex flex-col gap-1 text-left"
+              >
+                <span
+                  className={[
+                    'relative block h-12 w-full overflow-hidden rounded-lg border transition-all duration-150',
+                    elegido
+                      ? 'border-brand ring-2 ring-brand/40'
+                      : 'border-black/10 group-hover:border-brand dark:border-white/10',
+                  ].join(' ')}
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(135deg, #3b82f6 0%, #22d3ee 40%, #a3e635 70%, #fbbf24 100%)',
+                  }}
+                >
+                  {t.tipo !== 'ninguno' && (
+                    <span
+                      className="absolute inset-0"
+                      style={{ ...estiloMarco({ ...marco, tipo: t.tipo }, 4, 6), boxSizing: 'border-box' }}
+                    />
+                  )}
+                  {t.tipo === 'ninguno' && (
+                    <span className="absolute inset-0 grid place-items-center text-[10px] font-medium text-white/90">
+                      Sin marco
+                    </span>
+                  )}
+                </span>
+                <span
+                  className={[
+                    'truncate text-[10px] leading-tight transition-colors',
+                    elegido ? 'font-medium text-brand' : 'text-[color:var(--muted)]',
+                  ].join(' ')}
+                >
+                  {t.etiqueta}
+                </span>
+              </button>
+            )
+          })}
         </div>
       </Campo>
 

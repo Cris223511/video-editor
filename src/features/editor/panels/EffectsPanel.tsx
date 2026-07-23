@@ -2,12 +2,14 @@ import SinSeleccion from '../../../components/ui/SinSeleccion'
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { Campo, Deslizador, Segmentado } from '../../../components/ui/Controls'
-import { EfectoClip } from '../../../types/timeline'
+import { useState } from 'react'
+import { useProjectStore } from '../../../store/useProjectStore'
+import { CATEGORIAS_EFECTO, buscarEfecto, esFiltro } from '../../../lib/efectos/catalogo'
 
 // valores de partida al añadir el desenfoque: intensidad media y barrido
 // horizontal, que es la dirección más habitual en un travelling
-const DESENFOQUE_INICIAL: Omit<EfectoClip, 'id'> = {
-  tipo: 'desenfoque-movimiento',
+const DESENFOQUE_INICIAL = {
+  tipo: 'desenfoque-movimiento' as const,
   intensidad: 40,
   angulo: 0,
 }
@@ -22,7 +24,9 @@ export default function EffectsPanel() {
   const actualizarEfecto = useEditorStore((s) => s.actualizarEfecto)
   const quitarEfecto = useEditorStore((s) => s.quitarEfecto)
 
+  const medios = useProjectStore((s) => s.medios)
   const clip = clips.find((c) => c.id === clipSeleccionado)
+  const miniatura = clip ? medios.find((m) => m.id === clip.assetId)?.miniatura : undefined
 
   if (!clip) {
     return (
@@ -44,7 +48,6 @@ export default function EffectsPanel() {
       )}
 
       {efectos.map((e) => {
-        if (e.tipo !== 'desenfoque-movimiento') return null
         return (
           <div
             key={e.id}
@@ -53,7 +56,11 @@ export default function EffectsPanel() {
           >
             <div className="flex items-center gap-2">
               <Icon name="efectos" size={15} className="text-brand" />
-              <span className="text-sm font-medium">Desenfoque de movimiento</span>
+              <span className="text-sm font-medium">
+                {esFiltro(e)
+                  ? (buscarEfecto(e.filtro)?.nombre ?? 'Efecto')
+                  : 'Desenfoque de movimiento'}
+              </span>
               <button
                 onClick={() => quitarEfecto(clip.id, e.id)}
                 aria-label="Quitar efecto"
@@ -72,9 +79,9 @@ export default function EffectsPanel() {
               />
             </Campo>
 
-            {/* la dirección no va dentro de un Campo porque este usa un label y
-                envolver botones en un label reactiva el primero al pulsar los
-                demás. un bloque simple con su rótulo evita ese enredo */}
+            {/* la dirección y el ángulo solo tienen sentido en el desenfoque; los
+                del catálogo se gobiernan únicamente con su nivel */}
+            {!esFiltro(e) && (
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-[color:var(--muted)]">Dirección</span>
               <Segmentado
@@ -88,7 +95,9 @@ export default function EffectsPanel() {
                 }
               />
             </div>
+            )}
 
+            {!esFiltro(e) && (
             <Campo etiqueta={`Ángulo (${Math.round(e.angulo)}°)`}>
               <Deslizador
                 valor={Math.round(e.angulo)}
@@ -97,6 +106,7 @@ export default function EffectsPanel() {
                 onChange={(v) => actualizarEfecto(clip.id, e.id, { angulo: v })}
               />
             </Campo>
+            )}
           </div>
         )
       })}
@@ -107,6 +117,76 @@ export default function EffectsPanel() {
       >
         <Icon name="mas" size={16} /> Añadir desenfoque de movimiento
       </button>
+
+      {/* catálogo. cada muestra enseña el efecto ya puesto sobre el propio
+          material; al pasar el cursor sube a su intensidad plena y al salir vuelve
+          a la mitad, que es como se aplica al elegirlo */}
+      <Catalogo
+        miniatura={miniatura}
+        onElegir={(id) =>
+          agregarEfecto(clip.id, { id: crypto.randomUUID(), tipo: 'filtro', filtro: id, intensidad: 50 })
+        }
+      />
+    </div>
+  )
+}
+
+// rejilla del catálogo, repartida en subcategorías
+function Catalogo({
+  miniatura,
+  onElegir,
+}: {
+  miniatura?: string
+  onElegir: (id: string) => void
+}) {
+  const [categoria, setCategoria] = useState(CATEGORIAS_EFECTO[0].id)
+  const [encima, setEncima] = useState<string | null>(null)
+  const actual = CATEGORIAS_EFECTO.find((c) => c.id === categoria) ?? CATEGORIAS_EFECTO[0]
+  const fondo = miniatura
+    ? { backgroundImage: `url(${miniatura})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : {
+        backgroundImage:
+          'linear-gradient(135deg, #3b82f6 0%, #22d3ee 35%, #a3e635 65%, #fbbf24 100%)',
+      }
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-black/10 pt-3 dark:border-white/10">
+      <span className="text-xs font-medium text-[color:var(--muted)]">Catálogo de efectos</span>
+      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        {CATEGORIAS_EFECTO.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => setCategoria(c.id)}
+            className={[
+              'shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors',
+              c.id === categoria ? 'bg-brand text-white' : 'text-[color:var(--muted)] hover:text-brand',
+            ].join(' ')}
+            style={c.id === categoria ? undefined : { background: 'rgb(var(--border) / 0.1)' }}
+          >
+            {c.nombre}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {actual.efectos.map((e) => (
+          <button
+            key={e.id}
+            onClick={() => onElegir(e.id)}
+            onMouseEnter={() => setEncima(e.id)}
+            onMouseLeave={() => setEncima(null)}
+            title={e.nombre}
+            className="group flex flex-col gap-1 text-left"
+          >
+            <span
+              className="block h-12 w-full overflow-hidden rounded-lg border border-black/10 transition-all duration-200 group-hover:border-brand dark:border-white/10"
+              style={{ ...fondo, filter: e.css(encima === e.id ? 100 : 50) }}
+            />
+            <span className="truncate text-[10px] leading-tight text-[color:var(--muted)]">
+              {e.nombre}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

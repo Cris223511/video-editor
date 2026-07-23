@@ -7,6 +7,8 @@ import { tonoNeutro } from '../../../lib/color/tono'
 import { Campo, Deslizador } from '../../../components/ui/Controls'
 import RuedaColor from '../../../components/ui/RuedaColor'
 import EditorCurva from '../../../components/ui/EditorCurva'
+import PresetsColor from './PresetsColor'
+import { useProjectStore } from '../../../store/useProjectStore'
 import { PuntoRueda, RUEDAS_NEUTRAS, Ruedas } from '../../../lib/color/ruedas'
 import { Curvas, CURVAS_NEUTRAS, PuntoCurva } from '../../../lib/color/curvas'
 
@@ -45,6 +47,7 @@ export default function TonePanel() {
   const setTono = useEditorStore((s) => s.setTono)
   const resetTono = useEditorStore((s) => s.resetTono)
   const actualizarCapa = useEditorStore((s) => s.actualizarCapa)
+  const medios = useProjectStore((s) => s.medios)
 
   const clip = clips.find((c) => c.id === clipSeleccionado)
   const capaImagen = capas.find((c) => c.id === capaSeleccionada && c.tipo === 'imagen') as
@@ -101,8 +104,23 @@ export default function TonePanel() {
     })
   }
 
+  // miniatura del material elegido, para que las muestras se vean sobre el propio
+  // video en lugar de sobre un ejemplo cualquiera
+  const miniatura = clip
+    ? medios.find((m) => m.id === clip.assetId)?.miniatura
+    : capaImagen?.src
+
   return (
     <div className="flex flex-col gap-4">
+      <div>
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <span className="text-xs font-medium text-[color:var(--muted)]">Estilos de color</span>
+        </div>
+        {/* un preset solo rellena los ajustes de abajo, así que después se puede
+            seguir afinando a mano sin perder nada */}
+        <PresetsColor tono={tono} miniatura={miniatura} onAplicar={(t) => aplicar(t)} />
+      </div>
+
       <div>
         <div className="mb-2 flex items-start justify-between gap-2">
           <span className="text-xs font-medium text-[color:var(--muted)]">Ruedas de color</span>

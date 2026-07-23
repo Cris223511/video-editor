@@ -7,6 +7,7 @@ import { esTonoNeutro, filtroCss, hayEfectoFiltro } from '../color/tono'
 import { REPETICIONES_BRILLO, desenfoqueBrillo } from '../layers/defaults'
 import { anterior, posterior, pintarTransicion, progreso, progresoSalida } from '../transiciones/pintar'
 import { fundidoEn } from '../audio/ganancia'
+import { cssEfectos } from '../efectos/catalogo'
 import { encuadreDe, rectClip } from '../timeline/encuadre'
 import { aplicarTransformCanvas } from '../layers/transform'
 
@@ -574,7 +575,13 @@ export function dibujarFotograma(
         if (actx) {
           actx.setTransform(1, 0, 0, 1, 0, 0)
           actx.clearRect(0, 0, ancho, alto)
-          actx.filter = hayColor ? filtroCss(clip.tono, `tonoexp-${clip.id}`, []) : 'none'
+          // los efectos del catálogo son funciones css corrientes, así que se
+          // encadenan aquí mismo; el desenfoque de movimiento sigue yendo aparte
+          {
+            const base = hayColor ? filtroCss(clip.tono, `tonoexp-${clip.id}`, []) : ''
+            const ef = cssEfectos(clip.efectos)
+            actx.filter = `${base} ${ef}`.trim() || 'none'
+          }
           actx.drawImage(video, dx, dy, dw, dh)
           actx.filter = 'none'
           ctx.filter = `url(#blurexp-${clip.id})`
@@ -582,7 +589,12 @@ export function dibujarFotograma(
           ctx.filter = 'none'
         }
       } else {
-        if (hayColor) ctx.filter = filtroCss(clip.tono, `tonoexp-${clip.id}`, [])
+        {
+          const base = hayColor ? filtroCss(clip.tono, `tonoexp-${clip.id}`, []) : ''
+          const ef = cssEfectos(clip.efectos)
+          const cadena = `${base} ${ef}`.trim()
+          if (cadena) ctx.filter = cadena
+        }
         ctx.drawImage(video, dx, dy, dw, dh)
         ctx.filter = 'none'
       }

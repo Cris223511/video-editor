@@ -25,6 +25,7 @@ import {
   stdDeviationsDesenfoque,
 } from '../../lib/color/tono'
 import { anterior, posterior, pintarTransicion, progreso, progresoSalida } from '../../lib/transiciones/pintar'
+import { cssEfectos } from '../../lib/efectos/catalogo'
 import { buscarTransicion } from '../../lib/transiciones/catalogo'
 import { sufijoTransformCss, aplicarTransformCanvas } from '../../lib/layers/transform'
 import { TIPO_FIGURA } from './panels/FiguraPanel'
@@ -866,7 +867,7 @@ export default function Preview() {
                       filter:
                         esTonoNeutro(c.tono) && !hayEfectoFiltro(c.efectos ?? [])
                           ? undefined
-                          : filtroCss(c.tono, `tono-${c.id}`, c.efectos ?? []),
+                          : `${filtroCss(c.tono, `tono-${c.id}`, c.efectos ?? [])} ${cssEfectos(c.efectos)}`.trim(),
                     }}
                   />
                 )

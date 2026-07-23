@@ -78,7 +78,10 @@ const DESENFOQUE_MAX_PX = 20
 // efectos sin intensidad, que no aportarían nada
 export function stdDeviationsDesenfoque(efectos: EfectoClip[]): string[] {
   return efectos
-    .filter((e) => e.tipo === 'desenfoque-movimiento' && e.intensidad > 0)
+    .filter(
+      (e): e is EfectoClip & { tipo: 'desenfoque-movimiento'; angulo: number } =>
+        e.tipo === 'desenfoque-movimiento' && e.intensidad > 0,
+    )
     .map((e) => {
       const mag = (e.intensidad / 100) * DESENFOQUE_MAX_PX
       const rad = (e.angulo * Math.PI) / 180

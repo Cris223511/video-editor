@@ -4,7 +4,7 @@ import { Marco } from '../../../types/marco'
 
 // traduce el marco a estilos css. el grosor y el radio se escalan a la altura
 // del lienzo mostrado para que se vean iguales en cualquier tamaño
-function estiloMarco(m: Marco, g: number, r: number): CSSProperties {
+export function estiloMarco(m: Marco, g: number, r: number): CSSProperties {
   switch (m.tipo) {
     case 'solido':
       return { border: `${g}px solid ${m.color}` }

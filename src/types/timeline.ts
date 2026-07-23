@@ -27,7 +27,16 @@ export interface EfectoDesenfoque {
 // editarlos o quitarlos por separado. de momento solo existe el desenfoque de
 // movimiento, pero el campo tipo deja la puerta abierta a sumar más sin rehacer
 // el modelo: basta con añadir otra variante a esta unión
-export type EfectoClip = { id: string } & EfectoDesenfoque
+// efecto de imagen resuelto con filtros css. el catálogo dice qué funciones
+// aplica cada uno según su intensidad, así que sumar efectos nuevos no obliga a
+// tocar el visor ni el compositor: los dos piden la cadena al mismo sitio
+export interface EfectoFiltro {
+  tipo: 'filtro'
+  filtro: string // id dentro del catálogo de efectos
+  intensidad: number // 0 a 100
+}
+
+export type EfectoClip = { id: string } & (EfectoDesenfoque | EfectoFiltro)
 
 // encuadre del clip dentro del lienzo. x e y son el centro del video en
 // coordenadas del lienzo, de 0 a 1, con 0.5 en el medio; escala multiplica el
