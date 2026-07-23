@@ -436,9 +436,13 @@ export default function ClipBlock({
         </button>
       </Tooltip>
 
-      {verPropiedades && (
-        <PropiedadesClip clip={clip} onCerrar={() => setVerPropiedades(false)} />
-      )}
+      {/* se mantiene montado para que la animación de salida se vea; antes se
+          quitaba del árbol al cerrar y el modal desaparecía de golpe */}
+      <PropiedadesClip
+        clip={clip}
+        abierto={verPropiedades}
+        onCerrar={() => setVerPropiedades(false)}
+      />
 
       {/* los tiradores de recorte solo tienen sentido si la pista deja tocar el
           clip; en un nivel bloqueado desaparecen para no invitar a arrastrar */}

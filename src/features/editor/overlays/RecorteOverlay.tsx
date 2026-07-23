@@ -173,8 +173,49 @@ export default function RecorteOverlay() {
     window.addEventListener('mouseup', soltar)
   }
 
+  // arrastrar por dentro del recuadro lo desplaza entero sin cambiar su tamaño.
+  // los cuatro lados se mueven a la vez el mismo tanto, y el recorrido se topa
+  // para que el recorte no se salga de la imagen por ningún borde
+  function iniciarMoverRecorte(e: ReactMouseEvent) {
+    e.stopPropagation()
+    e.preventDefault()
+    const root = rootRef.current
+    if (!root) return
+    const inicioX = e.clientX
+    const inicioY = e.clientY
+    const base = { ...rec }
+    const mover = (ev: globalThis.MouseEvent) => {
+      const dx = (ev.clientX - inicioX) / caja.w
+      const dy = (ev.clientY - inicioY) / caja.h
+      // el desplazamiento se recorta al hueco que queda a cada lado, así el ancho
+      // y el alto del recorte se mantienen exactos mientras se arrastra
+      const mx = Math.max(-base.izq, Math.min(base.der, dx))
+      const my = Math.max(-base.arr, Math.min(base.aba, dy))
+      aplicarRecorte({
+        izq: base.izq + mx,
+        der: base.der - mx,
+        arr: base.arr + my,
+        aba: base.aba - my,
+      })
+    }
+    const soltar = () => {
+      window.removeEventListener('mousemove', mover)
+      window.removeEventListener('mouseup', soltar)
+    }
+    window.addEventListener('mousemove', mover)
+    window.addEventListener('mouseup', soltar)
+  }
+
   return (
     <div ref={rootRef} className="absolute inset-0 z-40">
+      {/* zona de agarre del centro: pone la manito y mueve el recorte entero. va
+          debajo de los agarres, así que tirar de un borde sigue redimensionando */}
+      <div
+        onMouseDown={iniciarMoverRecorte}
+        title="Arrastra para mover el recorte"
+        className="absolute cursor-move"
+        style={{ left: crop.x, top: crop.y, width: crop.w, height: crop.h }}
+      />
       {/* el recuadro que se conserva, con su borde blanco fino. el oscurecido de
           alrededor lo pinta una sombra enorme proyectada hacia afuera, un truco
           clásico para tapar todo menos el hueco del recorte */}

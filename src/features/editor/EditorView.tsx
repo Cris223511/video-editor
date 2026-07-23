@@ -171,6 +171,10 @@ export default function EditorView() {
                 </Panel>
               </PanelGroup>
             </div>
+
+            {/* opciones de lo que esté elegido, al costado derecho. antes iban sobre
+                la línea de tiempo y la empujaban al elegir un clip */}
+            {!visorCompleto && <BarraGlobales />}
           </div>
         </Panel>
 
@@ -207,9 +211,6 @@ export default function EditorView() {
 
                 <Panel id="linea" order={2} minSize={40} className={`flex ${suave}`}>
                   <div className="panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl">
-                    {/* las opciones de lo que esté elegido, justo encima de la línea
-                        de tiempo. si no hay nada seleccionado no se dibuja */}
-                    <BarraGlobales />
                     <Timeline
                       onOcultarMedios={() => alternar(medios, verMedios)}
                       mediosVisibles={verMedios}

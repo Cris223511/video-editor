@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useEditorStore } from '../../store/useEditorStore'
+import { useAppStore } from '../../store/useAppStore'
 import { duracionTotal } from '../../lib/timeline/clips'
 import { posicionCapa } from '../../lib/layers/motion'
 import { CapaCensura } from '../../types/layers'
@@ -43,6 +44,35 @@ export function useAtajos() {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
         e.preventDefault()
         st.pegar()
+        return
+      }
+
+      // duplicar lo elegido, sea un clip, una capa o un audio. es de lo que más se
+      // usa al montar y hasta ahora obligaba a ir al menú o a arrastrar con alt
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault()
+        if (st.clipSeleccionado) st.duplicarClip(st.clipSeleccionado)
+        else if (st.capaSeleccionada) st.duplicarCapa(st.capaSeleccionada)
+        else if (st.regionSeleccionada) {
+          if (st.audios.some((a) => a.id === st.regionSeleccionada)) st.duplicarAudio(st.regionSeleccionada)
+          else st.duplicarRegionAudio(st.regionSeleccionada)
+        }
+        return
+      }
+
+      // exportar sin ir a buscar el botón
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'e' || e.key === 'E')) {
+        e.preventDefault()
+        useAppStore.getState().abrirExport()
+        return
+      }
+
+      // orden de apilado de la capa elegida, con los corchetes, que es la
+      // combinación de toda la vida en las herramientas de diseño
+      if (st.capaSeleccionada && (e.key === ']' || e.key === '[')) {
+        e.preventDefault()
+        if (e.key === ']') st.traerAlFrente(st.capaSeleccionada)
+        else st.enviarAtras(st.capaSeleccionada)
         return
       }
 
@@ -128,6 +158,26 @@ export function useAtajos() {
           }
           return
         }
+
+        // saltar a una herramienta sin apuntar al riel. son las que más se pisan
+        // al montar; el resto se siguen eligiendo con el ratón
+        case 't':
+        case 'T':
+          e.preventDefault()
+          st.setHerramienta('texto')
+          return
+
+        case 'b':
+        case 'B':
+          e.preventDefault()
+          st.setHerramienta('borrador')
+          return
+
+        case 'p':
+        case 'P':
+          e.preventDefault()
+          st.setHerramienta('dibujar')
+          return
 
         case 'Delete':
         case 'Backspace':

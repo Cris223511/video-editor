@@ -12,6 +12,7 @@ import {
   VolumeX,
 } from 'lucide-react'
 import Tooltip from '../../components/ui/Tooltip'
+import { Deslizador } from '../../components/ui/Controls'
 import { useEditorStore, Herramienta } from '../../store/useEditorStore'
 
 // botón compacto de la barra. el estado activo se usa para lo que se enciende y
@@ -53,33 +54,34 @@ function Mando({
   valor,
   min,
   max,
+  imanes,
   onChange,
 }: {
   etiqueta: string
   valor: number
   min: number
   max: number
+  imanes?: number[]
   onChange: (v: number) => void
 }) {
   return (
-    <label className="flex items-center gap-2 text-[11px] text-[color:var(--muted)]">
-      <span className="whitespace-nowrap">{etiqueta}</span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        value={valor}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="h-1 w-24 cursor-pointer accent-[color:rgb(var(--brand))]"
-      />
-      <span className="w-9 tabular-nums text-right">{valor}</span>
-    </label>
+    <div className="flex flex-col gap-1">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="whitespace-nowrap text-[11px] font-medium text-[color:var(--muted)]">
+          {etiqueta}
+        </span>
+        <span className="text-[11px] font-medium tabular-nums text-brand">{valor}</span>
+      </div>
+      {/* el mismo control con estilo que usan los paneles, en lugar del deslizador
+          pelado del navegador que se veía de otra aplicación */}
+      <Deslizador valor={valor} min={min} max={max} imanes={imanes} onChange={onChange} />
+    </div>
   )
 }
 
 // separador vertical entre grupos de la barra
 function Corte() {
-  return <span className="h-5 w-px shrink-0" style={{ background: 'rgb(var(--border) / 0.16)' }} />
+  return <span className="my-0.5 h-px w-full shrink-0" style={{ background: 'rgb(var(--border) / 0.14)' }} />
 }
 
 // barra de opciones de lo que esté seleccionado. vive sobre la línea de tiempo, no
@@ -127,14 +129,18 @@ export default function BarraGlobales() {
   const irAPanel = (h: Herramienta) => setHerramienta(h)
 
   return (
+    // columna al costado derecho del visor. antes vivía sobre la línea de tiempo y
+    // al elegir un clip la empujaba hacia abajo, que era incómodo justo cuando se
+    // está montando. acá puede crecer sin descolocar nada
     <div
-      className="flex shrink-0 items-center gap-2 overflow-x-auto px-3 py-1.5"
-      style={{ borderBottom: '1px solid rgb(var(--border) / 0.1)' }}
+      className="panel flex w-52 shrink-0 flex-col gap-2.5 overflow-y-auto rounded-xl p-3"
     >
       {clip && (
         <>
-          <span className="shrink-0 text-[11px] font-medium text-[color:var(--text)]">Video</span>
-          <Corte />
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--muted)]">
+            Video
+          </span>
+          <div className="flex flex-wrap gap-1">
           <Accion
             icono={clip.mudo || clip.silenciado ? <VolumeX size={15} /> : <Volume2 size={15} />}
             texto={clip.mudo ? 'Su audio está en la pista de sonido' : clip.silenciado ? 'Quitar el silencio' : 'Silenciar'}
@@ -167,6 +173,7 @@ export default function BarraGlobales() {
           />
           <Accion icono={<Copy size={15} />} texto="Duplicar" onClick={() => duplicarClip(clip.id)} />
           <Accion icono={<Trash2 size={15} />} texto="Borrar" onClick={() => quitarClip(clip.id)} />
+          </div>
           <Corte />
           {/* el volumen del clip y su botón de silencio van de la mano: bajarlo a
               cero silencia y subirlo desde cero devuelve el sonido */}
@@ -211,7 +218,7 @@ export default function BarraGlobales() {
 
       {capa && (
         <>
-          <span className="shrink-0 text-[11px] font-medium text-[color:var(--text)]">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--muted)]">
             {capa.tipo === 'texto'
               ? 'Texto'
               : capa.tipo === 'imagen'
@@ -222,7 +229,7 @@ export default function BarraGlobales() {
                     ? 'Dibujo'
                     : 'Censura'}
           </span>
-          <Corte />
+          <div className="flex flex-wrap items-center gap-1">
           {/* el color se cambia sin salir de la barra en lo que lo admite */}
           {(capa.tipo === 'texto' || capa.tipo === 'trazo') && (
             <Tooltip texto="Color" lado="arriba">
@@ -265,6 +272,7 @@ export default function BarraGlobales() {
           )}
           <Accion icono={<Copy size={15} />} texto="Duplicar" onClick={() => duplicarCapa(capa.id)} />
           <Accion icono={<Trash2 size={15} />} texto="Borrar" onClick={() => quitarCapa(capa.id)} />
+          </div>
           <Corte />
           <Mando
             etiqueta="Opacidad"
@@ -294,9 +302,12 @@ export default function BarraGlobales() {
 
       {audio && (
         <>
-          <span className="shrink-0 text-[11px] font-medium text-[color:var(--text)]">Audio</span>
-          <Corte />
-          <Accion icono={<Trash2 size={15} />} texto="Borrar" onClick={() => quitarAudio(audio.id)} />
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--muted)]">
+            Audio
+          </span>
+          <div className="flex flex-wrap gap-1">
+            <Accion icono={<Trash2 size={15} />} texto="Borrar" onClick={() => quitarAudio(audio.id)} />
+          </div>
           <Corte />
           <Mando
             etiqueta="Volumen"
@@ -324,15 +335,16 @@ export default function BarraGlobales() {
 
       {region && (
         <>
-          <span className="shrink-0 text-[11px] font-medium text-[color:var(--text)]">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--muted)]">
             Franja de volumen
           </span>
-          <Corte />
-          <Accion
-            icono={<Trash2 size={15} />}
-            texto="Borrar"
-            onClick={() => quitarRegionAudio(region.id)}
-          />
+          <div className="flex flex-wrap gap-1">
+            <Accion
+              icono={<Trash2 size={15} />}
+              texto="Borrar"
+              onClick={() => quitarRegionAudio(region.id)}
+            />
+          </div>
           <Corte />
           <Mando
             etiqueta="Ganancia"
@@ -360,7 +372,7 @@ export default function BarraGlobales() {
                 : 'audio',
           )
         }
-        className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-[color:var(--muted)] transition-colors hover:bg-brand/10 hover:text-brand"
+        className="mt-auto inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-black/10 py-1.5 text-[11px] font-medium text-[color:var(--muted)] transition-colors hover:border-brand hover:text-brand dark:border-white/10"
       >
         <SlidersHorizontal size={14} /> Más opciones
       </button>

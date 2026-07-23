@@ -30,6 +30,10 @@ export interface DatosExport {
 export interface ControlExport {
   promesa: Promise<Blob>
   cancelar: () => void
+  // el mismo lienzo en el que se va dibujando cada fotograma. el diálogo lo mete
+  // en pantalla para enseñar por dónde va la exportación. no lleva sonido: el
+  // audio va por su propio camino hacia la grabadora, así que mostrarlo es mudo
+  lienzo: HTMLCanvasElement
 }
 
 // elige el mejor formato de contenedor que soporte el navegador
@@ -94,6 +98,9 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
   let cancelado = false
   let raf = 0
   const limpiezas: (() => void)[] = []
+  // se crea acá fuera para poder devolverlo de inmediato, antes de que arranque
+  // el trabajo, y que el diálogo pueda enseñarlo desde el primer fotograma
+  const canvas = document.createElement('canvas')
 
   const cancelar = () => {
     cancelado = true
@@ -118,7 +125,6 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
         return
       }
 
-      const canvas = document.createElement('canvas')
       canvas.width = ancho
       canvas.height = alto
       const ctx = canvas.getContext('2d')
@@ -407,5 +413,5 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
     })()
   })
 
-  return { promesa, cancelar }
+  return { promesa, cancelar, lienzo: canvas }
 }

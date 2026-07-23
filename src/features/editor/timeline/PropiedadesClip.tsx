@@ -23,8 +23,12 @@ import { buscarTransicion } from '../../../lib/transiciones/catalogo'
 // puede tocar desde aquí
 export default function PropiedadesClip({
   clip,
+  abierto,
   onCerrar,
 }: {
+  // el modal se queda montado y se abre y se cierra con esta bandera. si el padre
+  // lo desmontara de golpe, la animación de salida no llegaría a verse nunca
+  abierto: boolean
   clip: Clip
   onCerrar: () => void
 }) {
@@ -67,13 +71,15 @@ export default function PropiedadesClip({
     <Modal
       titulo="Propiedades del clip"
       descripcion="Un resumen de lo que se le aplicó a este clip en la línea de tiempo."
-      abierto
+      abierto={abierto}
       onCerrar={onCerrar}
       ancho="max-w-md"
     >
       <dl className="flex flex-col">
         <Fila icono={<Film size={15} />} etiqueta="Medio">
-          <span className="truncate" title={nombreMedio}>
+          {/* el nombre puede ser larguísimo: se parte en varias líneas en lugar de
+              estirar el modal y sacar una barra horizontal */}
+          <span className="block break-words" title={nombreMedio}>
             {nombreMedio}
           </span>
         </Fila>

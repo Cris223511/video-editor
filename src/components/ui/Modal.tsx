@@ -125,7 +125,10 @@ export default function Modal({
                   {/* el cuerpo se lleva el scroll propio con una barra fina y
                       redondeada. el padding derecho deja aire entre el contenido y
                       esa barra para que no queden pegados al desplazar */}
-                  <div className="scroll-modal min-h-0 flex-1 overflow-y-auto px-5 pb-5">
+                  {/* break-words vale para todo el contenido: ningún texto largo
+                      puede estirar el modal ni sacar barra horizontal, pase lo que
+                      pase dentro. así ningún modal de la aplicación se descuadra */}
+                  <div className="scroll-modal min-h-0 flex-1 overflow-y-auto overflow-x-hidden break-words px-5 pb-5">
                     {children}
                   </div>
                 </motion.div>

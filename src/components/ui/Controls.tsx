@@ -41,14 +41,35 @@ export function Deslizador({
   min,
   max,
   paso = 1,
+  imanes,
   onChange,
 }: {
   valor: number
   min: number
   max: number
   paso?: number
+  // valores a los que el deslizador se pega cuando pasa cerca. en un control
+  // corto cada píxel vale varias unidades, así que sin esto es imposible clavar
+  // el 100 a mano: se queda en 97 o en 101 por mucho cuidado que se ponga
+  imanes?: number[]
   onChange: (v: number) => void
 }) {
+  // umbral de enganche proporcional al recorrido, para que se sienta igual de
+  // firme en un rango corto que en uno largo
+  const umbral = Math.max(1, (max - min) * 0.02)
+  const pegar = (v: number) => {
+    if (!imanes?.length) return v
+    let mejor = v
+    let dist = Infinity
+    for (const m of imanes) {
+      const d = Math.abs(m - v)
+      if (d < dist && d <= umbral) {
+        dist = d
+        mejor = m
+      }
+    }
+    return mejor
+  }
   return (
     <input
       type="range"
@@ -56,7 +77,7 @@ export function Deslizador({
       max={max}
       step={paso}
       value={valor}
-      onChange={(e) => onChange(Number(e.target.value))}
+      onChange={(e) => onChange(pegar(Number(e.target.value)))}
       className="h-1.5 w-full cursor-pointer appearance-none rounded-full accent-brand"
       style={{
         background: `linear-gradient(to right, rgb(var(--accent)) ${

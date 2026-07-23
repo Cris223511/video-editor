@@ -1027,8 +1027,59 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     // los efectos estrenan id propio: siguen siendo la misma cadena pero cada clip
     // los edita por su cuenta sin pisar al otro
     copia.efectos = copia.efectos.map((e) => ({ ...e, id: crypto.randomUUID() }))
+
+    // la copia busca sitio, y solo en dos direcciones: a la derecha del original,
+    // en su misma fila, y si ahí no cabe, encima. nunca a la izquierda ni abajo
+    const finOrig = orig.inicio + orig.duracion
+    const chocaDerecha = s.pista.clips.some(
+      (c) =>
+        c.id !== orig.id &&
+        c.pista === orig.pista &&
+        // hay estorbo si algún clip pisa el tramo que ocuparía la copia
+        c.inicio < finOrig + orig.duracion - 0.001 &&
+        c.inicio + c.duracion > finOrig + 0.001,
+    )
+
+    if (!chocaDerecha) {
+      copia.inicio = finOrig
+      set({
+        pista: { ...s.pista, clips: [...s.pista.clips, copia] },
+        clipSeleccionado: copia.id,
+        capaSeleccionada: null,
+        regionSeleccionada: null,
+      })
+      return copia.id
+    }
+
+    // a la derecha hay algo, así que la copia sube: se abre un nivel encima del
+    // original y aterriza ahí, arrancando en el mismo segundo que él
+    if (s.numPistas >= MAX_PISTAS) {
+      // sin sitio para otro nivel, se deja donde quepa en la misma fila
+      copia.inicio = finOrig
+      set({
+        pista: { ...s.pista, clips: [...s.pista.clips, copia] },
+        clipSeleccionado: copia.id,
+        capaSeleccionada: null,
+        regionSeleccionada: null,
+      })
+      return copia.id
+    }
+    const corte = orig.pista + 1
+    copia.pista = corte
+    copia.inicio = orig.inicio
+    const altosPista = [...s.altosPista]
+    altosPista.splice(corte, 0, s.altosPista[orig.pista] ?? ALTO_PISTA_BASE)
+    const pistasMeta = [...s.pistasMeta]
+    pistasMeta.splice(corte, 0, metaPista(s.numPistas + 1))
     set({
-      pista: { ...s.pista, clips: [...s.pista.clips, copia] },
+      numPistas: s.numPistas + 1,
+      altosPista,
+      pistasMeta,
+      pista: {
+        ...s.pista,
+        // los que estaban en el nivel del corte o por encima suben un puesto
+        clips: [...s.pista.clips.map((c) => (c.pista >= corte ? { ...c, pista: c.pista + 1 } : c)), copia],
+      },
       clipSeleccionado: copia.id,
       capaSeleccionada: null,
       regionSeleccionada: null,

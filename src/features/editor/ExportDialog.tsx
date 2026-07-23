@@ -47,6 +47,8 @@ export default function ExportDialog() {
   // movimiento rápido a cambio de un archivo bastante más pesado
   const [fps, setFps] = useState(30)
   const controlRef = useRef<ControlExport | null>(null)
+  // contenedor donde se cuelga el lienzo de la exportación mientras dura
+  const cajaVista = useRef<HTMLDivElement>(null)
 
   const estado = useEditorStore.getState()
   const medios = useProjectStore.getState().medios
@@ -100,6 +102,14 @@ export default function ExportDialog() {
       (v) => setProgreso(v),
     )
     controlRef.current = control
+    // el lienzo se cuelga en cuanto existe. como el contenedor se pinta en el
+    // mismo cambio de fase, se espera un cuadro a que esté en el dom
+    requestAnimationFrame(() => {
+      const caja = cajaVista.current
+      if (!caja || !control.lienzo) return
+      control.lienzo.className = 'h-full w-full object-contain'
+      caja.replaceChildren(control.lienzo)
+    })
 
     try {
       const blob = await control.promesa
@@ -193,6 +203,14 @@ export default function ExportDialog() {
 
       {fase === 'exportando' && (
         <>
+          {/* el mismo lienzo en el que se está dibujando cada fotograma, para ver
+              por dónde va sin esperar al archivo. va mudo: el sonido viaja aparte
+              hacia la grabadora y este lienzo solo tiene imagen */}
+          <div
+            ref={cajaVista}
+            className="mb-3 grid w-full place-items-center overflow-hidden rounded-xl bg-black"
+            style={{ aspectRatio: `${ancho} / ${alto}`, maxHeight: '38vh' }}
+          />
           <p className="mb-3 text-sm">Exportando… {Math.round(progreso * 100)}%</p>
           {/* riel de fondo tenue con un relleno de marca bien contrastado. el ancho
               se ata directamente a progreso (0 a 1) y anima suave al crecer. el
