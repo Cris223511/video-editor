@@ -29,38 +29,31 @@
 
 ## What it is
 
-Video Editor builds a video from start to finish in the browser. You import, cut, grade color, censor moving subjects, add text, images, shapes and audio, and export the finished file. All processing happens on your device.
+Video Editor builds a video from start to finish in the browser. You import the files, cut and arrange the clips, grade color, censor moving subjects, add text, images, shapes and audio, and export the result. All processing happens on your device: no frame is uploaded to any server.
 
-| | |
-| --- | --- |
-| **No install** | Opens in the browser, no downloads or permissions. |
-| **Private** | No frame is uploaded to any server. |
-| **Free and open** | MIT license, no watermarks or paid features. |
-| **Everyday jobs** | A quick cut with music, a vertical clip, a tutorial, hiding a face or a plate. |
+It is meant to solve a specific video the same day, a quick cut with music, a vertical piece for social, a screen tutorial or an interview where a face needs hiding. It does not replace a desktop suite; it handles everyday work and keeps it direct, with no installs, no accounts, no watermarks and no paid features.
 
-## What you can do
+## Features
 
-| Area | Summary |
-| --- | --- |
-| **Import** | Video (MP4, WebM, MOV, MKV, M4V, OGV, up to 1.5 GB), images (PNG, JPG, WebP, GIF, AVIF and more) and audio (MP3, WAV, OGG, M4A, FLAC, OPUS…). Type, size and real binary signature are validated, not just the extension. |
-| **Timeline** | Up to six video levels plus dedicated lanes for text and shapes, images and audio. Each lane with several rows, adjustable height and an editable name. Non-destructive trimming, split at the playhead, snapping, speed from 0.25x to 4x and gap closing. |
-| **Transitions** | Twenty-one transitions across five families, for clips and for any element (text, shape, image, drawing). Duration editable right on the timeline. |
-| **Color** | Three tonal-zone wheels, four per-channel curves and exposure, contrast, saturation, temperature and tint. On clips and images. |
-| **Effects** | Motion blur and a per-clip effect chain, with the option to have color and effects fade in gradually. |
-| **Motion censoring** | Circle, rectangle or free brush; pixelate, blur or full cover; a path recorded with the cursor and editable node by node, with slow motion while recording. |
-| **Layers** | Text with font, outline, shadow and neon; images with crop and color; shapes; freehand drawing; and ten decorative canvas frames. |
-| **Audio** | Master volume, volume regions per range and splitting a video's audio to its own track. |
-| **Canvas** | Six aspect ratios or automatic fit, with band fill by color or by the video itself scaled up and blurred. |
-| **Export** | In-browser render at 24, 30 or 60 fps, MP4 (H.264/AAC) with a WebM fallback, with progress and cancel. |
-| **Projects** | Automatic in-browser saving with the videos included, a searchable paginated list, and export to a `.veproj` file. |
+**Import.** Video in MP4, WebM, MOV, MKV, M4V and OGV up to 1.5 GB, images in PNG, JPG, WebP, GIF, AVIF and more, and audio in MP3, WAV, OGG, M4A, FLAC or OPUS. Before adding a file, its type, size and real binary signature are checked, not just the extension.
 
-### Details that make the difference
+**Timeline.** Up to six video levels plus dedicated lanes for text and shapes, images and audio. Each lane has several rows, an adjustable height by dragging its edge and an editable name. Trimming is non-destructive, clips split at the playhead, snap to each other, run from 0.25x to 4x and close the gaps left when you delete.
 
-- **What you see is what you export.** The viewer and the exporter share the same color, transition and compositing engine, so the final file matches your edit.
-- **Transitions for any element.** A title or an image enters with the same gallery as clips, with its own duration and its wedge on the timeline.
-- **Motion on any layer.** The cursor-recorded path is not only for censoring: text, images, shapes and drawings animate with the same controls.
-- **Zoom in the viewer.** Hold Ctrl and scroll to zoom in around the cursor, to place a small censor or text precisely.
-- **Effortless saving.** Every change is saved on its own about a second later, videos included, without leaving your device.
+**Transitions.** Twenty-one across five families: fades, wipes, shapes, pushes and zooms. They work for clips and for any standalone element too, a text, a shape, an image or a drawing enters with the one you pick. Duration is set right on the timeline by dragging the entry wedge.
+
+**Color.** Three tonal-zone wheels for shadows, midtones and highlights, four per-channel curves and the exposure, contrast, saturation, temperature and tint adjustments. It works on video clips and on images, and the correction can fade in instead of being full from the first frame.
+
+**Motion censoring.** Circle, rectangle or free brush, with pixelation, blur or full cover. The path is recorded by dragging the element over the video, with slow motion to follow something fast, then corrected node by node. The same motion applies to text, images, shapes and drawings.
+
+**Layers.** Text with its own fonts, outline, shadow, background and neon; images with crop and color; geometric shapes; freehand drawing; and ten decorative frames around the canvas.
+
+**Audio.** Master project volume, volume regions per range to lower the music where someone speaks, and splitting a video's audio to its own track.
+
+**Canvas and export.** Six aspect ratios or automatic fit to the first video, with band fill by color or by the video itself scaled up and blurred. Export happens in the browser at 24, 30 or 60 fps, in MP4 with a WebM fallback, with progress and cancel.
+
+**Projects.** They save themselves in the browser with the videos inside, list with search and pagination, and can be packed into a `.veproj` file to move to another machine.
+
+One idea runs through the whole editor: what you see is what you export. The viewer and the compositor share the same color, transition and render engine, so the final file matches your edit. And with Ctrl and the mouse wheel you zoom into the viewer, anchored to the cursor, to place a small censor or text precisely.
 
 ## Keyboard shortcuts
 
@@ -82,40 +75,58 @@ There is no save shortcut because the project saves itself. While typing in a fi
 
 ## Run locally
 
-Requires **Node.js 18** or newer.
+Requires Node.js 18 or newer.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Vite serves the app at `http://localhost:5173`.
+Vite serves the app at `http://localhost:5173`. To build the production output into `dist` use `npm run build`, which also type-checks, and `npm run preview` serves that build locally.
 
-| Command | What it does |
-| --- | --- |
-| `npm run dev` | Development server with hot reload. |
-| `npm run build` | Type-checks and builds the production output in `dist`. |
-| `npm run preview` | Serves the build locally. |
+## How it is built
 
-## Tech stack
+The UI is React 18 with TypeScript, bundled with Vite and styled with Tailwind. State lives in Zustand and routing in React Router, with Framer Motion and Lenis for motion. Dialogs, menus and resizable panels rely on Radix, Embla and react-resizable-panels.
 
-| Component | Tool |
-| --- | --- |
-| UI | [React 18](https://react.dev/) and [TypeScript 5](https://www.typescriptlang.org/) |
-| Bundler | [Vite 5](https://vite.dev/) |
-| Styles | [Tailwind CSS](https://tailwindcss.com/) |
-| State | [Zustand](https://zustand-demo.pmnd.rs/) |
-| Routing | [React Router](https://reactrouter.com/) |
-| Animation | [Framer Motion](https://www.framer.com/motion/) and [Lenis](https://lenis.darkroom.engineering/) |
-| Components | [Radix UI](https://www.radix-ui.com/), [Embla](https://www.embla-carousel.com/), [react-resizable-panels](https://github.com/bvaughn/react-resizable-panels) |
-| Export | Canvas, Web Audio and MediaRecorder |
-| Storage | IndexedDB |
+Rendering and recording use Canvas, Web Audio and MediaRecorder, and saved projects go to IndexedDB. The whole editing engine (validation, media analysis, color, transitions, compositor and export) lives in `src/lib`, separate from the UI, so the logic does not depend on React.
 
-The editing engine (validation, media, color, transitions, compositor and export) lives in `src/lib`, separate from the UI, so the logic does not depend on React.
+<details>
+<summary>Project structure</summary>
+
+```
+video-editor/
+├── index.html
+├── vite.config.ts            COOP/COEP headers in case WebCodecs is used later
+├── vercel.json               the same headers in production
+└── src/
+    ├── main.tsx              entry point
+    ├── rutasDef.ts           all routes in one place
+    ├── config/               version, limits and accepted formats
+    ├── types/                domain types
+    ├── lib/                  engine with no react dependency
+    │   ├── validation/       file validation (type, size, signature)
+    │   ├── media/            video analysis and thumbnails
+    │   ├── layers/           layers, motion and geometry
+    │   ├── color/            wheels, curves and tone adjustments
+    │   ├── transiciones/     catalog, engine and element entrance
+    │   ├── audio/            per-region gain
+    │   ├── timeline/         timeline calculations
+    │   ├── proyecto/         store, packaging and session
+    │   └── export/           compositor and export
+    ├── store/                global state
+    ├── components/           icons, controls, site pieces and layout
+    └── features/             site, import, projects and editor
+```
+
+</details>
 
 ## Privacy
 
 > Your videos are processed entirely on your device. Nothing is uploaded to any server, while editing or exporting. There are no accounts, no tracking and no analytics. Saved projects live in your browser's storage, and deleting them from the app removes them for real.
+
+## Contributing
+
+Bug reports and ideas are welcome in the [issues](https://github.com/Cris223511/video-editor/issues). To contribute code, open a *pull request*. The project runs with `npm install` and `npm run dev`, with no extra setup.
 
 ## License
 
