@@ -174,23 +174,38 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
   const duplicarRegionAudio = useEditorStore((s) => s.duplicarRegionAudio)
   const recortarRegionAudio = useEditorStore((s) => s.recortarRegionAudio)
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
+  const alternarBloque = useEditorStore((s) => s.alternarBloque)
+  const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
+  const moverBloques = useEditorStore((s) => s.moverBloques)
+  const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(region.id))
 
   // mientras dura un gesto propio el bloque sigue al cursor sin suavizado; en
   // reposo se anima su posición para que se deslice al acomodarse en vez de saltar
   const [interactuando, setInteractuando] = useState(false)
 
   function iniciarMover(e: ReactMouseEvent) {
+    // solo el botón izquierdo arrastra. el derecho abre el menú, y si de paso
+    // arrancaba un gesto de movimiento el bloque se iba con el cursor
+    if (e.button !== 0) return
     e.stopPropagation()
     setInteractuando(true)
     // alt + arrastrar el cuerpo saca una copia de la franja y la lleva al soltar;
     // sin alt es el desplazamiento normal con imantado
-    let idGesto = region.id
-    if (e.altKey) {
-      const nuevo = duplicarRegionAudio(region.id)
-      if (nuevo) idGesto = nuevo
-    } else {
-      seleccionarRegion(region.id)
+    // shift suma o quita el bloque del conjunto marcado, sin arrastrar nada
+    if (e.shiftKey) {
+      alternarBloque(region.id)
+      setInteractuando(false)
+      return
     }
+    const st = useEditorStore.getState()
+    const enGrupo = st.bloquesSeleccionados.includes(region.id) && st.bloquesSeleccionados.length > 1
+    const grupo = enGrupo ? [...st.bloquesSeleccionados] : []
+    // con alt la copia nace al empezar a mover, no al pulsar: así alt y clic seco
+    // sirve para sumar el bloque al conjunto sin duplicar nada
+    const conAlt = e.altKey
+    let idGesto = region.id
+    let movido = false
+    if (!conAlt) seleccionarRegion(region.id)
     const startX = e.clientX
     const inicioOriginal = region.inicio
     const umbral = UMBRAL_IMAN_PX / pxPorSegundo
@@ -203,6 +218,19 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     const mover = (ev: globalThis.MouseEvent) => {
       ultimoX = ev.clientX
       ultimoY = ev.clientY
+      if (!movido) {
+        if (Math.abs(ev.clientX - startX) < 3) return
+        movido = true
+        if (conAlt) {
+          const nuevo = duplicarRegionAudio(region.id)
+          if (nuevo) idGesto = nuevo
+        }
+      }
+      // con varios bloques marcados se desplazan todos a la vez
+      if (grupo.length) {
+        moverBloques(grupo, inicioOriginal + (ev.clientX - startX) / pxPorSegundo - region.inicio)
+        return
+      }
       const dx = (ev.clientX - startX) / pxPorSegundo
       const bruto = Math.max(0, inicioOriginal + dx)
       const { inicio, guia } = imantarMover(bruto, region.duracion, puntos, umbral, propios)
@@ -210,6 +238,8 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
       moverRegionAudio(idGesto, inicio)
     }
     const soltar = () => {
+      // alt y clic seco: el bloque entra o sale del conjunto
+      if (!movido && conAlt) alternarBloque(region.id)
       setGuiaImantado(null)
       setInteractuando(false)
       const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelAudio')
@@ -263,9 +293,19 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
   return (
     <div
       onMouseDown={iniciarMover}
+      // el botón derecho abre el menú de este bloque en el punto donde se pulsó
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        abrirMenuContextual({ x: e.clientX, y: e.clientY, tipo: 'region', id: region.id })
+      }}
       className={[
         'group absolute top-0 flex h-full cursor-grab items-center overflow-hidden rounded-lg border px-2 transition-[border-color]',
-        seleccionado ? 'border-emerald-400' : 'border-transparent hover:border-white/30',
+        seleccionado
+          ? 'border-emerald-400'
+          : enConjunto
+            ? 'border-brand/70'
+            : 'border-transparent hover:border-white/30',
       ].join(' ')}
       style={{
         left: region.inicio * pxPorSegundo,

@@ -20,6 +20,10 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   const duplicarCapa = useEditorStore((s) => s.duplicarCapa)
   const recortarCapaTiempo = useEditorStore((s) => s.recortarCapaTiempo)
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
+  const alternarBloque = useEditorStore((s) => s.alternarBloque)
+  const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
+  const moverBloques = useEditorStore((s) => s.moverBloques)
+  const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(capa.id))
 
   // durante un gesto propio (mover o recortar) el bloque sigue al cursor sin
   // suavizado, para no ir por detrás del ratón; en reposo se anima su posición
@@ -27,17 +31,28 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   const [interactuando, setInteractuando] = useState(false)
 
   function iniciarMover(e: ReactMouseEvent) {
+    // solo el botón izquierdo arrastra. el derecho abre el menú, y si de paso
+    // arrancaba un gesto de movimiento el bloque se iba con el cursor
+    if (e.button !== 0) return
     e.stopPropagation()
     setInteractuando(true)
     // con alt pulsado el arrastre no mueve la capa sino que suelta una copia que
     // sigue al cursor, con la original intacta. sin alt es el movimiento de siempre
-    let idGesto = capa.id
-    if (e.altKey) {
-      const nuevo = duplicarCapa(capa.id)
-      if (nuevo) idGesto = nuevo
-    } else {
-      seleccionarCapa(capa.id)
+    // shift suma o quita el bloque del conjunto marcado, sin arrastrar nada
+    if (e.shiftKey) {
+      alternarBloque(capa.id)
+      setInteractuando(false)
+      return
     }
+    const st = useEditorStore.getState()
+    const enGrupo = st.bloquesSeleccionados.includes(capa.id) && st.bloquesSeleccionados.length > 1
+    const grupo = enGrupo ? [...st.bloquesSeleccionados] : []
+    // con alt la copia nace al empezar a mover, no al pulsar: así alt y clic seco
+    // sirve para sumar el bloque al conjunto sin duplicar nada
+    const conAlt = e.altKey
+    let idGesto = capa.id
+    let movido = false
+    if (!conAlt) seleccionarCapa(capa.id)
     const startX = e.clientX
     const inicioOriginal = capa.inicio
     const umbral = UMBRAL_IMAN_PX / pxPorSegundo
@@ -50,6 +65,19 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     const mover = (ev: globalThis.MouseEvent) => {
       ultimoX = ev.clientX
       ultimoY = ev.clientY
+      if (!movido) {
+        if (Math.abs(ev.clientX - startX) < 3) return
+        movido = true
+        if (conAlt) {
+          const nuevo = duplicarCapa(capa.id)
+          if (nuevo) idGesto = nuevo
+        }
+      }
+      // con varios bloques marcados se desplazan todos a la vez
+      if (grupo.length) {
+        moverBloques(grupo, inicioOriginal + (ev.clientX - startX) / pxPorSegundo - capa.inicio)
+        return
+      }
       const dx = (ev.clientX - startX) / pxPorSegundo
       const bruto = Math.max(0, inicioOriginal + dx)
       const { inicio, guia } = imantarMover(bruto, capa.duracion, puntos, umbral, propios)
@@ -57,6 +85,8 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       moverCapaTiempo(idGesto, inicio)
     }
     const soltar = () => {
+      // alt y clic seco: el bloque entra o sale del conjunto
+      if (!movido && conAlt) alternarBloque(capa.id)
       setGuiaImantado(null)
       setInteractuando(false)
       const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelTexto')
@@ -114,9 +144,19 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   return (
     <div
       onMouseDown={iniciarMover}
+      // el botón derecho abre el menú de este bloque en el punto donde se pulsó
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        abrirMenuContextual({ x: e.clientX, y: e.clientY, tipo: 'capa', id: capa.id })
+      }}
       className={[
         'group absolute top-0 flex h-full cursor-grab items-center overflow-hidden rounded-md border px-2 transition-[border-color]',
-        seleccionado ? 'border-amber-400' : 'border-transparent hover:border-white/30',
+        seleccionado
+          ? 'border-amber-400'
+          : enConjunto
+            ? 'border-brand/70'
+            : 'border-transparent hover:border-white/30',
       ].join(' ')}
       style={{
         left: capa.inicio * pxPorSegundo,

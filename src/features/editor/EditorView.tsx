@@ -8,6 +8,7 @@ import PlaybackControls from './PlaybackControls'
 import OptionsPanel from './OptionsPanel'
 import Timeline from './timeline/Timeline'
 import BarraGlobales from './BarraGlobales'
+import MenuContextual from './MenuContextual'
 import ExportDialog from './ExportDialog'
 import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
@@ -224,6 +225,9 @@ export default function EditorView() {
       </div>
 
       <ExportDialog />
+      {/* menú del botón derecho; vive arriba del todo para poder salir por encima
+          de cualquier panel sin que lo recorte ninguno */}
+      <MenuContextual />
     </div>
   )
 }

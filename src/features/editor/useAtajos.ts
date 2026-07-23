@@ -132,6 +132,16 @@ export function useAtajos() {
         case 'Delete':
         case 'Backspace':
           e.preventDefault()
+          // con varios bloques marcados se borran todos de una vez, pero antes se
+          // pregunta: perder de golpe un puñado de clips por un roce de tecla sería
+          // muy caro aunque exista deshacer
+          if (st.bloquesSeleccionados.length > 1) {
+            const cuantos = st.bloquesSeleccionados.length
+            if (window.confirm(`¿Borrar estos ${cuantos} elementos de la línea de tiempo?`)) {
+              st.quitarBloques(st.bloquesSeleccionados)
+            }
+            return
+          }
           if (st.clipSeleccionado) st.quitarClip(st.clipSeleccionado)
           else if (st.capaSeleccionada) st.quitarCapa(st.capaSeleccionada)
           else if (st.regionSeleccionada) st.quitarRegionAudio(st.regionSeleccionada)

@@ -194,6 +194,23 @@ interface EstadoEditor {
   // deja sin selección cualquier clip, capa o región a la vez. la usa el clic en
   // una zona vacía de la línea de tiempo para soltar lo que estuviera marcado
   limpiarSeleccion: () => void
+  // selección múltiple de bloques de la línea de tiempo. guarda ids de cualquier
+  // tipo (clip de video, capa, audio o franja) para poder borrarlos o moverlos en
+  // conjunto. convive con la selección de uno solo, que es la que abre los paneles
+  bloquesSeleccionados: string[]
+  alternarBloque: (id: string) => void
+  limpiarBloques: () => void
+  // menú que sale al pulsar con el botón derecho sobre un bloque de la línea de
+  // tiempo. guarda dónde se pulsó y sobre qué, y de ahí sale lo que se ofrece
+  menuContextual: { x: number; y: number; tipo: 'clip' | 'capa' | 'audio' | 'region'; id: string } | null
+  abrirMenuContextual: (m: { x: number; y: number; tipo: 'clip' | 'capa' | 'audio' | 'region'; id: string }) => void
+  cerrarMenuContextual: () => void
+  // borra de una vez todos los bloques marcados, sea cual sea su tipo
+  quitarBloques: (ids: string[]) => void
+  // desplaza en el tiempo todos los bloques marcados a la vez, sumando el mismo
+  // salto a cada uno. ninguno baja de cero, y si uno topa con el arranque el resto
+  // se frena con él para no descuadrar el conjunto
+  moverBloques: (ids: string[], delta: number) => void
 
   // vacía el documento por completo y borra el historial, para estrenar un
   // proyecto en blanco sin que quede nada del anterior
@@ -489,6 +506,8 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'moverClipAPista',
   'alternarSilencioClip',
   'setVolumenClip',
+  'quitarBloques',
+  'moverBloques',
   'moverCarril',
   'agregarNivelTexto',
   'agregarNivelAudio',
@@ -655,6 +674,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   clipSeleccionado: null,
   capaSeleccionada: null,
   capasSeleccionadas: [],
+  bloquesSeleccionados: [],
+  menuContextual: null,
   regionSeleccionada: null,
   herramienta: 'transiciones',
   pxPorSegundo: PX_POR_SEGUNDO_DEFECTO,
@@ -870,6 +891,61 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         pxPorSegundo: encaje ?? s.pxPorSegundo,
         resolucion,
         resolucionAuto,
+      }
+    }),
+
+  alternarBloque: (id) =>
+    set((s) => ({
+      bloquesSeleccionados: s.bloquesSeleccionados.includes(id)
+        ? s.bloquesSeleccionados.filter((x) => x !== id)
+        : [...s.bloquesSeleccionados, id],
+    })),
+
+  limpiarBloques: () => set({ bloquesSeleccionados: [] }),
+
+  abrirMenuContextual: (m) => set({ menuContextual: m }),
+  cerrarMenuContextual: () => set({ menuContextual: null }),
+
+  moverBloques: (ids, delta) =>
+    set((s) => {
+      const dentro = new Set(ids)
+      // el salto se recorta al que puede dar el bloque que esté más a la izquierda,
+      // así el grupo se mueve en bloque en lugar de irse apelotonando contra el cero
+      let minimo = Infinity
+      s.pista.clips.forEach((c) => dentro.has(c.id) && (minimo = Math.min(minimo, c.inicio)))
+      s.capas.forEach((c) => dentro.has(c.id) && (minimo = Math.min(minimo, c.inicio)))
+      s.audios.forEach((a) => dentro.has(a.id) && (minimo = Math.min(minimo, a.inicio)))
+      s.audioRegiones.forEach((r) => dentro.has(r.id) && (minimo = Math.min(minimo, r.inicio)))
+      if (!Number.isFinite(minimo)) return {}
+      const d = Math.max(delta, -minimo)
+      const correr = <T extends { id: string; inicio: number }>(x: T): T =>
+        dentro.has(x.id) ? { ...x, inicio: x.inicio + d } : x
+      return {
+        pista: { ...s.pista, clips: s.pista.clips.map(correr) },
+        capas: s.capas.map(correr),
+        audios: s.audios.map(correr),
+        audioRegiones: s.audioRegiones.map(correr),
+      }
+    }),
+
+  quitarBloques: (ids) =>
+    set((s) => {
+      const fuera = new Set(ids)
+      // un id puede ser de cualquiera de los cuatro tipos, así que se barre cada
+      // lista. borrar un video se lleva además el audio que se le separó
+      const clipsFuera = s.pista.clips.filter((c) => fuera.has(c.id)).map((c) => c.id)
+      return {
+        pista: { ...s.pista, clips: s.pista.clips.filter((c) => !fuera.has(c.id)) },
+        capas: s.capas.filter((c) => !fuera.has(c.id)),
+        audios: s.audios.filter(
+          (a) => !fuera.has(a.id) && !(a.vinculadoA && clipsFuera.includes(a.vinculadoA)),
+        ),
+        audioRegiones: s.audioRegiones.filter((r) => !fuera.has(r.id)),
+        bloquesSeleccionados: [],
+        clipSeleccionado: null,
+        capaSeleccionada: null,
+        capasSeleccionadas: [],
+        regionSeleccionada: null,
       }
     }),
 
@@ -1216,7 +1292,13 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     })),
 
   limpiarSeleccion: () =>
-    set({ clipSeleccionado: null, capaSeleccionada: null, capasSeleccionadas: [], regionSeleccionada: null }),
+    set({
+      clipSeleccionado: null,
+      capaSeleccionada: null,
+      capasSeleccionadas: [],
+      regionSeleccionada: null,
+      bloquesSeleccionados: [],
+    }),
 
   // el nivel nuevo aparece encima de los demás, vacío y con el alto estándar y
   // sus metadatos en reposo

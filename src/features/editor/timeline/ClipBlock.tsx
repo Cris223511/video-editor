@@ -37,6 +37,10 @@ export default function ClipBlock({
 }: Props) {
   const seleccionado = useEditorStore((s) => s.clipSeleccionado === clip.id)
   const alternarSilencioClip = useEditorStore((s) => s.alternarSilencioClip)
+  const alternarBloque = useEditorStore((s) => s.alternarBloque)
+  const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
+  const moverBloques = useEditorStore((s) => s.moverBloques)
+  const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(clip.id))
   const seleccionar = useEditorStore((s) => s.seleccionar)
   const setTransicion = useEditorStore((s) => s.setTransicion)
   const moverClip = useEditorStore((s) => s.moverClip)
@@ -85,19 +89,30 @@ export default function ClipBlock({
   const ancho = Math.max(clip.duracion * pxPorSegundo, 8)
 
   function iniciarMover(e: ReactMouseEvent) {
+    // solo el botón izquierdo arrastra. el derecho abre el menú, y si de paso
+    // arrancaba un gesto de movimiento el bloque se iba con el cursor
+    if (e.button !== 0) return
     e.stopPropagation()
     // este gesto nace en el cuerpo del clip; los tiradores de borde tienen su
     // propio manejador con stopPropagation, así que alt aquí nunca es el de la
     // velocidad. con alt pulsado se crea una copia y es ella la que sigue al
     // cursor, dejando el original quieto en su sitio
-    const duplicando = e.altKey && !bloqueada
-    let idGesto = clip.id
-    if (duplicando) {
-      const nuevo = duplicarClip(clip.id)
-      if (nuevo) idGesto = nuevo
-    } else {
-      seleccionar(clip.id)
+    // shift suma o quita el clip del conjunto marcado y ahí acaba el gesto: sirve
+    // para ir juntando bloques y luego borrarlos o moverlos todos de una vez
+    if (e.shiftKey) {
+      alternarBloque(clip.id)
+      return
     }
+    const st = useEditorStore.getState()
+    // si el clip forma parte de un conjunto de varios, el arrastre los lleva a todos
+    const enGrupo = st.bloquesSeleccionados.includes(clip.id) && st.bloquesSeleccionados.length > 1
+    const grupo = enGrupo ? [...st.bloquesSeleccionados] : []
+    // con alt la copia ya no nace al pulsar sino al empezar a mover. así un alt y
+    // clic seco, sin arrastrar, sirve para sumar el clip al conjunto sin duplicar nada
+    const conAlt = e.altKey && !bloqueada
+    let idGesto = clip.id
+    let movido = false
+    if (!conAlt) seleccionar(clip.id)
     // en un nivel bloqueado el gesto termina en la selección: no se mueve nada
     if (bloqueada) return
     setInteractuando(true)
@@ -129,6 +144,23 @@ export default function ClipBlock({
     }
 
     const mover = (ev: globalThis.MouseEvent) => {
+      // el primer desplazamiento de verdad es el que decide si el gesto era un
+      // arrastre o un simple clic con alt
+      if (!movido) {
+        if (Math.abs(ev.clientX - startX) < 3) return
+        movido = true
+        if (conAlt) {
+          const nuevo = duplicarClip(clip.id)
+          if (nuevo) idGesto = nuevo
+        }
+      }
+      // con varios bloques marcados el arrastre los lleva a todos a la vez, así que
+      // no hay imantado ni cambio de pista: solo el desplazamiento compartido
+      if (grupo.length) {
+        const dxg = (ev.clientX - startX) / pxPorSegundo
+        moverBloques(grupo, inicioOriginal + dxg - clip.inicio)
+        return
+      }
       const v = decidirVertical(ev.clientY)
       if (v) {
         if (v.insercion !== null) {
@@ -160,6 +192,8 @@ export default function ClipBlock({
       moverClip(idGesto, inicio)
     }
     const soltar = () => {
+      // alt y clic seco, sin llegar a arrastrar: el clip entra o sale del conjunto
+      if (!movido && conAlt) alternarBloque(clip.id)
       // si el gesto acabó sobre una separación, se abre allí el nivel nuevo y el
       // clip aterriza dentro; comparte el mismo paso de historial que el arrastre
       if (insercionActual !== null) insertarPistaEn(insercionActual, idGesto)
@@ -251,6 +285,12 @@ export default function ClipBlock({
   return (
     <div
       onMouseDown={iniciarMover}
+      // el botón derecho abre el menú de este bloque en el punto donde se pulsó
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        abrirMenuContextual({ x: e.clientX, y: e.clientY, tipo: 'clip', id: clip.id })
+      }}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes(TIPO_TRANSICION)) {
           e.preventDefault()
@@ -264,7 +304,11 @@ export default function ClipBlock({
       className={[
         'group absolute top-0 flex h-full items-end overflow-hidden rounded-lg border transition-[border-color]',
         bloqueada ? 'cursor-default' : 'cursor-grab',
-        seleccionado ? 'border-brand' : 'border-transparent hover:border-white/30',
+        seleccionado
+          ? 'border-brand'
+          : enConjunto
+            ? 'border-brand/70'
+            : 'border-transparent hover:border-white/30',
       ].join(' ')}
       style={{
         left: clip.inicio * pxPorSegundo,
