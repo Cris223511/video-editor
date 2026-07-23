@@ -96,7 +96,7 @@ export type Herramienta =
   | 'borrador'
 
 // las tres secciones que conviven en la línea de tiempo, cada una con sus filas
-export type Carril = 'video' | 'audio' | 'texto'
+export type Carril = 'video' | 'audio' | 'texto' | 'imagen'
 
 interface EstadoEditor {
   pista: Track
@@ -113,6 +113,22 @@ interface EstadoEditor {
   // guarda en su campo nivel en qué fila cae
   nivelesTexto: number
   nivelesAudio: number
+  // el carril de imágenes es independiente del de texto y figuras: las imágenes
+  // dejaron de mezclarse con ellos y tienen sus propias filas
+  nivelesImagen: number
+  // nombres de los carriles de texto y audio, editables como el de una pista de
+  // video. viven en el documento para guardarse y entrar en el historial
+  nombreCarrilTexto: string
+  nombreCarrilAudio: string
+  nombreCarrilImagen: string
+  renombrarCarril: (carril: 'texto' | 'audio' | 'imagen', nombre: string) => void
+  // alto de cada fila de los carriles de audio, texto e imagen, ajustable por el
+  // usuario igual que el de una pista de video. cada carril lleva el suyo, así que
+  // estirar uno no toca a los demás
+  altoFilaAudio: number
+  altoFilaTexto: number
+  altoFilaImagen: number
+  setAltoCarril: (carril: 'audio' | 'texto' | 'imagen', alto: number) => void
   // en qué orden se apilan las tres secciones de la línea de tiempo, de arriba
   // abajo. de fábrica el video manda arriba, luego el audio y al final el texto y
   // las figuras, pero se puede reordenar a gusto
@@ -189,6 +205,8 @@ interface EstadoEditor {
   actualizarEfecto: (id: string, efectoId: string, cambios: Partial<EfectoClip>) => void
   quitarEfecto: (id: string, efectoId: string) => void
   setTransicion: (id: string, cambios: Partial<Transicion>) => void
+  // duración de aparición del color y los efectos del clip; 0 la apaga
+  setTransicionEfecto: (id: string, duracion: number) => void
   // la transición con la que el clip se va. arranca en fundido a negro medio
   // segundo la primera vez que se toca, para no obligar a elegir dos cosas
   setTransicionSalida: (id: string, cambios: Partial<Transicion>) => void
@@ -243,6 +261,7 @@ interface EstadoEditor {
   // tramos no se coman el sonido entero
   setFundido: (id: string, lado: 'entrada' | 'salida', segundos: number) => void
   agregarNivelTexto: () => void
+  agregarNivelImagen: () => void
   agregarNivelAudio: () => void
   // lleva una capa a otra fila del carril de texto, o un audio o región a otra del
   // de audio. si la fila destino es la última vacía, el carril crece solo para
@@ -251,12 +270,17 @@ interface EstadoEditor {
   // abre una fila nueva encima de la indicada y muda ahí el bloque. las filas por
   // encima suben un puesto, igual que hace la inserción de niveles de video
   insertarNivelTexto: (nivel: number, id: string) => void
+  insertarNivelImagen: (nivel: number, id: string) => void
   insertarNivelAudio: (nivel: number, id: string) => void
   moverAudioNivel: (id: string, nivel: number) => void
   // guía celeste que aparece mientras se arrastra un clip sobre la separación
   // entre dos niveles: guarda el índice donde nacería la pista nueva, o null si
   // ahora mismo no se está apuntando a ninguna separación
   insercionPista: number | null
+  // lo que se está arrastrando ahora mismo por la línea de tiempo, para dibujar la
+  // etiqueta que acompaña al cursor. null cuando no hay ningún gesto en marcha
+  arrastreVivo: { etiqueta: string; x: number; y: number } | null
+  setArrastreVivo: (a: { etiqueta: string; x: number; y: number } | null) => void
   setInsercionPista: (indice: number | null) => void
   // instante (en segundos) donde se dibuja la línea guía del imantado mientras se
   // mueve o recorta un bloque. queda en null cuando no hay ningún enganche activo
@@ -268,6 +292,7 @@ interface EstadoEditor {
   // sube o baja un nivel un puesto, llevándose consigo sus clips, su alto y sus
   // metadatos. 'arriba' lo acerca a la cima (índice mayor), 'abajo' al suelo
   reordenarPista: (indice: number, direccion: 'arriba' | 'abajo') => void
+  renombrarPista: (indice: number, nombre: string) => void
 
   agregarTexto: () => void
   agregarImagen: (src: string, anchoNatural: number, altoNatural: number) => void
@@ -433,6 +458,13 @@ type Documento = Pick<
   | 'pistasMeta'
   | 'nivelesTexto'
   | 'nivelesAudio'
+  | 'nivelesImagen'
+  | 'nombreCarrilTexto'
+  | 'nombreCarrilAudio'
+  | 'nombreCarrilImagen'
+  | 'altoFilaAudio'
+  | 'altoFilaTexto'
+  | 'altoFilaImagen'
   | 'ordenCarriles'
   | 'capas'
   | 'marco'
@@ -458,6 +490,13 @@ function tomarDocumento(s: EstadoEditor): Documento {
     pistasMeta: s.pistasMeta,
     nivelesTexto: s.nivelesTexto,
     nivelesAudio: s.nivelesAudio,
+    nivelesImagen: s.nivelesImagen,
+    nombreCarrilTexto: s.nombreCarrilTexto,
+    nombreCarrilAudio: s.nombreCarrilAudio,
+    nombreCarrilImagen: s.nombreCarrilImagen,
+    altoFilaAudio: s.altoFilaAudio,
+    altoFilaTexto: s.altoFilaTexto,
+    altoFilaImagen: s.altoFilaImagen,
     ordenCarriles: s.ordenCarriles,
     audios: s.audios,
     capas: s.capas,
@@ -520,6 +559,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'actualizarEfecto',
   'quitarEfecto',
   'setTransicion',
+  'setTransicionEfecto',
   'setTransicionSalida',
   'dividirEnCabezal',
   'cerrarHueco',
@@ -535,15 +575,20 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'moverBloques',
   'moverCarril',
   'agregarNivelTexto',
+  'agregarNivelImagen',
   'agregarNivelAudio',
   'moverCapaNivel',
   'insertarNivelTexto',
+  'insertarNivelImagen',
   'insertarNivelAudio',
   'moverAudioNivel',
   'alternarSilencioPista',
   'alternarOcultarPista',
   'alternarBloquearPista',
   'reordenarPista',
+  'renombrarPista',
+  'renombrarCarril',
+  'setAltoCarril',
   'agregarTexto',
   'agregarImagen',
   'agregarCensura',
@@ -603,6 +648,8 @@ const MAX_PISTAS = 6
 // repartir bloques solapados sin que la línea de tiempo crezca de forma absurda
 const MAX_NIVELES = 6
 const ALTO_PISTA_BASE = 64
+const ALTO_FILA_MIN = 24
+const ALTO_FILA_MAX = 120
 const ALTO_PISTA_MIN = 40
 const ALTO_PISTA_MAX = 160
 const entre01 = (v: number) => Math.max(0, Math.min(1, v))
@@ -695,7 +742,14 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   pistasMeta: [metaPista(1)],
   nivelesTexto: 1,
   nivelesAudio: 1,
-  ordenCarriles: ['video', 'audio', 'texto'],
+  nivelesImagen: 1,
+  nombreCarrilTexto: 'Texto y figuras',
+  nombreCarrilAudio: 'Audio',
+  nombreCarrilImagen: 'Imágenes',
+  altoFilaAudio: 32,
+  altoFilaTexto: 36,
+  altoFilaImagen: 36,
+  ordenCarriles: ['video', 'audio', 'imagen', 'texto'],
   capas: [],
   playhead: 0,
   reproduciendo: false,
@@ -724,6 +778,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   grabandoMovimiento: false,
   dibujandoMascara: false,
   insercionPista: null,
+  arrastreVivo: null,
   guiaImantado: null,
   portapapeles: null,
 
@@ -798,8 +853,12 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       altosPista: [64],
       pistasMeta: [metaPista(1)],
       nivelesTexto: 1,
+      nivelesImagen: 1,
+      altoFilaAudio: 32,
+      altoFilaTexto: 36,
+      altoFilaImagen: 36,
       nivelesAudio: 1,
-      ordenCarriles: ['video', 'audio', 'texto'],
+      ordenCarriles: ['video', 'audio', 'imagen', 'texto'],
       capas: [],
       playhead: 0,
       reproduciendo: false,
@@ -1146,11 +1205,31 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
           const dMin = -b.recorteInicio / v
           const dMax = b.duracion - DURACION_MINIMA
           const d = Math.max(dMin, Math.min(delta, dMax))
+          const inicio = b.inicio + d
+          if (inicio >= 0) {
+            return {
+              ...c,
+              inicio,
+              duracion: b.duracion - d,
+              recorteInicio: b.recorteInicio + d * v,
+            }
+          }
+          // el borde izquierdo llegó al arranque de la pista. en lugar de dejar
+          // que el clip se salga por la izquierda, se clava en cero y lo que
+          // quedaba de gesto se gasta alargándolo por el borde derecho, mientras
+          // haya fuente. como todo se calcula desde el estado inicial y el
+          // desplazamiento total, volver atrás sin soltar lo encoge otra vez
+          const dTope = -b.inicio
+          const sobra = dTope - d
+          const entrada = b.recorteInicio + dTope * v
+          const duracionTope = b.duracion - dTope
+          // cuánto puede crecer por la derecha sin pasarse del final del material
+          const margen = Math.max(0, (b.duracionFuente - entrada) / v - duracionTope)
           return {
             ...c,
-            inicio: b.inicio + d,
-            duracion: b.duracion - d,
-            recorteInicio: b.recorteInicio + d * v,
+            inicio: 0,
+            duracion: duracionTope + Math.min(sobra, margen),
+            recorteInicio: entrada,
           }
         }
         // borde derecho: no puede pasar del final del video fuente
@@ -1335,6 +1414,16 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       },
     })),
 
+  setTransicionEfecto: (id, duracion) =>
+    set((s) => ({
+      pista: {
+        ...s.pista,
+        clips: s.pista.clips.map((c) =>
+          c.id === id ? { ...c, transicionEfecto: duracion > 0 ? duracion : undefined } : c,
+        ),
+      },
+    })),
+
   setTransicionSalida: (id, cambios) =>
     set((s) => ({
       pista: {
@@ -1438,6 +1527,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     }),
 
   setInsercionPista: (indice) => set({ insercionPista: indice }),
+
+  setArrastreVivo: (a) => set({ arrastreVivo: a }),
   setGuiaImantado: (segundo) => set({ guiaImantado: segundo }),
 
   // al eliminar un nivel se van con él sus clips, y los que estaban por encima
@@ -1496,6 +1587,31 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       const pistasMeta = [...s.pistasMeta]
       ;[pistasMeta[indice], pistasMeta[otro]] = [pistasMeta[otro], pistasMeta[indice]]
       return { pista: { ...s.pista, clips }, altosPista, pistasMeta }
+    }),
+
+  renombrarCarril: (carril, nombre) =>
+    set(() => {
+      const limpio = nombre.slice(0, 40)
+      if (carril === 'texto') return { nombreCarrilTexto: limpio }
+      if (carril === 'imagen') return { nombreCarrilImagen: limpio }
+      return { nombreCarrilAudio: limpio }
+    }),
+
+  setAltoCarril: (carril, alto) =>
+    set(() => {
+      const a = Math.round(Math.min(ALTO_FILA_MAX, Math.max(ALTO_FILA_MIN, alto)))
+      if (carril === 'audio') return { altoFilaAudio: a }
+      if (carril === 'imagen') return { altoFilaImagen: a }
+      return { altoFilaTexto: a }
+    }),
+
+  renombrarPista: (indice, nombre) =>
+    set((s) => {
+      // un nombre en blanco no se guarda, el nivel se queda con el que tenía. así
+      // el usuario puede borrar y desistir sin dejar la fila sin rótulo
+      const limpio = nombre.slice(0, 40)
+      const pistasMeta = s.pistasMeta.map((m, i) => (i === indice ? { ...m, nombre: limpio } : m))
+      return { pistasMeta }
     }),
 
   setAltoPista: (indice, alto) =>
@@ -1572,6 +1688,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   agregarNivelTexto: () =>
     set((s) => (s.nivelesTexto >= MAX_NIVELES ? {} : { nivelesTexto: s.nivelesTexto + 1 })),
 
+  agregarNivelImagen: () =>
+    set((s) => (s.nivelesImagen >= MAX_NIVELES ? {} : { nivelesImagen: s.nivelesImagen + 1 })),
+
   agregarNivelAudio: () =>
     set((s) => (s.nivelesAudio >= MAX_NIVELES ? {} : { nivelesAudio: s.nivelesAudio + 1 })),
 
@@ -1579,10 +1698,14 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     set((s) => {
       const destino = Math.max(0, Math.min(MAX_NIVELES - 1, nivel))
       const capas = s.capas.map((c) => (c.id === id ? { ...c, nivel: destino } : c))
-      // si el bloque sube a la última fila libre, el carril crece para que siempre
-      // quede una vacía encima donde seguir separando
-      const nivelesTexto = Math.max(s.nivelesTexto, Math.min(MAX_NIVELES, destino + 1))
-      return { capas, nivelesTexto }
+      // el carril que crece depende del tipo: una imagen empuja el de imágenes, el
+      // resto (texto, figura, dibujo, censura) empuja el de texto. así cada uno
+      // conserva siempre una fila libre encima donde seguir separando
+      const capa = s.capas.find((c) => c.id === id)
+      if (capa?.tipo === 'imagen') {
+        return { capas, nivelesImagen: Math.max(s.nivelesImagen, Math.min(MAX_NIVELES, destino + 1)) }
+      }
+      return { capas, nivelesTexto: Math.max(s.nivelesTexto, Math.min(MAX_NIVELES, destino + 1)) }
     }),
 
   insertarNivelTexto: (nivel, id) =>
@@ -1591,7 +1714,25 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       const corte = Math.max(0, Math.min(s.nivelesTexto, nivel))
       return {
         nivelesTexto: s.nivelesTexto + 1,
+        // solo se recolocan las capas del carril de texto; las imágenes viven en
+        // el suyo y no deben moverse al abrir una fila aquí
         capas: s.capas.map((c) => {
+          if (c.tipo === 'imagen') return c
+          if (c.id === id) return { ...c, nivel: corte }
+          const n = c.nivel ?? 0
+          return n >= corte ? { ...c, nivel: n + 1 } : c
+        }),
+      }
+    }),
+
+  insertarNivelImagen: (nivel, id) =>
+    set((s) => {
+      if (s.nivelesImagen >= MAX_NIVELES) return {}
+      const corte = Math.max(0, Math.min(s.nivelesImagen, nivel))
+      return {
+        nivelesImagen: s.nivelesImagen + 1,
+        capas: s.capas.map((c) => {
+          if (c.tipo !== 'imagen') return c
           if (c.id === id) return { ...c, nivel: corte }
           const n = c.nivel ?? 0
           return n >= corte ? { ...c, nivel: n + 1 } : c
@@ -2193,7 +2334,16 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       }
     }),
 
-  setHerramienta: (h) => set({ herramienta: h }),
+  setHerramienta: (h) =>
+    set((s) => ({
+      herramienta: h,
+      // cambiar de herramienta corta cualquier grabación de recorrido que
+      // estuviera en marcha. si no, la grabación abierta para una censura seguía
+      // viva al pasar a dibujar, y el panel aparecía en rojo diciendo que estaba
+      // grabando algo que nadie había empezado ahí
+      grabandoMovimiento: false,
+      dibujandoMascara: h === 'censura' ? s.dibujandoMascara : false,
+    })),
 
   setLienzo: (ancho, alto) => set({ resolucion: { ancho, alto }, lienzoManual: true }),
 

@@ -52,12 +52,15 @@ const MEDIOS = {
   },
 }
 
-// cifras del banner. son datos reales de lo construido, no promesas
+// cifras del banner. las cuatro se pueden contar en el propio editor: hay
+// veintiuna transiciones en el catálogo, seis niveles de video, sesenta cuadros
+// por segundo como tope de exportación y veinte efectos repartidos en familias.
+// aquí no va nada que no se pueda comprobar abriendo la aplicación
 const DATOS = [
   { cifra: '21', pie: 'transiciones' },
   { cifra: '6', pie: 'niveles de video' },
   { cifra: '60 fps', pie: 'al exportar' },
-  { cifra: '0', pie: 'archivos subidos' },
+  { cifra: '20', pie: 'efectos' },
 ]
 
 const CAPACIDADES = [
@@ -95,46 +98,49 @@ const HERRAMIENTAS = [
     icono: <Scissors size={17} />,
     titulo: 'Recorte y división',
     texto:
-      'Corta un clip por el cabezal, ajusta sus bordes con el ratón y cierra los espacios vacíos que queden entre planos con un solo botón.',
+      'Parte un clip por donde esté el cabezal, ajusta su entrada y su salida arrastrando los bordes, y cierra de una vez el hueco que quede entre dos planos.',
   },
   {
     id: 'censura',
     icono: <Wand2 size={17} />,
     titulo: 'Censura en movimiento',
     texto:
-      'Pixela o desenfoca una cara y graba el recorrido que sigue. Luego retocas cada punto del trazo hasta que encaje con el movimiento real.',
+      'Tapa una cara o una matrícula con pixelado, desenfoque o un bloque opaco, y graba el recorrido siguiéndola con el cursor. Después se retoca punto por punto hasta que encaje.',
   },
   {
     id: 'texto',
     icono: <Sparkles size={17} />,
     titulo: 'Texto, figuras y marcas',
     texto:
-      'Añade rótulos con contorno y sombra, figuras geométricas o tu logo. Todo se coloca sobre el lienzo con guías que lo alinean solo.',
+      'Rótulos con contorno, sombra y fondo, figuras geométricas o tu propio logo. Al arrastrarlos aparecen líneas guía que los encajan con el centro del lienzo y con los demás elementos.',
   },
   {
     id: 'velocidad',
     icono: <Gauge size={17} />,
     titulo: 'Velocidad del clip',
-    texto: 'Acelera o ralentiza un clip y la línea de tiempo se recalcula sola.',
+    texto:
+      'Lleva un clip de 0,25x a 4x. Lo que ocupa en la pista se recalcula solo y el sonido acompaña al cambio.',
   },
   {
     id: 'lienzo',
     icono: <Crop size={17} />,
     titulo: 'Lienzo y proporción',
-    texto: 'Cambia la proporción y rellena las bandas con el video desenfocado.',
+    texto:
+      'Pasa de apaisado a vertical o cuadrado, y rellena las bandas que sobran con un color o con el propio video ampliado y desenfocado.',
   },
   {
     id: 'audio',
     icono: <Volume2 size={17} />,
     titulo: 'Volumen y audio',
-    texto: 'Ajusta el volumen general o por franjas de la línea de tiempo.',
+    texto:
+      'Regula el volumen de todo el proyecto, el de cada clip por separado, o el de un tramo concreto con una franja sobre la línea de tiempo.',
   },
 ]
 
 const FORMATOS = ['MP4', 'WebM', '1080p', '4K', '24 fps', '30 fps', '60 fps']
 
 // portada del sitio. presenta qué hace el editor con ejemplos que se pueden
-// tocar, y lleva a probarlo sin pedir registro en ningún punto
+// tocar, y lleva a probarlo directamente, sin trámites de por medio
 export default function PortadaView() {
   const navegar = useNavigate()
   const irAImportar = () => navegar(RUTAS.medios)
@@ -147,8 +153,8 @@ export default function PortadaView() {
         <span className="pointer-events-none absolute right-[-14%] top-[-18%] hidden lg:block">
           <Anillos tamano={620} />
         </span>
-        <Destello x="18%" y="18%" tamano={520} intensidad={0.34} />
-        <Destello x="86%" y="52%" tamano={420} intensidad={0.24} />
+        <Destello x="18%" y="18%" tamano={520} intensidad={0.16} />
+        <Destello x="86%" y="52%" tamano={420} intensidad={0.14} />
 
         <div className={`mx-auto w-full ${ANCHO_CONTENIDO} ${RELLENO}`}>
           <Aparece>
@@ -172,9 +178,6 @@ export default function PortadaView() {
               >
                 Abrir el editor
               </button>
-              <span className="text-sm text-[color:var(--muted)]">
-                Abres un archivo y ya estás editando.
-              </span>
             </div>
           </Aparece>
 
@@ -253,7 +256,7 @@ export default function PortadaView() {
               {CAPACIDADES.map((c) => (
                 <Tarjeta key={c.titulo} hover className="h-full">
                   <IconoCirculo>{c.icono}</IconoCirculo>
-                  <h3 className="mt-4 text-[15px] font-semibold">{c.titulo}</h3>
+                  <h3 className="mt-4 text-[17px] font-semibold">{c.titulo}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-[color:var(--muted)]">{c.texto}</p>
                 </Tarjeta>
               ))}
@@ -333,25 +336,6 @@ export default function PortadaView() {
 
       {/* herramientas: se eligen de una lista y cada una enseña su propia
           demostración en movimiento, en vez de la rejilla plana con foto fija */}
-      <section className="relative py-20">
-        <Destello x="20%" y="35%" tamano={480} intensidad={0.14} />
-        <div className={`mx-auto w-full ${ANCHO_CONTENIDO} ${RELLENO}`}>
-          <Aparece>
-            <Titulo>
-              Lo que encuentras <Subrayado>dentro del editor</Subrayado>
-            </Titulo>
-            <p className="mt-4 max-w-xl text-sm leading-relaxed text-[color:var(--muted)]">
-              Elige una herramienta de la lista y verás lo que hace. Van pasando solas hasta que
-              toques una.
-            </p>
-          </Aparece>
-          <Aparece retraso={0.1} className="mt-8">
-            <DemoCaracteristicas items={HERRAMIENTAS} />
-          </Aparece>
-        </div>
-      </section>
-
-      {/* privacidad y formatos */}
       <section className="py-20">
         <div className={`mx-auto grid w-full ${ANCHO_CONTENIDO} ${RELLENO} items-center gap-10 lg:grid-cols-2`}>
           <Aparece>
@@ -383,9 +367,9 @@ export default function PortadaView() {
               ))}
             </div>
             <div className="mt-6">
-              <Aviso titulo="Sin cuenta ni seguimiento">
-                No hay registro, ni datos personales, ni medición de lo que haces. Abres la
-                aplicación y empiezas a editar.
+              <Aviso titulo="Nadie te pide nada a cambio">
+                Entras y montas. La herramienta no guarda quién eres, no mide lo que haces con ella
+                y no tiene funciones reservadas a quien pague.
               </Aviso>
             </div>
           </Aparece>
@@ -393,6 +377,25 @@ export default function PortadaView() {
       </section>
 
       {/* preguntas frecuentes */}
+      <section className="relative py-20">
+        <Destello x="20%" y="35%" tamano={480} intensidad={0.14} />
+        <div className={`mx-auto w-full ${ANCHO_CONTENIDO} ${RELLENO}`}>
+          <Aparece>
+            <Titulo>
+              Lo que encuentras <Subrayado>dentro del editor</Subrayado>
+            </Titulo>
+            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-[color:var(--muted)]">
+              Cada herramienta se demuestra funcionando, no con una captura. Elige una de la lista
+              para verla en marcha; si no tocas ninguna, van pasando solas.
+            </p>
+          </Aparece>
+          <Aparece retraso={0.1} className="mt-8">
+            <DemoCaracteristicas items={HERRAMIENTAS} />
+          </Aparece>
+        </div>
+      </section>
+
+      {/* privacidad y formatos */}
       <section className="relative py-20">
         <Destello x="80%" y="30%" tamano={460} intensidad={0.16} />
         <div className={`mx-auto w-full ${ANCHO_CONTENIDO} ${RELLENO}`}>
@@ -412,9 +415,12 @@ export default function PortadaView() {
         <Aparece className={`mx-auto w-full ${ANCHO_CONTENIDO} ${RELLENO}`}>
           <div
             className="relative overflow-hidden rounded-3xl px-6 py-16 text-center sm:py-20"
+            // el azul iba del profundo del pie, que ya no se usa en ningún otro
+            // sitio y quedaba despegado del resto. ahora sale del mismo --accent
+            // que tiñe la página, oscurecido sobre el fondo del tema
             style={{
               background:
-                'linear-gradient(160deg, rgb(var(--profundo-2)) 0%, rgb(var(--profundo)) 60%)',
+                'linear-gradient(160deg, rgb(var(--accent) / 0.22) 0%, rgb(9 16 30) 55%, rgb(6 12 24) 100%)',
             }}
           >
             <span
@@ -426,12 +432,23 @@ export default function PortadaView() {
                 backgroundSize: '64px 100%',
               }}
             />
+            {/* dos halos que respiran con desfase, como los del resto del sitio, en
+                lugar de una sola mancha fija: el bloque deja de verse plano */}
             <span
               aria-hidden
-              className="pointer-events-none absolute left-1/2 top-full h-72 w-[36rem] max-w-full -translate-x-1/2 -translate-y-1/2 rounded-full"
+              className="pointer-events-none absolute left-1/2 top-full h-72 w-[36rem] max-w-full -translate-x-1/2 -translate-y-1/2 animate-destello rounded-full"
               style={{
-                background: 'radial-gradient(circle, rgb(var(--accent) / 0.38) 0%, transparent 70%)',
+                background: 'radial-gradient(circle, rgb(var(--accent) / 0.2) 0%, transparent 70%)',
                 filter: 'blur(52px)',
+              }}
+            />
+            <span
+              aria-hidden
+              className="pointer-events-none absolute left-[14%] top-0 h-56 w-56 -translate-y-1/2 animate-destello rounded-full"
+              style={{
+                background: 'radial-gradient(circle, rgb(var(--accent-soft) / 0.16) 0%, transparent 70%)',
+                filter: 'blur(48px)',
+                animationDelay: '1.8s',
               }}
             />
 

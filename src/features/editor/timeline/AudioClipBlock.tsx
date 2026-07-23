@@ -1,11 +1,13 @@
+import { motion } from 'framer-motion'
 import { MouseEvent as ReactMouseEvent, useEffect, useState } from 'react'
 import { ClipAudio } from '../../../types/audio'
 import { MediaAsset } from '../../../types/media'
+import Tooltip from '../../../components/ui/Tooltip'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { amplitudEn, picosDeMedio } from '../../../lib/audio/picos'
 import { alturasOnda } from './AudioBlock'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
-import { nivelBajoCursor, separacionBajoCursor } from './nivelCursor'
+import { nivelBajoCursor, separacionBajoCursor, porDebajoDelUltimo } from './nivelCursor'
 
 interface Props {
   audio: ClipAudio
@@ -111,6 +113,10 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
     let ultimoX = e.clientX
     let ultimoY = e.clientY
     const mover = (ev: globalThis.MouseEvent) => {
+      // la etiqueta sigue al cursor durante todo el gesto, así se ve en qué punto
+      // de la línea de tiempo va a caer lo que se lleva en la mano
+      useEditorStore.getState().setArrastreVivo({ etiqueta: asset?.nombre ?? 'Audio', x: ev.clientX, y: ev.clientY })
+
       ultimoX = ev.clientX
       ultimoY = ev.clientY
       if (!movido) {
@@ -133,6 +139,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
       moverAudio(idGesto, inicio)
     }
     const soltar = () => {
+      useEditorStore.getState().setArrastreVivo(null)
       // alt y clic seco: el bloque entra o sale del conjunto
       if (!movido && conAlt) alternarBloque(audio.id)
       setGuiaImantado(null)
@@ -142,6 +149,8 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
       const junta = separacionBajoCursor(ultimoX, ultimoY, 'nivelAudio')
       if (junta !== null) {
         insertarNivelAudio(junta, idGesto)
+      } else if (porDebajoDelUltimo(ultimoX, ultimoY, 'nivelAudio')) {
+        insertarNivelAudio(0, idGesto)
       } else {
         const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelAudio')
         if (destino !== null) moverAudioNivel(idGesto, destino)
@@ -187,7 +196,11 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
   const onda = alturas ?? alturasOnda(audio.id, barras)
 
   return (
-    <div
+    <Tooltip texto={asset?.nombre ?? 'Audio'} retardo={2000} lado="arriba">
+    <motion.div
+      layout="position"
+      transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+      layoutDependency={audio.nivel ?? 0}
       onMouseDown={iniciarMover}
       // el botón derecho abre el menú de este bloque en el punto donde se pulsó
       onContextMenu={(e) => {
@@ -228,6 +241,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
           seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
         ].join(' ')}
       />
-    </div>
+    </motion.div>
+    </Tooltip>
   )
 }

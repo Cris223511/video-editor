@@ -55,6 +55,7 @@ export default function ProyectoPanel() {
       <Campo etiqueta="Nombre del proyecto">
         <input
           value={titulo}
+          maxLength={120}
           onChange={(e) => renombrar(e.target.value)}
           spellCheck={false}
           className="w-full rounded-lg px-2.5 py-2 text-sm outline-none transition-colors focus:ring-2 focus:ring-brand"
@@ -87,7 +88,8 @@ export default function ProyectoPanel() {
       </div>
 
       <p className="text-xs leading-relaxed text-[color:var(--muted)]">
-        Todo esto vive en tu equipo. Los videos no salen del navegador ni al editar ni al guardar.
+        El proyecto se guarda solo con cada cambio, con los videos incluidos, así que puedes cerrar
+        y retomarlo más tarde tal como lo dejaste.
       </p>
     </div>
   )

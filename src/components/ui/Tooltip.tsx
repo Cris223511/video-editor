@@ -32,15 +32,20 @@ export default function Tooltip({
   texto,
   atajo,
   lado = 'arriba',
+  // por defecto el tooltip sale al instante, que es lo que se quiere en una barra
+  // de iconos. algunos sitios piden lo contrario: en un clip de la línea de tiempo
+  // el nombre solo debe asomar si de verdad te paras a mirarlo un par de segundos
+  retardo = 0,
   children,
 }: {
   texto: string
   atajo?: string
   lado?: Lado
+  retardo?: number
   children: ReactNode
 }) {
   return (
-    <Tip.Root delayDuration={0}>
+    <Tip.Root delayDuration={retardo}>
       <Tip.Trigger asChild>{children}</Tip.Trigger>
       <Tip.Portal>
         <Tip.Content

@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { ReactNode, useEffect, useRef, useState } from 'react'
 import {
   ArrowDownAZ,
   CalendarPlus,
+  Info,
+  Save,
+  Clock,
+  Film,
   PencilLine,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
@@ -68,7 +72,9 @@ export default function ProyectosView() {
   // pulsar duplicar no se copia de una: primero se pregunta cómo llamarla
   const [duplicando, setDuplicando] = useState<{ id: string; nombre: string } | null>(null)
   // proyecto que se está renombrando, con su nombre actual para editarlo
-  const [renombrando, setRenombrando] = useState<{ id: string; nombre: string } | null>(null)
+  const [renombrando, setRenombrando] = useState<{ id: string; nombre: string; descripcion?: string } | null>(null)
+  // proyecto cuya ficha de detalles está abierta
+  const [detalle, setDetalle] = useState<ResumenProyecto | null>(null)
   // qué proyecto tiene la ficha abierta. null cuando no hay ninguna
   const [detalles, setDetalles] = useState<string | null>(null)
   const entrada = useRef<HTMLInputElement>(null)
@@ -121,9 +127,9 @@ export default function ProyectosView() {
     }
   }
 
-  async function renombrar(id: string, nombre: string) {
+  async function renombrar(id: string, nombre: string, nota?: string) {
     try {
-      await renombrarProyecto(id, nombre)
+      await renombrarProyecto(id, nombre, nota)
       setRenombrando(null)
       mostrar('success', 'Nombre cambiado.')
       refrescar()
@@ -208,8 +214,9 @@ export default function ProyectosView() {
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-titulo-lg">Mis proyectos</h1>
-          <p className="mt-1 text-sm text-[color:var(--muted)]">
-            Guardados en este navegador, en tu equipo. No se suben a ningún servidor.
+          <p className="mt-2.5 text-sm text-[color:var(--muted)]">
+            Retoma cualquiera donde lo dejaste, duplícalo para probar otra versión o descárgalo
+            para llevártelo a otro equipo.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -249,6 +256,7 @@ export default function ProyectosView() {
             />
             <input
               value={busqueda}
+              maxLength={60}
               onChange={(e) => {
                 setBusqueda(e.target.value)
                 setPagina(1)
@@ -389,32 +397,51 @@ export default function ProyectosView() {
             <div className="flex flex-1 flex-col gap-1 p-3.5">
               {/* el título no pasa de dos líneas y se corta con puntos suspensivos:
                   a una sola línea, cualquier nombre medianamente largo se perdía */}
-              <h2 className="line-clamp-2 font-display text-[15px] font-bold leading-snug">
+              <h2 className="line-clamp-2 font-display text-[18px] font-bold leading-snug">
                 {p.titulo}
               </h2>
-              <p className="text-[13px] text-[color:var(--muted)]">
-                {p.numMedios} {p.numMedios === 1 ? 'medio' : 'medios'}
-              </p>
 
-              {/* las dos fechas se ven aquí, sin tener que abrir la ficha, que es
-                  lo que uno mira al buscar un proyecto entre varios */}
+              {/* la nota de quien montó, recortada a dos líneas. si no hay ninguna
+                  no se deja el hueco vacío */}
+              {p.descripcion && (
+                <p className="line-clamp-2 text-[13px] leading-relaxed text-[color:var(--muted)]">
+                  {p.descripcion}
+                </p>
+              )}
+
+              {/* de las tres fechas que guarda el proyecto, en la tarjeta manda la
+                  última vez que se tocó: es lo que uno busca al reconocerlo entre
+                  varios. la de creación y la de apertura viven en la ficha */}
               <div className="mt-2 flex flex-col gap-1">
                 <p className="flex items-center gap-1.5 text-[13px] text-[color:var(--muted)]">
-                  <CalendarPlus size={13} className="shrink-0 text-brand" />
-                  <span className="truncate">Creado el {fechaLarga(p.creado)}</span>
+                  <Clock size={13} className="shrink-0 text-brand" />
+                  <span className="truncate">
+                    Última vez abierto el {fechaLarga(p.abierto ?? p.modificado)}
+                  </span>
                 </p>
                 <p className="flex items-center gap-1.5 text-[13px] text-[color:var(--muted)]">
-                  <PencilLine size={13} className="shrink-0 text-brand" />
-                  <span className="truncate">Editado el {fechaLarga(p.modificado)}</span>
+                  <Film size={13} className="shrink-0 text-brand" />
+                  <span className="truncate">
+                    {p.numMedios} {p.numMedios === 1 ? 'medio' : 'medios'}
+                  </span>
                 </p>
               </div>
 
               {/* el botón de abrir que había aquí sobraba: la miniatura entera ya
                   ofrece abrir el proyecto al pasar el cursor por encima */}
               <div className="mt-3 flex justify-end gap-1">
+                <Tooltip texto="Ver más información">
+                  <button
+                    onClick={() => setDetalle(p)}
+                    aria-label="Ver más información"
+                    className="grid h-8 w-8 place-items-center rounded-lg text-[color:var(--muted)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand/10 hover:text-brand"
+                  >
+                    <Info size={14} />
+                  </button>
+                </Tooltip>
                 <Tooltip texto="Cambiar el nombre">
                   <button
-                    onClick={() => setRenombrando({ id: p.id, nombre: p.titulo })}
+                    onClick={() => setRenombrando({ id: p.id, nombre: p.titulo, descripcion: p.descripcion })}
                     aria-label="Cambiar el nombre"
                     className="grid h-8 w-8 place-items-center rounded-lg text-[color:var(--muted)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand/10 hover:text-brand"
                   >
@@ -493,12 +520,58 @@ export default function ProyectosView() {
       <ModalNombre
         abierto={renombrando !== null}
         nombre={renombrando?.nombre ?? ''}
-        titulo="Cambiar el nombre"
+        titulo="Editar el proyecto"
         etiqueta="Nombre del proyecto"
         aceptar="Guardar"
+        conNota
+        nota={renombrando?.descripcion ?? ''}
         onCancelar={() => setRenombrando(null)}
-        onAceptar={(nombre) => renombrando && renombrar(renombrando.id, nombre)}
+        onAceptar={(nombre, nota) => renombrando && renombrar(renombrando.id, nombre, nota)}
       />
+
+      {/* ficha del proyecto: lo que no cabe en la tarjeta, en filas separadas por
+          una línea para leerlo de un vistazo */}
+      <Modal
+        titulo={detalle?.titulo ?? ''}
+        descripcion="Todo lo que se sabe de este proyecto."
+        abierto={detalle !== null}
+        onCerrar={() => setDetalle(null)}
+        ancho="max-w-lg"
+      >
+        {detalle && (
+          <div className="flex flex-col gap-4">
+            {detalle.descripcion && (
+              <p className="text-[13px] leading-relaxed text-[color:var(--muted)]">
+                {detalle.descripcion}
+              </p>
+            )}
+            <dl className="flex flex-col">
+              <FilaDato icono={<Film size={14} />} nombre="Medios" valor={`${detalle.numMedios}`} />
+              <FilaDato
+                icono={<Clock size={14} />}
+                nombre="Duración del montaje"
+                valor={formatearDuracion(detalle.duracion)}
+              />
+              <FilaDato
+                icono={<FolderOpen size={14} />}
+                nombre="Última vez abierto"
+                valor={detalle.abierto ? fechaLarga(detalle.abierto) : 'Todavía no se ha abierto'}
+              />
+              <FilaDato
+                icono={<Save size={14} />}
+                nombre="Último guardado"
+                valor={fechaLarga(detalle.modificado)}
+              />
+              <FilaDato
+                icono={<CalendarPlus size={14} />}
+                nombre="Creado"
+                valor={fechaLarga(detalle.creado)}
+                ultima
+              />
+            </dl>
+          </div>
+        )}
+      </Modal>
 
       {/* borrar un proyecto se lleva también sus videos y no tiene vuelta atrás,
           así que la pregunta se hace en una ventana y no de lado en la tarjeta */}
@@ -515,6 +588,33 @@ export default function ProyectosView() {
   )
 }
 
+// una fila de la ficha: icono y nombre a la izquierda, valor a la derecha, con
+// una línea que la separa de la siguiente salvo en la última
+function FilaDato({
+  icono,
+  nombre,
+  valor,
+  ultima,
+}: {
+  icono: ReactNode
+  nombre: string
+  valor: string
+  ultima?: boolean
+}) {
+  return (
+    <div
+      className="flex items-baseline justify-between gap-4 py-2"
+      style={ultima ? undefined : { borderBottom: '1px solid rgb(var(--border) / 0.1)' }}
+    >
+      <dt className="flex shrink-0 items-center gap-2 text-[13px] text-[color:var(--muted)]">
+        <span className="text-brand">{icono}</span>
+        {nombre}
+      </dt>
+      <dd className="min-w-0 text-right text-[13px] font-medium">{valor}</dd>
+    </div>
+  )
+}
+
 // ventana para escribir un nombre: sirve para duplicar (nombre de la copia) y para
 // renombrar. arranca con el nombre propuesto ya seleccionado, así que se escribe
 // encima o se acepta sin más. enter confirma y esc cierra, como en cualquier campo
@@ -524,6 +624,10 @@ function ModalNombre({
   titulo,
   etiqueta,
   aceptar,
+  // con conNota puesto sale además el campo de descripción. duplicar no lo usa,
+  // porque ahí solo se pide cómo llamar a la copia
+  conNota = false,
+  nota = '',
   onCancelar,
   onAceptar,
 }: {
@@ -532,10 +636,13 @@ function ModalNombre({
   titulo: string
   etiqueta: string
   aceptar: string
+  conNota?: boolean
+  nota?: string
   onCancelar: () => void
-  onAceptar: (nombre: string) => void
+  onAceptar: (nombre: string, nota?: string) => void
 }) {
   const [valor, setValor] = useState(nombre)
+  const [texto, setTexto] = useState(nota)
   const campo = useRef<HTMLInputElement>(null)
 
   // cada vez que se abre con otro proyecto se recarga el nombre propuesto y, en
@@ -545,26 +652,32 @@ function ModalNombre({
   useEffect(() => {
     if (!abierto) return
     setValor(nombre)
+    setTexto(nota)
     const t = window.setTimeout(() => {
       campo.current?.focus()
       campo.current?.select()
     }, 80)
     return () => window.clearTimeout(t)
-  }, [abierto, nombre])
+  }, [abierto, nombre, nota])
 
   const confirmar = () => {
     if (!valor.trim()) return
-    onAceptar(valor)
+    onAceptar(valor, conNota ? texto : undefined)
   }
 
   return (
-    <Modal titulo={titulo} abierto={abierto} onCerrar={onCancelar} ancho="max-w-sm">
-      <label className="mb-1.5 block text-[13px] font-medium text-[color:var(--muted)]">
-        {etiqueta}
+    <Modal titulo={titulo} abierto={abierto} onCerrar={onCancelar} ancho="max-w-lg">
+      <label className="mb-2 block text-[13px] font-medium text-[color:var(--muted)]">
+        {etiqueta}:
+        <span className="ml-0.5 font-semibold" style={{ color: 'rgb(var(--alerta))' }} title="Obligatorio">
+          *
+        </span>
+        <span className="ml-1 font-normal">(obligatorio)</span>
       </label>
       <input
         ref={campo}
         value={valor}
+        maxLength={120}
         onChange={(e) => setValor(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
@@ -579,6 +692,28 @@ function ModalNombre({
           border: '1px solid rgb(var(--border) / 0.16)',
         }}
       />
+
+      {/* la nota es opcional y de texto libre: sirve para reconocer el proyecto de
+          un vistazo cuando el título por sí solo no dice bastante */}
+      {conNota && (
+        <>
+          <label className="mb-2 mt-5 block text-[13px] font-medium text-[color:var(--muted)]">
+            Descripción: <span className="font-normal">(opcional)</span>
+          </label>
+          <textarea
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            rows={3}
+            maxLength={300}
+            placeholder="De qué va este proyecto, en qué punto lo dejaste, lo que te sirva para reconocerlo."
+            className="w-full resize-none rounded-xl px-3 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-brand"
+            style={{
+              background: 'rgb(var(--surface))',
+              border: '1px solid rgb(var(--border) / 0.16)',
+            }}
+          />
+        </>
+      )}
 
       <div className="mt-5 flex justify-end gap-2">
         <button

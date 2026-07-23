@@ -111,12 +111,7 @@ export default function FiguraPanel() {
   return (
     <div className="flex flex-col gap-4">
       {!capa ? (
-        <>
-          <p className="text-sm leading-relaxed text-[color:var(--muted)]">
-            Elige una forma para colocarla sobre el video. Haz clic para agregarla al centro o
-            arrástrala hasta el punto exacto del visor.
-          </p>
-          <RejillaFormas agregar={(f) => agregarFigura(f)} />
+        <>          <RejillaFormas agregar={(f) => agregarFigura(f)} />
         </>
       ) : (
         <>

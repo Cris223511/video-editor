@@ -92,6 +92,10 @@ export async function abrirSesion(id: string): Promise<boolean> {
   const p = await leerProyecto(id)
   if (!p) return false
 
+  // se anota cuándo se abrió, que es el dato que la lista enseña para reconocer
+  // un proyecto. no se toca 'modificado', porque abrir no es editar
+  void guardarProyecto({ ...p, abierto: Date.now() })
+
   // se liberan las direcciones del proyecto que estaba abierto para no dejar
   // archivos retenidos en memoria
   useProjectStore.getState().limpiar()
@@ -195,12 +199,19 @@ export function nuevoProyecto(): void {
 
 // cambia el nombre de un proyecto guardado. si además es el que está abierto ahora
 // mismo, se actualiza también el título en vivo para que la barra lo refleje
-export async function renombrarProyecto(id: string, nombre: string): Promise<void> {
+export async function renombrarProyecto(
+  id: string,
+  nombre: string,
+  descripcion?: string,
+): Promise<void> {
   const limpio = nombre.trim()
   if (!limpio) return
   const p = await leerProyecto(id)
   if (!p) return
-  await guardarProyecto({ ...p, titulo: limpio, modificado: Date.now() })
+  // la descripción llega sin definir cuando quien llama no la toca, así que en ese
+  // caso se conserva la que hubiera en lugar de borrarla sin querer
+  const nota = descripcion === undefined ? p.descripcion : descripcion.trim() || undefined
+  await guardarProyecto({ ...p, titulo: limpio, descripcion: nota, modificado: Date.now() })
   if (useProjectStore.getState().idProyecto === id) {
     useProjectStore.setState({ titulo: limpio })
   }

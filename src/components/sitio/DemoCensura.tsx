@@ -1,5 +1,4 @@
 import {
-  KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
   useEffect,
   useRef,
@@ -11,7 +10,7 @@ import { Deslizador } from '../ui/Controls'
 // escena de laboratorio, con una persona trabajando: tapar una cara que se
 // mueve es exactamente el caso que la censura resuelve. dirección tomada de las
 // tres de Pexels ya verificadas en DemoVideo
-const CLIP = 'https://videos.pexels.com/video-files/3195394/3195394-hd_1920_1080_25fps.mp4'
+const CLIP = 'https://videos.pexels.com/video-files/4114797/4114797-hd_1920_1080_25fps.mp4'
 
 // más bajo que antes: a 500 de alto la pieza dominaba la sección entera
 const ANCHO = 880
@@ -33,11 +32,6 @@ const FORMAS: { id: Forma; nombre: string; icono: JSX.Element }[] = [
 // atajos de teclado con los que el editor afina la selección: las flechas la
 // desplazan y, sujetando un modificador, ajustan su ancho o su alto. la flecha
 // en la leyenda representa las cuatro direcciones
-const ATAJOS: { teclas: string[]; texto: string }[] = [
-  { teclas: ['←', '→', '↑', '↓'], texto: 'mover' },
-  { teclas: ['Alt', '←→'], texto: 'ancho' },
-  { teclas: ['Ctrl', '↑↓'], texto: 'alto' },
-]
 
 // las cuatro esquinas, con el cursor que corresponde a cada una
 const ESQUINAS = [
@@ -60,6 +54,8 @@ export default function DemoCensura() {
   const [forma, setForma] = useState<Forma>('rectangulo')
   const [intensidad, setIntensidad] = useState(22)
   const [listo, setListo] = useState(false)
+  // zona de la demo, para saber si está a la vista y aceptar entonces las flechas
+  const zonaRef = useRef<HTMLDivElement>(null)
 
   function recortar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
     ctx.beginPath()
@@ -159,13 +155,10 @@ export default function DemoCensura() {
   // afinado con teclado sobre el recuadro, el mismo gesto que ofrece el editor:
   // las flechas lo desplazan y, sujetando un modificador, cambian su tamaño. los
   // pasos son cortos para que el movimiento se sienta suave y todo se mantiene
-  // dentro del lienzo. el scroll de la página solo se frena cuando la demo tiene
-  // el foco y se pulsa una flecha, así el resto del teclado no queda atrapado
-  function teclado(e: ReactKeyboardEvent) {
-    const flechas = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']
-    if (!flechas.includes(e.key)) return
-    e.preventDefault()
+  // dentro del lienzo
+  function moverConTeclado(key: string, altKey: boolean, ctrlKey: boolean) {
     const paso = 0.02
+    const e = { key, altKey, ctrlKey }
     setCaja((prev) => {
       let { x, y, w, h } = prev
       if (e.altKey) {
@@ -188,6 +181,41 @@ export default function DemoCensura() {
       return { x, y, w, h }
     })
   }
+
+  // los atajos escuchan en la ventana mientras la demo está a la vista, no en el
+  // propio recuadro. antes colgaban de un div con tabIndex, así que no hacían nada
+  // hasta que se pulsaba dentro para darle el foco, y quien leía la ayuda de teclas
+  // probaba y no pasaba nada. con el observador de visibilidad solo actúan cuando
+  // esta demo se está viendo de verdad, de modo que en otra pestaña de la sección
+  // las flechas vuelven a desplazar la página con normalidad
+  useEffect(() => {
+    const el = zonaRef.current
+    if (!el) return
+    let visible = false
+    const observador = new IntersectionObserver(
+      ([entrada]) => {
+        visible = entrada.isIntersecting && entrada.intersectionRatio > 0.35
+      },
+      { threshold: [0, 0.35, 1] },
+    )
+    observador.observe(el)
+
+    const alPulsar = (ev: KeyboardEvent) => {
+      if (!visible) return
+      // mientras se escribe en un campo el teclado es de quien escribe
+      const destino = ev.target as HTMLElement | null
+      if (destino && (destino.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(destino.tagName)))
+        return
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(ev.key)) return
+      ev.preventDefault()
+      moverConTeclado(ev.key, ev.altKey, ev.ctrlKey)
+    }
+    window.addEventListener('keydown', alPulsar)
+    return () => {
+      observador.disconnect()
+      window.removeEventListener('keydown', alPulsar)
+    }
+  }, [])
 
   // arrastre de la caja entera
   function mover(e: ReactMouseEvent) {
@@ -313,12 +341,11 @@ export default function DemoCensura() {
         </div>
       </div>
 
-      {/* el área es enfocable para que responda al teclado; el anillo de foco,
-          discreto, avisa de que la demo acepta flechas para afinar el recuadro */}
+      {/* ya no hace falta enfocar el área: los atajos escuchan en la ventana
+          mientras esta demo se está viendo */}
       <div
-        tabIndex={0}
-        onKeyDown={teclado}
-        className="relative overflow-hidden rounded-xl bg-black outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-brand/50"
+        ref={zonaRef}
+        className="relative overflow-hidden rounded-xl bg-black"
       >
         {/* la fuente del clip vive fuera de la vista: lo que se enseña es el
             lienzo, que es donde ocurre la censura. queda dentro del documento en
@@ -377,35 +404,6 @@ export default function DemoCensura() {
         <span className="pointer-events-none absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-medium text-white">
           <Move size={11} /> Arrastra el recuadro o estíralo por las esquinas
         </span>
-      </div>
-
-      {/* atajos de teclado del editor para afinar la selección sin el ratón:
-          las flechas la mueven y, con un modificador, cambian su tamaño. se
-          enseñan como leyenda porque la demo se maneja con el ratón, pero en el
-          editor la selección responde también al teclado */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-[color:var(--muted)]">
-        {ATAJOS.map((a) => (
-          <span key={a.texto} className="inline-flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-1">
-              {a.teclas.map((k, i) => (
-                <span key={i} className="inline-flex items-center gap-1">
-                  {i > 0 && <span className="opacity-60">+</span>}
-                  <kbd
-                    className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[color:var(--text)]"
-                    style={{
-                      background: 'rgb(var(--border) / 0.1)',
-                      border: '1px solid rgb(var(--border) / 0.18)',
-                      boxShadow: '0 1px 0 rgb(var(--border) / 0.2)',
-                    }}
-                  >
-                    {k}
-                  </kbd>
-                </span>
-              ))}
-            </span>
-            {a.texto}
-          </span>
-        ))}
       </div>
 
       <p className="mt-3 text-[11px] leading-relaxed text-[color:var(--muted)]">

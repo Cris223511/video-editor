@@ -7,6 +7,8 @@ import { esTonoNeutro, filtroCss, hayEfectoFiltro } from '../color/tono'
 import { REPETICIONES_BRILLO, desenfoqueBrillo } from '../layers/defaults'
 import { anterior, posterior, pintarTransicion, progreso, progresoSalida } from '../transiciones/pintar'
 import { fundidoEn } from '../audio/ganancia'
+import { estiloEntrada, progresoEntrada } from '../transiciones/entrada'
+import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../color/mezcla'
 import { cssEfectos } from '../efectos/catalogo'
 import { encuadreDe, rectClip } from '../timeline/encuadre'
 import { aplicarTransformCanvas } from '../layers/transform'
@@ -566,8 +568,12 @@ export function dibujarFotograma(
       // así que cuando lo hay se pinta en dos pasadas conservando el mismo orden
       // que el visor: primero el video con su color, después ese resultado con el
       // desenfoque solo
-      const efectos = clip.efectos ?? []
-      const hayColor = !esTonoNeutro(clip.tono)
+      // aparición progresiva del color y los efectos: se mezclan hacia lo neutro
+      // según cuánto lleve el clip en pantalla, igual que en el visor
+      const mixEf = mixEntradaEfecto(clip.inicio, clip.transicionEfecto, t)
+      const tonoEf = mezclarTono(clip.tono, mixEf)
+      const efectos = mezclarEfectos(clip.efectos ?? [], mixEf)
+      const hayColor = !esTonoNeutro(tonoEf)
       const hayDesenfoque = hayEfectoFiltro(efectos)
       if (hayDesenfoque) {
         const aux = auxDesenfoque(ancho, alto)
@@ -578,8 +584,8 @@ export function dibujarFotograma(
           // los efectos del catálogo son funciones css corrientes, así que se
           // encadenan aquí mismo; el desenfoque de movimiento sigue yendo aparte
           {
-            const base = hayColor ? filtroCss(clip.tono, `tonoexp-${clip.id}`, []) : ''
-            const ef = cssEfectos(clip.efectos)
+            const base = hayColor ? filtroCss(tonoEf, `tonoexp-${clip.id}`, []) : ''
+            const ef = cssEfectos(efectos)
             actx.filter = `${base} ${ef}`.trim() || 'none'
           }
           actx.drawImage(video, dx, dy, dw, dh)
@@ -590,8 +596,8 @@ export function dibujarFotograma(
         }
       } else {
         {
-          const base = hayColor ? filtroCss(clip.tono, `tonoexp-${clip.id}`, []) : ''
-          const ef = cssEfectos(clip.efectos)
+          const base = hayColor ? filtroCss(tonoEf, `tonoexp-${clip.id}`, []) : ''
+          const ef = cssEfectos(efectos)
           const cadena = `${base} ${ef}`.trim()
           if (cadena) ctx.filter = cadena
         }
@@ -628,11 +634,32 @@ export function dibujarFotograma(
   for (const cOrig of capas) {
     if (t < cOrig.inicio || t >= cOrig.inicio + cOrig.duracion) continue
     const f = fundidoEn(t, cOrig.inicio, cOrig.duracion, cOrig.fundidoEntrada, cOrig.fundidoSalida)
-    const c = f >= 1 ? cOrig : ({ ...cOrig, opacidad: cOrig.opacidad * f } as typeof cOrig)
+    // entrada de la capa: la opacidad rebaja el alfa igual que el fundido; la
+    // escala y el deslizamiento se aplican como una transformación del lienzo
+    // anclada al centro de la capa, para que el archivo salga idéntico al visor
+    const entrada = estiloEntrada(cOrig.transicion?.tipo ?? 'ninguna', progresoEntrada(t, cOrig.inicio, cOrig.transicion))
+    const c = f >= 1 && entrada.opacidad >= 1
+      ? cOrig
+      : ({ ...cOrig, opacidad: cOrig.opacidad * f * entrada.opacidad } as typeof cOrig)
+    const mueve = entrada.escala !== 1 || entrada.tx !== 0 || entrada.ty !== 0
+    ctx.save()
+    if (mueve) {
+      const pos = posicionCapa(c, t)
+      const cx = pos.x * ancho
+      const cy = pos.y * alto
+      const menor = Math.min(ancho, alto)
+      // mismo orden que el visor: se centra en la capa, se desplaza (en fracción
+      // del lado menor) y luego se escala alrededor de ese centro
+      ctx.translate(cx, cy)
+      if (entrada.tx || entrada.ty) ctx.translate(entrada.tx * menor, entrada.ty * menor)
+      if (entrada.escala !== 1) ctx.scale(entrada.escala, entrada.escala)
+      ctx.translate(-cx, -cy)
+    }
     if (c.tipo === 'texto') dibujarTexto(ctx, c, ancho, alto, t)
     else if (c.tipo === 'imagen') dibujarImagen(ctx, c, ancho, alto, t, imagenDe(c.id))
     else if (c.tipo === 'figura') dibujarFigura(ctx, c, ancho, alto, t, escala)
     else if (c.tipo === 'trazo') dibujarTrazo(ctx, c, ancho, alto, t)
+    ctx.restore()
   }
 
   dibujarMarco(ctx, marco, ancho, alto, escala)

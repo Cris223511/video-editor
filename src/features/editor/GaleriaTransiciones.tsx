@@ -181,6 +181,7 @@ export default function GaleriaTransiciones({
         />
         <input
           value={busqueda}
+          maxLength={60}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder="Buscar transiciones"
           spellCheck={false}

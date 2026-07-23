@@ -2,7 +2,8 @@ import { MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import Icon from '../../../components/ui/Icon'
 import Tooltip from '../../../components/ui/Tooltip'
-import { OndaAudio } from './AudioBlock'
+import BarraGlobales from '../BarraGlobales'
+import FantasmaArrastre from './FantasmaArrastre'
 import { TIPO_ARRASTRE } from '../MediaLibrary'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
@@ -33,15 +34,13 @@ const ALTO_REGLA = 29
 // del bloque de video y el de audio del de texto). se aplica idéntica en la
 // columna de cabeceras y en las filas del lado derecho para que no se
 // desalineen. el hueco entre niveles de video vive en HUECO_PISTA
-const SEP_SECCION = 18
+const SEP_SECCION = 12
 // ancho que se reserva para el rótulo «Añadir audio» del carril vacío. la onda
 // tenue de relleno arranca pasado ese punto para no quedar por debajo del texto
 const ANCHO_ROTULO_AUDIO = 120
 // alto de cada fila de los carriles de texto y de audio, y el hueco entre filas
 // de un mismo carril. la cabecera de la columna izquierda se dibuja a la altura
 // total de su bloque de filas para que ambas columnas cuadren
-const ALTO_FILA_TEXTO = 36
-const ALTO_FILA_AUDIO = 32
 const GAP_FILAS = 4
 
 // alto total que ocupa un carril con varias filas: la suma de las filas más los
@@ -89,6 +88,16 @@ export default function Timeline({
   const audios = useEditorStore((s) => s.audios)
   const nivelesTexto = useEditorStore((s) => s.nivelesTexto)
   const nivelesAudio = useEditorStore((s) => s.nivelesAudio)
+  const nombreCarrilTexto = useEditorStore((s) => s.nombreCarrilTexto)
+  const nombreCarrilAudio = useEditorStore((s) => s.nombreCarrilAudio)
+  const nombreCarrilImagen = useEditorStore((s) => s.nombreCarrilImagen)
+  const renombrarCarril = useEditorStore((s) => s.renombrarCarril)
+  const nivelesImagen = useEditorStore((s) => s.nivelesImagen)
+  const agregarNivelImagen = useEditorStore((s) => s.agregarNivelImagen)
+  const altoFilaAudio = useEditorStore((s) => s.altoFilaAudio)
+  const altoFilaTexto = useEditorStore((s) => s.altoFilaTexto)
+  const altoFilaImagen = useEditorStore((s) => s.altoFilaImagen)
+  const setAltoCarril = useEditorStore((s) => s.setAltoCarril)
   const agregarNivelTexto = useEditorStore((s) => s.agregarNivelTexto)
   const agregarNivelAudio = useEditorStore((s) => s.agregarNivelAudio)
   const ordenCarriles = useEditorStore((s) => s.ordenCarriles)
@@ -136,6 +145,24 @@ export default function Timeline({
   // tiempo junto a la manija
   const [cabezalActivo, setCabezalActivo] = useState(false)
   const total = duracionTotal(clips)
+
+  // arranca el arrastre que cambia el alto de las filas de un carril. el mismo
+  // gesto que el de las pistas de video: se sigue el cursor en vertical y el store
+  // acota el valor a su mínimo y máximo. cada carril lleva su propio alto, así que
+  // estirar uno no arrastra a los de al lado
+  const estirarCarril = (carril: 'audio' | 'texto' | 'imagen', altoActual: number) => (e: React.MouseEvent) => {
+    e.preventDefault()
+    const inicioY = e.clientY
+    const mover = (ev: globalThis.MouseEvent) => setAltoCarril(carril, altoActual + (ev.clientY - inicioY))
+    const soltar = () => {
+      window.removeEventListener('mousemove', mover)
+      window.removeEventListener('mouseup', soltar)
+      document.body.style.cursor = ''
+    }
+    document.body.style.cursor = 'ns-resize'
+    window.addEventListener('mousemove', mover)
+    window.addEventListener('mouseup', soltar)
+  }
   const anchoContenido = Math.max(total * pxPorSegundo + 200, anchoVisible || 600)
 
   // instantes a los que se imantan clips y capas: el cero, el cabezal y los
@@ -180,6 +207,10 @@ export default function Timeline({
     if (!cont) return
 
     function alGirar(e: WheelEvent) {
+      // la rueda sola sube y baja por los niveles, sin tocar el recorrido a lo
+      // ancho. para moverse en el tiempo está la barra de abajo, que se arrastra
+      // con el cursor. el control es lo único que cambia el gesto, y lo dedica al
+      // acercamiento
       if (!e.ctrlKey && !e.metaKey) return
       e.preventDefault()
       const zona = contenidoRef.current
@@ -366,6 +397,7 @@ export default function Timeline({
 
   return (
     <div className="flex h-full flex-col">
+      <FantasmaArrastre />
       <div
         className="flex items-center gap-1 px-3 py-2"
         style={{ borderBottom: '1px solid rgb(var(--border) / 0.1)' }}
@@ -385,6 +417,10 @@ export default function Timeline({
           Línea de tiempo · {formatearDuracion(total)}
         </span>
         <div className="ml-auto flex items-center gap-1">
+          {/* opciones de lo que esté seleccionado. van pegadas a las tijeras porque
+              es donde se está mirando mientras se monta, y aparecen solas al elegir
+              algo. cada clip conserva sus propios valores */}
+          <BarraGlobales />
           <Tooltip texto="Dividir en el cabezal" atajo="S" lado="abajo">
             <button
               onClick={dividirEnCabezal}
@@ -458,9 +494,11 @@ export default function Timeline({
                 {carril === 'texto' && (
                   <CarrilHeader
                     icono="texto"
-                    titulo="Texto y figuras"
+                    titulo={nombreCarrilTexto}
+                    onRenombrar={(n) => renombrarCarril('texto', n)}
                     acento="#f59e0b"
-                    alto={altoCarril(nivelesTexto, ALTO_FILA_TEXTO)}
+                    alto={altoCarril(nivelesTexto, altoFilaTexto)}
+                    onEstirar={estirarCarril('texto', altoFilaTexto)}
                     onAgregar={agregarNivelTexto}
                     puedeAgregar={nivelesTexto < 6}
                     onSubir={i > 0 ? () => moverCarril('texto', -1) : undefined}
@@ -470,13 +508,29 @@ export default function Timeline({
                 {carril === 'audio' && (
                   <CarrilHeader
                     icono="musica"
-                    titulo="Audio"
+                    titulo={nombreCarrilAudio}
+                    onRenombrar={(n) => renombrarCarril('audio', n)}
                     acento="#10b981"
-                    alto={altoCarril(nivelesAudio, ALTO_FILA_AUDIO)}
+                    alto={altoCarril(nivelesAudio, altoFilaAudio)}
+                    onEstirar={estirarCarril('audio', altoFilaAudio)}
                     onAgregar={agregarNivelAudio}
                     puedeAgregar={nivelesAudio < 6}
                     onSubir={i > 0 ? () => moverCarril('audio', -1) : undefined}
                     onBajar={i < ordenCarriles.length - 1 ? () => moverCarril('audio', 1) : undefined}
+                  />
+                )}
+                {carril === 'imagen' && (
+                  <CarrilHeader
+                    icono="imagen"
+                    titulo={nombreCarrilImagen}
+                    onRenombrar={(n) => renombrarCarril('imagen', n)}
+                    acento="#38bdf8"
+                    alto={altoCarril(nivelesImagen, altoFilaImagen)}
+                    onEstirar={estirarCarril('imagen', altoFilaImagen)}
+                    onAgregar={agregarNivelImagen}
+                    puedeAgregar={nivelesImagen < 6}
+                    onSubir={i > 0 ? () => moverCarril('imagen', -1) : undefined}
+                    onBajar={i < ordenCarriles.length - 1 ? () => moverCarril('imagen', 1) : undefined}
                   />
                 )}
               </div>
@@ -585,18 +639,50 @@ export default function Timeline({
                   para que ambas cuadren */}
               <div className="flex flex-col" style={{ gap: GAP_FILAS }}>
                 {Array.from({ length: nivelesTexto }, (_, i) => nivelesTexto - 1 - i).map((n) => {
-                  const propias = capas.filter((c) => (c.nivel ?? 0) === n)
+                  const propias = capas.filter((c) => c.tipo !== 'imagen' && (c.nivel ?? 0) === n)
+                  const filaVacia = propias.length === 0
                   return (
                     <div
                       key={`texto-${n}`}
                       data-nivel-texto={n}
                       className="relative overflow-hidden rounded-lg"
-                      style={{ height: ALTO_FILA_TEXTO, background: 'rgb(var(--border) / 0.05)' }}
+                      style={{ height: altoFilaTexto, background: 'rgb(var(--border) / 0.05)' }}
                     >
-                      {n === 0 && capas.length === 0 && (
+                      {filaVacia && (
                         <div className="pointer-events-none flex h-full items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
                           <Icon name="texto" size={13} />
                           <span>Añadir texto</span>
+                        </div>
+                      )}
+                      {propias.map((c) => (
+                        <CapaBlock key={c.id} capa={c} pxPorSegundo={pxPorSegundo} puntos={puntos} />
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+                </>
+              )}
+              {carril === 'imagen' && (
+                <>
+              {/* carril propio de las imágenes, con la misma mecánica de filas que
+                  el de texto pero leyendo data-nivel-imagen. así una imagen ya no
+                  comparte pista con los textos y figuras */}
+              <div className="flex flex-col" style={{ gap: GAP_FILAS }}>
+                {Array.from({ length: nivelesImagen }, (_, i) => nivelesImagen - 1 - i).map((n) => {
+                  const propias = capas.filter((c) => c.tipo === 'imagen' && (c.nivel ?? 0) === n)
+                  const filaVacia = propias.length === 0
+                  return (
+                    <div
+                      key={`imagen-${n}`}
+                      data-nivel-imagen={n}
+                      className="relative overflow-hidden rounded-lg"
+                      style={{ height: altoFilaImagen, background: 'rgb(var(--border) / 0.05)' }}
+                    >
+                      {filaVacia && (
+                        <div className="pointer-events-none flex h-full items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
+                          <Icon name="imagen" size={13} />
+                          <span>Añadir imagen</span>
                         </div>
                       )}
                       {propias.map((c) => (
@@ -618,32 +704,35 @@ export default function Timeline({
                 {Array.from({ length: nivelesAudio }, (_, i) => nivelesAudio - 1 - i).map((n) => {
                   const regionesFila = audioRegiones.filter((r) => (r.nivel ?? 0) === n)
                   const audiosFila = audios.filter((a) => (a.nivel ?? 0) === n)
-                  const carrilVacio = audioRegiones.length === 0 && audios.length === 0
+                  // el nivel está vacío si no tiene ni franjas ni audios propios. así
+                  // cada fila añadida se ve igual que la primera y no queda una banda
+                  // muerta sin nada que la explique
+                  const filaVacia = regionesFila.length === 0 && audiosFila.length === 0
                   return (
                     <div
                       key={`audio-${n}`}
                       data-nivel-audio={n}
                       className="relative overflow-hidden rounded-lg"
-                      style={{ height: ALTO_FILA_AUDIO, background: 'rgb(var(--border) / 0.05)' }}
+                      style={{ height: altoFilaAudio, background: 'rgb(var(--border) / 0.05)' }}
                     >
-                      {n === 0 && carrilVacio ? (
+                      {filaVacia ? (
                         <>
-                          {/* el rótulo del carril va a la izquierda y limpio; ninguna
-                              onda pasa por debajo para que se lea sin ruido */}
+                          {/* rótulo a la izquierda, limpio */}
                           <div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
                             <Icon name="musica" size={13} />
                             <span>Añadir audio</span>
                           </div>
-                          {/* la onda tenue de relleno arranca pasado el rótulo, así las
-                              líneas empiezan después del texto y no lo tapan */}
-                          <div className="absolute inset-y-0 right-0" style={{ left: ANCHO_ROTULO_AUDIO }}>
-                            <OndaAudio
-                              semilla="fondo-audio"
-                              color="rgb(var(--border) / 0.5)"
-                              opacidad={0.35}
-                              barras={Math.max(80, Math.floor((anchoContenido - ANCHO_ROTULO_AUDIO) / 2))}
-                            />
-                          </div>
+                          {/* líneas por defecto pegadas al borde de arriba y repetidas
+                              a paso fijo: ni centradas ni estiradas, para que una fila
+                              larga no deforme el patrón */}
+                          <div
+                            className="pointer-events-none absolute top-0 right-0 h-2/3"
+                            style={{
+                              left: ANCHO_ROTULO_AUDIO,
+                              backgroundImage:
+                                'repeating-linear-gradient(90deg, rgb(var(--border) / 0.4) 0 1px, transparent 1px 5px)',
+                            }}
+                          />
                         </>
                       ) : (
                         <>
@@ -681,7 +770,12 @@ export default function Timeline({
               className="pointer-events-none absolute z-30 flex items-center"
               style={{ top: yInsercion(insercionPista) - 1, left: 0, width: anchoContenido }}
             >
-              <span className="h-0.5 w-full rounded-full" style={{ background: '#38bdf8', boxShadow: '0 0 6px rgba(56,189,248,0.9)' }} />
+              {/* la línea late despacio mientras espera el soltado: quieta pasaba
+                  desapercibida entre tanto bloque */}
+              <span
+                className="h-0.5 w-full animate-pulse rounded-full"
+                style={{ background: '#38bdf8', boxShadow: '0 0 8px rgba(56,189,248,0.95)' }}
+              />
               <span
                 className="absolute left-2 -translate-y-px rounded px-1.5 py-0.5 text-[10px] font-medium text-white"
                 style={{ background: '#38bdf8' }}

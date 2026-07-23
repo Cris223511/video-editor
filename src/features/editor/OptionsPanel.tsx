@@ -29,11 +29,49 @@ import BorradorPanel from './panels/BorradorPanel'
 // se consultan desde el panel de Medios, así que aquí va solo lo de las
 // transiciones y la acción de quitar el clip. el encuadre se hace directamente en
 // el visor, arrastrando el video y sus tiradores
+// transición de entrada de la capa elegida. reutiliza la galería de los clips,
+// pero aquí la transición se lee como la entrada del propio elemento sobre lo que
+// ya hay debajo, no como una mezcla entre dos planos
+function TransicionCapa() {
+  const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
+  const capas = useEditorStore((s) => s.capas)
+  const actualizarCapa = useEditorStore((s) => s.actualizarCapa)
+  const capa = capas.find((c) => c.id === capaSeleccionada)
+  if (!capa) return null
+
+  const trans = capa.transicion ?? { tipo: 'ninguna', duracion: 0.5 }
+  return (
+    <div className="flex flex-col gap-3">
+      <span className="text-sm font-medium">Transición de entrada</span>
+      <p className="text-[13px] leading-relaxed text-[color:var(--muted)]">
+        Elige cómo aparece este elemento cuando llega su turno en la línea de tiempo. La duración
+        marca cuánto tarda en asentarse.
+      </p>
+      <GaleriaTransiciones
+        actual={trans.tipo}
+        onElegir={(t) => actualizarCapa(capa.id, { transicion: { tipo: t, duracion: trans.duracion } })}
+      />
+      {trans.tipo !== 'ninguna' && (
+        <Campo etiqueta={`Duración (${trans.duracion.toFixed(1)} s)`}>
+          <Deslizador
+            valor={Math.round(trans.duracion * 10)}
+            min={2}
+            max={20}
+            onChange={(v) => actualizarCapa(capa.id, { transicion: { tipo: trans.tipo, duracion: v / 10 } })}
+          />
+        </Campo>
+      )}
+    </div>
+  )
+}
+
 function Transiciones() {
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
+  const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const clips = useEditorStore((s) => s.pista.clips)
   const quitarClip = useEditorStore((s) => s.quitarClip)
   const setTransicion = useEditorStore((s) => s.setTransicion)
+  const setTransicionEfecto = useEditorStore((s) => s.setTransicionEfecto)
   const separarAudio = useEditorStore((s) => s.separarAudio)
   const medios = useProjectStore((s) => s.medios)
   const agregarMedio = useProjectStore((s) => s.agregar)
@@ -94,9 +132,12 @@ function Transiciones() {
   }
 
   if (!clip) {
+    // sin clip pero con una capa elegida, esta misma sección gobierna su entrada
+    if (capaSeleccionada) return <TransicionCapa />
     return (
-      <SinSeleccion icono="transiciones" titulo="Ningún clip seleccionado">
-        Pulsa un clip en la línea de tiempo o en el visor para elegir con qué transición entra.
+      <SinSeleccion icono="transiciones" titulo="Nada seleccionado">
+        Pulsa un clip, un texto, una figura o cualquier elemento de la línea de tiempo para elegir
+        con qué transición entra.
       </SinSeleccion>
     )
   }
@@ -116,6 +157,35 @@ function Transiciones() {
               min={2}
               max={20}
               onChange={(v) => setTransicion(clip.id, { duracion: v / 10 })}
+            />
+          </Campo>
+        )}
+      </div>
+
+      {/* aparición del color y los efectos del clip. es independiente de la
+          transición de entrada del plano: aquí lo que entra poco a poco es la
+          corrección de color y los efectos aplicados, no el video en sí */}
+      <div className="flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/10">
+        <label className="flex cursor-pointer items-center justify-between gap-2">
+          <span className="text-sm font-medium">El color y los efectos aparecen</span>
+          <input
+            type="checkbox"
+            checked={!!clip.transicionEfecto}
+            onChange={(e) => setTransicionEfecto(clip.id, e.target.checked ? 0.6 : 0)}
+            className="h-4 w-4 accent-brand"
+          />
+        </label>
+        <p className="text-[13px] leading-relaxed text-[color:var(--muted)]">
+          Con esto la corrección de color y los efectos del clip no están a pleno desde el primer
+          fotograma, sino que se asientan durante los primeros segundos.
+        </p>
+        {!!clip.transicionEfecto && (
+          <Campo etiqueta={`Duración (${clip.transicionEfecto.toFixed(1)} s)`}>
+            <Deslizador
+              valor={Math.round(clip.transicionEfecto * 10)}
+              min={2}
+              max={30}
+              onChange={(v) => setTransicionEfecto(clip.id, v / 10)}
             />
           </Campo>
         )}

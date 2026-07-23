@@ -14,6 +14,7 @@ import Tooltip from '../../../components/ui/Tooltip'
 import Confirmar from '../../../components/ui/Confirmar'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { HUECO_PISTA } from './ClipBlock'
+import NombreEditable from './NombreEditable'
 
 // botón compacto de un interruptor del encabezado. cuando el estado está activo
 // (silenciado, oculto o bloqueado) se resalta para que se distinga de un vistazo
@@ -62,6 +63,7 @@ export default function PistaHeader({ indice, alto }: { indice: number; alto: nu
   const alternarOcultarPista = useEditorStore((s) => s.alternarOcultarPista)
   const alternarBloquearPista = useEditorStore((s) => s.alternarBloquearPista)
   const reordenarPista = useEditorStore((s) => s.reordenarPista)
+  const renombrarPista = useEditorStore((s) => s.renombrarPista)
   const finGesto = useEditorStore((s) => s.finGesto)
   const [confirmando, setConfirmando] = useState(false)
   // se enciende mientras se arrastra la cabecera para reordenarla, y sirve para
@@ -156,7 +158,7 @@ export default function PistaHeader({ indice, alto }: { indice: number; alto: nu
       }}
     >
       <div className="flex items-center gap-1">
-        <span className="truncate text-[12px] font-medium text-[color:var(--muted)]">{nombre}</span>
+        <NombreEditable valor={nombre} onGuardar={(n) => renombrarPista(indice, n)} />
         <div className="ml-auto flex items-center opacity-0 transition-opacity duration-200 group-hover:opacity-100">
           <BotonPista
             etiqueta="Subir el nivel"

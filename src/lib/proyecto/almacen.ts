@@ -64,8 +64,10 @@ export async function listarProyectos(): Promise<ResumenProyecto[]> {
     .map((p) => ({
       id: p.id,
       titulo: p.titulo,
+      descripcion: p.descripcion,
       creado: p.creado,
       modificado: p.modificado,
+      abierto: p.abierto,
       portada: p.portada,
       numMedios: p.medios?.length ?? 0,
       duracion: (p.edicion?.clips ?? []).reduce(

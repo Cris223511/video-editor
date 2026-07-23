@@ -132,7 +132,7 @@ export default function ExportDialog() {
   return (
     <Modal
       titulo="Exportar video"
-      descripcion="Se genera en tu equipo, en tiempo real y con alta calidad."
+      descripcion="Elige los cuadros por segundo y descarga el resultado ya montado."
       abierto={abierto}
       onCerrar={cerrarTodo}
       ancho="max-w-lg"

@@ -8,6 +8,7 @@ import { fundidoEn } from '../../../lib/audio/ganancia'
 import { Ancla, Caja, redimensionar } from '../../../lib/layers/resize'
 import { CajaGuia, Guia, imantar } from '../../../lib/layers/guias'
 import { sufijoTransformCss } from '../../../lib/layers/transform'
+import { estiloEntrada, progresoEntrada, transformEntradaCss } from '../../../lib/transiciones/entrada'
 import { esTonoNeutro, filtroCss, usaMatriz, matrizTono, tablasColor } from '../../../lib/color/tono'
 import Tiradores from './Tiradores'
 import ManijaGiro, { anguloGiro } from './ManijaGiro'
@@ -352,7 +353,12 @@ export default function CapasOverlay() {
 
     const mover = (ev: globalThis.MouseEvent) => {
       const p = normalizar(ev)
-      const forzarProporcion = capa.tipo === 'texto' || ev.shiftKey
+      // el texto siempre guarda proporción. la imagen va al revés que el resto:
+      // por defecto mantiene su relación (se estira ancho y alto a la vez) y solo
+      // con shift se deforma libre, que es lo pedido para no aplastar una foto sin
+      // querer. figuras y demás siguen libres salvo que se pulse shift
+      const forzarProporcion =
+        capa.tipo === 'texto' || (capa.tipo === 'imagen' ? !ev.shiftKey : ev.shiftKey)
       const n = redimensionar(inicial, ancla, p.x, p.y, forzarProporcion)
       const posicion = fija ? { x: entre(0, 1, n.x), y: entre(0, 1, n.y) } : {}
 
@@ -464,7 +470,19 @@ export default function CapasOverlay() {
         // giro y espejo de la capa, que se anexan al translate de centrado. la
         // censura queda fuera: su efecto muestrea el video y girarla descuadraría
         // la zona tapada, así que ahí no se ofrece transformar
-        const extra = c.tipo === 'censura' ? '' : sufijoTransformCss(c)
+        // entrada de la capa: la transición elegida se reinterpreta como una
+        // animación del propio elemento (desvanecido, crecimiento, deslizamiento o
+        // revelado). la censura queda fuera, igual que del giro y el espejo
+        const entrada =
+          c.tipo === 'censura'
+            ? { opacidad: 1, escala: 1, tx: 0, ty: 0 }
+            : estiloEntrada(c.transicion?.tipo ?? 'ninguna', progresoEntrada(playhead, c.inicio, c.transicion))
+        const entradaCss = transformEntradaCss(entrada, Math.min(rect.w, rect.h))
+        const extra = [c.tipo === 'censura' ? '' : sufijoTransformCss(c), entradaCss]
+          .filter(Boolean)
+          .join(' ')
+        // opacidad ya combinada con la de la entrada, para reutilizarla en cada rama
+        const opa = (c.opacidad / 100) * entrada.opacidad
 
         if (c.tipo === 'censura' && c.forma === 'pincel') {
           // superficie para dibujar o mover la máscara de pincel; solo activa
@@ -493,9 +511,10 @@ export default function CapasOverlay() {
                 width: c.anchoRel * rect.w,
                 height: c.altoRel * rect.h,
                 transform: 'translate(-50%, -50%)',
-                // borde fino: el trazo grueso de antes tapaba parte de la escena y
-                // se veía tosco. seleccionada va en azul, en reposo en blanco tenue
-                border: `1px solid ${seleccion ? '#1861ff' : 'rgba(255,255,255,.5)'}`,
+                // el contorno solo sale mientras la censura está elegida. dejarlo
+                // puesto siempre hacía dudar de si el marco formaba parte del
+                // resultado o era una ayuda del editor
+                border: seleccion ? '1px solid #1861ff' : 'none',
                 borderRadius: c.forma === 'circulo' ? '50%' : 6,
               }}
             >
@@ -525,7 +544,7 @@ export default function CapasOverlay() {
                 width: ancho,
                 height: alto,
                 transform: `translate(-50%, -50%) ${extra}`.trim(),
-                opacity: c.opacidad / 100,
+                opacity: opa,
               }}
             >
               <svg
@@ -564,7 +583,7 @@ export default function CapasOverlay() {
               key={c.id}
               data-capa-id={c.id}
               className="pointer-events-none absolute"
-              style={{ left: rect.ox, top: rect.oy, width: rect.w, height: rect.h, opacity: c.opacidad / 100 }}
+              style={{ left: rect.ox, top: rect.oy, width: rect.w, height: rect.h, opacity: opa }}
             >
               <svg
                 width={rect.w}
@@ -683,7 +702,7 @@ export default function CapasOverlay() {
                 width: ancho,
                 height: alto,
                 transform: `translate(-50%, -50%) ${extra}`.trim(),
-                opacity: c.opacidad / 100,
+                opacity: opa,
               }}
             >
               {/* la imagen entera llena la caja; el recorte se aplica como inset
@@ -730,7 +749,7 @@ export default function CapasOverlay() {
           textDecoration: c.subrayado ? 'underline' : 'none',
           textAlign: c.alineacion,
           color: c.color,
-          opacity: c.opacidad / 100,
+          opacity: opa,
           whiteSpace: 'pre-wrap',
           lineHeight: c.interlineado ?? 1.2,
           letterSpacing: `${(c.tracking ?? 0) * escala}px`,

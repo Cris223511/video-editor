@@ -105,6 +105,67 @@ html {
    la barra va en otra más alta (z-40), así que por mucho que se suba el z del
    visor dentro del main, la barra seguía pintándose encima. subiendo la capa del
    main entero mientras dura la pantalla completa, el visor tapa de verdad todo */
+/* los textos de ejemplo de los campos iban con el mismo peso visual que el texto
+   escrito de verdad y competían con él. se bajan a un gris más tenue, que es como
+   se comporta un placeholder normal, sin cambiar el color de familia */
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+/* el pie llevaba el mismo azul profundo en los dos temas, así que en modo claro se
+   veía como un bloque oscuro pegado al final de una página luminosa. ahora cambia
+   con el tema y sus textos salen de estas variables en lugar de ir en blanco fijo.
+   ojo al tocar esto: el selector oscuro lleva el prefijo html.dark y no se puede
+   perder, o el pie se queda oscuro también en claro */
+.pie-sitio {
+  /* el fondo se separa del de la página solo lo justo: un blanco algo más limpio
+     que el celeste del cuerpo, para que se lea como el cierre de la página y no
+     como un bloque de otro color pegado al final */
+  background: linear-gradient(180deg, rgb(247 250 255) 0%, rgb(255 255 255) 100%);
+  --pie-texto: 15 23 42;
+  --pie-suave: 71 85 105;
+  --pie-borde: 15 23 42;
+}
+
+/* enlaces del pie: al pasar el cursor toman el azul de marca y les crece una
+   línea por debajo, de izquierda a derecha, como el subrayado de los títulos del
+   sitio. el color sale de --accent, así que en claro es el azul y en oscuro el
+   celeste, sin escribir dos veces lo mismo */
+.enlace-pie {
+  position: relative;
+  transition: color 0.2s ease;
+}
+.enlace-pie::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 1.5px;
+  width: 100%;
+  border-radius: 2px;
+  background: rgb(var(--accent));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.enlace-pie:hover {
+  color: rgb(var(--accent));
+}
+.enlace-pie:hover::after {
+  transform: scaleX(1);
+}
+
+html.dark .pie-sitio {
+  /* en oscuro sigue el mismo criterio: se levanta un punto sobre el fondo de la
+     página en lugar del azul profundo de antes, que cantaba demasiado */
+  background: linear-gradient(180deg, rgb(14 24 44) 0%, rgb(9 16 30) 100%);
+  --pie-texto: 255 255 255;
+  --pie-suave: 148 163 184;
+  --pie-borde: 255 255 255;
+}
+
 html.ve-visor-completo main {
   z-index: 60;
 }

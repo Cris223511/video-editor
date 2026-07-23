@@ -281,8 +281,8 @@ function EscenaRecorte({ t }: { t: number }) {
     { t: 1.6, x: CORTE, y: 30 },
     { t: 2.1, x: CORTE, y: 30 },
     { t: 2.7, x: CORTE, y: 44 },
-    { t: 4.2, x: CORTE + 12, y: 44 },
-    { t: 4.8, x: CORTE + 12, y: 44 },
+    { t: 4.2, x: CORTE + 9, y: 44 },
+    { t: 4.8, x: CORTE + 9, y: 44 },
     { t: 6.3, x: CORTE, y: 44 },
     { t: 6.8, x: CORTE, y: 30 },
     { t: 8.1, x: CORTE, y: 30 },
@@ -290,6 +290,11 @@ function EscenaRecorte({ t }: { t: number }) {
   ])
   const pulsando = t < 1.6 || (t > 2.6 && t < 6.35)
   const etiqueta = t > 2.55 && t < 3.15 ? 'Dividir' : undefined
+  // mientras se aparta el trozo, el puntero se ata al desplazamiento de verdad en
+  // lugar de seguir su propia interpolación: antes el cursor recorría doce y el
+  // clip nueve, así que se despegaba del borde justo en el gesto que lo explica
+  const arrastrando = t >= 2.7 && t <= 6.3
+  const cursorX = arrastrando ? CORTE + hueco : cursor.x
 
   return (
     <Marco>
@@ -385,7 +390,7 @@ function EscenaRecorte({ t }: { t: number }) {
         <span className="absolute -left-[5px] -top-1 h-2.5 w-3 rounded-sm bg-brand" />
       </span>
 
-      <Cursor t={t} {...cursor} pulsando={pulsando} etiqueta={etiqueta} />
+      <Cursor t={t} x={cursorX} y={cursor.y} pulsando={pulsando} etiqueta={etiqueta} />
       <Pie>{dividido ? 'apartas el trozo y el hueco se cierra solo' : 'llevas el cabezal al punto de corte'}</Pie>
     </Marco>
   )
@@ -395,20 +400,117 @@ function EscenaRecorte({ t }: { t: number }) {
 // grabado como puntos. todo el movimiento es de ida y vuelta, con lo que el
 // final del ciclo es exactamente el principio
 function EscenaCensura({ t }: { t: number }) {
-  const avance = vaiven(t)
-  const x = 20 + 48 * avance
-  const y = 24 + 14 * Math.sin((2 * Math.PI * t) / ACCION)
-  const grabados = Math.round(avance * 8)
+  // la zona de video, en porcentaje de la escena. de aquí salen las conversiones
+  // para saber qué hay debajo del recuadro en cada momento
+  const VX = 3
+  const VY = 20
+  const VW = 94
+  const VH = 58
+
+  // color del fondo en un punto, en coordenadas propias del video (0 a 1). es la
+  // misma composición que se pinta detrás: el degradado y las dos siluetas. de
+  // aquí sale el mosaico, así que el pixelado tapa lo que hay de verdad en lugar
+  // de inventarse unos colores que no pegaban con la escena
+  const colorFondo = (u: number, v: number) => {
+    const f = Math.min(1, Math.max(0, 0.26 * u + 0.74 * v))
+    let r = 29 + (47 - 29) * f
+    let g = 53 + (107 - 53) * f
+    let b = 87 + (214 - 87) * f
+    // siluetas del fondo, como dos medios óvalos apoyados abajo
+    const oval = (cx: number, cy: number, rx: number, ry: number, fuerza: number) => {
+      const d = ((u - cx) / rx) ** 2 + ((v - cy) / ry) ** 2
+      if (d < 1) {
+        const k = fuerza * (1 - d * 0.35)
+        r += (6 - r) * k
+        g += (12 - g) * k
+        b += (24 - b) * k
+      }
+    }
+    oval(0.25, 1, 0.15, 0.45, 0.3)
+    oval(0.73, 1, 0.19, 0.6, 0.22)
+    // franjas verticales y unos puntos de luz: sin algo de detalle, un fondo casi
+    // liso hace que el pixelado y el desenfoque no se distingan de un color plano
+    const franja = Math.sin(u * Math.PI * 9)
+    r += franja * 9
+    g += franja * 11
+    b += franja * 14
+    const luz = (cx: number, cy: number, rad: number, fuerza: number) => {
+      const d = Math.hypot(u - cx, (v - cy) * 1.6)
+      if (d < rad) {
+        const k = fuerza * (1 - d / rad)
+        r += (235 - r) * k
+        g += (245 - g) * k
+        b += (255 - b) * k
+      }
+    }
+    luz(0.17, 0.3, 0.12, 0.5)
+    luz(0.52, 0.62, 0.1, 0.38)
+    luz(0.86, 0.24, 0.11, 0.42)
+    return `rgb(${Math.round(Math.min(255, Math.max(0, r)))} ${Math.round(Math.min(255, Math.max(0, g)))} ${Math.round(Math.min(255, Math.max(0, b)))})`
+  }
+
+  // el ciclo se reparte entre los tres modos. en cada tramo el cursor sube a su
+  // pestaña, la pulsa, y luego baja a arrastrar el recuadro, que es la secuencia
+  // que de verdad se sigue en el editor
+  const TRAMO = ACCION / 3
+  const modo = Math.min(2, Math.floor(t / TRAMO))
+  const dentro = t - modo * TRAMO
+  // el arrastre ocupa la parte final del tramo, tras elegir el modo
+  const ELIGE = TRAMO * 0.34
+  const arrastrando = dentro > ELIGE
+  const avanceLocal = arrastrando ? (dentro - ELIGE) / (TRAMO - ELIGE) : 0
+
+  // el recuadro y los puntos del trazo salen de la MISMA función. antes cada uno
+  // tenía la suya (una con avance suavizado y otra con un seno distinto), así que
+  // los puntos quedaban fuera del camino que el cursor acababa de recorrer
+  const ruta = (p: number) => ({
+    x: 20 + 48 * (0.5 - 0.5 * Math.cos(Math.PI * 2 * p)),
+    y: 24 + 14 * Math.sin(Math.PI * 2 * p),
+  })
+  const { x, y } = ruta(avanceLocal)
+  const grabados = Math.round(avanceLocal * 8)
+
+  // posición de la pestaña que toca pulsar en este tramo, para llevar el cursor
+  const xPestana = [72, 82, 91][modo]
+
+  // el resalte de la pestaña espera a que el puntero llegue: antes cambiaba al
+  // entrar en el tramo, con el cursor todavía de camino, y se leía al revés
+  const modoVisible = dentro < ELIGE * 0.55 ? Math.max(0, modo - 1) : modo
+
+  const cursor = arrastrando
+    ? { x: x + 5, y: y + 9 }
+    : enRuta(dentro, [
+        { t: 0, x: xPestana, y: 30 },
+        { t: ELIGE * 0.55, x: xPestana, y: 11 },
+        { t: ELIGE, x: x + 5, y: y + 9 },
+      ])
+
+  // celdas del mosaico. con el modo tapar no hace falta muestrear nada
+  const COLS = 5
+  const FILAS = 4
+  const celdas = Array.from({ length: COLS * FILAS }, (_, k) => {
+    const cx = ((k % COLS) + 0.5) / COLS
+    const cy = (Math.floor(k / COLS) + 0.5) / FILAS
+    // del recuadro a coordenadas del video: dónde cae esta celda sobre el fondo
+    const u = (x + cx * 13 - VX) / VW
+    const v = (y + cy * 22 - VY) / VH
+    return colorFondo(Math.min(1, Math.max(0, u)), Math.min(1, Math.max(0, v)))
+  })
 
   return (
     <Marco>
-      <Barra titulo="Censura en movimiento" acciones={['Pixelar', 'Difuminar', 'Tapar']} activa={0} />
+      <Barra
+        titulo="Censura en movimiento"
+        acciones={['Pixelar', 'Difuminar', 'Tapar']}
+        activa={modoVisible}
+      />
 
       <span
         className="absolute inset-x-[3%] top-[20%] h-[58%] overflow-hidden rounded-lg"
         style={{ background: 'linear-gradient(165deg, #1d3557, #2f6bd6)' }}
       >
-        {/* dos siluetas de fondo para que el plano no sea un color plano */}
+        {/* dos siluetas de fondo para que el plano no sea un color plano. las
+            mismas que replica colorFondo para muestrear */}
         <span
           className="absolute bottom-0 left-[10%] h-[45%] w-[30%] rounded-t-full"
           style={{ background: 'rgb(6 12 24 / 0.3)' }}
@@ -417,18 +519,48 @@ function EscenaCensura({ t }: { t: number }) {
           className="absolute bottom-0 right-[8%] h-[60%] w-[38%] rounded-t-full"
           style={{ background: 'rgb(6 12 24 / 0.22)' }}
         />
+        {/* franjas y luces, lo que da textura al plano para que se note lo que
+            hace cada modo de censura */}
+        <span
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              'repeating-linear-gradient(90deg, rgb(255 255 255 / 0.05) 0 4%, transparent 4% 11%)',
+          }}
+        />
+        {[
+          { x: 17, y: 30, s: 24 },
+          { x: 52, y: 62, s: 20 },
+          { x: 86, y: 24, s: 22 },
+        ].map((l) => (
+          <span
+            key={`${l.x}-${l.y}`}
+            className="absolute rounded-full"
+            style={{
+              left: `${l.x}%`,
+              top: `${l.y}%`,
+              width: `${l.s}%`,
+              height: `${l.s * 1.6}%`,
+              transform: 'translate(-50%, -50%)',
+              background: 'radial-gradient(circle, rgb(235 245 255 / 0.5) 0%, transparent 70%)',
+            }}
+          />
+        ))}
       </span>
 
       {/* puntos del recorrido que ya quedó grabado */}
       {Array.from({ length: 9 }, (_, k) => {
         const f = k / 8
+        const q = ruta(f)
         return (
           <span
             key={k}
             className="absolute h-1.5 w-1.5 rounded-full transition-opacity duration-300"
             style={{
-              left: `${20 + 48 * f + 5}%`,
-              top: `${24 + 14 * Math.sin(Math.PI * f) + 9}%`,
+              // el punto marca el centro del recuadro en ese instante, de ahí el
+              // desplazamiento de media caja
+              left: `${q.x + 6.5}%`,
+              top: `${q.y + 11}%`,
               background: 'rgb(255 255 255 / 0.5)',
               opacity: k <= grabados ? 1 : 0.18,
             }}
@@ -436,18 +568,28 @@ function EscenaCensura({ t }: { t: number }) {
         )
       })}
 
+      {/* el recuadro censurado. pixelar deja ver el mosaico del fondo, difuminar
+          usa esas mismas celdas emborronadas, y tapar las cubre con un bloque */}
       <span
-        className="absolute grid h-[22%] w-[13%] grid-cols-3 grid-rows-3 overflow-hidden rounded"
-        style={{ left: `${x}%`, top: `${y}%`, outline: '2px solid rgb(var(--accent))' }}
+        className="absolute overflow-hidden rounded"
+        style={{ left: `${x}%`, top: `${y}%`, width: '13%', height: '22%', outline: '2px solid rgb(var(--accent))' }}
       >
-        {Array.from({ length: 9 }, (_, k) => (
+        {modoVisible === 2 ? (
+          <span className="absolute inset-0" style={{ background: 'rgb(9 14 26)' }} />
+        ) : (
           <span
-            key={k}
+            className="absolute inset-0 grid"
             style={{
-              background: `rgb(${180 + ((k * 37) % 60)} ${140 + ((k * 53) % 70)} ${120 + ((k * 71) % 80)})`,
+              gridTemplateColumns: `repeat(${COLS}, 1fr)`,
+              gridTemplateRows: `repeat(${FILAS}, 1fr)`,
+              filter: modoVisible === 1 ? 'blur(7px)' : undefined,
             }}
-          />
-        ))}
+          >
+            {celdas.map((c, k) => (
+              <span key={k} style={{ background: c }} />
+            ))}
+          </span>
+        )}
       </span>
 
       {/* pista de puntos clave: se van encendiendo al ritmo del arrastre */}
@@ -469,8 +611,18 @@ function EscenaCensura({ t }: { t: number }) {
         ))}
       </div>
 
-      <Cursor t={t} x={x + 5} y={y + 9} pulsando etiqueta="Grabando" />
-      <Pie>el recuadro va donde lo llevas y el trazo se guarda</Pie>
+      <Cursor
+        t={t}
+        x={cursor.x}
+        y={cursor.y}
+        pulsando
+        etiqueta={arrastrando ? 'Grabando' : ['Pixelar', 'Difuminar', 'Tapar'][modo]}
+      />
+      <Pie>
+        {arrastrando
+          ? 'el recuadro va donde lo llevas y el trazo se guarda'
+          : 'eliges cómo tapar: pixelado, desenfoque o bloque'}
+      </Pie>
     </Marco>
   )
 }
@@ -914,18 +1066,20 @@ function EscenaAudio({ t }: { t: number }) {
         <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>
           Volumen
         </span>
-        <span className="relative h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: 'rgb(var(--border) / 0.16)' }}>
+        {/* la bolita vive dentro de la propia barra: colocándola sobre el
+            contenedor entero se salía por la derecha, porque el rótulo y el
+            porcentaje ocupan un trozo que el porcentaje del mando no descontaba */}
+        <span className="relative h-1.5 flex-1 rounded-full" style={{ background: 'rgb(var(--border) / 0.16)' }}>
           <span className="absolute inset-y-0 left-0 rounded-full bg-brand" style={{ width: `${volumen * 100}%` }} />
+          <span
+            className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-brand shadow"
+            style={{ left: `${volumen * 100}%` }}
+          />
         </span>
         <span className="w-9 shrink-0 text-right font-mono text-[11px] font-bold" style={{ color: 'var(--text)' }}>
           {Math.round(volumen * 100)}%
         </span>
       </div>
-      <span
-        className="absolute top-[68%] h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-brand shadow"
-        style={{ left: `${mando}%` }}
-      />
-
       {/* franjas con ganancia propia, la otra forma de tocar el sonido */}
       <div className="absolute inset-x-[3%] top-[79%] flex h-[10%] gap-[2%]">
         {[0.55, 0.9, 0.4].map((g, i) => (

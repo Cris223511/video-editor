@@ -5,6 +5,7 @@ import TopBar from './TopBar'
 import NavSitio from './NavSitio'
 import Estrellas from '../sitio/Estrellas'
 import PieSitio from './PieSitio'
+import HaloCursor from '../sitio/HaloCursor'
 import { RUTAS } from '../../rutasDef'
 import { useScrollSuave } from '../../lib/scroll/useScrollSuave'
 
@@ -56,6 +57,8 @@ export default function Marco() {
       {/* el cielo solo en el sitio: dentro del editor competiría con el visor y
           añadiría trabajo de pintado mientras se reproduce un video */}
       {!enEditor && <Estrellas />}
+      {/* el halo que sigue al puntero, solo en el sitio y solo en modo oscuro */}
+      {!enEditor && <HaloCursor />}
       {enEditor ? <TopBar /> : <NavSitio />}
       <main className="relative z-10 flex-1">
         {/* cada vista entra con un desplazamiento corto. el editor se queda

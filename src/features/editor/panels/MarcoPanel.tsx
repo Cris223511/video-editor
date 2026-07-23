@@ -44,15 +44,14 @@ export default function MarcoPanel() {
               >
                 <span
                   className={[
-                    'relative block h-12 w-full overflow-hidden rounded-lg border transition-all duration-150',
+                    'relative block h-16 w-full overflow-hidden rounded-lg border bg-cover bg-center transition-all duration-150',
                     elegido
                       ? 'border-brand ring-2 ring-brand/40'
                       : 'border-black/10 group-hover:border-brand dark:border-white/10',
                   ].join(' ')}
-                  style={{
-                    backgroundImage:
-                      'linear-gradient(135deg, #3b82f6 0%, #22d3ee 40%, #a3e635 70%, #fbbf24 100%)',
-                  }}
+                  // la muestra va sobre una foto real, que deja ver de verdad cómo
+                  // se comporta cada marco encima de una imagen y no sobre un color plano
+                  style={{ backgroundImage: 'url(/poster-equipo.jpg)' }}
                 >
                   {t.tipo !== 'ninguno' && (
                     <span

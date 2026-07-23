@@ -50,7 +50,8 @@ export default function TopBar() {
       const st = useProjectStore.getState()
       await guardarSesion(st.idProyecto, st.creado)
       useProjectStore.setState({ sinGuardar: false, guardadoEn: Date.now() })
-      mostrar('success', 'Proyecto guardado en este equipo.')
+      // el propio botón ya cambia a "Guardado" y el punto de pendiente se apaga,
+      // así que un aviso encima solo tapaba la vista cada vez que se guardaba
     } catch {
       mostrar('error', 'No se pudo guardar. Puede que no quede espacio libre.')
     } finally {
@@ -92,9 +93,9 @@ export default function TopBar() {
             <img src="/logo-circle.png" alt="" className="h-7 w-7 object-contain" />
           </Link>
           {enEditor ? (
-            <Tooltip texto="Escribe para renombrar el proyecto" lado="abajo">
-              <input
+            <input
                 value={titulo}
+                maxLength={120}
                 onChange={(e) => renombrar(e.target.value)}
                 // al perder el foco, un nombre vacío o de puros espacios vuelve
                 // al de por defecto para que el proyecto nunca quede sin título
@@ -104,7 +105,6 @@ export default function TopBar() {
                 spellCheck={false}
                 className="w-40 truncate rounded-lg border border-transparent bg-transparent px-2 py-1 text-[15px] font-semibold tracking-tight outline-none transition-colors hover:border-[rgb(var(--border)/0.18)] focus:border-brand sm:w-56"
               />
-            </Tooltip>
           ) : (
             <div className="flex items-baseline gap-2">
               <Link to={RUTAS.portada} className="font-display text-[15px] font-extrabold tracking-tight">

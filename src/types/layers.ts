@@ -1,4 +1,4 @@
-import { AjusteTono } from './timeline'
+import { AjusteTono, Transicion } from './timeline'
 
 // un punto del recorrido de una capa en movimiento. t es el segundo relativo al
 // inicio de la capa; x e y, el centro en ese instante
@@ -34,6 +34,11 @@ export interface CapaBase {
   // definir entra y sale seco, como hasta ahora
   fundidoEntrada?: number
   fundidoSalida?: number
+  // transición con la que entra la capa, elegida del mismo catálogo que la de los
+  // clips. reinterpreta cada técnica como una entrada del propio elemento
+  // (desvanecido, crecimiento, deslizamiento o revelado por máscara). sin definir,
+  // la capa aparece de golpe salvo que tenga fundidoEntrada, que sigue vigente
+  transicion?: Transicion
   // fila del carril de texto y figuras en la que se dibuja el bloque. es solo una
   // ayuda visual de la línea de tiempo para separar elementos que se solapan en el
   // tiempo; no cambia qué queda delante de qué (eso lo deciden el orden y los

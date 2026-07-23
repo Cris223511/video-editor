@@ -5,6 +5,7 @@ import { RegionAudio, ClipAudio } from '../../types/audio'
 import { clipEnTiempo, duracionTotal } from '../timeline/clips'
 import { gananciaEn, fundidoEn } from '../audio/ganancia'
 import { usaMatriz, matrizTono, tablasColor, stdDeviationsDesenfoque } from '../color/tono'
+import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../color/mezcla'
 import { dibujarFotograma, Escena } from './compositor'
 
 export interface DatosExport {
@@ -134,60 +135,76 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
       }
       const off = document.createElement('canvas')
 
+
+      // arma (o rearma) el filtro de color de un clip a partir de un tono. se usa
+      // en el montaje y, para los clips con aparición progresiva, en cada cuadro
+      const NS = 'http://www.w3.org/2000/svg'
+      const construirFiltroTono = (id: string, tono: typeof clips[number]['tono']) => {
+        if (!usaMatriz(tono)) return null
+        const filtro = document.createElementNS(NS, 'filter')
+        filtro.setAttribute('id', id)
+        filtro.setAttribute('color-interpolation-filters', 'sRGB')
+        const fe = document.createElementNS(NS, 'feColorMatrix')
+        fe.setAttribute('type', 'matrix')
+        fe.setAttribute('values', matrizTono(tono))
+        filtro.appendChild(fe)
+        const tablas = tablasColor(tono)
+        if (tablas) {
+          const trans = document.createElementNS(NS, 'feComponentTransfer')
+          ;(['feFuncR', 'feFuncG', 'feFuncB'] as const).forEach((nombre, i) => {
+            const fn = document.createElementNS(NS, nombre)
+            fn.setAttribute('type', 'table')
+            fn.setAttribute('tableValues', tablas[i])
+            trans.appendChild(fn)
+          })
+          filtro.appendChild(trans)
+        }
+        return filtro
+      }
+      const construirFiltroBlur = (id: string, efectos: typeof clips[number]['efectos']) => {
+        const desenfoques = stdDeviationsDesenfoque(efectos ?? [])
+        if (!desenfoques.length) return null
+        const filtroB = document.createElementNS(NS, 'filter')
+        filtroB.setAttribute('id', id)
+        filtroB.setAttribute('color-interpolation-filters', 'sRGB')
+        desenfoques.forEach((sd) => {
+          const blur = document.createElementNS(NS, 'feGaussianBlur')
+          blur.setAttribute('stdDeviation', sd)
+          blur.setAttribute('edgeMode', 'duplicate')
+          filtroB.appendChild(blur)
+        })
+        return filtroB
+      }
+
       // filtros svg de tono (temperatura y tinte) referenciados por el compositor
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
       svg.setAttribute('style', 'position:absolute;width:0;height:0')
       const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs')
+      // los clips con aparición progresiva de color/efectos rehacen sus defs en
+      // cada cuadro, así que se apuntan aquí para actualizarlos en el bucle
+      const clipsConEntradaEfecto = clips.filter((c) => c.transicionEfecto && c.transicionEfecto > 0)
       clips.forEach((c) => {
-        const efectos = c.efectos ?? []
-        const desenfoques = stdDeviationsDesenfoque(efectos)
-
-        // filtro de color: temperatura, tinte, ruedas y curvas. va aparte del
-        // desenfoque porque el compositor los aplica en pasadas distintas para
-        // esquivar el fallo de ctx.filter que ennegrece el canvas al mezclar
-        // funciones nativas con un desenfoque svg
-        if (usaMatriz(c.tono)) {
-          const filtro = document.createElementNS('http://www.w3.org/2000/svg', 'filter')
-          filtro.setAttribute('id', `tonoexp-${c.id}`)
-          filtro.setAttribute('color-interpolation-filters', 'sRGB')
-
-          const fe = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix')
-          fe.setAttribute('type', 'matrix')
-          fe.setAttribute('values', matrizTono(c.tono))
-          filtro.appendChild(fe)
-
-          // las ruedas de color viajan como curva por canal, igual que en el
-          // visor, para que lo exportado coincida con lo que se vio al corregir
-          const tablas = tablasColor(c.tono)
-          if (tablas) {
-            const trans = document.createElementNS('http://www.w3.org/2000/svg', 'feComponentTransfer')
-            ;(['feFuncR', 'feFuncG', 'feFuncB'] as const).forEach((nombre, i) => {
-              const fn = document.createElementNS('http://www.w3.org/2000/svg', nombre)
-              fn.setAttribute('type', 'table')
-              fn.setAttribute('tableValues', tablas[i])
-              trans.appendChild(fn)
-            })
-            filtro.appendChild(trans)
-          }
-          defs.appendChild(filtro)
-        }
-
-        // filtro de solo desenfoque, con el mismo stdDeviation direccional que
-        // calcula el visor. el compositor lo aplica en su propia pasada, tras el
-        // color, de modo que el orden coincide con el del visor
-        if (desenfoques.length) {
-          const filtroB = document.createElementNS('http://www.w3.org/2000/svg', 'filter')
-          filtroB.setAttribute('id', `blurexp-${c.id}`)
-          filtroB.setAttribute('color-interpolation-filters', 'sRGB')
-          desenfoques.forEach((sd) => {
-            const blur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur')
-            blur.setAttribute('stdDeviation', sd)
-            blur.setAttribute('edgeMode', 'duplicate')
-            filtroB.appendChild(blur)
-          })
-          defs.appendChild(filtroB)
-        }
+        const fTono = construirFiltroTono(`tonoexp-${c.id}`, c.tono)
+        if (fTono) defs.appendChild(fTono)
+        const fBlur = construirFiltroBlur(`blurexp-${c.id}`, c.efectos)
+        if (fBlur) defs.appendChild(fBlur)
       })
+
+      // rehace las defs de un clip con el tono y los efectos ya mezclados por su
+      // factor de aparición en el instante dado. quita las anteriores por id y
+      // vuelve a crearlas, para que el color de matriz (temperatura, ruedas,
+      // curvas) también anime, no solo las funciones nativas
+      const refrescarDefsEfecto = (t: number) => {
+        for (const c of clipsConEntradaEfecto) {
+          const mix = mixEntradaEfecto(c.inicio, c.transicionEfecto, t)
+          defs.querySelector(`#tonoexp-${c.id}`)?.remove()
+          defs.querySelector(`#blurexp-${c.id}`)?.remove()
+          const fTono = construirFiltroTono(`tonoexp-${c.id}`, mezclarTono(c.tono, mix))
+          if (fTono) defs.appendChild(fTono)
+          const fBlur = construirFiltroBlur(`blurexp-${c.id}`, mezclarEfectos(c.efectos ?? [], mix))
+          if (fBlur) defs.appendChild(fBlur)
+        }
+      }
       // las imágenes de capa también corrigen color por el mismo camino que los
       // clips: si usan temperatura, tinte, ruedas o curvas, arman su propio
       // filtro svg con la matriz y las tablas por canal, referenciado por el id
@@ -388,6 +405,9 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
             phRef.t = Math.min(act.inicio + (v.currentTime - act.recorteInicio) / act.velocidad, total)
           }
 
+          // antes de pintar, se ponen al día las defs de color de los clips cuya
+          // corrección aparece progresivamente, para el instante actual
+          if (clipsConEntradaEfecto.length) refrescarDefsEfecto(phRef.t)
           dibujarFotograma(ctx, escena(), phRef.t, (id) => videos.get(id) ?? null, (id) => imagenes.get(id), off)
           onProgreso(Math.min(0.999, phRef.t / total))
           raf = requestAnimationFrame(paso)

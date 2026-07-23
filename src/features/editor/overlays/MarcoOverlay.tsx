@@ -24,10 +24,17 @@ export function estiloMarco(m: Marco, g: number, r: number): CSSProperties {
         boxShadow: `0 0 ${g}px ${m.color}, inset 0 0 ${g}px ${m.color}`,
       }
     case 'degradado':
+      // el marco de color se pinta como un fondo degradado recortado con dos
+      // máscaras que se restan, dejando solo el reborde. es más de fiar que
+      // border-image, que a ciertos grosores dejaba de dibujarse
       return {
-        border: `${g}px solid transparent`,
-        borderImage: 'linear-gradient(45deg, #ff6b6b, #f9d423, #4ecdc4, #556270) 1',
-      }
+        padding: g,
+        background: 'linear-gradient(45deg, #ff6b6b, #f9d423, #4ecdc4, #556270)',
+        WebkitMask:
+          'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+        WebkitMaskComposite: 'xor',
+        maskComposite: 'exclude',
+      } as CSSProperties
     case 'vineta':
       return { background: 'radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.75) 100%)' }
     case 'polaroid':

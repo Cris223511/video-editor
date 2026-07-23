@@ -26,6 +26,7 @@ import {
 } from '../../lib/color/tono'
 import { anterior, posterior, pintarTransicion, progreso, progresoSalida } from '../../lib/transiciones/pintar'
 import { cssEfectos } from '../../lib/efectos/catalogo'
+import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../../lib/color/mezcla'
 import { buscarTransicion } from '../../lib/transiciones/catalogo'
 import { sufijoTransformCss, aplicarTransformCanvas } from '../../lib/layers/transform'
 import { TIPO_FIGURA } from './panels/FiguraPanel'
@@ -69,6 +70,9 @@ export default function Preview() {
   // contenedor del visor y el recuadro de selección que se dibuja al arrastrar por
   // una zona vacía (incluidas las bandas de los lados), al estilo del escritorio
   const visorRef = useRef<HTMLDivElement>(null)
+  // acercamiento manual del visor. arranca en 1, que es el lienzo entero, y de ahí
+  // solo sube: alejarse más allá del lienzo no aporta nada
+  const [zoomVisor, setZoomVisor] = useState({ z: 1, x: 0, y: 0 })
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
 
   // arrastrar desde una zona vacía dibuja un recuadro azul; al soltar, se
@@ -692,9 +696,15 @@ export default function Preview() {
 
   // clips que necesitan el filtro svg: los que corrigen color y también los que
   // llevan algún efecto de desenfoque, aunque no toquen el color
-  const filtrosClip = clipsOrdenados.filter(
-    (c) => usaMatriz(c.tono) || hayEfectoFiltro(c.efectos ?? []),
-  )
+  // un clip lleva def de filtro svg si su color usa matriz o tiene un efecto de
+  // filtro. con la aparición progresiva se evalúa sobre el tono ya mezclado en el
+  // instante actual, así la def está lista justo cuando empieza a hacer falta
+  const filtrosClip = clipsOrdenados
+    .map((c) => {
+      const mix = mixEntradaEfecto(c.inicio, c.transicionEfecto, playhead)
+      return { clip: c, tono: mezclarTono(c.tono, mix), efectos: mezclarEfectos(c.efectos ?? [], mix) }
+    })
+    .filter((x) => usaMatriz(x.tono) || hayEfectoFiltro(x.efectos))
 
   const hayContenido = clipsOrdenados.length > 0 || hayCapas
 
@@ -728,6 +738,28 @@ export default function Preview() {
       // lienzo y las capas cortan la propagación, así que esto solo salta fuera de
       // la imagen
       onMouseDown={iniciarMarquee}
+      // con control pulsado la rueda acerca la imagen tomando como ancla el punto
+      // donde está el cursor, igual que en cualquier visor de fotos. sirve para
+      // afinar la colocación de una censura o un texto pequeño
+      onWheel={(e) => {
+        if (!e.ctrlKey && !e.metaKey) return
+        e.preventDefault()
+        const caja = visorRef.current?.getBoundingClientRect()
+        if (!caja) return
+        setZoomVisor((prev) => {
+          const z = Math.min(8, Math.max(1, prev.z * (e.deltaY < 0 ? 1.12 : 1 / 1.12)))
+          if (z === prev.z) return prev
+          // el punto bajo el cursor se queda quieto mientras el resto crece
+          const cx = e.clientX - caja.left - caja.width / 2
+          const cy = e.clientY - caja.top - caja.height / 2
+          const k = z / prev.z
+          const x = cx - (cx - prev.x) * k
+          const y = cy - (cy - prev.y) * k
+          // al volver al lienzo completo el desplazamiento se olvida, así nunca
+          // queda la imagen encajada fuera de sitio
+          return z === 1 ? { z: 1, x: 0, y: 0 } : { z, x, y }
+        })
+      }}
     >
       {/* recuadro azul de selección múltiple */}
       {marquee && marquee.w > 2 && marquee.h > 2 && (
@@ -750,10 +782,20 @@ export default function Preview() {
           </Vacio>
         </div>
       ) : (
-        <div ref={areaRef} className="flex h-full w-full items-center justify-center">
+        <div ref={areaRef} className="flex h-full w-full items-center justify-center overflow-hidden">
           <div
             className="relative shadow-2xl"
-            style={{ width: lienzoRect.w, height: lienzoRect.h, background: colorFondo }}
+            data-zoom-visor={zoomVisor.z > 1 ? '1' : undefined}
+            style={{
+              width: lienzoRect.w,
+              height: lienzoRect.h,
+              background: colorFondo,
+              transform:
+                zoomVisor.z > 1
+                  ? `translate(${zoomVisor.x}px, ${zoomVisor.y}px) scale(${zoomVisor.z})`
+                  : undefined,
+              transition: 'transform 140ms ease-out',
+            }}
             // un clic sobre la imagen elige el clip que hay bajo el cabezal para
             // poder reencuadrarlo; las capas y los tiradores cortan la
             // propagación, así que solo llega aquí el clic en el propio video. se
@@ -817,6 +859,13 @@ export default function Preview() {
                 })()}
               {clipsOrdenados.map((c) => {
                 const asset = assetPorId.get(c.assetId)
+                // aparición progresiva del color y los efectos, si el clip la lleva
+                const mixEf = mixEntradaEfecto(c.inicio, c.transicionEfecto, playhead)
+                const mezclaEfecto = {
+                  tono: mezclarTono(c.tono, mixEf),
+                  efectos: mezclarEfectos(c.efectos ?? [], mixEf),
+                  animando: !!c.transicionEfecto && mixEf < 1,
+                }
                 if (!asset) return null
                 // el encuadre se aplica como transformación del elemento: se
                 // escala respecto al centro y luego se lleva a su posición, en
@@ -864,10 +913,21 @@ export default function Preview() {
                       transform,
                       transformOrigin: 'center',
                       clipPath,
+                      // el color y el giro entran progresivamente. aplicar un estilo
+                      // o rotar noventa grados cambiaba la imagen de un fotograma al
+                      // siguiente y el salto se notaba mucho
+                      // mientras el color y los efectos aparecen (su transición
+                      // propia), la mezcla ya cambia el filtro fotograma a fotograma,
+                      // así que el suavizado css sobra y solo dejaría estela; sin esa
+                      // transición sí conviene, para que aplicar un color a mano entre
+                      // con calma
+                      transition: mezclaEfecto.animando
+                        ? 'transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1)'
+                        : 'filter 320ms cubic-bezier(0.4, 0, 0.2, 1), transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1)',
                       filter:
-                        esTonoNeutro(c.tono) && !hayEfectoFiltro(c.efectos ?? [])
+                        esTonoNeutro(mezclaEfecto.tono) && !hayEfectoFiltro(mezclaEfecto.efectos)
                           ? undefined
-                          : `${filtroCss(c.tono, `tono-${c.id}`, c.efectos ?? [])} ${cssEfectos(c.efectos)}`.trim(),
+                          : `${filtroCss(mezclaEfecto.tono, `tono-${c.id}`, mezclaEfecto.efectos)} ${cssEfectos(mezclaEfecto.efectos)}`.trim(),
                     }}
                   />
                 )
@@ -888,13 +948,13 @@ export default function Preview() {
             {filtrosClip.length > 0 && (
               <svg className="absolute h-0 w-0">
                 <defs>
-                  {filtrosClip.map((c) => {
-                    const tablas = tablasColor(c.tono)
-                    const desenfoques = stdDeviationsDesenfoque(c.efectos ?? [])
+                  {filtrosClip.map(({ clip: c, tono, efectos }) => {
+                    const tablas = tablasColor(tono)
+                    const desenfoques = stdDeviationsDesenfoque(efectos)
                     return (
                       <filter key={c.id} id={`tono-${c.id}`} colorInterpolationFilters="sRGB">
-                        {usaMatriz(c.tono) && (
-                          <feColorMatrix type="matrix" values={matrizTono(c.tono)} />
+                        {usaMatriz(tono) && (
+                          <feColorMatrix type="matrix" values={matrizTono(tono)} />
                         )}
                         {/* las ruedas se aplican como curva por canal: cada zona
                             tonal empuja su tramo y deja el resto en su sitio */}

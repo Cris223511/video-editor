@@ -310,14 +310,14 @@ export default function FichaProyecto({
           <Loader texto="Leyendo el proyecto..." />
         </div>
       ) : (
-        <div className="flex max-h-[65vh] flex-col gap-5 overflow-y-auto pr-1">
+        <div className="flex max-h-[65vh] flex-col gap-8 overflow-y-auto pr-1">
           <section>
-            <h3 className="mb-1 text-[14px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
+            <h3 className="mb-3 text-[14px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
               Proyecto
             </h3>
             {/* las dos fechas van juntas y con su icono, separadas del resto de
                 datos: son lo primero que se busca al abrir la ficha */}
-            <div className="mb-3 flex flex-col gap-2">
+            <div className="mb-5 flex flex-col gap-2">
               <p className="flex items-center gap-2 text-[13px]">
                 <CalendarPlus size={15} className="shrink-0 text-brand" />
                 <span className="text-[color:var(--muted)]">Creado el</span>
@@ -345,15 +345,10 @@ export default function FichaProyecto({
               />
               <Dato nombre="Espacio ocupado" valor={formatearBytes(pesoTotal)} />
             </dl>
-            <p className="mt-2 text-[13px] leading-relaxed text-[color:var(--muted)]">
-              Los archivos viven dentro del navegador de este equipo, no en una carpeta que puedas
-              abrir. Por eso no hay una ruta que mostrar: descarga el proyecto si quieres una copia
-              en disco.
-            </p>
           </section>
 
           <section>
-            <h3 className="mb-2 text-[14px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
+            <h3 className="mb-3 text-[14px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
               Archivos ({proyecto.medios.length})
             </h3>
             {/* cada archivo va plegado, con su borde punteado; se despliega al

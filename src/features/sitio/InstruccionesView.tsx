@@ -19,7 +19,7 @@ const MONTAJE: Paso[] = [
   {
     clave: 'Importa',
     texto:
-      'tus videos arrastrándolos a la zona de carga o pulsando para buscarlos en el equipo. Los archivos no se suben a ningún servidor, se abren directamente desde tu disco.',
+      'tus videos arrastrándolos a la zona de carga o pulsando para buscarlos. Puedes traer varios de una vez, y sumar más cuando quieras sin perder lo que ya llevas montado.',
   },
   {
     clave: 'Arrastra',
@@ -29,7 +29,12 @@ const MONTAJE: Paso[] = [
   {
     clave: 'Apila',
     texto:
-      'clips en varios niveles de video, y reparte los textos, las figuras y los audios en varias filas cuando se solapan en el tiempo. Lo que esté en un nivel superior tapa a lo que haya debajo, y cada nivel tiene su propia altura ajustable.',
+      'clips en varios niveles de video, y reparte los textos y figuras, las imágenes y los audios en sus propios carriles, con varias filas cuando se solapan en el tiempo. Lo que esté en un nivel superior tapa a lo que haya debajo. Cada carril tiene su propio alto, que ajustas tirando de su borde inferior, y su nombre, que cambias con un clic sobre él.',
+  },
+  {
+    clave: 'Añade filas',
+    texto:
+      'con el botón de más de cada carril o, más rápido, arrastrando un elemento por debajo de la última fila para que nazca una nueva justo ahí. Arrastrar un bloque entre dos filas también abre una en medio.',
   },
   {
     clave: 'Duplica',
@@ -72,7 +77,12 @@ const EFECTOS: Paso[] = [
   {
     clave: 'Elige la transición',
     texto:
-      'de entrada de cada clip, con veintiuna para elegir entre fundidos, barridos direccionales, persianas, puertas, círculo, rombo, empujes y zooms. Pasa el cursor por una muestra para verla funcionando antes de aplicarla.',
+      'de entrada de cada clip, con veintiuna para elegir entre fundidos, barridos direccionales, persianas, puertas, círculo, rombo, empujes y zooms. La misma galería sirve para cualquier elemento: un texto, una figura, una imagen o un dibujo también entran con la transición y la duración que decidas, y su cuña se ve y se estira en la línea de tiempo.',
+  },
+  {
+    clave: 'Haz que el color aparezca',
+    texto:
+      'de forma progresiva. En un clip de video puedes marcar que su corrección de color y sus efectos no estén a pleno desde el primer fotograma, sino que se asienten durante los primeros segundos, con la duración que elijas.',
   },
   {
     clave: 'Cambia la velocidad',
@@ -100,7 +110,7 @@ const CAPAS: Paso[] = [
   {
     clave: 'Coloca imágenes',
     texto:
-      'o tu logo sobre el video, con opacidad, corrección de color propia y un recorte que ajustas arrastrando un recuadro sobre el visor. Puedes deformarlas libremente o devolverles su proporción original.',
+      'o tu logo sobre el video, en su propio carril de la línea de tiempo, con opacidad, corrección de color propia y un recorte que ajustas arrastrando un recuadro sobre el visor. Al redimensionarlas mantienen su proporción, y con Shift pulsado las deformas libremente, para no aplastar una foto sin querer.',
   },
   {
     clave: 'Inserta figuras',
@@ -255,11 +265,10 @@ export default function InstruccionesView() {
         </Aparece>
 
         <Aparece className="mt-10">
-          <Aviso titulo="Privacidad">
-            Todo el procesamiento ocurre dentro de tu navegador. Los videos no se suben ni se envían
-            a ningún servidor externo, ni mientras editas ni al exportar. La información permanece
-            en tu equipo en todo momento, y el rendimiento depende del tamaño de los archivos y de
-            la potencia de tu ordenador.
+          <Aviso titulo="Qué esperar del rendimiento">
+            La exportación va en tiempo real, así que un video de un minuto tarda alrededor de un
+            minuto. El resto del montaje se mueve al instante, aunque con material muy pesado o
+            muchos niveles a la vez notarás que el equipo trabaja más.
           </Aviso>
         </Aparece>
       </div>

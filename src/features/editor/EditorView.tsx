@@ -7,7 +7,6 @@ import Preview from './Preview'
 import PlaybackControls from './PlaybackControls'
 import OptionsPanel from './OptionsPanel'
 import Timeline from './timeline/Timeline'
-import BarraGlobales from './BarraGlobales'
 import MenuContextual from './MenuContextual'
 import ExportDialog from './ExportDialog'
 import Icon from '../../components/ui/Icon'
@@ -172,9 +171,6 @@ export default function EditorView() {
               </PanelGroup>
             </div>
 
-            {/* opciones de lo que esté elegido, al costado derecho. antes iban sobre
-                la línea de tiempo y la empujaban al elegir un clip */}
-            {!visorCompleto && <BarraGlobales />}
           </div>
         </Panel>
 

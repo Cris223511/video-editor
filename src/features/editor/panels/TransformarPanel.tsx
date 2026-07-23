@@ -9,10 +9,18 @@ import { CapaTexto, CapaImagen, CapaFigura, CapaTrazo } from '../../../types/lay
 // efecto muestrea el video y girarla dejaría la zona tapada descuadrada
 type CapaTransformable = CapaTexto | CapaImagen | CapaFigura | CapaTrazo
 
-// deja el ángulo siempre entre 0 y 359, para que sumar y restar giros no acumule
-// vueltas enteras que no aportan nada
-function normalizarAngulo(a: number): number {
+// el ángulo que se guarda no se recorta a una sola vuelta. si al llegar a 270 se
+// devolvía a 0, la animación del visor tomaba el camino largo y el cuarto giro se
+// veía retroceder tres cuartos en vez de completar la vuelta
+function anguloMostrado(a: number): number {
   return ((a % 360) + 360) % 360
+}
+
+// el deslizador trabaja sobre una vuelta, así que su valor se traslada a la vuelta
+// en la que esté el elemento y se toma el camino corto hacia el ángulo elegido
+function anguloContinuo(actual: number, destino: number): number {
+  const dif = ((destino - anguloMostrado(actual) + 540) % 360) - 180
+  return actual + dif
 }
 
 // botón cuadrado con icono y rótulo debajo, en rejilla. se resalta cuando su
@@ -68,7 +76,7 @@ export default function TransformarPanel() {
   ) {
     const t = capa as CapaTransformable
     const girar = (delta: number) =>
-      actualizarCapa(t.id, { rotacion: normalizarAngulo((t.rotacion ?? 0) + delta) })
+      actualizarCapa(t.id, { rotacion: (t.rotacion ?? 0) + delta })
     return (
       <Contenido
         titulo={`Transformar ${etiquetaCapa(t.tipo)}`}
@@ -84,7 +92,7 @@ export default function TransformarPanel() {
         onOpacidad={(v) => actualizarCapa(t.id, { opacidad: v })}
         onTraerFrente={() => traerAlFrente(t.id)}
         onEnviarAtras={() => enviarAtras(t.id)}
-        onRotacionLibre={(v) => actualizarCapa(t.id, { rotacion: normalizarAngulo(v) })}
+        onRotacionLibre={(v) => actualizarCapa(t.id, { rotacion: anguloContinuo(t.rotacion ?? 0, v) })}
       />
     )
   }
@@ -95,7 +103,7 @@ export default function TransformarPanel() {
     const enc = clip.encuadre
     const rot = enc?.rotacion ?? 0
     const girarClip = (delta: number) =>
-      actualizarEncuadre(clip.id, { rotacion: normalizarAngulo(rot + delta) })
+      actualizarEncuadre(clip.id, { rotacion: rot + delta })
     return (
       <Contenido
         titulo="Transformar video"
@@ -109,7 +117,7 @@ export default function TransformarPanel() {
         onReiniciar={() =>
           actualizarEncuadre(clip.id, { rotacion: 0, espejoH: false, espejoV: false, escala: 1 })
         }
-        onRotacionLibre={(v) => actualizarEncuadre(clip.id, { rotacion: normalizarAngulo(v) })}
+        onRotacionLibre={(v) => actualizarEncuadre(clip.id, { rotacion: anguloContinuo(rot, v) })}
         escala={enc?.escala ?? 1}
         onEscala={(v) => actualizarEncuadre(clip.id, { escala: v })}
       />
@@ -179,7 +187,7 @@ function Contenido({
   onEscala?: (v: number) => void
 }) {
   const hayGiro = onGirarIzq && onGirarDer
-  const tocado = espejoH || espejoV || (rotacion ?? 0) !== 0
+  const tocado = espejoH || espejoV || anguloMostrado(rotacion ?? 0) !== 0
   return (
     <div className="flex flex-col gap-4">
       <p className="text-[13px] leading-relaxed text-[color:var(--muted)]">
@@ -212,8 +220,13 @@ function Contenido({
       {/* giro fino a cualquier ángulo. los botones de arriba siguen sirviendo para
           los cuartos de vuelta, que es lo que se usa la mayoría de las veces */}
       {onRotacionLibre && (
-        <Campo etiqueta={`Rotación (${rotacion ?? 0}°)`}>
-          <Deslizador valor={rotacion ?? 0} min={0} max={359} onChange={onRotacionLibre} />
+        <Campo etiqueta={`Rotación (${anguloMostrado(rotacion ?? 0)}°)`}>
+          <Deslizador
+            valor={anguloMostrado(rotacion ?? 0)}
+            min={0}
+            max={359}
+            onChange={onRotacionLibre}
+          />
         </Campo>
       )}
 

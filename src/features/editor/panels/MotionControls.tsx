@@ -130,8 +130,20 @@ export default function MotionControls({ capa }: { capa: CapaBase }) {
               type="number"
               min={1}
               max={10}
+              step={1}
+              // el teclado numérico en táctil y, sobre todo, nada de letras: un
+              // campo de número acepta 'e' y signos por defecto, y eso deja pasar
+              // valores que luego no son un número
+              inputMode="numeric"
               value={segundosCuenta}
-              onChange={(e) => setSegundosCuenta(Number(e.target.value))}
+              onKeyDown={(e) => {
+                if (['e', 'E', '+', '-', ','].includes(e.key)) e.preventDefault()
+              }}
+              onChange={(e) => {
+                const n = Number(e.target.value)
+                if (!Number.isFinite(n)) return
+                setSegundosCuenta(Math.max(1, Math.min(10, Math.round(n))))
+              }}
               className="w-12 rounded-md border border-black/10 bg-transparent px-1.5 py-0.5 text-xs dark:border-white/10"
             />
             <span className="text-xs text-[color:var(--muted)]">s</span>

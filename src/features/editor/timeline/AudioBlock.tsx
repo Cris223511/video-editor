@@ -4,7 +4,7 @@ import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
 import { amplitudEn, picosDeMedio, PerfilPicos } from '../../../lib/audio/picos'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
-import { nivelBajoCursor, separacionBajoCursor } from './nivelCursor'
+import { nivelBajoCursor, separacionBajoCursor, porDebajoDelUltimo } from './nivelCursor'
 
 interface Props {
   region: RegionAudio
@@ -30,14 +30,14 @@ export function alturasOnda(semilla: string, n: number): number[] {
   return alturas
 }
 
-// dibuja una lista de alturas (0..1) como líneas verticales finas y centradas.
-// cada línea mide un solo píxel de ancho y crece de forma simétrica desde el eje
-// horizontal del carril, así que la franja se lee como el waveform de un editor
-// de audio y no como una fila de bloques anchos. el reparto lo hace justify-between
-// para que las líneas queden bien pegadas ocupando todo el ancho disponible
+// dibuja una lista de alturas (0..1) como líneas verticales finas pegadas al
+// borde de arriba. cada línea mide un píxel y va a paso fijo desde la izquierda,
+// sin estirarse para llenar el ancho: si sobra sitio, el patrón simplemente se
+// repite. antes iban centradas y repartidas con justify-between, que al ensanchar
+// el bloque separaba las líneas y deformaba la onda
 function LineasOnda({ alturas, color }: { alturas: number[]; color: string }) {
   return (
-    <div className="pointer-events-none absolute inset-0 flex items-center justify-between overflow-hidden px-1">
+    <div className="pointer-events-none absolute inset-0 flex items-start gap-px overflow-hidden px-1">
       {alturas.map((h, i) => (
         <span
           key={i}
@@ -217,6 +217,10 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     let ultimoY = e.clientY
 
     const mover = (ev: globalThis.MouseEvent) => {
+      // la etiqueta sigue al cursor durante todo el gesto, así se ve en qué punto
+      // de la línea de tiempo va a caer lo que se lleva en la mano
+      useEditorStore.getState().setArrastreVivo({ etiqueta: 'Audio', x: ev.clientX, y: ev.clientY })
+
       ultimoX = ev.clientX
       ultimoY = ev.clientY
       if (!movido) {
@@ -239,6 +243,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
       moverRegionAudio(idGesto, inicio)
     }
     const soltar = () => {
+      useEditorStore.getState().setArrastreVivo(null)
       // alt y clic seco: el bloque entra o sale del conjunto
       if (!movido && conAlt) alternarBloque(region.id)
       setGuiaImantado(null)
@@ -248,6 +253,8 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
       const junta = separacionBajoCursor(ultimoX, ultimoY, 'nivelAudio')
       if (junta !== null) {
         insertarNivelAudio(junta, idGesto)
+      } else if (porDebajoDelUltimo(ultimoX, ultimoY, 'nivelAudio')) {
+        insertarNivelAudio(0, idGesto)
       } else {
         const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelAudio')
         if (destino !== null) moverAudioNivel(idGesto, destino)

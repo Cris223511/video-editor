@@ -11,6 +11,7 @@ export function Campo({
   etiqueta,
   ayuda,
   valor,
+  obligatorio = false,
   children,
 }: {
   etiqueta: string
@@ -18,12 +19,24 @@ export function Campo({
   ayuda?: string
   // valor actual mostrado a la derecha de la etiqueta, útil en deslizadores
   valor?: ReactNode
+  // marca el campo como obligatorio con un asterisco rojo, para distinguirlo de
+  // los que se pueden dejar en blanco sin más
+  obligatorio?: boolean
   children: ReactNode
 }) {
+  // la etiqueta acaba en dos puntos salvo que ya traiga su propio signo final
+  const rotulo = /[:?]$/.test(etiqueta.trim()) ? etiqueta : `${etiqueta}:`
   return (
-    <label className="flex flex-col gap-1.5">
+    <label className="flex flex-col gap-2">
       <span className="flex items-center gap-1.5">
-        <span className="text-xs font-medium text-[color:var(--muted)]">{etiqueta}</span>
+        <span className="text-xs font-medium text-[color:var(--muted)]">
+          {rotulo}
+          {obligatorio && (
+            <span className="ml-0.5 font-semibold" style={{ color: 'rgb(var(--alerta))' }} title="Obligatorio">
+              *
+            </span>
+          )}
+        </span>
         {ayuda && <Ayuda texto={ayuda} />}
         {valor !== undefined && (
           <span className="ml-auto text-xs font-semibold tabular-nums text-[color:var(--text)]">

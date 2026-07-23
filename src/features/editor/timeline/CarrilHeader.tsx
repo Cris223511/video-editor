@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import Icon, { NombreIcono } from '../../../components/ui/Icon'
 import Tooltip from '../../../components/ui/Tooltip'
+import NombreEditable from './NombreEditable'
 
 // cabecera de un carril que no es de video (el de texto y figuras, y el de
 // audio). vive en la misma columna izquierda que las cabeceras de las pistas,
@@ -17,6 +18,8 @@ export default function CarrilHeader({
   puedeAgregar = false,
   onSubir,
   onBajar,
+  onRenombrar,
+  onEstirar,
 }: {
   icono: NombreIcono
   titulo: string
@@ -24,24 +27,29 @@ export default function CarrilHeader({
   alto: number
   onAgregar?: () => void
   puedeAgregar?: boolean
+  // cuando llega, el rótulo se puede editar en el sitio igual que el de una pista
+  onRenombrar?: (nombre: string) => void
   // suben o bajan la sección entera dentro de la línea de tiempo. llegan sin
   // definir cuando el carril ya está arriba del todo o abajo del todo
   onSubir?: () => void
   onBajar?: () => void
+  // arrastre para cambiar el alto de las filas del carril; el gesto lo maneja quien
+  // lo pasa, aquí solo se pinta el tirador en el borde inferior
+  onEstirar?: (e: React.MouseEvent) => void
 }) {
   return (
     <div
-      className="relative flex items-center gap-2 overflow-hidden rounded-lg pl-3 pr-2"
+      className="group relative flex items-center gap-2 overflow-hidden rounded-r-lg pl-3 pr-2"
       style={{
         height: alto,
         background: 'rgb(var(--border) / 0.06)',
       }}
     >
-      {/* la franja vertical del color propio del carril es la marca que lo
-          diferencia de las pistas de video, que no la llevan */}
+      {/* franja fina del color del carril, de arriba abajo del todo. distingue el
+          carril de las pistas de video sin cargar la cabecera */}
       <span
-        className="absolute inset-y-0 left-0 w-1 rounded-l-lg"
-        style={{ background: acento }}
+        className="absolute inset-y-0 left-0 w-0.5"
+        style={{ background: acento, opacity: 0.7 }}
       />
       <span
         className="grid h-6 w-6 shrink-0 place-items-center rounded-md"
@@ -49,7 +57,11 @@ export default function CarrilHeader({
       >
         <Icon name={icono} size={14} />
       </span>
-      <span className="truncate text-[12px] font-medium text-[color:var(--muted)]">{titulo}</span>
+      {onRenombrar ? (
+        <NombreEditable valor={titulo} onGuardar={onRenombrar} />
+      ) : (
+        <span className="truncate text-[12px] font-medium text-[color:var(--muted)]">{titulo}</span>
+      )}
       {/* reordenar la sección completa. el video no lleva flechas propias, pero al
           mover estas dos por encima o por debajo de él se llega a cualquier orden */}
       <span className="ml-auto flex shrink-0 items-center">
@@ -72,6 +84,14 @@ export default function CarrilHeader({
           <ChevronDown size={13} />
         </button>
       </span>
+      {onEstirar && (
+        <div
+          onMouseDown={onEstirar}
+          title="Arrastra para cambiar el alto"
+          className="absolute inset-x-0 bottom-0 z-10 h-1.5 cursor-ns-resize opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover:opacity-60"
+          style={{ background: 'rgb(var(--brand) / 0.8)' }}
+        />
+      )}
       {onAgregar && (
         <Tooltip texto={puedeAgregar ? 'Añadir una fila' : 'Máximo de filas alcanzado'} lado="derecha">
           <button

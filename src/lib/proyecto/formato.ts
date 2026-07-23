@@ -32,8 +32,14 @@ export interface ProyectoGuardado {
   version: number
   id: string
   titulo: string
+  // nota libre que escribe quien monta, para reconocer el proyecto de un vistazo
+  // cuando el título no basta. opcional, así que lo guardado antes sigue valiendo
+  descripcion?: string
   creado: number
   modificado: number
+  // última vez que se abrió el proyecto, que suele decir más que la fecha de
+  // creación a la hora de reconocerlo en la lista
+  abierto?: number
   portada: string // miniatura del primer medio, para la lista de proyectos
   medios: MedioGuardado[]
   edicion: {
@@ -61,8 +67,10 @@ export interface ProyectoGuardado {
 export interface ResumenProyecto {
   id: string
   titulo: string
+  descripcion?: string
   creado: number
   modificado: number
+  abierto?: number
   portada: string
   numMedios: number
   duracion: number

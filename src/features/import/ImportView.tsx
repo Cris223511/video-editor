@@ -42,8 +42,8 @@ export default function ImportView() {
       <div className="mb-8">
         <h1 className="font-display text-titulo-lg">Empieza tu proyecto</h1>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[color:var(--muted)]">
-          Sube uno o varios videos para editarlos. El material se procesa en tu equipo y no viaja a
-          ningún servidor.
+          Trae los videos, las imágenes y los audios con los que vas a trabajar. Puedes soltar
+          varios de una vez y añadir más cuando quieras, ya con el montaje empezado.
         </p>
       </div>
 
@@ -80,10 +80,10 @@ export default function ImportView() {
           ))}
         </div>
 
-        <Aviso titulo="Privacidad">
-          Todo el procesamiento ocurre dentro de tu navegador. Los videos no se suben ni se envían a
-          ningún servidor externo, ni mientras editas ni al exportar. La información permanece en tu
-          equipo en todo momento, y el rendimiento puede variar según el tamaño de los archivos.
+        <Aviso titulo="Antes de empezar">
+          Cada archivo se comprueba al entrar, no solo por su extensión, así que si algo no encaja te
+          lo dirá en el momento en lugar de fallar más adelante. El rendimiento depende del tamaño de
+          lo que traigas y de la potencia de tu equipo.
         </Aviso>
       </div>
     </div>

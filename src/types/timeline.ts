@@ -80,6 +80,10 @@ export interface Clip {
   tono: AjusteTono // corrección de color del clip
   efectos: EfectoClip[] // cadena de efectos, vacía mientras no se aplique ninguno
   transicion: Transicion // cómo entra el clip respecto al anterior
+  // duración, en segundos, durante la cual la corrección de color y los efectos
+  // del clip aparecen de forma progresiva desde su arranque, en vez de estar a
+  // pleno desde el primer fotograma. sin definir o en cero, se aplican de una
+  transicionEfecto?: number
   // cómo se va el clip al terminar. es independiente de la de entrada, así que un
   // mismo plano puede abrir de una forma y cerrar de otra. sin definir se corta seco
   transicionSalida?: Transicion

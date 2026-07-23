@@ -1,7 +1,20 @@
-import { useEffect, useRef, useState } from 'react'
+import { ReactNode, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDown, Download, Play, X } from 'lucide-react'
+import {
+  Clock,
+  Compass,
+  Download,
+  FileCode2,
+  FileVideo,
+  Grid2x2,
+  HardDrive,
+  Hash,
+  Play,
+  RectangleHorizontal,
+  Ruler,
+  X,
+} from 'lucide-react'
 import Modal from '../../components/ui/Modal'
 import { MediaAsset } from '../../types/media'
 import { formatearDuracion } from '../../lib/format/duracion'
@@ -25,13 +38,27 @@ function orientacion(ancho: number, alto: number): string {
   return ancho > alto ? 'Horizontal' : 'Vertical'
 }
 
-function Dato({ nombre, valor }: { nombre: string; valor: string }) {
+function Dato({
+  icono,
+  nombre,
+  valor,
+  ultima,
+}: {
+  icono?: ReactNode
+  nombre: string
+  valor: string
+  // la última fila no lleva línea abajo, que si no la lista parece cortada
+  ultima?: boolean
+}) {
   return (
     <div
-      className="flex items-baseline justify-between gap-4 py-1.5"
-      style={{ borderBottom: '1px solid rgb(var(--border) / 0.08)' }}
+      className="flex items-baseline justify-between gap-4 py-2"
+      style={ultima ? undefined : { borderBottom: '1px solid rgb(var(--border) / 0.1)' }}
     >
-      <dt className="shrink-0 text-[13px] text-[color:var(--muted)]">{nombre}</dt>
+      <dt className="flex shrink-0 items-center gap-2 text-[13px] text-[color:var(--muted)]">
+        {icono && <span className="text-brand">{icono}</span>}
+        {nombre}
+      </dt>
       <dd className="min-w-0 truncate text-right text-[13px] font-medium">{valor}</dd>
     </div>
   )
@@ -170,14 +197,12 @@ export default function FichaMedio({
   medio: MediaAsset | null
   onCerrar: () => void
 }) {
-  // datos plegados al abrir la ficha, y el visor cerrado hasta que se pulse play
-  const [datosAbiertos, setDatosAbiertos] = useState(false)
+  // el visor arranca cerrado hasta que se pulse play
   const [reproduciendo, setReproduciendo] = useState(false)
 
-  // cada vez que se abre otra ficha se vuelve al estado de reposo, para no
-  // heredar el despliegue ni el visor del medio anterior
+  // al abrir otra ficha se vuelve al estado de reposo, para no heredar el visor
+  // del medio anterior
   useEffect(() => {
-    setDatosAbiertos(false)
     setReproduciendo(false)
   }, [medio])
 
@@ -195,14 +220,17 @@ export default function FichaMedio({
         descripcion="Datos del archivo importado."
         abierto={medio !== null}
         onCerrar={onCerrar}
-        ancho="max-w-md"
+        ancho="max-w-3xl"
       >
-        <div className="flex flex-col gap-4">
+        {/* dos columnas: el video a la izquierda y sus datos a la derecha. antes
+            los datos vivían plegados dentro de un desplegable, así que había que
+            abrirlos para ver algo tan básico como las dimensiones */}
+        <div className="grid gap-5 sm:grid-cols-[1.1fr_1fr]">
           {/* la portada hace de disparador del visor: al pasar el cursor se
               oscurece y aparece el botón de reproducir en el centro */}
           <button
             onClick={() => setReproduciendo(true)}
-            className="group relative block w-full overflow-hidden rounded-lg bg-black/40"
+            className="group relative block w-full self-start overflow-hidden rounded-xl bg-black/40"
             style={{ aspectRatio: `${medio.ancho} / ${medio.alto}` }}
             aria-label="Reproducir video"
           >
@@ -218,48 +246,19 @@ export default function FichaMedio({
             </span>
           </button>
 
-          {/* datos técnicos dentro de un bloque de borde punteado que se despliega.
-              plegados de entrada, no estorban a quien solo quiere ver el video */}
-          <div
-            className="rounded-xl"
-            style={{ border: '1px dashed rgb(var(--border) / 0.35)' }}
-          >
-            <button
-              onClick={() => setDatosAbiertos((v) => !v)}
-              className="flex w-full items-center justify-between gap-2 px-3.5 py-2.5 text-left"
-              aria-expanded={datosAbiertos}
-            >
-              <span className="text-[13px] font-semibold">Detalles del archivo</span>
-              <ChevronDown
-                size={16}
-                className="shrink-0 text-[color:var(--muted)] transition-transform duration-300"
-                style={{ transform: datosAbiertos ? 'rotate(180deg)' : 'none' }}
-              />
-            </button>
-            <AnimatePresence initial={false}>
-              {datosAbiertos && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                  className="overflow-hidden"
-                >
-                  <dl className="px-3.5 pb-3">
-                    <Dato nombre="Dimensiones" valor={`${medio.ancho} × ${medio.alto} px`} />
-                    <Dato nombre="Proporción" valor={proporcion(medio.ancho, medio.alto)} />
-                    <Dato nombre="Orientación" valor={orientacion(medio.ancho, medio.alto)} />
-                    <Dato nombre="Duración" valor={formatearDuracion(medio.duracion)} />
-                    <Dato nombre="Tamaño" valor={formatearBytes(medio.tamano)} />
-                    <Dato nombre="Formato" valor={formato} />
-                    <Dato nombre="Tipo MIME" valor={medio.tipo || 'Desconocido'} />
-                    <Dato nombre="Megapíxeles" valor={`${(pixeles / 1_000_000).toFixed(2)} MP`} />
-                    <Dato nombre="Píxeles totales" valor={pixeles.toLocaleString('es')} />
-                  </dl>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          {/* los datos, siempre a la vista y repartidos en filas separadas por una
+              línea, que es como se lee una ficha de un vistazo */}
+          <dl className="flex flex-col self-start">
+            <Dato icono={<Ruler size={14} />} nombre="Dimensiones" valor={`${medio.ancho} × ${medio.alto} px`} />
+            <Dato icono={<RectangleHorizontal size={14} />} nombre="Proporción" valor={proporcion(medio.ancho, medio.alto)} />
+            <Dato icono={<Compass size={14} />} nombre="Orientación" valor={orientacion(medio.ancho, medio.alto)} />
+            <Dato icono={<Clock size={14} />} nombre="Duración" valor={formatearDuracion(medio.duracion)} />
+            <Dato icono={<HardDrive size={14} />} nombre="Tamaño" valor={formatearBytes(medio.tamano)} />
+            <Dato icono={<FileVideo size={14} />} nombre="Formato" valor={formato} />
+            <Dato icono={<FileCode2 size={14} />} nombre="Tipo MIME" valor={medio.tipo || 'Desconocido'} />
+            <Dato icono={<Grid2x2 size={14} />} nombre="Megapíxeles" valor={`${(pixeles / 1_000_000).toFixed(2)} MP`} />
+            <Dato icono={<Hash size={14} />} nombre="Píxeles totales" valor={pixeles.toLocaleString('es')} ultima />
+          </dl>
         </div>
       </Modal>
 

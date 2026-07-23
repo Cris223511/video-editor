@@ -42,3 +42,26 @@ export function nivelBajoCursor(x: number, y: number, attr: string): number | nu
   }
   return null
 }
+
+// dice si el cursor cae en la franja justo por debajo de la última fila del
+// carril (la de nivel 0, que es la más baja). arrastrar un bloque ahí y soltarlo
+// abre un nivel nuevo en el fondo, sin tener que apuntar al botón de más. se toma
+// como zona sensible una banda de 26 px bajo el borde inferior del carril
+export function porDebajoDelUltimo(x: number, y: number, attr: string): boolean {
+  const filas = Array.from(document.querySelectorAll<HTMLElement>(`[data-${camelAGuion(attr)}]`))
+  if (!filas.length) return false
+  let masBaja: DOMRect | null = null
+  for (const el of filas) {
+    const r = el.getBoundingClientRect()
+    if (!masBaja || r.bottom > masBaja.bottom) masBaja = r
+  }
+  if (!masBaja) return false
+  return x >= masBaja.left && x <= masBaja.right && y > masBaja.bottom && y < masBaja.bottom + 26
+}
+
+// los atributos se leen del dataset en camelCase (nivelTexto) pero en el dom van
+// con guion (data-nivel-texto). esta conversión permite pasar el mismo nombre que
+// usan nivelBajoCursor y separacionBajoCursor
+function camelAGuion(attr: string): string {
+  return attr.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase())
+}

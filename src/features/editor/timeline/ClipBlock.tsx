@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import { MouseEvent as ReactMouseEvent, useEffect, useState } from 'react'
 import { Info, Volume2, VolumeX } from 'lucide-react'
 import { Clip } from '../../../types/timeline'
@@ -144,6 +145,10 @@ export default function ClipBlock({
     }
 
     const mover = (ev: globalThis.MouseEvent) => {
+      // la etiqueta sigue al cursor durante todo el gesto, así se ve en qué punto
+      // de la línea de tiempo va a caer lo que se lleva en la mano
+      useEditorStore.getState().setArrastreVivo({ etiqueta: nombre, x: ev.clientX, y: ev.clientY })
+
       // el primer desplazamiento de verdad es el que decide si el gesto era un
       // arrastre o un simple clic con alt
       if (!movido) {
@@ -192,6 +197,7 @@ export default function ClipBlock({
       moverClip(idGesto, inicio)
     }
     const soltar = () => {
+      useEditorStore.getState().setArrastreVivo(null)
       // alt y clic seco, sin llegar a arrastrar: el clip entra o sale del conjunto
       if (!movido && conAlt) alternarBloque(clip.id)
       // si el gesto acabó sobre una separación, se abre allí el nivel nuevo y el
@@ -283,7 +289,11 @@ export default function ClipBlock({
   }
 
   return (
-    <div
+    <Tooltip texto={nombre} retardo={2000} lado="arriba">
+    <motion.div
+      layout="position"
+      transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+      layoutDependency={clip.pista}
       onMouseDown={iniciarMover}
       // el botón derecho abre el menú de este bloque en el punto donde se pulsó
       onContextMenu={(e) => {
@@ -466,6 +476,7 @@ export default function ClipBlock({
           />
         </>
       )}
-    </div>
+    </motion.div>
+    </Tooltip>
   )
 }
