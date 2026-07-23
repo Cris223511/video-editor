@@ -5,7 +5,8 @@ import { clipEnTiempo } from '../timeline/clips'
 import { posicionCapa } from '../layers/motion'
 import { esTonoNeutro, filtroCss, hayEfectoFiltro } from '../color/tono'
 import { REPETICIONES_BRILLO, desenfoqueBrillo } from '../layers/defaults'
-import { anterior, pintarTransicion, progreso } from '../transiciones/pintar'
+import { anterior, posterior, pintarTransicion, progreso, progresoSalida } from '../transiciones/pintar'
+import { fundidoEn } from '../audio/ganancia'
 import { encuadreDe, rectClip } from '../timeline/encuadre'
 import { aplicarTransformCanvas } from '../layers/transform'
 
@@ -590,7 +591,14 @@ export function dibujarFotograma(
       ctx.restore()
     }
 
-    pintarTransicion(ctx, ancho, alto, activo, saliente, p, pintar)
+    // misma decisión que en el visor: la salida manda sobre la entrada mientras
+    // dura, para que el archivo exportado coincida con lo que se vio al montar
+    const q = progresoSalida(activo, t)
+    if (q < 1 && activo.transicionSalida) {
+      pintarTransicion(ctx, ancho, alto, posterior(activo, clips), activo, q, pintar, activo.transicionSalida.tipo)
+    } else {
+      pintarTransicion(ctx, ancho, alto, activo, saliente, p, pintar)
+    }
   }
 
   const activoVideo = activo ? videoDe(activo.id) : null
@@ -602,9 +610,13 @@ export function dibujarFotograma(
     dibujarCensura(ctx, c, ancho, alto, t, activoVideo, off, colorFondo)
   }
 
-  // luego texto, imagen y figuras en orden
-  for (const c of capas) {
-    if (t < c.inicio || t >= c.inicio + c.duracion) continue
+  // luego texto, imagen y figuras en orden. el fundido de la capa se aplica
+  // rebajando su opacidad antes de dibujarla, que es exactamente lo que hace el
+  // visor, así que ninguna función de dibujo necesita enterarse
+  for (const cOrig of capas) {
+    if (t < cOrig.inicio || t >= cOrig.inicio + cOrig.duracion) continue
+    const f = fundidoEn(t, cOrig.inicio, cOrig.duracion, cOrig.fundidoEntrada, cOrig.fundidoSalida)
+    const c = f >= 1 ? cOrig : ({ ...cOrig, opacidad: cOrig.opacidad * f } as typeof cOrig)
     if (c.tipo === 'texto') dibujarTexto(ctx, c, ancho, alto, t)
     else if (c.tipo === 'imagen') dibujarImagen(ctx, c, ancho, alto, t, imagenDe(c.id))
     else if (c.tipo === 'figura') dibujarFigura(ctx, c, ancho, alto, t, escala)

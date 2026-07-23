@@ -24,7 +24,7 @@ import {
   hayEfectoFiltro,
   stdDeviationsDesenfoque,
 } from '../../lib/color/tono'
-import { anterior, pintarTransicion, progreso } from '../../lib/transiciones/pintar'
+import { anterior, posterior, pintarTransicion, progreso, progresoSalida } from '../../lib/transiciones/pintar'
 import { buscarTransicion } from '../../lib/transiciones/catalogo'
 import { sufijoTransformCss, aplicarTransformCanvas } from '../../lib/layers/transform'
 import { TIPO_FIGURA } from './panels/FiguraPanel'
@@ -673,7 +673,16 @@ export default function Preview() {
         ctx.restore()
       }
 
-      pintarTransicion(ctx, lienzo.width, lienzo.height, act, sal, p, pintar)
+      // si el clip está terminando y lleva transición de salida, manda ella: el
+      // plano se va con su efecto y por debajo asoma el siguiente, o el fondo si
+      // este era el último. si no, se pinta la de entrada de siempre
+      const q = progresoSalida(act, st.playhead)
+      if (q < 1 && act.transicionSalida) {
+        const sig = posterior(act, st.pista.clips)
+        pintarTransicion(ctx, lienzo.width, lienzo.height, sig, act, q, pintar, act.transicionSalida.tipo)
+      } else {
+        pintarTransicion(ctx, lienzo.width, lienzo.height, act, sal, p, pintar)
+      }
       raf = requestAnimationFrame(paso)
     }
     raf = requestAnimationFrame(paso)

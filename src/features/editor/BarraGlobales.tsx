@@ -3,6 +3,7 @@ import {
   BringToFront,
   Copy,
   Crop,
+  LogOut,
   Scissors,
   SendToBack,
   SlidersHorizontal,
@@ -99,6 +100,7 @@ export default function BarraGlobales() {
   const alternarSilencioClip = useEditorStore((s) => s.alternarSilencioClip)
   const setVolumenClip = useEditorStore((s) => s.setVolumenClip)
   const setFundido = useEditorStore((s) => s.setFundido)
+  const setTransicionSalida = useEditorStore((s) => s.setTransicionSalida)
   const dividirEnCabezal = useEditorStore((s) => s.dividirEnCabezal)
   const duplicarClip = useEditorStore((s) => s.duplicarClip)
   const quitarClip = useEditorStore((s) => s.quitarClip)
@@ -143,6 +145,26 @@ export default function BarraGlobales() {
           />
           <Accion icono={<Crop size={15} />} texto="Recortar la imagen" onClick={() => irAPanel('recortar')} />
           <Accion icono={<Scissors size={15} />} texto="Dividir en el cabezal" onClick={dividirEnCabezal} />
+          {/* la transición de salida se enciende de una y luego se estira desde el
+              propio bloque, o se cambia de tipo desde la galería */}
+          <Accion
+            icono={<LogOut size={15} />}
+            texto={
+              clip.transicionSalida && clip.transicionSalida.tipo !== 'ninguna'
+                ? 'Quitar la transición de salida'
+                : 'Transición al terminar'
+            }
+            activo={!!clip.transicionSalida && clip.transicionSalida.tipo !== 'ninguna'}
+            onClick={() =>
+              setTransicionSalida(clip.id, {
+                tipo:
+                  clip.transicionSalida && clip.transicionSalida.tipo !== 'ninguna'
+                    ? 'ninguna'
+                    : 'fundido',
+                duracion: Math.min(0.5, clip.duracion / 2),
+              })
+            }
+          />
           <Accion icono={<Copy size={15} />} texto="Duplicar" onClick={() => duplicarClip(clip.id)} />
           <Accion icono={<Trash2 size={15} />} texto="Borrar" onClick={() => quitarClip(clip.id)} />
           <Corte />
@@ -250,6 +272,22 @@ export default function BarraGlobales() {
             min={0}
             max={100}
             onChange={(v) => actualizarCapa(capa.id, { opacidad: v })}
+          />
+          {/* aparecer y desaparecer fundiéndose, en décimas de segundo, en vez de
+              saltar de golpe a pantalla */}
+          <Mando
+            etiqueta="Entra"
+            valor={Math.round((capa.fundidoEntrada ?? 0) * 10)}
+            min={0}
+            max={Math.round((capa.duracion / 2) * 10)}
+            onChange={(v) => actualizarCapa(capa.id, { fundidoEntrada: v / 10 })}
+          />
+          <Mando
+            etiqueta="Sale"
+            valor={Math.round((capa.fundidoSalida ?? 0) * 10)}
+            min={0}
+            max={Math.round((capa.duracion / 2) * 10)}
+            onChange={(v) => actualizarCapa(capa.id, { fundidoSalida: v / 10 })}
           />
         </>
       )}

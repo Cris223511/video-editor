@@ -4,6 +4,7 @@ import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTrazo } from '../../../t
 import { REPETICIONES_BRILLO, desenfoqueBrillo, hexAOpacidad } from '../../../lib/layers/defaults'
 import { rectContenido } from '../../../lib/layers/rect'
 import { posicionCapa } from '../../../lib/layers/motion'
+import { fundidoEn } from '../../../lib/audio/ganancia'
 import { Ancla, Caja, redimensionar } from '../../../lib/layers/resize'
 import { CajaGuia, Guia, imantar } from '../../../lib/layers/guias'
 import { sufijoTransformCss } from '../../../lib/layers/transform'
@@ -376,7 +377,15 @@ export default function CapasOverlay() {
     window.addEventListener('mouseup', soltar)
   }
 
-  const visibles = capas.filter((c) => playhead >= c.inicio && playhead < c.inicio + c.duracion)
+  // el fundido de la capa se resuelve aquí, rebajando su opacidad, en lugar de
+  // repartirlo por cada sitio que la dibuja. así el resto del render no se entera
+  // y la exportación puede hacer exactamente lo mismo
+  const visibles = capas
+    .filter((c) => playhead >= c.inicio && playhead < c.inicio + c.duracion)
+    .map((c) => {
+      const f = fundidoEn(playhead, c.inicio, c.duracion, c.fundidoEntrada, c.fundidoSalida)
+      return f >= 1 ? c : ({ ...c, opacidad: c.opacidad * f } as Capa)
+    })
 
   // imágenes cuyo color necesita el filtro svg (temperatura, tinte, ruedas o
   // curvas). el brillo, el contraste y la saturación salen de funciones nativas

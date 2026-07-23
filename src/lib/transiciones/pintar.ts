@@ -12,6 +12,27 @@ export function progreso(clip: Clip, t: number): number {
   return Math.max(0, e / tr.duracion)
 }
 
+// cuánto ha avanzado la transición de salida de un clip. devuelve 1 mientras no
+// haya empezado, igual que la de entrada, de modo que fuera de su ventana no
+// cambia nada. la salida se mide desde el final del clip hacia atrás
+export function progresoSalida(clip: Clip, t: number): number {
+  const tr = clip.transicionSalida
+  if (!tr || tr.tipo === 'ninguna' || tr.duracion <= 0) return 1
+  const fin = clip.inicio + clip.duracion
+  const restante = fin - t
+  if (restante >= tr.duracion) return 1
+  return Math.max(0, Math.min(1, 1 - restante / tr.duracion))
+}
+
+// el clip que entra justo después de este en su misma pista. durante la salida es
+// el que va apareciendo por debajo; si no hay ninguno, se ve el fondo del lienzo
+export function posterior(clip: Clip, clips: Clip[]): Clip | null {
+  const mismos = clips
+    .filter((c) => c.pista === clip.pista && c.inicio >= clip.inicio + clip.duracion - 0.001)
+    .sort((a, b) => a.inicio - b.inicio)
+  return mismos.length ? mismos[0] : null
+}
+
 // el clip que estaba en pantalla justo antes que este en su misma pista. es el
 // que debe verse debajo mientras dura la transición
 export function anterior(clip: Clip, clips: Clip[]): Clip | null {
@@ -35,24 +56,29 @@ export function pintarTransicion(
   ctx: CanvasRenderingContext2D,
   ancho: number,
   alto: number,
-  entrante: Clip,
+  // en una salida el que entra puede no existir (el clip es el último): entonces
+  // lo que asoma por debajo es el fondo del lienzo, ya pintado antes
+  entrante: Clip | null,
   saliente: Clip | null,
   p: number,
   pintar: Pintor,
+  // el tipo se puede imponer desde fuera. lo usa la transición de salida, que no
+  // sale del clip entrante sino del que se está yendo
+  tipoForzado?: string,
 ) {
-  const t = buscarTransicion(entrante.transicion.tipo)
+  const t = buscarTransicion(tipoForzado ?? entrante?.transicion.tipo ?? 'ninguna')
   const op = opacidades(t, p)
 
   // el corte y las transiciones ya terminadas no necesitan nada especial
   if (t.tecnica === 'corte' || p >= 1) {
-    pintar(entrante, 1)
+    if (entrante) pintar(entrante, 1)
     return
   }
 
   switch (t.tecnica) {
     case 'opacidad': {
       if (saliente) pintar(saliente, 1)
-      pintar(entrante, op.entrante)
+      if (entrante) pintar(entrante, op.entrante)
       return
     }
 
@@ -61,7 +87,7 @@ export function pintarTransicion(
       // en la primera mitad se ve el plano que sale, en la segunda el que entra,
       // y el velo de color cubre el paso entre ambos
       if (p < 0.5 && saliente) pintar(saliente, 1)
-      else pintar(entrante, 1)
+      else if (entrante) pintar(entrante, 1)
       if (op.velo > 0) {
         ctx.save()
         ctx.globalAlpha = op.velo
@@ -75,7 +101,7 @@ export function pintarTransicion(
     case 'mascara': {
       if (saliente) pintar(saliente, 1)
       if (!t.forma) {
-        pintar(entrante, 1)
+        if (entrante) pintar(entrante, 1)
         return
       }
       ctx.save()
@@ -88,7 +114,7 @@ export function pintarTransicion(
       trazarForma(ctx, t.forma, p, ancho, alto)
       ctx.clip()
       ctx.filter = 'none'
-      pintar(entrante, 1)
+      if (entrante) pintar(entrante, 1)
       ctx.restore()
       return
     }
@@ -101,10 +127,12 @@ export function pintarTransicion(
         pintar(saliente, 1)
         ctx.restore()
       }
-      ctx.save()
-      ctx.translate(d.entrante[0], d.entrante[1])
-      pintar(entrante, 1)
-      ctx.restore()
+      if (entrante) {
+        ctx.save()
+        ctx.translate(d.entrante[0], d.entrante[1])
+        pintar(entrante, 1)
+        ctx.restore()
+      }
       return
     }
 
@@ -122,11 +150,13 @@ export function pintarTransicion(
         pintar(saliente, 1)
         ctx.restore()
       }
-      ctx.save()
-      centrar(e.entrante)
-      // el que entra se funde además de crecer, o el salto se nota demasiado
-      pintar(entrante, p)
-      ctx.restore()
+      if (entrante) {
+        ctx.save()
+        centrar(e.entrante)
+        // el que entra se funde además de crecer, o el salto se nota demasiado
+        pintar(entrante, p)
+        ctx.restore()
+      }
       return
     }
   }

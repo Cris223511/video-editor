@@ -348,6 +348,7 @@ export default function ClipBlock({
       )}
 
       <TransicionBlock clip={clip} pxPorSegundo={pxPorSegundo} />
+      <TransicionBlock clip={clip} pxPorSegundo={pxPorSegundo} lado="salida" />
 
       {/* señal de que se está soltando una transición encima: un aro azul y una
           franja en el borde de entrada, que es donde va a colocarse */}

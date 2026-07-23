@@ -71,6 +71,9 @@ export interface Clip {
   tono: AjusteTono // corrección de color del clip
   efectos: EfectoClip[] // cadena de efectos, vacía mientras no se aplique ninguno
   transicion: Transicion // cómo entra el clip respecto al anterior
+  // cómo se va el clip al terminar. es independiente de la de entrada, así que un
+  // mismo plano puede abrir de una forma y cerrar de otra. sin definir se corta seco
+  transicionSalida?: Transicion
   encuadre?: Encuadre // posición y tamaño del video en el lienzo; ausente = centrado a escala 1
   // recorte de la imagen del video, en fracción de cada lado (0 a 1). ausente o
   // todo en cero significa sin recortar. lo que queda fuera del recuadro no se ve

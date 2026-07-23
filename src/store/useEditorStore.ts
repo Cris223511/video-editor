@@ -188,6 +188,9 @@ interface EstadoEditor {
   actualizarEfecto: (id: string, efectoId: string, cambios: Partial<EfectoClip>) => void
   quitarEfecto: (id: string, efectoId: string) => void
   setTransicion: (id: string, cambios: Partial<Transicion>) => void
+  // la transición con la que el clip se va. arranca en fundido a negro medio
+  // segundo la primera vez que se toca, para no obligar a elegir dos cosas
+  setTransicionSalida: (id: string, cambios: Partial<Transicion>) => void
   dividirEnCabezal: () => void
   cerrarHueco: (desde: number, pista: number) => void
   seleccionar: (id: string | null) => void
@@ -501,6 +504,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'actualizarEfecto',
   'quitarEfecto',
   'setTransicion',
+  'setTransicionSalida',
   'dividirEnCabezal',
   'cerrarHueco',
   'agregarPista',
@@ -1255,6 +1259,24 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         ...s.pista,
         clips: s.pista.clips.map((c) =>
           c.id === id ? { ...c, transicion: { ...c.transicion, ...cambios } } : c,
+        ),
+      },
+    })),
+
+  setTransicionSalida: (id, cambios) =>
+    set((s) => ({
+      pista: {
+        ...s.pista,
+        clips: s.pista.clips.map((c) =>
+          c.id === id
+            ? {
+                ...c,
+                transicionSalida: {
+                  ...(c.transicionSalida ?? { tipo: 'fundido', duracion: 0.5 }),
+                  ...cambios,
+                },
+              }
+            : c,
         ),
       },
     })),

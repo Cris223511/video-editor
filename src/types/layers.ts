@@ -29,6 +29,11 @@ export interface CapaBase {
   rotacion?: number
   espejoH?: boolean
   espejoV?: boolean
+  // transición de la capa, en segundos: aparece fundiéndose durante los primeros
+  // y se va durante los últimos, en lugar de saltar de golpe a pantalla. sin
+  // definir entra y sale seco, como hasta ahora
+  fundidoEntrada?: number
+  fundidoSalida?: number
   // fila del carril de texto y figuras en la que se dibuja el bloque. es solo una
   // ayuda visual de la línea de tiempo para separar elementos que se solapan en el
   // tiempo; no cambia qué queda delante de qué (eso lo deciden el orden y los
