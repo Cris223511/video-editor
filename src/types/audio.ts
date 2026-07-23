@@ -29,4 +29,8 @@ export interface ClipAudio {
   // fila del carril de audio donde se muestra. mismo criterio que la región: es
   // orden visual, no afecta la mezcla. sin definir cae en la fila 0
   nivel?: number
+  // fundido de entrada y de salida, en segundos, para que el audio no entre ni
+  // se corte de golpe. sin definir suena plano de principio a fin
+  fundidoEntrada?: number
+  fundidoSalida?: number
 }

@@ -98,6 +98,7 @@ export default function BarraGlobales() {
   const setHerramienta = useEditorStore((s) => s.setHerramienta)
   const alternarSilencioClip = useEditorStore((s) => s.alternarSilencioClip)
   const setVolumenClip = useEditorStore((s) => s.setVolumenClip)
+  const setFundido = useEditorStore((s) => s.setFundido)
   const dividirEnCabezal = useEditorStore((s) => s.dividirEnCabezal)
   const duplicarClip = useEditorStore((s) => s.duplicarClip)
   const quitarClip = useEditorStore((s) => s.quitarClip)
@@ -155,6 +156,26 @@ export default function BarraGlobales() {
               max={200}
               onChange={(v) => setVolumenClip(clip.id, v / 100)}
             />
+          )}
+          {/* el sonido entra y sale poco a poco en lugar de arrancar y cortarse de
+              golpe. se mide en décimas de segundo y nunca pasa de media duración */}
+          {!clip.mudo && (
+            <>
+              <Mando
+                etiqueta="Entra"
+                valor={Math.round((clip.fundidoEntrada ?? 0) * 10)}
+                min={0}
+                max={Math.round((clip.duracion / 2) * 10)}
+                onChange={(v) => setFundido(clip.id, 'entrada', v / 10)}
+              />
+              <Mando
+                etiqueta="Sale"
+                valor={Math.round((clip.fundidoSalida ?? 0) * 10)}
+                min={0}
+                max={Math.round((clip.duracion / 2) * 10)}
+                onChange={(v) => setFundido(clip.id, 'salida', v / 10)}
+              />
+            </>
           )}
           <Mando
             etiqueta="Tamaño"
@@ -245,6 +266,20 @@ export default function BarraGlobales() {
             min={0}
             max={200}
             onChange={(v) => setVolumenAudio(audio.id, v / 100)}
+          />
+          <Mando
+            etiqueta="Entra"
+            valor={Math.round((audio.fundidoEntrada ?? 0) * 10)}
+            min={0}
+            max={Math.round((audio.duracion / 2) * 10)}
+            onChange={(v) => setFundido(audio.id, 'entrada', v / 10)}
+          />
+          <Mando
+            etiqueta="Sale"
+            valor={Math.round((audio.fundidoSalida ?? 0) * 10)}
+            min={0}
+            max={Math.round((audio.duracion / 2) * 10)}
+            onChange={(v) => setFundido(audio.id, 'salida', v / 10)}
           />
         </>
       )}

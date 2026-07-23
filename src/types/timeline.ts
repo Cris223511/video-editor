@@ -84,6 +84,10 @@ export interface Clip {
   // doble). va de la mano del silencio: bajarlo del todo silencia y subirlo desde
   // cero devuelve el sonido. sin definir vale 1, así que lo guardado antes suena igual
   volumen?: number
+  // fundido del sonido del clip, en segundos. la entrada lo abre desde el silencio
+  // al empezar y la salida lo cierra al terminar. sin definir no hay fundido
+  fundidoEntrada?: number
+  fundidoSalida?: number
   // cuando su audio se ha separado a la pista de sonido, el video queda mudo para
   // no sonar dos veces; el sonido pasa a llevarlo el clip de audio vinculado
   mudo?: boolean

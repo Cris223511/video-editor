@@ -3,7 +3,7 @@ import { Capa } from '../../types/layers'
 import { Marco } from '../../types/marco'
 import { RegionAudio, ClipAudio } from '../../types/audio'
 import { clipEnTiempo, duracionTotal } from '../timeline/clips'
-import { gananciaEn } from '../audio/ganancia'
+import { gananciaEn, fundidoEn } from '../audio/ganancia'
 import { usaMatriz, matrizTono, tablasColor, stdDeviationsDesenfoque } from '../color/tono'
 import { dibujarFotograma, Escena } from './compositor'
 
@@ -249,6 +249,9 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
         // audios importados: cada uno se enruta por su propio nodo de ganancia
         // hacia el mismo destino que graba la mezcla, con su volumen ya aplicado
         const audiosEl = new Map<string, HTMLAudioElement>()
+        // el nodo de ganancia de cada audio se guarda aparte porque su valor deja
+        // de ser fijo: el fundido lo cambia en cada fotograma
+        const gananciasAudio = new Map<string, GainNode>()
         for (const a of datos.audios) {
           const url = datos.urlDeAsset(a.assetId)
           if (!url) continue
@@ -260,6 +263,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
             fuente.connect(g)
             g.connect(destino)
             audiosEl.set(a.id, el)
+            gananciasAudio.set(a.id, g)
           } catch {
             // si un audio no carga, la exportación sigue sin él
           }
@@ -311,6 +315,14 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
               if (!el.paused) el.pause()
               return
             }
+            // el fundido se recalcula en cada instante, igual que hace el visor
+            const g = gananciasAudio.get(a.id)
+            if (g) {
+              g.gain.value =
+                a.volumen *
+                datos.volumenGlobal *
+                fundidoEn(t, a.inicio, a.duracion, a.fundidoEntrada, a.fundidoSalida)
+            }
             const objetivo = a.recorteInicio + (t - a.inicio)
             if (Math.abs(el.currentTime - objetivo) > 0.25) el.currentTime = objetivo
             if (el.paused) el.play().catch(() => {})
@@ -350,7 +362,9 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
           // visor, para que lo exportado suene exactamente como se oía al montar
           ganancia.gain.value = silenciada
             ? 0
-            : gananciaEn(datos.audioRegiones, datos.volumenGlobal, t) * (act.volumen ?? 1)
+            : gananciaEn(datos.audioRegiones, datos.volumenGlobal, t) *
+              (act.volumen ?? 1) *
+              fundidoEn(t, act.inicio, act.duracion, act.fundidoEntrada, act.fundidoSalida)
           v.playbackRate = act.velocidad
           if (v.paused) {
             try {

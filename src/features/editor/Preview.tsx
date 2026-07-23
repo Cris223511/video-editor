@@ -10,7 +10,7 @@ import { useProjectStore } from '../../store/useProjectStore'
 import { MediaAsset } from '../../types/media'
 import { clipEnTiempo, duracionTotal } from '../../lib/timeline/clips'
 import { encuadreDe, encuadreNeutro, rectClip } from '../../lib/timeline/encuadre'
-import { gananciaEn } from '../../lib/audio/ganancia'
+import { gananciaEn, fundidoEn } from '../../lib/audio/ganancia'
 import { rectContenido } from '../../lib/layers/rect'
 import { posicionCapa } from '../../lib/layers/motion'
 import { CapaCensura, CapaFigura } from '../../types/layers'
@@ -234,7 +234,16 @@ export default function Preview() {
       const el = audiosRef.current.get(a.id)
       if (!el) return
       const dentro = playhead >= a.inicio && playhead < a.inicio + a.duracion
-      el.volume = Math.max(0, Math.min(1, a.volumen * volumenGlobal))
+      // el fundido del audio se aplica sobre su volumen, igual que en la exportación
+      el.volume = Math.max(
+        0,
+        Math.min(
+          1,
+          a.volumen *
+            volumenGlobal *
+            fundidoEn(playhead, a.inicio, a.duracion, a.fundidoEntrada, a.fundidoSalida),
+        ),
+      )
       if (!dentro) {
         if (!el.paused) el.pause()
         return
@@ -335,7 +344,9 @@ export default function Preview() {
         // un clip bajo sigue respetando las franjas y el volumen general
         nodo.gain.value = metas[act.pista]?.silenciada || act.mudo || act.silenciado
           ? 0
-          : gananciaEn(audioRef.current.regiones, audioRef.current.general, ph) * (act.volumen ?? 1)
+          : gananciaEn(audioRef.current.regiones, audioRef.current.general, ph) *
+            (act.volumen ?? 1) *
+            fundidoEn(ph, act.inicio, act.duracion, act.fundidoEntrada, act.fundidoSalida)
       }
       // grabando un recorrido el video corre más despacio, que es la única forma
       // de seguir con el cursor algo que se mueve rápido sin ir a tirones. el

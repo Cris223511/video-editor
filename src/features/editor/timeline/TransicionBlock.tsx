@@ -54,19 +54,30 @@ export default function TransicionBlock({
         style={{ width: ancho }}
         onMouseDown={(e) => e.stopPropagation()}
       >
+        {/* cuña diagonal, como la que dibujan los editores de escritorio: se lee de
+            un vistazo hacia dónde abre la transición y cuánto ocupa. antes era un
+            degradado blanco plano que ensuciaba la miniatura y no decía gran cosa */}
         <div
-          className="pointer-events-none h-full w-full"
+          className="pointer-events-none h-full w-full rounded-l-lg"
           style={{
             background:
-              'linear-gradient(105deg, rgb(255 255 255 / 0.85) 0%, rgb(255 255 255 / 0.25) 55%, transparent 100%)',
+              'linear-gradient(to right, rgb(24 97 255 / 0.55), rgb(24 97 255 / 0.12))',
+            clipPath: 'polygon(0 0, 100% 0, 0 100%)',
           }}
         />
-        {/* tirador para alargar o acortar la transición */}
+        <div
+          className="pointer-events-none absolute inset-0 rounded-l-lg"
+          style={{ border: '1px solid rgb(255 255 255 / 0.35)', borderRight: 'none' }}
+        />
+        {/* tirador de duración, siempre a la vista para que se sepa que se puede
+            estirar sin tener que descubrirlo pasando el cursor por encima */}
         <div
           onMouseDown={estirar}
           title="Arrastra para cambiar la duración"
-          className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize bg-white/70 opacity-0 transition-opacity duration-200 group-hover/tr:opacity-100"
-        />
+          className="absolute right-0 top-0 flex h-full w-2 cursor-ew-resize items-center justify-center rounded-r-sm bg-white/80 transition-colors duration-150 group-hover/tr:bg-white"
+        >
+          <span className="h-3 w-px bg-black/40" />
+        </div>
       </div>
     </Tooltip>
   )

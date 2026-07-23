@@ -234,6 +234,10 @@ interface EstadoEditor {
   // volumen del clip. dejarlo en cero equivale a silenciarlo y subirlo desde cero
   // le quita el silencio, para que el botón y el deslizador cuenten lo mismo
   setVolumenClip: (id: string, volumen: number) => void
+  // fundido de entrada o de salida, en segundos, de un clip de video o de un audio
+  // importado. nunca pasa de la mitad de lo que dura el bloque, para que los dos
+  // tramos no se coman el sonido entero
+  setFundido: (id: string, lado: 'entrada' | 'salida', segundos: number) => void
   agregarNivelTexto: () => void
   agregarNivelAudio: () => void
   // lleva una capa a otra fila del carril de texto, o un audio o región a otra del
@@ -506,6 +510,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'moverClipAPista',
   'alternarSilencioClip',
   'setVolumenClip',
+  'setFundido',
   'quitarBloques',
   'moverBloques',
   'moverCarril',
@@ -1431,6 +1436,19 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         }),
       },
     })),
+
+  setFundido: (id, lado, segundos) =>
+    set((s) => {
+      const campo = lado === 'entrada' ? 'fundidoEntrada' : 'fundidoSalida'
+      const acotar = (x: { duracion: number }) => Math.max(0, Math.min(segundos, x.duracion / 2))
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) => (c.id === id ? { ...c, [campo]: acotar(c) } : c)),
+        },
+        audios: s.audios.map((a) => (a.id === id ? { ...a, [campo]: acotar(a) } : a)),
+      }
+    }),
 
   setVolumenClip: (id, volumen) =>
     set((s) => {
