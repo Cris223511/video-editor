@@ -84,6 +84,8 @@ export default function CapasOverlay() {
   const anadirTrazo = useEditorStore((s) => s.anadirTrazo)
   const agregarTrazo = useEditorStore((s) => s.agregarTrazo)
   const anadirTrazoDibujo = useEditorStore((s) => s.anadirTrazoDibujo)
+  const borrarEn = useEditorStore((s) => s.borrarEn)
+  const borradorGrosor = useEditorStore((s) => s.borradorGrosor)
   const abrirGesto = useEditorStore((s) => s.abrirGesto)
   const finGesto = useEditorStore((s) => s.finGesto)
 
@@ -249,6 +251,28 @@ export default function CapasOverlay() {
       if (puntos.length) anadirTrazoDibujo(id, puntos)
       // el trazo ya vive en la capa, así que la copia en vivo sobra
       setTrazoVivo(null)
+      finGesto()
+    }
+    window.addEventListener('mousemove', mover)
+    window.addEventListener('mouseup', soltar)
+  }
+
+  // borrador: mientras se arrastra va quitando lo que el círculo toca. el radio se
+  // pasa a unidades del lienzo, que es en las que viven las capas, y todo el gesto
+  // cuenta como un solo paso de deshacer
+  function iniciarBorrado(e: ReactMouseEvent) {
+    e.stopPropagation()
+    abrirGesto()
+    const radio = borradorGrosor / 2 / Math.max(1, rect.w)
+    const borrar = (ev: globalThis.MouseEvent) => {
+      const p = normalizar(ev)
+      borrarEn(p.x, p.y, radio)
+    }
+    borrar(e.nativeEvent)
+    const mover = (ev: globalThis.MouseEvent) => borrar(ev)
+    const soltar = () => {
+      window.removeEventListener('mousemove', mover)
+      window.removeEventListener('mouseup', soltar)
       finGesto()
     }
     window.addEventListener('mousemove', mover)
@@ -823,6 +847,25 @@ export default function CapasOverlay() {
           onMouseDown={iniciarDibujo}
           className="pointer-events-auto absolute z-20"
           style={{ left: rect.ox, top: rect.oy, width: rect.w, height: rect.h, cursor: 'crosshair' }}
+        />
+      )}
+
+      {/* superficie del borrador: mismo tamaño que la de dibujo, pero el arrastre
+          quita en lugar de pintar. el cursor se dibuja del tamaño real del borrador
+          para saber qué se va a llevar antes de pulsar */}
+      {herramienta === 'borrador' && (
+        <div
+          onMouseDown={iniciarBorrado}
+          className="pointer-events-auto absolute z-20"
+          style={{
+            left: rect.ox,
+            top: rect.oy,
+            width: rect.w,
+            height: rect.h,
+            cursor: `url("data:image/svg+xml;utf8,${encodeURIComponent(
+              `<svg xmlns='http://www.w3.org/2000/svg' width='${borradorGrosor}' height='${borradorGrosor}'><circle cx='${borradorGrosor / 2}' cy='${borradorGrosor / 2}' r='${Math.max(2, borradorGrosor / 2 - 1)}' fill='rgba(255,255,255,0.25)' stroke='white' stroke-width='1.5'/></svg>`,
+            )}") ${borradorGrosor / 2} ${borradorGrosor / 2}, crosshair`,
+          }}
         />
       )}
     </div>

@@ -20,12 +20,20 @@ export function useScrollSuave(activo: boolean) {
     if (menosMovimiento) return
 
     const lenis = new Lenis({
-      duration: 1.05,
-      // arranca rápido y frena despacio, que es lo que da la sensación de peso
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      // la inercia estaba bien montada pero duraba tan poco que no se llegaba a
+      // notar: la página frenaba en poco menos de medio segundo y se sentía casi
+      // igual que el desplazamiento normal del navegador. alargarla y suavizar la
+      // curva es lo que hace que se perciba el peso al soltar la rueda
+      duration: 1.45,
+      // arranca decidido y frena muy despacio al final, que es de donde sale la
+      // sensación de que la página sigue viva un momento después de parar
+      easing: (t) => 1 - Math.pow(1 - t, 4),
+      smoothWheel: true,
+      // cada golpe de rueda avanza algo menos, de modo que el recorrido se reparte
+      // en más tiempo y el frenado se aprecia en lugar de pasar de golpe
+      wheelMultiplier: 0.85,
       // en pantallas táctiles el desplazamiento nativo ya se siente bien y
       // añadir inercia encima lo vuelve resbaladizo
-      smoothWheel: true,
       touchMultiplier: 1.6,
     })
     ref.current = lenis

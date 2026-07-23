@@ -11,6 +11,7 @@ export const herramientas: { id: Herramienta; icono: NombreIcono; etiqueta: stri
   { id: 'texto', icono: 'texto', etiqueta: 'Texto' },
   { id: 'figura', icono: 'figura', etiqueta: 'Figura' },
   { id: 'dibujar', icono: 'dibujar', etiqueta: 'Dibujar' },
+  { id: 'borrador', icono: 'papelera', etiqueta: 'Borrador' },
   { id: 'transformar', icono: 'transformar', etiqueta: 'Transformar' },
   // recortar salió del riel: es una acción sobre lo que ya está elegido, así que
   // vive en la barra de opciones de la selección y en la tecla C. el panel sigue

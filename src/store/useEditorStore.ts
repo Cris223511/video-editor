@@ -93,6 +93,7 @@ export type Herramienta =
   | 'dibujar'
   | 'transformar'
   | 'recortar'
+  | 'borrador'
 
 // las tres secciones que conviven en la línea de tiempo, cada una con sus filas
 export type Carril = 'video' | 'audio' | 'texto'
@@ -247,6 +248,10 @@ interface EstadoEditor {
   // de audio. si la fila destino es la última vacía, el carril crece solo para
   // dejar de nuevo una libre encima
   moverCapaNivel: (id: string, nivel: number) => void
+  // abre una fila nueva encima de la indicada y muda ahí el bloque. las filas por
+  // encima suben un puesto, igual que hace la inserción de niveles de video
+  insertarNivelTexto: (nivel: number, id: string) => void
+  insertarNivelAudio: (nivel: number, id: string) => void
   moverAudioNivel: (id: string, nivel: number) => void
   // guía celeste que aparece mientras se arrastra un clip sobre la separación
   // entre dos niveles: guarda el índice donde nacería la pista nueva, o null si
@@ -289,6 +294,17 @@ interface EstadoEditor {
   duplicarAudio: (id: string) => string | null
   // orden de apilado de las capas: las capas se dibujan en el orden del array, así
   // que llevar una al final la pone delante de todo y al principio, detrás de todo
+  // qué se lleva por delante el borrador. 'todo' borra cualquier capa que toque;
+  // el resto lo limita a un tipo, para poder limpiar los trazos sin arriesgar los
+  // textos que hay al lado
+  borradorFiltro: 'todo' | 'trazo' | 'figura' | 'texto' | 'imagen'
+  setBorradorFiltro: (f: 'todo' | 'trazo' | 'figura' | 'texto' | 'imagen') => void
+  borradorGrosor: number
+  setBorradorGrosor: (v: number) => void
+  // borra lo que el borrador toque en un punto del lienzo. de un dibujo se lleva
+  // solo los trazos alcanzados, y si se queda sin ninguno desaparece la capa
+  // entera; del resto de capas se lleva la capa completa
+  borrarEn: (x: number, y: number, radio: number) => void
   traerAlFrente: (id: string) => void
   enviarAtras: (id: string) => void
   // portapapeles del editor: guarda una copia de lo que se copió con Ctrl+C, para
@@ -521,6 +537,8 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'agregarNivelTexto',
   'agregarNivelAudio',
   'moverCapaNivel',
+  'insertarNivelTexto',
+  'insertarNivelAudio',
   'moverAudioNivel',
   'alternarSilencioPista',
   'alternarOcultarPista',
@@ -535,6 +553,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'quitarCapa',
   'duplicarCapa',
   'duplicarAudio',
+  'borrarEn',
   'traerAlFrente',
   'enviarAtras',
   'pegar',
@@ -684,6 +703,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   capaSeleccionada: null,
   capasSeleccionadas: [],
   bloquesSeleccionados: [],
+  borradorFiltro: 'todo',
+  borradorGrosor: 24,
   menuContextual: null,
   regionSeleccionada: null,
   herramienta: 'transiciones',
@@ -1513,6 +1534,36 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       return { capas, nivelesTexto }
     }),
 
+  insertarNivelTexto: (nivel, id) =>
+    set((s) => {
+      if (s.nivelesTexto >= MAX_NIVELES) return {}
+      const corte = Math.max(0, Math.min(s.nivelesTexto, nivel))
+      return {
+        nivelesTexto: s.nivelesTexto + 1,
+        capas: s.capas.map((c) => {
+          if (c.id === id) return { ...c, nivel: corte }
+          const n = c.nivel ?? 0
+          return n >= corte ? { ...c, nivel: n + 1 } : c
+        }),
+      }
+    }),
+
+  insertarNivelAudio: (nivel, id) =>
+    set((s) => {
+      if (s.nivelesAudio >= MAX_NIVELES) return {}
+      const corte = Math.max(0, Math.min(s.nivelesAudio, nivel))
+      const subir = <T extends { id: string; nivel?: number }>(x: T): T => {
+        if (x.id === id) return { ...x, nivel: corte }
+        const n = x.nivel ?? 0
+        return n >= corte ? { ...x, nivel: n + 1 } : x
+      }
+      return {
+        nivelesAudio: s.nivelesAudio + 1,
+        audios: s.audios.map(subir),
+        audioRegiones: s.audioRegiones.map(subir),
+      }
+    }),
+
   moverAudioNivel: (id, nivel) =>
     set((s) => {
       const destino = Math.max(0, Math.min(MAX_NIVELES - 1, nivel))
@@ -1638,6 +1689,46 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     })
     return copia.id
   },
+
+  setBorradorFiltro: (f) => set({ borradorFiltro: f }),
+  setBorradorGrosor: (v) => set({ borradorGrosor: Math.max(4, Math.min(200, v)) }),
+
+  borrarEn: (x, y, radio) =>
+    set((s) => {
+      const t = s.playhead
+      const filtro = s.borradorFiltro
+      // solo entra lo que está en pantalla ahora mismo y encaja con el filtro
+      const alcanza = (c: Capa) =>
+        t >= c.inicio && t < c.inicio + c.duracion && (filtro === 'todo' || c.tipo === filtro)
+      const fuera: string[] = []
+      const capas = s.capas.map((c) => {
+        if (!alcanza(c)) return c
+        if (c.tipo === 'trazo') {
+          // de un dibujo se quitan únicamente los trazos que el borrador roza, no
+          // la capa entera: es lo que se espera de un borrador de verdad
+          const quedan = c.trazos.filter(
+            (tr) => !tr.some((p) => Math.hypot(c.x + p.x - x, c.y + p.y - y) <= radio),
+          )
+          if (quedan.length === c.trazos.length) return c
+          if (quedan.length === 0) {
+            fuera.push(c.id)
+            return c
+          }
+          return { ...c, trazos: quedan }
+        }
+        // las demás capas se borran enteras cuando el borrador cae sobre ellas
+        const media = 'anchoRel' in c ? (c as { anchoRel: number }).anchoRel / 2 : 0.06
+        const mediaAlto = 'altoRel' in c && (c as { altoRel?: number }).altoRel
+          ? ((c as { altoRel: number }).altoRel) / 2
+          : media
+        if (Math.abs(c.x - x) <= media + radio && Math.abs(c.y - y) <= mediaAlto + radio) {
+          fuera.push(c.id)
+        }
+        return c
+      })
+      if (!fuera.length && capas.every((c, i) => c === s.capas[i])) return {}
+      return { capas: capas.filter((c) => !fuera.includes(c.id)) }
+    }),
 
   traerAlFrente: (id) =>
     set((s) => {

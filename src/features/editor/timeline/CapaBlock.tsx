@@ -2,7 +2,7 @@ import { MouseEvent as ReactMouseEvent, useState } from 'react'
 import { Capa } from '../../../types/layers'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
-import { nivelBajoCursor } from './nivelCursor'
+import { nivelBajoCursor, separacionBajoCursor } from './nivelCursor'
 
 interface Props {
   capa: Capa
@@ -21,6 +21,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   const recortarCapaTiempo = useEditorStore((s) => s.recortarCapaTiempo)
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
   const alternarBloque = useEditorStore((s) => s.alternarBloque)
+  const insertarNivelTexto = useEditorStore((s) => s.insertarNivelTexto)
   const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
   const moverBloques = useEditorStore((s) => s.moverBloques)
   const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(capa.id))
@@ -89,8 +90,15 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       if (!movido && conAlt) alternarBloque(capa.id)
       setGuiaImantado(null)
       setInteractuando(false)
-      const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelTexto')
-      if (destino !== null) moverCapaNivel(idGesto, destino)
+      // si se soltó sobre la juntura entre dos filas se abre una nueva ahí y el
+      // bloque estrena ese carril; si cayó dentro de una fila, se muda a ella
+      const junta = separacionBajoCursor(ultimoX, ultimoY, 'nivelTexto')
+      if (junta !== null) {
+        insertarNivelTexto(junta, idGesto)
+      } else {
+        const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelTexto')
+        if (destino !== null) moverCapaNivel(idGesto, destino)
+      }
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }

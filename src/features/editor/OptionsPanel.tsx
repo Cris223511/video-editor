@@ -23,6 +23,7 @@ import FiguraPanel from './panels/FiguraPanel'
 import DibujarPanel from './panels/DibujarPanel'
 import TransformarPanel from './panels/TransformarPanel'
 import RecortarPanel from './panels/RecortarPanel'
+import BorradorPanel from './panels/BorradorPanel'
 
 // transiciones del clip seleccionado. los datos del medio (dimensiones, formato)
 // se consultan desde el panel de Medios, así que aquí va solo lo de las
@@ -181,6 +182,7 @@ export default function OptionsPanel({
     efectos: <EffectsPanel />,
     transformar: <TransformarPanel />,
     recortar: <RecortarPanel />,
+    borrador: <BorradorPanel />,
   }
 
   const actual = herramientas.find((h) => h.id === herramienta)

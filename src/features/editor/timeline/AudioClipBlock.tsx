@@ -5,7 +5,7 @@ import { useEditorStore } from '../../../store/useEditorStore'
 import { amplitudEn, picosDeMedio } from '../../../lib/audio/picos'
 import { alturasOnda } from './AudioBlock'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
-import { nivelBajoCursor } from './nivelCursor'
+import { nivelBajoCursor, separacionBajoCursor } from './nivelCursor'
 
 interface Props {
   audio: ClipAudio
@@ -39,6 +39,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
   const duplicarAudio = useEditorStore((s) => s.duplicarAudio)
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
   const alternarBloque = useEditorStore((s) => s.alternarBloque)
+  const insertarNivelAudio = useEditorStore((s) => s.insertarNivelAudio)
   const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
   const moverBloques = useEditorStore((s) => s.moverBloques)
   const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(audio.id))
@@ -136,8 +137,15 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
       if (!movido && conAlt) alternarBloque(audio.id)
       setGuiaImantado(null)
       setInteractuando(false)
-      const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelAudio')
-      if (destino !== null) moverAudioNivel(idGesto, destino)
+      // si se soltó sobre la juntura entre dos filas se abre una nueva ahí y el
+      // bloque estrena ese carril; si cayó dentro de una fila, se muda a ella
+      const junta = separacionBajoCursor(ultimoX, ultimoY, 'nivelAudio')
+      if (junta !== null) {
+        insertarNivelAudio(junta, idGesto)
+      } else {
+        const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelAudio')
+        if (destino !== null) moverAudioNivel(idGesto, destino)
+      }
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
