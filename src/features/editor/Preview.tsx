@@ -285,8 +285,18 @@ export default function Preview() {
         phRef.current = ph
       }
       if (ph >= total) {
+        // se acabó el montaje: el cabezal se queda clavado en el último fotograma
+        // y la reproducción termina ahí, sin volver al principio ni repetirse
         irA(total)
         pausar()
+        // nada puede seguir corriendo por detrás. si algún clip o el fondo borroso
+        // se quedan reproduciendo, la imagen sigue moviéndose con el cabezal ya
+        // parado y parece que el video se repitiera
+        videosRef.current.forEach((el) => {
+          if (!el.paused) el.pause()
+        })
+        const fondoFin = fondoRef.current
+        if (fondoFin && !fondoFin.paused) fondoFin.pause()
         return
       }
       // los metadatos se leen en vivo para que esconder o silenciar un nivel
@@ -321,7 +331,7 @@ export default function Preview() {
       if (nodo) {
         // un nivel silenciado o un clip con su audio ya separado no suena: el
         // sonido de un clip separado lo lleva su clip de audio vinculado
-        nodo.gain.value = metas[act.pista]?.silenciada || act.mudo
+        nodo.gain.value = metas[act.pista]?.silenciada || act.mudo || act.silenciado
           ? 0
           : gananciaEn(audioRef.current.regiones, audioRef.current.general, ph)
       }

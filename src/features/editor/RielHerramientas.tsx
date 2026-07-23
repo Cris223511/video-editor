@@ -12,7 +12,9 @@ export const herramientas: { id: Herramienta; icono: NombreIcono; etiqueta: stri
   { id: 'figura', icono: 'figura', etiqueta: 'Figura' },
   { id: 'dibujar', icono: 'dibujar', etiqueta: 'Dibujar' },
   { id: 'transformar', icono: 'transformar', etiqueta: 'Transformar' },
-  { id: 'recortar', icono: 'recortar', etiqueta: 'Recortar' },
+  // recortar salió del riel: es una acción sobre lo que ya está elegido, así que
+  // vive en la barra de opciones de la selección y en la tecla C. el panel sigue
+  // existiendo y se abre desde ahí
   { id: 'audio', icono: 'audio', etiqueta: 'Audio' },
   { id: 'censura', icono: 'censura', etiqueta: 'Censura' },
   { id: 'velocidad', icono: 'velocidad', etiqueta: 'Velocidad' },
@@ -24,23 +26,19 @@ export const herramientas: { id: Herramienta; icono: NombreIcono; etiqueta: stri
 // no merece un store aparte, así que basta con localStorage
 const CLAVE_EXPANDIDO = 've-riel-expandido'
 
-// anchos del riel en cada estado. el estrecho deja hueco para el icono centrado
-// más el carril de la barra de desplazamiento a cada lado; el ancho suma el
-// espacio del nombre que se revela al lado. se ensanchó un poco respecto de antes
-// para que, al reservar el carril simétrico de la barra, el icono siga cabiendo
-// justo sin quedar apretado
-const ANCHO_COLAPSADO = 76
+// anchos del riel en cada estado. el estrecho se ajustó para que la tira de
+// iconos no ocupe más de lo necesario, que era lo que la hacía verse amontonada;
+// el ancho suma el espacio del nombre que se revela al lado
+const ANCHO_COLAPSADO = 62
 const ANCHO_EXPANDIDO = 196
 
-// margen lateral de cada fila. el panel gasta 1px de borde por lado, así que del
-// ancho colapsado quedan 54px útiles; con 5px de aire a cada costado la fila mide
-// justo 44px, el mismo cuadro que ocupa el icono. de ese modo el icono llena la
-// fila sin sobrar ni faltar y su centro cae exacto en el eje del riel (28px). el
-// mismo margen sirve plegado y desplegado, por lo que el icono no salta de sitio
-// al abrir. antes la fila usaba 6px de margen (42px de ancho) contra un icono de
-// 44px: el cuadro asomaba 2px y empujaba el dibujo 1px a la derecha, ese era el
-// descuadre que se veía plegado
-const AIRE_LATERAL = 8
+// aire a cada costado de las filas y hueco que se reserva para el carril de la
+// barra de desplazamiento. las cuentas del ancho plegado salen así: 62 de riel
+// menos 2 de borde, menos 12 de aire y menos 8 de los dos carriles dejan 40
+// limpios, que es justo el cuadro del icono. de ese modo el dibujo llena la fila
+// y su centro cae en el eje del riel, haya barra o no
+const AIRE_LATERAL = 6
+const CARRIL_BARRA = 4
 
 // envuelve una fila en su tooltip solo cuando hace falta. plegado el riel el
 // nombre no se ve y el tooltip lo aclara; desplegado el texto ya está a la vista
@@ -124,7 +122,7 @@ export default function RielHerramientas({ onElegir }: { onElegir?: () => void }
                   con el ancho de la fila: el dibujo llena la casilla y su centro
                   cae en el eje. desplegado ese cuadro sigue igual a la izquierda,
                   de modo que el icono no se mueve ni un pixel al abrir */}
-              <span className="grid w-11 shrink-0 place-items-center">
+              <span className="grid w-10 shrink-0 place-items-center">
                 <Icon name={h.icono} size={19} />
               </span>
               {/* el nombre solo se pinta con el riel desplegado. plegado no se
@@ -139,7 +137,10 @@ export default function RielHerramientas({ onElegir }: { onElegir?: () => void }
 
       {/* control para alternar el ancho, apoyado abajo del todo. la flecha apunta
           hacia donde va a moverse el riel y gira al cambiar de estado */}
-      <div style={{ paddingLeft: AIRE_LATERAL, paddingRight: AIRE_LATERAL }}>
+      {/* este bloque vive fuera de la zona que se desplaza, así que no recibe el
+          carril de la barra; se le suma a mano para que su icono caiga en el mismo
+          eje que los de arriba y no quede descuadrado respecto de ellos */}
+      <div style={{ paddingLeft: AIRE_LATERAL + CARRIL_BARRA, paddingRight: AIRE_LATERAL + CARRIL_BARRA }}>
         <button
           type="button"
           onClick={alternar}
@@ -147,7 +148,7 @@ export default function RielHerramientas({ onElegir }: { onElegir?: () => void }
           aria-expanded={expandido}
           className="interactivo flex h-9 w-full shrink-0 items-center overflow-hidden rounded-xl text-[color:var(--muted)]"
         >
-          <span className="grid w-11 shrink-0 place-items-center">
+          <span className="grid w-10 shrink-0 place-items-center">
             <Icon
               name="desplegar"
               size={18}

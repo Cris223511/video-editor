@@ -33,7 +33,7 @@ const ALTO_REGLA = 29
 // del bloque de video y el de audio del de texto). se aplica idéntica en la
 // columna de cabeceras y en las filas del lado derecho para que no se
 // desalineen. el hueco entre niveles de video vive en HUECO_PISTA
-const SEP_SECCION = 12
+const SEP_SECCION = 18
 // ancho que se reserva para el rótulo «Añadir audio» del carril vacío. la onda
 // tenue de relleno arranca pasado ese punto para no quedar por debajo del texto
 const ANCHO_ROTULO_AUDIO = 120
@@ -199,6 +199,24 @@ export default function Timeline({
     cont.addEventListener('wheel', alGirar, { passive: false })
     return () => cont.removeEventListener('wheel', alGirar)
   }, [])
+
+  // el resalte de la fila y la guía de nueva pista solo deben vivir mientras dura
+  // un arrastre. si el gesto termina fuera de la línea de tiempo no llega ni el
+  // drop ni el dragleave, y el aro azul se quedaba pegado alrededor de la fila como
+  // si fuera un borde fijo. escuchando el final del arrastre en la ventana se apaga
+  // siempre, acabe donde acabe
+  useEffect(() => {
+    const limpiar = () => {
+      setPistaResaltada(null)
+      if (useEditorStore.getState().insercionPista !== null) setInsercionPista(null)
+    }
+    window.addEventListener('dragend', limpiar)
+    window.addEventListener('drop', limpiar)
+    return () => {
+      window.removeEventListener('dragend', limpiar)
+      window.removeEventListener('drop', limpiar)
+    }
+  }, [setInsercionPista])
 
   // el ancho útil de la pista se sigue con un observador: al cambiar el tamaño
   // del panel o plegar los medios, la regla se reajusta para no quedarse a medias
@@ -495,9 +513,10 @@ export default function Timeline({
                       : vacio
                         ? 'rgb(var(--border) / 0.05)'
                         : undefined,
-                    // el resalte va con un aro interior de esquinas redondeadas, sin
-                    // desplazar nada, para que se lea claro sobre qué fila se suelta
-                    boxShadow: resaltada ? 'inset 0 0 0 2px rgb(24 97 255 / 0.55)' : undefined,
+                    // el resalte se queda en un tinte suave. antes llevaba un aro
+                    // interior de dos píxeles que se leía como un borde permanente
+                    // alrededor de la fila entera, clip y hueco incluidos, y confundía
+                    boxShadow: resaltada ? 'inset 0 0 0 1px rgb(24 97 255 / 0.28)' : undefined,
                     // un nivel oculto no se pinta en el visor; en la pista se
                     // atenúa para recordarlo sin sacarlo de en medio
                     opacity: oculta ? 0.4 : 1,

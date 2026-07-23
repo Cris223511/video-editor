@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { X } from 'lucide-react'
 import { ImperativePanelHandle, Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import RielHerramientas from './RielHerramientas'
 import MediaLibrary from './MediaLibrary'
@@ -6,6 +7,7 @@ import Preview from './Preview'
 import PlaybackControls from './PlaybackControls'
 import OptionsPanel from './OptionsPanel'
 import Timeline from './timeline/Timeline'
+import BarraGlobales from './BarraGlobales'
 import ExportDialog from './ExportDialog'
 import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
@@ -45,6 +47,10 @@ export default function EditorView() {
   useAtajos()
   // el proyecto se guarda solo unos segundos después de cada cambio
   useAutoguardado(true)
+
+  // el visor ocupando toda la ventana. es solo cuestión de vista, así que vive en
+  // el componente y no en el store del proyecto
+  const [visorCompleto, setVisorCompleto] = useState(false)
   // al entrar al editor, si no se está trabajando en nada y hay una sesión
   // guardada, se recarga. eso es lo que evita que un refresco deje el editor en
   // blanco con el trabajo aparentemente perdido. la guarda de vacío impide pisar
@@ -115,9 +121,42 @@ export default function EditorView() {
                 <Tirador orientacion="vertical" onDobleClic={() => alternar(opciones, verOpciones)} />
 
                 <Panel id="visor" order={2} minSize={30} className={`flex ${suave}`}>
-                  <div className="panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl">
+                  {/* el mismo contenedor cambia de vestido al pasar a pantalla
+                      completa en lugar de montarse otro aparte. así el visor no se
+                      reinicia: el video sigue donde estaba y las capas encima no
+                      parpadean. el primer hijo (el visor en sí) se redondea para que
+                      la imagen no llegue a tocar los bordes de la pantalla */}
+                  <div
+                    className={
+                      visorCompleto
+                        ? 'fixed inset-0 z-[70] flex flex-col overflow-hidden p-6 backdrop-blur-2xl [&>*:first-child]:overflow-hidden [&>*:first-child]:rounded-2xl'
+                        : 'panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl'
+                    }
+                    // el fondo va en el estilo y no en una clase para que no dependa
+                    // del tema: a pantalla completa siempre se quiere oscuro, tanto
+                    // en claro como en oscuro, y así el video destaca de verdad
+                    style={
+                      visorCompleto
+                        ? { animation: 'fundido-in 0.25s ease-out', background: 'rgb(6 10 20 / 0.94)' }
+                        : undefined
+                    }
+                  >
                     <Preview />
-                    <PlaybackControls />
+                    <PlaybackControls
+                      visorCompleto={visorCompleto}
+                      onAlternarCompleto={() => setVisorCompleto((v) => !v)}
+                    />
+                    {/* a pantalla completa solo cierra la equis, nada de clic al
+                        fondo ni escape, que es como se pidió */}
+                    {visorCompleto && (
+                      <button
+                        onClick={() => setVisorCompleto(false)}
+                        aria-label="Cerrar la pantalla completa"
+                        className="absolute right-5 top-5 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/12 text-white backdrop-blur transition-colors hover:bg-white/25"
+                      >
+                        <X size={18} />
+                      </button>
+                    )}
                   </div>
                 </Panel>
               </PanelGroup>
@@ -158,6 +197,9 @@ export default function EditorView() {
 
                 <Panel id="linea" order={2} minSize={40} className={`flex ${suave}`}>
                   <div className="panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl">
+                    {/* las opciones de lo que esté elegido, justo encima de la línea
+                        de tiempo. si no hay nada seleccionado no se dibuja */}
+                    <BarraGlobales />
                     <Timeline
                       onOcultarMedios={() => alternar(medios, verMedios)}
                       mediosVisibles={verMedios}
@@ -199,12 +241,13 @@ function BarraReabrir({ titulo, onClick }: { titulo: string; onClick: () => void
   )
 }
 
-// separador entre paneles: fino en reposo, azul al pasar el cursor o mientras
-// se arrastra, con la zona sensible más ancha de lo que se ve. la línea visible
-// no llega hasta los extremos del tirador: se retira un trecho en cada punta
-// (RETIRO) para que, donde un separador vertical se topa con el horizontal, no
-// se dibuje una cruz sino un hueco limpio en esa esquina. el área arrastrable
-// sigue ocupando todo el largo, así que retirar la línea no le quita agarre
+// separador entre paneles. en reposo no se dibuja nada, para que las secciones se
+// separen por el aire y no por una raya fija cruzando la pantalla; la línea del
+// color de marca solo aparece, y con un fundido suave, al pasar el cursor por la
+// junta o mientras se arrastra. la zona sensible es más ancha de lo que se ve.
+// la línea no llega hasta los extremos: se retira un trecho en cada punta (RETIRO)
+// para que, donde un separador vertical se topa con el horizontal, no se dibuje
+// una cruz sino un hueco limpio. el área arrastrable ocupa todo el largo igual
 const RETIRO = 12
 function Tirador({
   orientacion,
@@ -221,15 +264,19 @@ function Tirador({
       onDoubleClick={onDobleClic}
       className={[
         'group relative shrink-0',
-        esVertical ? 'w-1.5 cursor-col-resize' : 'h-1.5 cursor-row-resize',
+        // algo más de grosor que antes para que las secciones respiren entre sí
+        esVertical ? 'w-2.5 cursor-col-resize' : 'h-2.5 cursor-row-resize',
       ].join(' ')}
     >
+      {/* el color va siempre puesto y lo que se anima es la opacidad. antes el
+          fondo se fijaba en el estilo en línea, que gana a la clase del hover, así
+          que la línea se quedaba gris para siempre y el azul no llegaba a verse */}
       <div
-        className="absolute inset-0 m-auto rounded-full transition-colors duration-200 group-hover:bg-brand group-data-[resize-handle-state=drag]:bg-brand"
+        className="absolute inset-0 m-auto rounded-full opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-data-[resize-handle-state=drag]:opacity-100"
         style={{
           width: esVertical ? 2 : `calc(100% - ${RETIRO * 2}px)`,
           height: esVertical ? `calc(100% - ${RETIRO * 2}px)` : 2,
-          background: 'rgb(var(--border) / 0.14)',
+          background: 'rgb(var(--brand))',
         }}
       />
     </PanelResizeHandle>

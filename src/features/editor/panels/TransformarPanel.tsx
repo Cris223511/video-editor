@@ -84,22 +84,34 @@ export default function TransformarPanel() {
         onOpacidad={(v) => actualizarCapa(t.id, { opacidad: v })}
         onTraerFrente={() => traerAlFrente(t.id)}
         onEnviarAtras={() => enviarAtras(t.id)}
+        onRotacionLibre={(v) => actualizarCapa(t.id, { rotacion: normalizarAngulo(v) })}
       />
     )
   }
 
-  // un clip de video se voltea en espejo. el giro del video no está disponible
-  // por ahora, así que sus botones de girar no aparecen
+  // el clip de video también gira y se escala: su encuadre guarda el giro, el
+  // espejo y el tamaño, y el visor y la exportación los aplican igual
   if (clip) {
     const enc = clip.encuadre
+    const rot = enc?.rotacion ?? 0
+    const girarClip = (delta: number) =>
+      actualizarEncuadre(clip.id, { rotacion: normalizarAngulo(rot + delta) })
     return (
       <Contenido
         titulo="Transformar video"
+        rotacion={rot}
         espejoH={!!enc?.espejoH}
         espejoV={!!enc?.espejoV}
+        onGirarIzq={() => girarClip(-90)}
+        onGirarDer={() => girarClip(90)}
         onEspejoH={() => actualizarEncuadre(clip.id, { espejoH: !enc?.espejoH })}
         onEspejoV={() => actualizarEncuadre(clip.id, { espejoV: !enc?.espejoV })}
-        onReiniciar={() => actualizarEncuadre(clip.id, { espejoH: false, espejoV: false })}
+        onReiniciar={() =>
+          actualizarEncuadre(clip.id, { rotacion: 0, espejoH: false, espejoV: false, escala: 1 })
+        }
+        onRotacionLibre={(v) => actualizarEncuadre(clip.id, { rotacion: normalizarAngulo(v) })}
+        escala={enc?.escala ?? 1}
+        onEscala={(v) => actualizarEncuadre(clip.id, { escala: v })}
       />
     )
   }
@@ -141,6 +153,9 @@ function Contenido({
   onOpacidad,
   onTraerFrente,
   onEnviarAtras,
+  onRotacionLibre,
+  escala,
+  onEscala,
 }: {
   titulo: string
   rotacion?: number
@@ -157,6 +172,11 @@ function Contenido({
   // orden de apilado: solo las capas lo traen, porque el video vive por debajo
   onTraerFrente?: () => void
   onEnviarAtras?: () => void
+  // giro a cualquier ángulo, no solo en saltos de noventa grados
+  onRotacionLibre?: (v: number) => void
+  // tamaño del video dentro del lienzo; las capas se escalan por sus tiradores
+  escala?: number
+  onEscala?: (v: number) => void
 }) {
   const hayGiro = onGirarIzq && onGirarDer
   const tocado = espejoH || espejoV || (rotacion ?? 0) !== 0
@@ -189,10 +209,25 @@ function Contenido({
         />
       </div>
 
-      {hayGiro && (
-        <p className="text-[11px] text-[color:var(--muted)]">
-          Rotación actual: <b className="text-brand">{rotacion ?? 0}°</b>
-        </p>
+      {/* giro fino a cualquier ángulo. los botones de arriba siguen sirviendo para
+          los cuartos de vuelta, que es lo que se usa la mayoría de las veces */}
+      {onRotacionLibre && (
+        <Campo etiqueta={`Rotación (${rotacion ?? 0}°)`}>
+          <Deslizador valor={rotacion ?? 0} min={0} max={359} onChange={onRotacionLibre} />
+        </Campo>
+      )}
+
+      {/* tamaño del video dentro del lienzo, del 20 % al 300 %. pasado el 100 % la
+          imagen se sale del cuadro y lo que sobresale no llega al archivo final */}
+      {onEscala && (
+        <Campo etiqueta={`Tamaño (${Math.round((escala ?? 1) * 100)}%)`}>
+          <Deslizador
+            valor={Math.round((escala ?? 1) * 100)}
+            min={20}
+            max={300}
+            onChange={(v) => onEscala(v / 100)}
+          />
+        </Campo>
       )}
 
       {onOpacidad && (

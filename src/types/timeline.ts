@@ -76,6 +76,10 @@ export interface Clip {
   // todo en cero significa sin recortar. lo que queda fuera del recuadro no se ve
   // ni se exporta, dejando ver el fondo o las capas de debajo
   recorte?: RecorteRel
+  // silencio propio del clip, el que se enciende y se apaga desde su botón en la
+  // línea de tiempo. es distinto de mudo: aquel lo pone el editor al separar el
+  // audio, este lo decide quien monta. cualquiera de los dos deja el clip sin sonido
+  silenciado?: boolean
   // cuando su audio se ha separado a la pista de sonido, el video queda mudo para
   // no sonar dos veces; el sonido pasa a llevarlo el clip de audio vinculado
   mudo?: boolean

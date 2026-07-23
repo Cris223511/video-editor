@@ -116,6 +116,19 @@ export function useAtajos() {
           st.dividirEnCabezal()
           return
 
+        // la C abre el recorte de lo que esté elegido, sea un clip de video o una
+        // imagen. copiar es Ctrl+C y se atiende más arriba, así que aquí solo llega
+        // la tecla suelta
+        case 'c':
+        case 'C': {
+          const capaSel = st.capas.find((c) => c.id === st.capaSeleccionada)
+          if (st.clipSeleccionado || capaSel?.tipo === 'imagen') {
+            e.preventDefault()
+            st.setHerramienta('recortar')
+          }
+          return
+        }
+
         case 'Delete':
         case 'Backspace':
           e.preventDefault()

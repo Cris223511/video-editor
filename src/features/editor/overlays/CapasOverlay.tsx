@@ -92,6 +92,12 @@ export default function CapasOverlay() {
   const [guias, setGuias] = useState<Guia[]>([])
   // id de la capa de texto que se está editando en el sitio, tras un doble clic
   const [editando, setEditando] = useState<string | null>(null)
+  // trazo que se está pintando ahora mismo con el pincel. se guarda aparte del
+  // store para dibujarlo en vivo sin abrir un paso de deshacer por cada punto;
+  // al soltar el ratón pasa a la capa de una sola vez y esto vuelve a quedar en null
+  const [trazoVivo, setTrazoVivo] = useState<{ id: string; puntos: { x: number; y: number }[] } | null>(
+    null,
+  )
   const editRef = useRef<HTMLDivElement | null>(null)
 
   // al entrar en edición se vuelca el texto actual en el elemento editable, se le
@@ -230,6 +236,9 @@ export default function CapasOverlay() {
     const agregar = (ev: globalThis.MouseEvent) => {
       const p = normalizar(ev)
       puntos.push({ x: p.x - centro.x, y: p.y - centro.y })
+      // se copia el array para que react vea un valor nuevo y repinte: así el
+      // trazo va apareciendo bajo el cursor en lugar de saltar entero al soltar
+      setTrazoVivo({ id, puntos: [...puntos] })
     }
     agregar(e.nativeEvent)
     const mover = (ev: globalThis.MouseEvent) => agregar(ev)
@@ -237,6 +246,8 @@ export default function CapasOverlay() {
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
       if (puntos.length) anadirTrazoDibujo(id, puntos)
+      // el trazo ya vive en la capa, así que la copia en vivo sobra
+      setTrazoVivo(null)
       finGesto()
     }
     window.addEventListener('mousemove', mover)
@@ -509,9 +520,12 @@ export default function CapasOverlay() {
           // con transform-origin en el centro de la capa, igual que el resto
           const origen = `${pos.x * rect.w}px ${pos.y * rect.h}px`
           // mientras la herramienta dibujar está activa el arrastre pinta (lo
-          // gestiona la superficie de dibujo), así que aquí no se captura nada; con
-          // la herramienta en otra cosa, un dibujo seleccionado se puede mover
-          const movible = seleccion && herramienta !== 'dibujar'
+          // gestiona la superficie de dibujo), así que aquí no se captura nada. con
+          // cualquier otra herramienta el dibujo se puede agarrar aunque todavía no
+          // esté elegido, y el propio agarre lo selecciona, igual que pasa con un
+          // texto o una figura. antes hacía falta tenerlo ya seleccionado, y como
+          // elegirlo abría la herramienta de dibujar, no había manera de moverlo
+          const movible = herramienta !== 'dibujar'
           return (
             <div
               key={c.id}
@@ -550,8 +564,31 @@ export default function CapasOverlay() {
                     />
                   )
                 })}
+                {/* trazo que se está pintando en este instante. se dibuja igual que
+                    los ya guardados, así el pincel deja rastro bajo el cursor */}
+                {trazoVivo?.id === c.id &&
+                  trazoVivo.puntos.length > 0 &&
+                  (trazoVivo.puntos.length === 1 ? (
+                    <circle
+                      cx={(pos.x + trazoVivo.puntos[0].x) * rect.w}
+                      cy={(pos.y + trazoVivo.puntos[0].y) * rect.h}
+                      r={g / 2}
+                      fill={c.color}
+                    />
+                  ) : (
+                    <polyline
+                      points={trazoVivo.puntos
+                        .map((p) => `${(pos.x + p.x) * rect.w},${(pos.y + p.y) * rect.h}`)
+                        .join(' ')}
+                      fill="none"
+                      stroke={c.color}
+                      strokeWidth={g}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  ))}
                 {/* copia gruesa e invisible de cada trazo, solo para poder agarrarlo
-                    y moverlo cuando el dibujo está seleccionado y no se está pintando */}
+                    y moverlo cuando no se está pintando */}
                 {movible &&
                   c.trazos.map((tr, i) =>
                     tr.length === 1 ? (

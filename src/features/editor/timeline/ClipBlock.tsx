@@ -1,5 +1,5 @@
 import { MouseEvent as ReactMouseEvent, useEffect, useState } from 'react'
-import { Info } from 'lucide-react'
+import { Info, Volume2, VolumeX } from 'lucide-react'
 import { Clip } from '../../../types/timeline'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useTira } from './useTira'
@@ -36,6 +36,7 @@ export default function ClipBlock({
   puntos,
 }: Props) {
   const seleccionado = useEditorStore((s) => s.clipSeleccionado === clip.id)
+  const alternarSilencioClip = useEditorStore((s) => s.alternarSilencioClip)
   const seleccionar = useEditorStore((s) => s.seleccionar)
   const setTransicion = useEditorStore((s) => s.setTransicion)
   const moverClip = useEditorStore((s) => s.moverClip)
@@ -359,6 +360,34 @@ export default function ClipBlock({
           ].join(' ')}
         >
           <Info size={12} />
+        </button>
+      </Tooltip>
+
+      {/* silencio del propio clip, pegado al botón de propiedades. si su audio ya
+          se separó a la pista de sonido el clip queda mudo por otro motivo, así que
+          el botón se muestra apagado y no deja liarla volviendo a darle sonido */}
+      <Tooltip texto={clip.mudo ? 'Su audio está en la pista de sonido' : clip.silenciado ? 'Quitar el silencio' : 'Silenciar este video'}>
+        <button
+          type="button"
+          aria-label={clip.silenciado ? 'Quitar el silencio del clip' : 'Silenciar el clip'}
+          disabled={clip.mudo}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            alternarSilencioClip(clip.id)
+          }}
+          className={[
+            'absolute left-7 top-1 z-30 grid h-5 w-5 place-items-center rounded-md transition-opacity duration-200',
+            clip.mudo || clip.silenciado
+              ? 'bg-black/75 text-white/90'
+              : 'bg-black/60 text-white hover:bg-black/80',
+            clip.mudo ? 'cursor-default' : '',
+            verPropiedades || seleccionado || clip.silenciado || clip.mudo
+              ? 'opacity-100'
+              : 'opacity-0 group-hover:opacity-100',
+          ].join(' ')}
+        >
+          {clip.mudo || clip.silenciado ? <VolumeX size={12} /> : <Volume2 size={12} />}
         </button>
       </Tooltip>
 

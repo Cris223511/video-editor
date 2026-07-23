@@ -344,7 +344,8 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
           })
           cablear(act.id, v)
           // un nivel silenciado, o un clip con su audio separado, no aporta sonido
-          const silenciada = (datos.pistasMeta[act.pista]?.silenciada ?? false) || !!act.mudo
+          const silenciada =
+            (datos.pistasMeta[act.pista]?.silenciada ?? false) || !!act.mudo || !!act.silenciado
           ganancia.gain.value = silenciada
             ? 0
             : gananciaEn(datos.audioRegiones, datos.volumenGlobal, t)

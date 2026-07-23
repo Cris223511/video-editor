@@ -84,9 +84,6 @@ export default function TextPanel() {
   const agregarTexto = useEditorStore((s) => s.agregarTexto)
   const actualizarCapa = useEditorStore((s) => s.actualizarCapa)
   const quitarCapa = useEditorStore((s) => s.quitarCapa)
-  // agrupan toda la escritura del contenido en un único paso de deshacer
-  const abrirGesto = useEditorStore((s) => s.abrirGesto)
-  const finGesto = useEditorStore((s) => s.finGesto)
 
   const capa = capas.find((c) => c.id === capaSeleccionada && c.tipo === 'texto') as
     | CapaTexto
@@ -112,18 +109,12 @@ export default function TextPanel() {
         </p>
       ) : (
         <>
-          {/* el campo va sin etiqueta "Contenido": queda justo debajo del botón de
-              agregar y se entiende solo. al enfocarlo se rodea de azul para dejar
-              claro dónde se está escribiendo */}
-          <textarea
-            value={capa.texto}
-            onChange={(e) => editar('texto', e.target.value)}
-            onFocus={abrirGesto}
-            onBlur={finGesto}
-            rows={2}
-            placeholder="Escribe tu texto"
-            className="w-full resize-none rounded-lg border border-black/10 bg-transparent px-3 py-2 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/35 dark:border-white/10"
-          />
+          {/* el contenido se escribe con doble clic sobre el propio texto en el
+              visor, que es más directo que ir al panel. el campo que había aquí
+              duplicaba esa misma edición y solo ocupaba sitio */}
+          <p className="text-[11px] leading-relaxed text-[color:var(--muted)]">
+            Haz doble clic sobre el texto en el visor para escribirlo.
+          </p>
 
           <Campo etiqueta="Fuente">
             {/* cada tipografía se ve escrita con su propia letra, algo que el

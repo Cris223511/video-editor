@@ -200,6 +200,9 @@ interface EstadoEditor {
   // añade una fila al carril de texto o al de audio. la última fila siempre queda
   // libre para recibir un bloque, así que se puede seguir subiendo mientras haga
   // falta hasta el tope
+  // enciende o apaga el silencio de un clip de video desde su propio bloque en la
+  // línea de tiempo, sin pasar por ningún panel
+  alternarSilencioClip: (id: string) => void
   agregarNivelTexto: () => void
   agregarNivelAudio: () => void
   // lleva una capa a otra fila del carril de texto, o un audio o región a otra del
@@ -468,6 +471,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'quitarPista',
   'setAltoPista',
   'moverClipAPista',
+  'alternarSilencioClip',
   'agregarNivelTexto',
   'agregarNivelAudio',
   'moverCapaNivel',
@@ -865,13 +869,25 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   // propio video) y suma a la pista de sonido el clip de audio decodificado, que
   // llega ya vinculado a este clip para moverse y borrarse junto a él
   separarAudio: (clipId, audio) =>
-    set((s) => ({
-      pista: {
-        ...s.pista,
-        clips: s.pista.clips.map((c) => (c.id === clipId ? { ...c, mudo: true } : c)),
-      },
-      audios: [...s.audios, audio],
-    })),
+    set((s) => {
+      // el audio que sale del video no debe aterrizar encima de lo que ya suena:
+      // se busca la primera fila del carril que esté libre y, si todas están
+      // ocupadas, se abre una nueva encima hasta llegar al tope
+      const ocupados = new Set<number>([
+        ...s.audios.map((a) => a.nivel ?? 0),
+        ...s.audioRegiones.map((r) => r.nivel ?? 0),
+      ])
+      let destino = 0
+      while (destino < MAX_NIVELES - 1 && ocupados.has(destino)) destino++
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) => (c.id === clipId ? { ...c, mudo: true } : c)),
+        },
+        audios: [...s.audios, { ...audio, nivel: destino }],
+        nivelesAudio: Math.max(s.nivelesAudio, destino + 1),
+      }
+    }),
 
   duplicarClip: (id) => {
     const s = get()
@@ -1299,6 +1315,14 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       }
     }),
 
+  alternarSilencioClip: (id) =>
+    set((s) => ({
+      pista: {
+        ...s.pista,
+        clips: s.pista.clips.map((c) => (c.id === id ? { ...c, silenciado: !c.silenciado } : c)),
+      },
+    })),
+
   agregarNivelTexto: () =>
     set((s) => (s.nivelesTexto >= MAX_NIVELES ? {} : { nivelesTexto: s.nivelesTexto + 1 })),
 
@@ -1474,16 +1498,15 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
           ? s.capasSeleccionadas.filter((x) => x !== id)
           : [...s.capasSeleccionadas, id]
         : [id]
-      // el tipo de capa coincide con el nombre de su herramienta salvo dos casos:
-      // el dibujo abre el panel 'dibujar', y la imagen abre 'transformar' (sus
-      // opciones generales), porque su color se ajusta en Tono y el recorte en
-      // Recortar, no en un panel propio
+      // el tipo de capa coincide con el nombre de su herramienta salvo la imagen y
+      // el dibujo, que abren 'transformar' (sus opciones generales). el dibujo no
+      // puede abrir 'dibujar' al elegirlo: con esa herramienta activa el arrastre
+      // pinta en vez de mover, así que elegir un trazo lo dejaba imposible de
+      // agarrar. quien quiera seguir pintando entra a Dibujar a propósito
       const herrCapa: Herramienta = capa
-        ? capa.tipo === 'trazo'
-          ? 'dibujar'
-          : capa.tipo === 'imagen'
-            ? 'transformar'
-            : capa.tipo
+        ? capa.tipo === 'trazo' || capa.tipo === 'imagen'
+          ? 'transformar'
+          : capa.tipo
         : s.herramienta
       return {
         capaSeleccionada: conjunto[conjunto.length - 1] ?? null,
