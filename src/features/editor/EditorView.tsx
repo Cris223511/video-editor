@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { ImperativePanelHandle, Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import RielHerramientas from './RielHerramientas'
@@ -16,7 +16,6 @@ import { useAtajos } from './useAtajos'
 import { useAutoguardado } from './useAutoguardado'
 import { useRestaurarSesion } from './useRestaurarSesion'
 import { useProjectStore } from '../../store/useProjectStore'
-import { useEffect } from 'react'
 
 // disposición al estilo de un editor de escritorio: opciones a la izquierda,
 // visor al centro, y abajo los medios junto a la línea de tiempo. el reparto lo
@@ -51,6 +50,16 @@ export default function EditorView() {
   // el visor ocupando toda la ventana. es solo cuestión de vista, así que vive en
   // el componente y no en el store del proyecto
   const [visorCompleto, setVisorCompleto] = useState(false)
+
+  // marca la raíz mientras dura la pantalla completa. de eso cuelga la regla que
+  // sube la capa del contenido por encima de la barra superior, que si no se
+  // quedaba pintada encima del visor
+  useEffect(() => {
+    const raiz = document.documentElement
+    if (visorCompleto) raiz.classList.add('ve-visor-completo')
+    else raiz.classList.remove('ve-visor-completo')
+    return () => raiz.classList.remove('ve-visor-completo')
+  }, [visorCompleto])
   // al entrar al editor, si no se está trabajando en nada y hay una sesión
   // guardada, se recarga. eso es lo que evita que un refresco deje el editor en
   // blanco con el trabajo aparentemente perdido. la guarda de vacío impide pisar

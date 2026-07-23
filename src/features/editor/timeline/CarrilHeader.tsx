@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import Icon, { NombreIcono } from '../../../components/ui/Icon'
 import Tooltip from '../../../components/ui/Tooltip'
 
@@ -14,6 +15,8 @@ export default function CarrilHeader({
   alto,
   onAgregar,
   puedeAgregar = false,
+  onSubir,
+  onBajar,
 }: {
   icono: NombreIcono
   titulo: string
@@ -21,6 +24,10 @@ export default function CarrilHeader({
   alto: number
   onAgregar?: () => void
   puedeAgregar?: boolean
+  // suben o bajan la sección entera dentro de la línea de tiempo. llegan sin
+  // definir cuando el carril ya está arriba del todo o abajo del todo
+  onSubir?: () => void
+  onBajar?: () => void
 }) {
   return (
     <div
@@ -43,13 +50,35 @@ export default function CarrilHeader({
         <Icon name={icono} size={14} />
       </span>
       <span className="truncate text-[12px] font-medium text-[color:var(--muted)]">{titulo}</span>
+      {/* reordenar la sección completa. el video no lleva flechas propias, pero al
+          mover estas dos por encima o por debajo de él se llega a cualquier orden */}
+      <span className="ml-auto flex shrink-0 items-center">
+        <button
+          onClick={onSubir}
+          disabled={!onSubir}
+          aria-label={`Subir la sección de ${titulo}`}
+          title={`Subir la sección de ${titulo}`}
+          className="interactivo grid h-5 w-5 place-items-center rounded text-[color:var(--muted)] disabled:pointer-events-none disabled:opacity-25"
+        >
+          <ChevronUp size={13} />
+        </button>
+        <button
+          onClick={onBajar}
+          disabled={!onBajar}
+          aria-label={`Bajar la sección de ${titulo}`}
+          title={`Bajar la sección de ${titulo}`}
+          className="interactivo grid h-5 w-5 place-items-center rounded text-[color:var(--muted)] disabled:pointer-events-none disabled:opacity-25"
+        >
+          <ChevronDown size={13} />
+        </button>
+      </span>
       {onAgregar && (
         <Tooltip texto={puedeAgregar ? 'Añadir una fila' : 'Máximo de filas alcanzado'} lado="derecha">
           <button
             onClick={onAgregar}
             disabled={!puedeAgregar}
             aria-label="Añadir una fila a este carril"
-            className="interactivo ml-auto grid h-6 w-6 shrink-0 place-items-center rounded-md text-[color:var(--muted)] disabled:pointer-events-none disabled:opacity-40"
+            className="interactivo grid h-6 w-6 shrink-0 place-items-center rounded-md text-[color:var(--muted)] disabled:pointer-events-none disabled:opacity-40"
           >
             <Icon name="mas" size={15} />
           </button>

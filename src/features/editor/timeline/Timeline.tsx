@@ -91,6 +91,8 @@ export default function Timeline({
   const nivelesAudio = useEditorStore((s) => s.nivelesAudio)
   const agregarNivelTexto = useEditorStore((s) => s.agregarNivelTexto)
   const agregarNivelAudio = useEditorStore((s) => s.agregarNivelAudio)
+  const ordenCarriles = useEditorStore((s) => s.ordenCarriles)
+  const moverCarril = useEditorStore((s) => s.moverCarril)
   const playhead = useEditorStore((s) => s.playhead)
   const pxPorSegundo = useEditorStore((s) => s.pxPorSegundo)
   const irA = useEditorStore((s) => s.irA)
@@ -437,40 +439,48 @@ export default function Timeline({
             }}
           >
             <div style={{ height: ALTO_REGLA }} />
-            {/* bloque de niveles de video, relativo para colgar de él las guías
-                de inserción entre filas sin que ocupen sitio en el flujo */}
-            <div className="relative mt-2 flex flex-col" style={{ gap: HUECO_PISTA }}>
-              {filas.map((p) => (
-                <motion.div key={pistasMeta[p]?.id ?? p} layout="position" transition={DESLIZA}>
-                  <PistaHeader indice={p} alto={altosPista[p]} />
-                </motion.div>
-              ))}
-              <AgregarNivelGuia />
-            </div>
-            {/* cabeceras de los carriles de texto y de audio, alineadas con sus
-                filas del lado derecho (mismo margen y alto). se muestran siempre,
-                aunque el carril esté vacío, para que se entienda que ese espacio
-                existe y qué le corresponde */}
-            <div style={{ marginTop: SEP_SECCION }}>
-              <CarrilHeader
-                icono="texto"
-                titulo="Texto y figuras"
-                acento="#f59e0b"
-                alto={altoCarril(nivelesTexto, ALTO_FILA_TEXTO)}
-                onAgregar={agregarNivelTexto}
-                puedeAgregar={nivelesTexto < 6}
-              />
-            </div>
-            <div style={{ marginTop: SEP_SECCION }}>
-              <CarrilHeader
-                icono="musica"
-                titulo="Audio"
-                acento="#10b981"
-                alto={altoCarril(nivelesAudio, ALTO_FILA_AUDIO)}
-                onAgregar={agregarNivelAudio}
-                puedeAgregar={nivelesAudio < 6}
-              />
-            </div>
+            {/* las tres secciones se dibujan en el orden que diga ordenCarriles, y
+                esta columna sigue exactamente el mismo para no descuadrarse de las
+                filas de la derecha. las cabeceras se ven siempre, aunque el carril
+                esté vacío, para que se entienda que ese espacio existe */}
+            {ordenCarriles.map((carril, i) => (
+              <div key={carril} style={{ marginTop: i === 0 ? 8 : SEP_SECCION }}>
+                {carril === 'video' && (
+                  <div className="relative flex flex-col" style={{ gap: HUECO_PISTA }}>
+                    {filas.map((p) => (
+                      <motion.div key={pistasMeta[p]?.id ?? p} layout="position" transition={DESLIZA}>
+                        <PistaHeader indice={p} alto={altosPista[p]} />
+                      </motion.div>
+                    ))}
+                    <AgregarNivelGuia />
+                  </div>
+                )}
+                {carril === 'texto' && (
+                  <CarrilHeader
+                    icono="texto"
+                    titulo="Texto y figuras"
+                    acento="#f59e0b"
+                    alto={altoCarril(nivelesTexto, ALTO_FILA_TEXTO)}
+                    onAgregar={agregarNivelTexto}
+                    puedeAgregar={nivelesTexto < 6}
+                    onSubir={i > 0 ? () => moverCarril('texto', -1) : undefined}
+                    onBajar={i < ordenCarriles.length - 1 ? () => moverCarril('texto', 1) : undefined}
+                  />
+                )}
+                {carril === 'audio' && (
+                  <CarrilHeader
+                    icono="musica"
+                    titulo="Audio"
+                    acento="#10b981"
+                    alto={altoCarril(nivelesAudio, ALTO_FILA_AUDIO)}
+                    onAgregar={agregarNivelAudio}
+                    puedeAgregar={nivelesAudio < 6}
+                    onSubir={i > 0 ? () => moverCarril('audio', -1) : undefined}
+                    onBajar={i < ordenCarriles.length - 1 ? () => moverCarril('audio', 1) : undefined}
+                  />
+                )}
+              </div>
+            ))}
           </div>
 
           <div
@@ -488,163 +498,179 @@ export default function Timeline({
             <TimeRuler total={total} pxPorSegundo={pxPorSegundo} ancho={anchoContenido} alto={ALTO_REGLA} />
           </div>
 
-          {/* niveles de video, del más alto al más bajo */}
-          <div ref={filasRef} data-tracks className="mt-2 flex flex-col" style={{ gap: HUECO_PISTA }}>
-            {filas.map((p) => {
-              const fila = porPista.get(p)
-              const vacio = !fila || fila.clips.length === 0
-              const oculta = pistasMeta[p]?.oculta
-              // esta fila es la que recibiría el medio que se arrastra ahora mismo
-              const resaltada = pistaResaltada === p
-              return (
-                <motion.div
-                  key={pistasMeta[p]?.id ?? p}
-                  layout="position"
-                  transition={DESLIZA}
-                  data-fila-pista={p}
-                  className="relative rounded-lg transition-[opacity,box-shadow,background-color] duration-150"
-                  style={{
-                    height: altosPista[p],
-                    // el azul de marca va literal (rgb del #1861ff) porque el resto
-                    // del tema no expone --brand como variable; así el tinte de la
-                    // fila objetivo se ve de verdad en lugar de quedar transparente
-                    background: resaltada
-                      ? 'rgb(24 97 255 / 0.12)'
-                      : vacio
-                        ? 'rgb(var(--border) / 0.05)'
-                        : undefined,
-                    // el resalte se queda en un tinte suave. antes llevaba un aro
-                    // interior de dos píxeles que se leía como un borde permanente
-                    // alrededor de la fila entera, clip y hueco incluidos, y confundía
-                    boxShadow: resaltada ? 'inset 0 0 0 1px rgb(24 97 255 / 0.28)' : undefined,
-                    // un nivel oculto no se pinta en el visor; en la pista se
-                    // atenúa para recordarlo sin sacarlo de en medio
-                    opacity: oculta ? 0.4 : 1,
-                  }}
-                >
-                  {vacio && p === 0 && clips.length === 0 && (
-                    <div className="flex h-full items-center gap-2.5 px-6 text-xs text-[color:var(--muted)]">
-                      <Icon name="subir" size={14} />
-                      <span className="leading-relaxed">
-                        Arrastra un video desde el panel de medios hasta aquí.
-                      </span>
-                    </div>
-                  )}
-                  {fila?.huecos.map((h) => (
-                    <Hueco
-                      key={`hueco-${p}-${h.desde}`}
-                      desde={h.desde}
-                      hasta={h.hasta}
-                      pista={p}
-                      pxPorSegundo={pxPorSegundo}
-                    />
-                  ))}
-                  {fila?.clips.map((c) => {
-                    const asset = medios.find((m) => m.id === c.assetId)
-                    return (
-                      <ClipBlock
-                        key={c.id}
-                        clip={c}
-                        nombre={asset?.nombre ?? 'clip'}
-                        url={asset?.url}
-                        altoPista={altosPista[p]}
-                        pxPorSegundo={pxPorSegundo}
-                        puntos={puntos}
-                      />
-                    )
-                  })}
-                </motion.div>
-              )
-            })}
-          </div>
-
-          {/* carril de capas (texto y figuras), ahora con varias filas para
-              separar bloques que se solapan en el tiempo. cada fila lleva su
-              data-nivel-texto, que es lo que leen los bloques al soltarlos para
-              saber a qué fila mudarse. la fila más alta encabeza la pila. el
-              margen superior es el mismo SEP_SECCION que en la columna izquierda
-              para que ambas cuadren */}
-          <div className="flex flex-col" style={{ marginTop: SEP_SECCION, gap: GAP_FILAS }}>
-            {Array.from({ length: nivelesTexto }, (_, i) => nivelesTexto - 1 - i).map((n) => {
-              const propias = capas.filter((c) => (c.nivel ?? 0) === n)
-              return (
-                <div
-                  key={`texto-${n}`}
-                  data-nivel-texto={n}
-                  className="relative overflow-hidden rounded-lg"
-                  style={{ height: ALTO_FILA_TEXTO, background: 'rgb(var(--border) / 0.05)' }}
-                >
-                  {n === 0 && capas.length === 0 && (
-                    <div className="pointer-events-none flex h-full items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
-                      <Icon name="texto" size={13} />
-                      <span>Añadir texto</span>
-                    </div>
-                  )}
-                  {propias.map((c) => (
-                    <CapaBlock key={c.id} capa={c} pxPorSegundo={pxPorSegundo} puntos={puntos} />
-                  ))}
-                </div>
-              )
-            })}
-          </div>
-
-          {/* carril de audio, con varias filas igual que el de texto. la fila 0,
-              cuando el carril entero está vacío, enseña el rótulo y una onda muy
-              tenue de fondo para que no se vea plano. cada fila lleva su
-              data-nivel-audio para recibir el bloque que se suelte encima */}
-          <div className="flex flex-col" style={{ marginTop: SEP_SECCION, gap: GAP_FILAS }}>
-            {Array.from({ length: nivelesAudio }, (_, i) => nivelesAudio - 1 - i).map((n) => {
-              const regionesFila = audioRegiones.filter((r) => (r.nivel ?? 0) === n)
-              const audiosFila = audios.filter((a) => (a.nivel ?? 0) === n)
-              const carrilVacio = audioRegiones.length === 0 && audios.length === 0
-              return (
-                <div
-                  key={`audio-${n}`}
-                  data-nivel-audio={n}
-                  className="relative overflow-hidden rounded-lg"
-                  style={{ height: ALTO_FILA_AUDIO, background: 'rgb(var(--border) / 0.05)' }}
-                >
-                  {n === 0 && carrilVacio ? (
-                    <>
-                      {/* el rótulo del carril va a la izquierda y limpio; ninguna
-                          onda pasa por debajo para que se lea sin ruido */}
-                      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
-                        <Icon name="musica" size={13} />
-                        <span>Añadir audio</span>
-                      </div>
-                      {/* la onda tenue de relleno arranca pasado el rótulo, así las
-                          líneas empiezan después del texto y no lo tapan */}
-                      <div className="absolute inset-y-0 right-0" style={{ left: ANCHO_ROTULO_AUDIO }}>
-                        <OndaAudio
-                          semilla="fondo-audio"
-                          color="rgb(var(--border) / 0.5)"
-                          opacidad={0.35}
-                          barras={Math.max(80, Math.floor((anchoContenido - ANCHO_ROTULO_AUDIO) / 2))}
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {/* franjas de ganancia (verdes) y audios importados (azules)
-                          conviven en la misma fila, cada uno con su color */}
-                      {regionesFila.map((r) => (
-                        <AudioBlock key={r.id} region={r} pxPorSegundo={pxPorSegundo} puntos={puntos} />
-                      ))}
-                      {audiosFila.map((a) => (
-                        <AudioClipBlock
-                          key={a.id}
-                          audio={a}
-                          asset={medios.find((m) => m.id === a.assetId)}
+          {/* las filas siguen el mismo orden que la columna de cabeceras, para que
+              cada sección quede enfrente de su rótulo pase lo que pase */}
+          {ordenCarriles.map((carril, i) => (
+            <div key={carril} style={{ marginTop: i === 0 ? 8 : SEP_SECCION }}>
+              {carril === 'video' && (
+                <>
+              {/* niveles de video, del más alto al más bajo */}
+              <div ref={filasRef} data-tracks className="flex flex-col" style={{ gap: HUECO_PISTA }}>
+                {filas.map((p) => {
+                  const fila = porPista.get(p)
+                  const vacio = !fila || fila.clips.length === 0
+                  const oculta = pistasMeta[p]?.oculta
+                  // esta fila es la que recibiría el medio que se arrastra ahora mismo
+                  const resaltada = pistaResaltada === p
+                  return (
+                    <motion.div
+                      key={pistasMeta[p]?.id ?? p}
+                      layout="position"
+                      transition={DESLIZA}
+                      data-fila-pista={p}
+                      className="relative rounded-lg transition-[opacity,box-shadow,background-color] duration-150"
+                      style={{
+                        height: altosPista[p],
+                        // el azul de marca va literal (rgb del #1861ff) porque el resto
+                        // del tema no expone --brand como variable; así el tinte de la
+                        // fila objetivo se ve de verdad en lugar de quedar transparente
+                        background: resaltada
+                          ? 'rgb(24 97 255 / 0.12)'
+                          : vacio
+                            ? 'rgb(var(--border) / 0.05)'
+                            : undefined,
+                        // el resalte se queda en un tinte suave. antes llevaba un aro
+                        // interior de dos píxeles que se leía como un borde permanente
+                        // alrededor de la fila entera, clip y hueco incluidos, y confundía
+                        boxShadow: resaltada ? 'inset 0 0 0 1px rgb(24 97 255 / 0.28)' : undefined,
+                        // un nivel oculto no se pinta en el visor; en la pista se
+                        // atenúa para recordarlo sin sacarlo de en medio
+                        opacity: oculta ? 0.4 : 1,
+                      }}
+                    >
+                      {vacio && p === 0 && clips.length === 0 && (
+                        <div className="flex h-full items-center gap-2.5 px-6 text-xs text-[color:var(--muted)]">
+                          <Icon name="subir" size={14} />
+                          <span className="leading-relaxed">
+                            Arrastra un video desde el panel de medios hasta aquí.
+                          </span>
+                        </div>
+                      )}
+                      {fila?.huecos.map((h) => (
+                        <Hueco
+                          key={`hueco-${p}-${h.desde}`}
+                          desde={h.desde}
+                          hasta={h.hasta}
+                          pista={p}
                           pxPorSegundo={pxPorSegundo}
-                          puntos={puntos}
                         />
                       ))}
-                    </>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+                      {fila?.clips.map((c) => {
+                        const asset = medios.find((m) => m.id === c.assetId)
+                        return (
+                          <ClipBlock
+                            key={c.id}
+                            clip={c}
+                            nombre={asset?.nombre ?? 'clip'}
+                            url={asset?.url}
+                            altoPista={altosPista[p]}
+                            pxPorSegundo={pxPorSegundo}
+                            puntos={puntos}
+                          />
+                        )
+                      })}
+                    </motion.div>
+                  )
+                })}
+              </div>
+                </>
+              )}
+              {carril === 'texto' && (
+                <>
+              {/* carril de capas (texto y figuras), ahora con varias filas para
+                  separar bloques que se solapan en el tiempo. cada fila lleva su
+                  data-nivel-texto, que es lo que leen los bloques al soltarlos para
+                  saber a qué fila mudarse. la fila más alta encabeza la pila. el
+                  margen superior es el mismo SEP_SECCION que en la columna izquierda
+                  para que ambas cuadren */}
+              <div className="flex flex-col" style={{ gap: GAP_FILAS }}>
+                {Array.from({ length: nivelesTexto }, (_, i) => nivelesTexto - 1 - i).map((n) => {
+                  const propias = capas.filter((c) => (c.nivel ?? 0) === n)
+                  return (
+                    <div
+                      key={`texto-${n}`}
+                      data-nivel-texto={n}
+                      className="relative overflow-hidden rounded-lg"
+                      style={{ height: ALTO_FILA_TEXTO, background: 'rgb(var(--border) / 0.05)' }}
+                    >
+                      {n === 0 && capas.length === 0 && (
+                        <div className="pointer-events-none flex h-full items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
+                          <Icon name="texto" size={13} />
+                          <span>Añadir texto</span>
+                        </div>
+                      )}
+                      {propias.map((c) => (
+                        <CapaBlock key={c.id} capa={c} pxPorSegundo={pxPorSegundo} puntos={puntos} />
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+                </>
+              )}
+              {carril === 'audio' && (
+                <>
+              {/* carril de audio, con varias filas igual que el de texto. la fila 0,
+                  cuando el carril entero está vacío, enseña el rótulo y una onda muy
+                  tenue de fondo para que no se vea plano. cada fila lleva su
+                  data-nivel-audio para recibir el bloque que se suelte encima */}
+              <div className="flex flex-col" style={{ gap: GAP_FILAS }}>
+                {Array.from({ length: nivelesAudio }, (_, i) => nivelesAudio - 1 - i).map((n) => {
+                  const regionesFila = audioRegiones.filter((r) => (r.nivel ?? 0) === n)
+                  const audiosFila = audios.filter((a) => (a.nivel ?? 0) === n)
+                  const carrilVacio = audioRegiones.length === 0 && audios.length === 0
+                  return (
+                    <div
+                      key={`audio-${n}`}
+                      data-nivel-audio={n}
+                      className="relative overflow-hidden rounded-lg"
+                      style={{ height: ALTO_FILA_AUDIO, background: 'rgb(var(--border) / 0.05)' }}
+                    >
+                      {n === 0 && carrilVacio ? (
+                        <>
+                          {/* el rótulo del carril va a la izquierda y limpio; ninguna
+                              onda pasa por debajo para que se lea sin ruido */}
+                          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
+                            <Icon name="musica" size={13} />
+                            <span>Añadir audio</span>
+                          </div>
+                          {/* la onda tenue de relleno arranca pasado el rótulo, así las
+                              líneas empiezan después del texto y no lo tapan */}
+                          <div className="absolute inset-y-0 right-0" style={{ left: ANCHO_ROTULO_AUDIO }}>
+                            <OndaAudio
+                              semilla="fondo-audio"
+                              color="rgb(var(--border) / 0.5)"
+                              opacidad={0.35}
+                              barras={Math.max(80, Math.floor((anchoContenido - ANCHO_ROTULO_AUDIO) / 2))}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {/* franjas de ganancia (verdes) y audios importados (azules)
+                              conviven en la misma fila, cada uno con su color */}
+                          {regionesFila.map((r) => (
+                            <AudioBlock key={r.id} region={r} pxPorSegundo={pxPorSegundo} puntos={puntos} />
+                          ))}
+                          {audiosFila.map((a) => (
+                            <AudioClipBlock
+                              key={a.id}
+                              audio={a}
+                              asset={medios.find((m) => m.id === a.assetId)}
+                              pxPorSegundo={pxPorSegundo}
+                              puntos={puntos}
+                            />
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+                </>
+              )}
+            </div>
+          ))}
 
           {/* guía de inserción: la línea celeste que cruza la pista mientras se
               arrastra un clip sobre la separación entre dos niveles. anuncia que

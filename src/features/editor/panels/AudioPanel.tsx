@@ -17,6 +17,13 @@ export default function AudioPanel() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* este panel guarda lo que vale para todo el proyecto. el volumen de un clip
+          o de un audio suelto se toca en la barra que sale al elegirlo, encima de
+          la línea de tiempo, para no mezclar lo general con lo de cada pieza */}
+      <p className="text-[11px] leading-relaxed text-[color:var(--muted)]">
+        Acá manda el sonido de todo el proyecto. Para subir o bajar un clip o un audio
+        concreto, elígelo y usa la barra que aparece sobre la línea de tiempo.
+      </p>
       <Campo etiqueta={`Volumen general (${Math.round(volumenGlobal * 100)}%)`}>
         <Deslizador
           valor={Math.round(volumenGlobal * 100)}

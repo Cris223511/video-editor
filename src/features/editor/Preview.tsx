@@ -331,9 +331,11 @@ export default function Preview() {
       if (nodo) {
         // un nivel silenciado o un clip con su audio ya separado no suena: el
         // sonido de un clip separado lo lleva su clip de audio vinculado
+        // el volumen propio del clip multiplica a la ganancia de la pista, así que
+        // un clip bajo sigue respetando las franjas y el volumen general
         nodo.gain.value = metas[act.pista]?.silenciada || act.mudo || act.silenciado
           ? 0
-          : gananciaEn(audioRef.current.regiones, audioRef.current.general, ph)
+          : gananciaEn(audioRef.current.regiones, audioRef.current.general, ph) * (act.volumen ?? 1)
       }
       // grabando un recorrido el video corre más despacio, que es la única forma
       // de seguir con el cursor algo que se mueve rápido sin ir a tirones. el
@@ -695,6 +697,10 @@ export default function Preview() {
       // las bandas alrededor del lienzo toman el color del marco del visor, claro en
       // modo claro y casi negro en oscuro; sin contenido se usa la superficie suave
       style={{ background: hayContenido ? 'rgb(var(--marco-visor))' : 'rgb(var(--surface-2))' }}
+      // marca para poder apagar ese fondo desde el css cuando el visor va a pantalla
+      // completa: ahí las bandas deben fundirse con el fondo oscuro en vez de dibujar
+      // un marco claro alrededor del video
+      data-visor
       ref={visorRef}
       // arrastrar por el fondo del visor (o las bandas de los lados) dibuja un
       // recuadro de selección; un clic seco suelta lo que hubiera seleccionado. el

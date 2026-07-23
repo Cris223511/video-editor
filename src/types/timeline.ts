@@ -80,6 +80,10 @@ export interface Clip {
   // línea de tiempo. es distinto de mudo: aquel lo pone el editor al separar el
   // audio, este lo decide quien monta. cualquiera de los dos deja el clip sin sonido
   silenciado?: boolean
+  // volumen propio del clip, de 0 a 2 (0 es silencio, 1 es su nivel natural y 2 el
+  // doble). va de la mano del silencio: bajarlo del todo silencia y subirlo desde
+  // cero devuelve el sonido. sin definir vale 1, así que lo guardado antes suena igual
+  volumen?: number
   // cuando su audio se ha separado a la pista de sonido, el video queda mudo para
   // no sonar dos veces; el sonido pasa a llevarlo el clip de audio vinculado
   mudo?: boolean

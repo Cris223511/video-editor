@@ -1,7 +1,7 @@
 {
   "name": "video-editor",
   "private": true,
-  "version": "2.20.0",
+  "version": "2.21.0",
   "description": "Editor de video que funciona por completo en el navegador: línea de tiempo con varios niveles, corrección de color, censura en movimiento, capas y exportación, sin que los archivos salgan del equipo.",
   "keywords": [
     "video-editor",

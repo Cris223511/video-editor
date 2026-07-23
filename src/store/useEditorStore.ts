@@ -94,6 +94,9 @@ export type Herramienta =
   | 'transformar'
   | 'recortar'
 
+// las tres secciones que conviven en la línea de tiempo, cada una con sus filas
+export type Carril = 'video' | 'audio' | 'texto'
+
 interface EstadoEditor {
   pista: Track
   // niveles de video visibles y el alto en píxeles de cada uno. los clips viven
@@ -109,6 +112,14 @@ interface EstadoEditor {
   // guarda en su campo nivel en qué fila cae
   nivelesTexto: number
   nivelesAudio: number
+  // en qué orden se apilan las tres secciones de la línea de tiempo, de arriba
+  // abajo. de fábrica el video manda arriba, luego el audio y al final el texto y
+  // las figuras, pero se puede reordenar a gusto
+  ordenCarriles: Carril[]
+  // sube o baja una sección entera. el video no lleva flechas propias: se mueve
+  // solo cuando el audio o el texto le pasan por encima, y con esas dos se llega
+  // igualmente a cualquier orden posible
+  moverCarril: (carril: Carril, direccion: -1 | 1) => void
   capas: Capa[]
   playhead: number
   reproduciendo: boolean
@@ -203,6 +214,9 @@ interface EstadoEditor {
   // enciende o apaga el silencio de un clip de video desde su propio bloque en la
   // línea de tiempo, sin pasar por ningún panel
   alternarSilencioClip: (id: string) => void
+  // volumen del clip. dejarlo en cero equivale a silenciarlo y subirlo desde cero
+  // le quita el silencio, para que el botón y el deslizador cuenten lo mismo
+  setVolumenClip: (id: string, volumen: number) => void
   agregarNivelTexto: () => void
   agregarNivelAudio: () => void
   // lleva una capa a otra fila del carril de texto, o un audio o región a otra del
@@ -379,6 +393,7 @@ type Documento = Pick<
   | 'pistasMeta'
   | 'nivelesTexto'
   | 'nivelesAudio'
+  | 'ordenCarriles'
   | 'capas'
   | 'marco'
   | 'volumenGlobal'
@@ -403,6 +418,7 @@ function tomarDocumento(s: EstadoEditor): Documento {
     pistasMeta: s.pistasMeta,
     nivelesTexto: s.nivelesTexto,
     nivelesAudio: s.nivelesAudio,
+    ordenCarriles: s.ordenCarriles,
     audios: s.audios,
     capas: s.capas,
     marco: s.marco,
@@ -472,6 +488,8 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'setAltoPista',
   'moverClipAPista',
   'alternarSilencioClip',
+  'setVolumenClip',
+  'moverCarril',
   'agregarNivelTexto',
   'agregarNivelAudio',
   'moverCapaNivel',
@@ -630,6 +648,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   pistasMeta: [metaPista(1)],
   nivelesTexto: 1,
   nivelesAudio: 1,
+  ordenCarriles: ['video', 'audio', 'texto'],
   capas: [],
   playhead: 0,
   reproduciendo: false,
@@ -729,6 +748,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       pistasMeta: [metaPista(1)],
       nivelesTexto: 1,
       nivelesAudio: 1,
+      ordenCarriles: ['video', 'audio', 'texto'],
       capas: [],
       playhead: 0,
       reproduciendo: false,
@@ -1319,9 +1339,41 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     set((s) => ({
       pista: {
         ...s.pista,
-        clips: s.pista.clips.map((c) => (c.id === id ? { ...c, silenciado: !c.silenciado } : c)),
+        clips: s.pista.clips.map((c) => {
+          if (c.id !== id) return c
+          const silenciado = !c.silenciado
+          // al quitar el silencio de un clip que estaba a cero se le devuelve un
+          // nivel audible; si no, el botón diría que suena y se seguiría sin oír
+          const volumen = !silenciado && (c.volumen ?? 1) === 0 ? 1 : c.volumen
+          return { ...c, silenciado, volumen }
+        }),
       },
     })),
+
+  setVolumenClip: (id, volumen) =>
+    set((s) => {
+      const v = Math.max(0, Math.min(2, volumen))
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) =>
+            // bajar a cero es lo mismo que silenciar, y subir desde cero devuelve
+            // el sonido: así el deslizador y el botón nunca se contradicen
+            c.id === id ? { ...c, volumen: v, silenciado: v === 0 } : c,
+          ),
+        },
+      }
+    }),
+
+  moverCarril: (carril, direccion) =>
+    set((s) => {
+      const orden = [...s.ordenCarriles]
+      const i = orden.indexOf(carril)
+      const j = i + direccion
+      if (i < 0 || j < 0 || j >= orden.length) return {}
+      ;[orden[i], orden[j]] = [orden[j], orden[i]]
+      return { ordenCarriles: orden }
+    }),
 
   agregarNivelTexto: () =>
     set((s) => (s.nivelesTexto >= MAX_NIVELES ? {} : { nivelesTexto: s.nivelesTexto + 1 })),

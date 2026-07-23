@@ -30,6 +30,11 @@ export default function RecortarPanel() {
         Arrastra los agarres del recuadro sobre el video para recortar su imagen. Lo que queda fuera
         del recuadro no se ve ni sale al exportar.
       </p>
+      <p className="text-[11px] leading-relaxed text-[color:var(--muted)]">
+        Con <b className="text-brand">Alt</b> el recorte se cierra por los dos costados a la vez,
+        midiendo desde el centro. La tecla <b className="text-brand">C</b> abre esta herramienta
+        sobre lo que tengas elegido.
+      </p>
 
       {tieneRecorte && (
         <button

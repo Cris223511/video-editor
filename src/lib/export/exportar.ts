@@ -346,9 +346,11 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
           // un nivel silenciado, o un clip con su audio separado, no aporta sonido
           const silenciada =
             (datos.pistasMeta[act.pista]?.silenciada ?? false) || !!act.mudo || !!act.silenciado
+          // el volumen propio del clip multiplica a la ganancia, igual que en el
+          // visor, para que lo exportado suene exactamente como se oía al montar
           ganancia.gain.value = silenciada
             ? 0
-            : gananciaEn(datos.audioRegiones, datos.volumenGlobal, t)
+            : gananciaEn(datos.audioRegiones, datos.volumenGlobal, t) * (act.volumen ?? 1)
           v.playbackRate = act.velocidad
           if (v.paused) {
             try {

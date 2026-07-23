@@ -100,6 +100,22 @@ html {
 /* estilos que Lenis necesita para tomar el control del desplazamiento del sitio.
    sin ellos, la inercia no llegaba a aplicarse y el scroll seguía siendo el del
    navegador. lenis marca la raíz con estas clases al arrancar */
+/* con el visor a pantalla completa el contenido tiene que pasar por encima de la
+   barra superior. el contenido vive dentro de un main con su propia capa (z-10) y
+   la barra va en otra más alta (z-40), así que por mucho que se suba el z del
+   visor dentro del main, la barra seguía pintándose encima. subiendo la capa del
+   main entero mientras dura la pantalla completa, el visor tapa de verdad todo */
+html.ve-visor-completo main {
+  z-index: 60;
+}
+
+/* a pantalla completa las bandas del visor se funden con el fondo oscuro. su color
+   se pinta en el estilo en línea, que gana a cualquier clase, así que la única
+   forma de apagarlo desde fuera es esta regla */
+html.ve-visor-completo [data-visor] {
+  background: transparent !important;
+}
+
 html.lenis,
 html.lenis body {
   height: auto;

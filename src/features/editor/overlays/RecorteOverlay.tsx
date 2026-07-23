@@ -153,6 +153,16 @@ export default function RecorteOverlay() {
         if (lado === 'arr') cambios.arr = fy
         if (lado === 'aba') cambios.aba = 1 - fy
       }
+      // con alt el recorte crece o encoge por los dos costados a la vez, midiendo
+      // desde el centro. arrastrar un lado mueve también el de enfrente lo mismo,
+      // así que el encuadre se cierra sin descentrarse y hay que apuntar a un solo
+      // borde en lugar de ir corrigiendo los dos por turnos
+      if (ev.altKey) {
+        if (cambios.izq !== undefined) cambios.der = cambios.izq
+        if (cambios.der !== undefined && cambios.izq === undefined) cambios.izq = cambios.der
+        if (cambios.arr !== undefined) cambios.aba = cambios.arr
+        if (cambios.aba !== undefined && cambios.arr === undefined) cambios.arr = cambios.aba
+      }
       aplicarRecorte(cambios)
     }
     const soltar = () => {

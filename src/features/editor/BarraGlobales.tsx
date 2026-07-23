@@ -97,6 +97,7 @@ export default function BarraGlobales() {
 
   const setHerramienta = useEditorStore((s) => s.setHerramienta)
   const alternarSilencioClip = useEditorStore((s) => s.alternarSilencioClip)
+  const setVolumenClip = useEditorStore((s) => s.setVolumenClip)
   const dividirEnCabezal = useEditorStore((s) => s.dividirEnCabezal)
   const duplicarClip = useEditorStore((s) => s.duplicarClip)
   const quitarClip = useEditorStore((s) => s.quitarClip)
@@ -144,6 +145,17 @@ export default function BarraGlobales() {
           <Accion icono={<Copy size={15} />} texto="Duplicar" onClick={() => duplicarClip(clip.id)} />
           <Accion icono={<Trash2 size={15} />} texto="Borrar" onClick={() => quitarClip(clip.id)} />
           <Corte />
+          {/* el volumen del clip y su botón de silencio van de la mano: bajarlo a
+              cero silencia y subirlo desde cero devuelve el sonido */}
+          {!clip.mudo && (
+            <Mando
+              etiqueta="Volumen"
+              valor={clip.silenciado ? 0 : Math.round((clip.volumen ?? 1) * 100)}
+              min={0}
+              max={200}
+              onChange={(v) => setVolumenClip(clip.id, v / 100)}
+            />
+          )}
           <Mando
             etiqueta="Tamaño"
             valor={Math.round((clip.encuadre?.escala ?? 1) * 100)}
