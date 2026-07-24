@@ -1,6 +1,11 @@
-import { ReactNode } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import * as Tip from '@radix-ui/react-tooltip'
 import { HelpCircle } from 'lucide-react'
+
+// evento con el que se cierran todas las burbujas de ayuda a la vez. lo dispara el
+// proveedor al detectar cualquier desplazamiento; cada tooltip lo escucha y se
+// oculta. sin esto, al hacer scroll la burbuja quedaba flotando pegada en su sitio
+const EVENTO_CERRAR = 'cerrar-tooltips'
 
 type Lado = 'arriba' | 'abajo' | 'derecha' | 'izquierda'
 
@@ -15,6 +20,16 @@ const lados: Record<Lado, 'top' | 'bottom' | 'right' | 'left'> = {
 // tarda en aparecer el primero; los siguientes salen al instante mientras el
 // cursor se mueve entre elementos cercanos
 export function TooltipProvider({ children }: { children: ReactNode }) {
+  // cualquier desplazamiento (de un panel, de la línea de tiempo, de la rueda del
+  // ratón) cierra las burbujas de ayuda abiertas, para que no queden pegadas en un
+  // sitio que ya no corresponde. se escucha en captura para enterarse de todos los
+  // contenedores con scroll, no solo de la ventana
+  useEffect(() => {
+    const alScroll = () => window.dispatchEvent(new Event(EVENTO_CERRAR))
+    window.addEventListener('scroll', alScroll, true)
+    return () => window.removeEventListener('scroll', alScroll, true)
+  }, [])
+
   return (
     // sin espera: el tooltip sale en cuanto el cursor entra. tener que dejar el
     // ratón quieto un momento para saber qué hace un botón entorpece más de lo
@@ -44,8 +59,18 @@ export default function Tooltip({
   retardo?: number
   children: ReactNode
 }) {
+  // el estado abierto se controla aquí para poder forzar el cierre al hacer scroll;
+  // radix sigue decidiendo cuándo abrir al pasar el cursor, y solo interceptamos el
+  // cierre por desplazamiento
+  const [abierto, setAbierto] = useState(false)
+  useEffect(() => {
+    const cerrar = () => setAbierto(false)
+    window.addEventListener(EVENTO_CERRAR, cerrar)
+    return () => window.removeEventListener(EVENTO_CERRAR, cerrar)
+  }, [])
+
   return (
-    <Tip.Root delayDuration={retardo}>
+    <Tip.Root open={abierto} onOpenChange={setAbierto} delayDuration={retardo}>
       <Tip.Trigger asChild>{children}</Tip.Trigger>
       <Tip.Portal>
         <Tip.Content

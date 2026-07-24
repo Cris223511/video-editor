@@ -232,7 +232,7 @@ function Catalogo({
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(104px,1fr))]">
         {actual.efectos.map((e) => (
           <button
             key={e.id}
@@ -243,7 +243,7 @@ function Catalogo({
             className="group flex flex-col gap-1 text-left"
           >
             <span
-              className="relative block h-14 w-full overflow-hidden rounded-lg border border-black/10 transition-all duration-200 group-hover:border-brand dark:border-white/10"
+              className="relative block h-16 w-full overflow-hidden rounded-lg border border-black/10 transition-all duration-200 group-hover:border-brand dark:border-white/10"
               style={{ ...fondo, filter: e.css(encima === e.id ? 100 : 50) }}
             >
               {/* al pasar el cursor, la muestra deja de ser un fotograma quieto y

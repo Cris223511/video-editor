@@ -32,7 +32,7 @@ export default function MarcoPanel() {
             la muestra usa la misma función que pinta el marco de verdad sobre el
             visor, con el grosor y el radio a escala de la miniatura, así que lo que
             se ve acá es exactamente lo que va a caer sobre el video */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(88px,1fr))]">
           {TIPOS.map((t) => {
             const elegido = marco.tipo === t.tipo
             return (

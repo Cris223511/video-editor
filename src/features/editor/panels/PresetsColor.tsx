@@ -69,7 +69,9 @@ export default function PresetsColor({
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      {/* dos por fila en un panel estrecho y más columnas cuando se ensancha: la
+          rejilla se llena sola con muestras de un ancho mínimo */}
+      <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(104px,1fr))]">
         {actual.presets.map((p) => {
           const puesto = presetAplicado(tono, p)
           return (
@@ -83,7 +85,7 @@ export default function PresetsColor({
             >
               <span
                 className={[
-                  'relative block h-14 w-full overflow-hidden rounded-lg border transition-all duration-150',
+                  'relative block h-16 w-full overflow-hidden rounded-lg border transition-all duration-150',
                   puesto
                     ? 'border-brand ring-2 ring-brand/40'
                     : 'border-black/10 group-hover:border-brand dark:border-white/10',

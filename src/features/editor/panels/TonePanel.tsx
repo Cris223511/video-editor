@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import SinSeleccion from '../../../components/ui/SinSeleccion'
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
@@ -81,6 +82,11 @@ export default function TonePanel() {
 
   const ruedas = tono.ruedas ?? RUEDAS_NEUTRAS
   const curvas = tono.curvas ?? CURVAS_NEUTRAS
+  // canal de curva que se está editando. las cuatro curvas ya no se apilan: se
+  // elige una con las pestañas y se muestra solo esa, que en un panel estrecho es
+  // mucho más cómodo que verlas todas a la vez
+  const [curvaActiva, setCurvaActiva] = useState<keyof Curvas>('maestra')
+  const canalActivo = CANALES.find((c) => c.campo === curvaActiva) ?? CANALES[0]
 
   function cambiarRueda(zona: keyof Ruedas, p: PuntoRueda) {
     aplicar({ ruedas: { ...ruedas, [zona]: p } })
@@ -144,7 +150,10 @@ export default function TonePanel() {
             <Icon name="restablecer" size={14} /> Restablecer ruedas
           </button>
         </div>
-        <div className="flex justify-between gap-2">
+        {/* las tres ruedas se reparten a lo ancho; si el panel se estrecha y ya no
+            caben, saltan de línea y quedan centradas en vez de aplastarse unas
+            contra otras */}
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-3">
           {ZONAS.map((z) => (
             <RuedaColor
               key={z.campo}
@@ -173,24 +182,33 @@ export default function TonePanel() {
             <Icon name="restablecer" size={14} /> Restablecer curvas
           </button>
         </div>
-        {/* las cuatro curvas se muestran a la vez, cada una con su editor. en un
-            panel estrecho se apilan y cuando hay ancho de sobra pasan a dos
-            columnas gracias al auto-fit de la rejilla */}
-        <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
-          {CANALES.map((c) => (
-            <div key={c.campo} className="flex flex-col gap-1.5">
-              <span className="flex items-center gap-1.5 text-[13px] font-medium text-[color:var(--muted)]">
+        {/* una pestaña por canal; se edita solo la curva elegida. cada pestaña lleva
+            su punto de color y la activa se resalta, así se sabe de un vistazo cuál
+            se está tocando sin apilar los cuatro editores */}
+        <div className="mb-2 flex gap-1.5">
+          {CANALES.map((c) => {
+            const sel = c.campo === curvaActiva
+            return (
+              <button
+                key={c.campo}
+                onClick={() => setCurvaActiva(c.campo)}
+                className={[
+                  'flex flex-1 items-center justify-center gap-1.5 rounded-md px-1.5 py-1.5 text-[11px] font-medium transition-colors',
+                  sel ? 'bg-brand text-white' : 'text-[color:var(--muted)] hover:text-brand',
+                ].join(' ')}
+                style={sel ? undefined : { background: 'rgb(var(--border) / 0.1)' }}
+              >
                 <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: c.color }} />
-                {c.etiqueta}
-              </span>
-              <EditorCurva
-                puntos={curvas[c.campo]}
-                color={c.color}
-                onChange={(p) => cambiarCurva(c.campo, p)}
-              />
-            </div>
-          ))}
+                {c.etiqueta.replace('Curva de ', '')}
+              </button>
+            )
+          })}
         </div>
+        <EditorCurva
+          puntos={curvas[curvaActiva]}
+          color={canalActivo.color}
+          onChange={(p) => cambiarCurva(curvaActiva, p)}
+        />
         <p className="mt-2 text-[13px] italic leading-relaxed text-[color:var(--muted)]">
           Haz clic para añadir un punto, arrástralo para doblar la curva y dale{' '}
           <b>doble clic</b> para quitarlo.
