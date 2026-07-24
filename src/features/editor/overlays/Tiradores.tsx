@@ -19,7 +19,7 @@ export default function Tiradores({
         <div
           key={a}
           onMouseDown={(e) => onAgarrar(a, e)}
-          className="absolute h-2.5 w-2.5 rounded-[3px] border-2 border-white bg-brand shadow-sm transition-transform duration-150 hover:scale-125"
+          className="pointer-events-auto absolute h-2.5 w-2.5 rounded-[3px] border-2 border-white bg-brand shadow-sm transition-transform duration-150 hover:scale-125"
           style={{
             left: POSICION[a].left,
             top: POSICION[a].top,

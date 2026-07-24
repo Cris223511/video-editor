@@ -3,6 +3,7 @@ import { MouseEvent as ReactMouseEvent, useState } from 'react'
 import { Capa } from '../../../types/layers'
 import Tooltip from '../../../components/ui/Tooltip'
 import Icon from '../../../components/ui/Icon'
+import { TIPO_TRANSICION } from '../GaleriaTransiciones'
 import TransicionCapaBlock from './TransicionCapaBlock'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
@@ -19,6 +20,7 @@ interface Props {
 export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   const seleccionado = useEditorStore((s) => s.capaSeleccionada === capa.id)
   const seleccionarCapa = useEditorStore((s) => s.seleccionarCapa)
+  const actualizarCapa = useEditorStore((s) => s.actualizarCapa)
   const moverCapaTiempo = useEditorStore((s) => s.moverCapaTiempo)
   const moverCapaNivel = useEditorStore((s) => s.moverCapaNivel)
   const duplicarCapa = useEditorStore((s) => s.duplicarCapa)
@@ -35,6 +37,20 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   // suavizado, para no ir por detrás del ratón; en reposo se anima su posición
   // para que, al cerrar un hueco o acomodarse, se deslice en vez de saltar
   const [interactuando, setInteractuando] = useState(false)
+  // arrastrar una transición de la galería y soltarla aquí se la pone a este
+  // elemento, igual que a un clip de video. el audio es la excepción y no llega
+  // por este bloque, así que cualquier capa la acepta
+  const [transEncima, setTransEncima] = useState(false)
+  function alSoltarTransicion(e: React.DragEvent) {
+    const tipo = e.dataTransfer.getData(TIPO_TRANSICION)
+    if (!tipo) return
+    e.preventDefault()
+    e.stopPropagation()
+    setTransEncima(false)
+    const dur = capa.transicion?.duracion ?? 0.5
+    actualizarCapa(capa.id, { transicion: { tipo, duracion: dur } })
+    seleccionarCapa(capa.id)
+  }
 
   function iniciarMover(e: ReactMouseEvent) {
     // solo el botón izquierdo arrastra. el derecho abre el menú, y si de paso
@@ -185,10 +201,20 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   return (
     <Tooltip texto={etiqueta} retardo={2000} lado="arriba">
     <motion.div
-      layout="position"
+      layout={interactuando ? false : 'position'}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={capa.nivel ?? 0}
       onMouseDown={iniciarMover}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes(TIPO_TRANSICION)) {
+          e.preventDefault()
+          if (!transEncima) setTransEncima(true)
+        }
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setTransEncima(false)
+      }}
+      onDrop={alSoltarTransicion}
       // el botón derecho abre el menú de este bloque en el punto donde se pulsó
       onContextMenu={(e) => {
         e.preventDefault()
@@ -231,11 +257,40 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
           </span>
         </>
       ) : (
-        <span className="pointer-events-none truncate text-[10px] text-white">{etiqueta}</span>
+        <>
+          {/* trama de líneas diagonales sobre el ámbar, para que el bloque de un
+              texto, figura o dibujo no sea un rectángulo plano y se distinga de un
+              vistazo */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              backgroundImage:
+                'repeating-linear-gradient(45deg, rgba(180,120,10,0.25) 0 1px, transparent 1px 7px)',
+            }}
+          />
+          {/* el rótulo va en el color del tema (oscuro en claro, claro en oscuro),
+              porque en blanco no se leía sobre el ámbar claro */}
+          <span className="pointer-events-none relative truncate text-[10px] font-medium text-[color:var(--text)]">
+            {etiqueta}
+          </span>
+        </>
       )}
 
       {/* cuña de la transición de entrada, si la tiene */}
       <TransicionCapaBlock capa={capa} pxPorSegundo={pxPorSegundo} />
+
+      {/* resalte al arrastrar una transición encima, en el borde de entrada */}
+      {transEncima && (
+        <div className="pointer-events-none absolute inset-0 z-20 rounded-md ring-2 ring-inset ring-brand">
+          <div
+            className="absolute left-0 top-0 h-full w-6"
+            style={{
+              background:
+                'linear-gradient(105deg, rgb(24 97 255 / 0.75) 0%, rgb(24 97 255 / 0.25) 60%, transparent 100%)',
+            }}
+          />
+        </div>
+      )}
 
       <div
         onMouseDown={(e) => iniciarRecorte(e, 'inicio')}

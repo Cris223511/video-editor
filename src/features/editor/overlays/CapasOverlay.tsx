@@ -72,6 +72,10 @@ export default function CapasOverlay() {
   const capas = useEditorStore((s) => s.capas)
   const playhead = useEditorStore((s) => s.playhead)
   const herramienta = useEditorStore((s) => s.herramienta)
+  const categoriaClip = useEditorStore((s) => s.categoriaClip)
+  // el lápiz se activa con su herramienta del riel o con la categoría Dibujo
+  // abierta en el panel derecho de un dibujo elegido
+  const dibujando = herramienta === 'dibujar' || categoriaClip === 'dibujar'
   const resolucion = useEditorStore((s) => s.resolucion)
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const capasSeleccionadas = useEditorStore((s) => s.capasSeleccionadas)
@@ -87,6 +91,7 @@ export default function CapasOverlay() {
   const anadirTrazoDibujo = useEditorStore((s) => s.anadirTrazoDibujo)
   const borrarEn = useEditorStore((s) => s.borrarEn)
   const borradorGrosor = useEditorStore((s) => s.borradorGrosor)
+  const escalarTrazo = useEditorStore((s) => s.escalarTrazo)
   const abrirGesto = useEditorStore((s) => s.abrirGesto)
   const finGesto = useEditorStore((s) => s.finGesto)
 
@@ -191,6 +196,10 @@ export default function CapasOverlay() {
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
       setGuias([])
+      // soltar el cursor durante una toma la pausa, sin cerrarla: el cabezal se
+      // detiene y uno decide si sigue grabando, mueve o cambia el elemento, o guarda
+      const st = useEditorStore.getState()
+      if (st.grabandoMovimiento && st.grabacionActiva) st.pausarGrabacion()
     }
     window.addEventListener('mousemove', mover)
     window.addEventListener('mouseup', soltar)
@@ -387,6 +396,41 @@ export default function CapasOverlay() {
   // giro por la manija: se toma el centro del elemento en pantalla y se sigue el
   // ángulo del cursor respecto de él. la caja se rota alrededor de su centro, así
   // que su rectángulo envolvente sigue centrado ahí y sirve para el cálculo
+  // redimensiona un dibujo escalando sus puntos desde el centro de su caja. el
+  // factor sale de cuánto se acerca o aleja el cursor de ese centro respecto al
+  // fotograma anterior, así el arrastre se siente proporcional y sin saltos
+  function iniciarEscalaTrazo(e: ReactMouseEvent, id: string, centro: { x: number; y: number }) {
+    e.stopPropagation()
+    e.preventDefault()
+    abrirGesto()
+    const dist = (ev: globalThis.MouseEvent) => {
+      const root = rootRef.current
+      if (!root) return 1
+      const r = root.getBoundingClientRect()
+      return Math.hypot(ev.clientX - r.left - centro.x, ev.clientY - r.top - centro.y)
+    }
+    let ultimo = 0
+    const mover = (ev: globalThis.MouseEvent) => {
+      const d = dist(ev)
+      if (ultimo > 4 && d > 4) escalarTrazo(id, d / ultimo)
+      ultimo = d
+    }
+    const soltar = () => {
+      finGesto()
+      window.removeEventListener('mousemove', mover)
+      window.removeEventListener('mouseup', soltar)
+    }
+    // se toma la distancia de partida en el primer movimiento para no dar un salto
+    ultimo = 0
+    const arranque = (ev: globalThis.MouseEvent) => {
+      ultimo = dist(ev)
+      window.removeEventListener('mousemove', arranque)
+      window.addEventListener('mousemove', mover)
+    }
+    window.addEventListener('mousemove', arranque)
+    window.addEventListener('mouseup', soltar)
+  }
+
   function iniciarGiro(e: ReactMouseEvent, capa: Capa) {
     e.stopPropagation()
     e.preventDefault()
@@ -571,13 +615,32 @@ export default function CapasOverlay() {
           // lienzo sumándole la posición de la capa. el giro y el volteo se aplican
           // con transform-origin en el centro de la capa, igual que el resto
           const origen = `${pos.x * rect.w}px ${pos.y * rect.h}px`
+          // caja que abarca todo lo dibujado, en píxeles del lienzo. sirve para
+          // pintar el contorno de selección: sin él, un dibujo elegido no se
+          // distinguía de uno cualquiera. lleva el grosor del trazo como margen
+          let minX = Infinity
+          let minY = Infinity
+          let maxX = -Infinity
+          let maxY = -Infinity
+          for (const tr of c.trazos) {
+            for (const p of tr) {
+              const px = (pos.x + p.x) * rect.w
+              const py = (pos.y + p.y) * rect.h
+              if (px < minX) minX = px
+              if (py < minY) minY = py
+              if (px > maxX) maxX = px
+              if (py > maxY) maxY = py
+            }
+          }
+          const hayCaja = isFinite(minX)
+          const m = g / 2 + 4
           // mientras la herramienta dibujar está activa el arrastre pinta (lo
           // gestiona la superficie de dibujo), así que aquí no se captura nada. con
           // cualquier otra herramienta el dibujo se puede agarrar aunque todavía no
           // esté elegido, y el propio agarre lo selecciona, igual que pasa con un
           // texto o una figura. antes hacía falta tenerlo ya seleccionado, y como
           // elegirlo abría la herramienta de dibujar, no había manera de moverlo
-          const movible = herramienta !== 'dibujar'
+          const movible = !dibujando
           return (
             <div
               key={c.id}
@@ -591,6 +654,21 @@ export default function CapasOverlay() {
                 className={movible ? 'overflow-visible' : 'pointer-events-none overflow-visible'}
                 style={{ transform: extra || undefined, transformOrigin: origen }}
               >
+                {/* contorno de selección del dibujo: un recuadro azul que abarca lo
+                    trazado, para que al elegirlo se vea igual que una imagen */}
+                {seleccion && hayCaja && (
+                  <rect
+                    x={minX - m}
+                    y={minY - m}
+                    width={maxX - minX + m * 2}
+                    height={maxY - minY + m * 2}
+                    fill="none"
+                    stroke="#1861ff"
+                    strokeWidth={2}
+                    rx={4}
+                    className="pointer-events-none"
+                  />
+                )}
                 {c.trazos.map((tr, i) => {
                   if (tr.length === 1) {
                     const p = tr[0]
@@ -669,6 +747,23 @@ export default function CapasOverlay() {
                     ),
                   )}
               </svg>
+              {/* tiradores para redimensionar el dibujo, en su caja. escalan lo
+                  trazado desde el centro, igual que se estira una imagen */}
+              {seleccion && hayCaja && (
+                <div
+                  className="pointer-events-none absolute"
+                  style={{ left: rect.ox + minX - m, top: rect.oy + minY - m, width: maxX - minX + m * 2, height: maxY - minY + m * 2 }}
+                >
+                  <Tiradores
+                    onAgarrar={(_a, ev) =>
+                      iniciarEscalaTrazo(ev, c.id, {
+                        x: rect.ox + (minX + maxX) / 2,
+                        y: rect.oy + (minY + maxY) / 2,
+                      })
+                    }
+                  />
+                </div>
+              )}
             </div>
           )
         }
@@ -861,7 +956,7 @@ export default function CapasOverlay() {
       {/* superficie de dibujo: con la herramienta de lápiz activa cubre el lienzo
           y convierte el arrastre en un trazo a mano alzada. va por encima de todo
           para que pintar no mueva las capas de debajo */}
-      {herramienta === 'dibujar' && (
+      {dibujando && (
         <div
           onMouseDown={iniciarDibujo}
           className="pointer-events-auto absolute z-20"

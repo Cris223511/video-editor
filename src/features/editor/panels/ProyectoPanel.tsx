@@ -7,7 +7,7 @@ import { formatearBytes } from '../../../lib/format/bytes'
 
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 text-sm">
+    <div className="flex items-baseline justify-between gap-3 text-[13px]">
       <span className="text-[color:var(--muted)]">{etiqueta}</span>
       <span className="text-right font-medium">{valor}</span>
     </div>
@@ -67,7 +67,7 @@ export default function ProyectoPanel() {
       </Campo>
 
       <div className="flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/10">
-        <span className="text-sm font-medium">Contenido</span>
+        <span className="text-[13px] font-medium">Contenido</span>
         <Dato etiqueta="Duración" valor={formatearDuracion(duracionTotal(clips))} />
         <Dato etiqueta="Clips" valor={`${clips.length} en ${numPistas} ${numPistas === 1 ? 'nivel' : 'niveles'}`} />
         <Dato etiqueta="Capas" valor={capas.length === 0 ? 'ninguna' : resumenCapas} />
@@ -77,7 +77,7 @@ export default function ProyectoPanel() {
       </div>
 
       <div className="flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/10">
-        <span className="text-sm font-medium">Archivo</span>
+        <span className="text-[13px] font-medium">Archivo</span>
         <Dato etiqueta="Lienzo" valor={`${resolucion.ancho}×${resolucion.alto}`} />
         <Dato etiqueta="Medios" valor={`${medios.length} · ${formatearBytes(peso)}`} />
         <Dato etiqueta="Creado" valor={fecha(creado)} />

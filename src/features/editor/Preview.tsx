@@ -1,14 +1,15 @@
-import { MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../components/ui/Icon'
 import CapasOverlay from './overlays/CapasOverlay'
 import ClipOverlay from './overlays/ClipOverlay'
 import RecorteOverlay from './overlays/RecorteOverlay'
+import CuentaRegresiva from './overlays/CuentaRegresiva'
 import Vacio from '../../components/ui/Vacio'
 import MarcoOverlay from './overlays/MarcoOverlay'
 import { useEditorStore } from '../../store/useEditorStore'
 import { useProjectStore } from '../../store/useProjectStore'
 import { MediaAsset } from '../../types/media'
-import { clipEnTiempo, duracionTotal } from '../../lib/timeline/clips'
+import { clipEnTiempo, duracionProyecto } from '../../lib/timeline/clips'
 import { encuadreDe, encuadreNeutro, rectClip } from '../../lib/timeline/encuadre'
 import { gananciaEn, fundidoEn } from '../../lib/audio/ganancia'
 import { rectContenido } from '../../lib/layers/rect'
@@ -27,6 +28,7 @@ import {
 import { anterior, posterior, pintarTransicion, progreso, progresoSalida } from '../../lib/transiciones/pintar'
 import { cssEfectos } from '../../lib/efectos/catalogo'
 import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../../lib/color/mezcla'
+import { estiloRecorte, vinetaRecorte } from '../../lib/layers/recorteMascara'
 import { buscarTransicion } from '../../lib/transiciones/catalogo'
 import { sufijoTransformCss, aplicarTransformCanvas } from '../../lib/layers/transform'
 import { TIPO_FIGURA } from './panels/FiguraPanel'
@@ -52,6 +54,7 @@ export default function Preview() {
   const desenfoqueFondo = useEditorStore((s) => s.desenfoqueFondo)
   const audioRegiones = useEditorStore((s) => s.audioRegiones)
   const audios = useEditorStore((s) => s.audios)
+  const capasTodas = useEditorStore((s) => s.capas)
   const volumenGlobal = useEditorStore((s) => s.volumenGlobal)
   const pistasMeta = useEditorStore((s) => s.pistasMeta)
   const medios = useProjectStore((s) => s.medios)
@@ -180,7 +183,10 @@ export default function Preview() {
     })
     return set
   }, [pistasMeta])
-  const total = useMemo(() => duracionTotal(clips), [clips])
+  const total = useMemo(
+    () => duracionProyecto(clips, capasTodas, audios, audioRegiones),
+    [clips, capasTodas, audios, audioRegiones],
+  )
   const assetPorId = useMemo(() => {
     const mapa = new Map<string, MediaAsset>()
     medios.forEach((a) => mapa.set(a.id, a))
@@ -274,7 +280,10 @@ export default function Preview() {
   // terminar; el cabezal se calcula desde el tiempo real del video
   useEffect(() => {
     if (!reproduciendo) return
-    if (clipsOrdenados.length === 0) {
+    // se puede reproducir aunque no haya ningún video: basta con que el proyecto
+    // dure algo (un texto, un dibujo o un audio ya le dan duración). solo se para
+    // en seco si de verdad no hay nada que mostrar ni oír
+    if (total <= 0) {
       pausar()
       return
     }
@@ -284,6 +293,14 @@ export default function Preview() {
     if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume().catch(() => {})
     let raf = 0
     let cancelado = false
+    // red de seguridad contra congelamientos: si el video del clip activo no está
+    // listo (recién duplicado y aún cargando, buffer, cambio de clip), su
+    // currentTime deja de avanzar y, atado a él, el cabezal se quedaba clavado. se
+    // vigila cuánto lleva el video sin progresar y, pasado un umbral, el cabezal
+    // avanza con el reloj para que la línea de tiempo nunca se congele
+    let tPrev = performance.now()
+    let ctPrev = -1
+    let estancado = 0
 
     const paso = () => {
       if (cancelado) return
@@ -298,9 +315,16 @@ export default function Preview() {
         ph = playheadStore
         phRef.current = ph
       }
-      if (ph >= total) {
-        // se acabó el montaje: el cabezal se queda clavado en el último fotograma
-        // y la reproducción termina ahí, sin volver al principio ni repetirse
+      // mientras se graba un recorrido, la reproducción no se para al llegar al
+      // final: el cabezal sigue y el elemento se va estirando para abarcar todo el
+      // movimiento, tal como se pidió. fuera de la grabación, al acabar el montaje
+      // se detiene en el último fotograma
+      const grabando = useEditorStore.getState().grabandoMovimiento
+      // mientras se graba, el bloque de la capa se estira cuadro a cuadro hasta el
+      // cabezal, aunque el cursor no se mueva. así la toma no se corta y el elemento
+      // no desaparece del visor al pasar del final que tenía el bloque
+      if (grabando) useEditorStore.getState().crecerCapaGrabando(ph)
+      if (ph >= total && !grabando) {
         irA(total)
         pausar()
         // nada puede seguir corriendo por detrás. si algún clip o el fondo borroso
@@ -322,7 +346,9 @@ export default function Preview() {
       })
       const act = clipEnTiempo(clipsOrdenados, ph, ocultasVivo)
       if (!act) {
-        phRef.current = Math.min(ph + 0.033, total)
+        // el avance normal se topa al final del montaje; grabando no, para que el
+        // recorrido pueda pasarse y estirar el bloque
+        phRef.current = grabando ? ph + 0.033 : Math.min(ph + 0.033, total)
         irA(phRef.current)
         raf = requestAnimationFrame(paso)
         return
@@ -392,10 +418,33 @@ export default function Preview() {
         raf = requestAnimationFrame(paso)
         return
       }
-      phRef.current = Math.min(
-        act.inicio + (v.currentTime - act.recorteInicio) / act.velocidad,
-        total,
-      )
+      // tiempo real transcurrido desde el fotograma anterior, acotado por si la
+      // pestaña estuvo en segundo plano y volvió con un salto enorme
+      const ahora = performance.now()
+      const dt = Math.min(0.25, (ahora - tPrev) / 1000)
+      tPrev = ahora
+      // ¿avanzó el video desde la última vuelta? si no, se acumula ese tiempo; en
+      // cuanto cambia su currentTime se reinicia el contador de estancamiento
+      if (v.currentTime === ctPrev) estancado += dt
+      else {
+        estancado = 0
+        ctPrev = v.currentTime
+      }
+      let nuevo: number
+      if (estancado > 0.15) {
+        // el video lleva un buen rato sin progresar: el cabezal avanza con el
+        // reloj para no congelar la línea, y se empuja el video a esa posición
+        // para que reenganche en cuanto tenga datos
+        nuevo = phRef.current + dt * act.velocidad
+        try {
+          v.currentTime = act.recorteInicio + (nuevo - act.inicio) * act.velocidad
+        } catch {
+          // sin metadatos todavía
+        }
+      } else {
+        nuevo = act.inicio + (v.currentTime - act.recorteInicio) / act.velocidad
+      }
+      phRef.current = Math.min(nuevo, total)
       irA(phRef.current)
       raf = requestAnimationFrame(paso)
     }
@@ -883,17 +932,16 @@ export default function Preview() {
                   espejoV: enc.espejoV,
                 })
                 const transform = `${base} ${giro}`.trim() || undefined
-                // el recorte se aplica como inset del propio elemento, antes de la
-                // transformación, igual que lo hace el lienzo de exportación: lo que
-                // queda fuera del recuadro no se ve y deja pasar el fondo
-                const rec = c.recorte
-                const clipPath =
-                  rec && (rec.izq || rec.der || rec.arr || rec.aba)
-                    ? `inset(${rec.arr * 100}% ${rec.der * 100}% ${rec.aba * 100}% ${rec.izq * 100}%)`
-                    : undefined
+                // el recorte se aplica al propio elemento: el rectángulo con un
+                // clip-path duro y el óvalo con una máscara radial que, difuminada,
+                // deja el borde suave y transparente. la viñeta blanca opcional va
+                // en una capa aparte encima, recortada por la misma silueta
+                const recEstilo = estiloRecorte(c.recorte)
+                const clipPath = recEstilo.clipPath
+                const vineta = vinetaRecorte(c.recorte)
                 return (
+                  <Fragment key={c.id}>
                   <video
-                    key={c.id}
                     ref={(el) => {
                       if (el) videosRef.current.set(c.id, el)
                       else videosRef.current.delete(c.id)
@@ -913,6 +961,8 @@ export default function Preview() {
                       transform,
                       transformOrigin: 'center',
                       clipPath,
+                      maskImage: recEstilo.maskImage,
+                      WebkitMaskImage: recEstilo.WebkitMaskImage,
                       // el color y el giro entran progresivamente. aplicar un estilo
                       // o rotar noventa grados cambiaba la imagen de un fotograma al
                       // siguiente y el salto se notaba mucho
@@ -930,6 +980,23 @@ export default function Preview() {
                           : `${filtroCss(mezclaEfecto.tono, `tono-${c.id}`, mezclaEfecto.efectos)} ${cssEfectos(mezclaEfecto.efectos)}`.trim(),
                     }}
                   />
+                  {/* viñeta blanca interior del óvalo, si la lleva. sigue el mismo
+                      encuadre y la misma silueta que el video */}
+                  {vineta && !conLienzo && (
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0 h-full w-full"
+                      style={{
+                        opacity: opacidadDe(c),
+                        transform,
+                        transformOrigin: 'center',
+                        background: vineta.background,
+                        maskImage: vineta.maskImage,
+                        WebkitMaskImage: vineta.WebkitMaskImage,
+                      }}
+                    />
+                  )}
+                  </Fragment>
                 )
               })}
 
@@ -983,6 +1050,7 @@ export default function Preview() {
             <CapasOverlay />
             <RecorteOverlay />
             <MarcoOverlay alturaLienzo={lienzoRect.h} />
+            <CuentaRegresiva />
 
             {/* elementos de sonido de los audios importados. no se ven; solo
                 suenan, sincronizados con el cabezal por el efecto de arriba */}

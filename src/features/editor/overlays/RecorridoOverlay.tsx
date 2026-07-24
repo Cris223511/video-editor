@@ -46,16 +46,55 @@ export default function RecorridoOverlay({
 }) {
   const moverKeyframe = useEditorStore((s) => s.moverKeyframe)
   const quitarKeyframe = useEditorStore((s) => s.quitarKeyframe)
+  const insertarKeyframe = useEditorStore((s) => s.insertarKeyframe)
   const setTiradorNodo = useEditorStore((s) => s.setTiradorNodo)
   const playhead = useEditorStore((s) => s.playhead)
   const grabando = useEditorStore((s) => s.grabandoMovimiento)
+  const editandoNodos = useEditorStore((s) => s.editandoNodos)
+
+  // color con el que se pinta el recorrido; el usuario lo puede cambiar para que
+  // resalte sobre el fondo. sin elegir, el rojo de siempre
+  const color = capa.colorRuta ?? '#ff2d2d'
 
   const k = capa.keyframes
   if (k.length < 1) return null
 
+  // con el pincel activo, pulsar sobre la línea mete un nodo nuevo por donde se
+  // pulsa. el instante se saca proyectando el clic sobre el tramo más cercano entre
+  // dos nodos, así el punto se cuela en el sitio del recorrido que le toca
+  function insertarEnClic(e: ReactMouseEvent) {
+    e.stopPropagation()
+    e.preventDefault()
+    const p = normalizar(e.nativeEvent)
+    if (k.length < 2) {
+      insertarKeyframe(capa.id, k.length ? k[0].t + 0.3 : 0, p.x, p.y)
+      return
+    }
+    let mejor = { d: Infinity, i: 0, f: 0 }
+    for (let i = 0; i < k.length - 1; i++) {
+      const a = k[i]
+      const b = k[i + 1]
+      const dx = b.x - a.x
+      const dy = b.y - a.y
+      const largo2 = dx * dx + dy * dy
+      let f = largo2 ? ((p.x - a.x) * dx + (p.y - a.y) * dy) / largo2 : 0
+      f = Math.max(0, Math.min(1, f))
+      const d = Math.hypot(p.x - (a.x + f * dx), p.y - (a.y + f * dy))
+      if (d < mejor.d) mejor = { d, i, f }
+    }
+    const a = k[mejor.i]
+    const b = k[mejor.i + 1]
+    insertarKeyframe(capa.id, a.t + (b.t - a.t) * mejor.f, p.x, p.y)
+  }
+
   function agarrar(e: ReactMouseEvent, indice: number) {
     e.stopPropagation()
     e.preventDefault()
+    // con el pincel, pulsar un nodo lo borra en vez de arrastrarlo
+    if (editandoNodos) {
+      quitarKeyframe(capa.id, indice)
+      return
+    }
     const mover = (ev: globalThis.MouseEvent) => {
       const p = normalizar(ev)
       moverKeyframe(capa.id, indice, p.x, p.y)
@@ -110,18 +149,37 @@ export default function RecorridoOverlay({
   const mostrarTiradores = !grabando && k.length >= 2
 
   return (
-    <svg className="pointer-events-none absolute inset-0 z-20 h-full w-full">
+    <svg
+      className="pointer-events-none absolute inset-0 z-20 h-full w-full"
+      style={{ cursor: editandoNodos ? 'crosshair' : undefined }}
+    >
       {/* la línea va doble: una oscura debajo para que se vea sobre imágenes
-          claras, y la roja encima, a juego con los nodos */}
+          claras, y la de color encima, a juego con los nodos */}
       <polyline points={trazo} fill="none" stroke="rgba(0,0,0,.45)" strokeWidth={4} strokeLinejoin="round" />
       <polyline
         points={trazo}
         fill="none"
-        stroke="#ff2d2d"
+        stroke={color}
         strokeWidth={2}
         strokeLinejoin="round"
         strokeDasharray="6 4"
       />
+
+      {/* franja ancha e invisible sobre la línea que, con el pincel activo, recoge
+          el clic para insertar un nodo donde se pulse. va por debajo de los nodos,
+          así pulsar justo encima de uno lo borra en vez de crear otro */}
+      {editandoNodos && (
+        <polyline
+          points={trazo}
+          fill="none"
+          stroke="#fff"
+          strokeOpacity={0.01}
+          strokeWidth={18}
+          className="pointer-events-auto cursor-crosshair"
+          style={{ pointerEvents: 'stroke' }}
+          onMouseDown={insertarEnClic}
+        />
+      )}
 
       {/* tiradores primero, para que queden por debajo de los nodos y no tapen el
           punto que se arrastra */}
@@ -146,7 +204,7 @@ export default function RecorridoOverlay({
                 cy={cy + dy}
                 r={4}
                 fill="#fff"
-                stroke="#ff2d2d"
+                stroke={color}
                 strokeWidth={1.5}
                 className="pointer-events-auto cursor-move"
                 onMouseDown={(e) => agarrarTirador(e, i, 1)}
@@ -159,7 +217,7 @@ export default function RecorridoOverlay({
                 cy={cy - dy}
                 r={4}
                 fill="#fff"
-                stroke="#ff2d2d"
+                stroke={color}
                 strokeWidth={1.5}
                 className="pointer-events-auto cursor-move"
                 onMouseDown={(e) => agarrarTirador(e, i, -1)}
@@ -183,7 +241,7 @@ export default function RecorridoOverlay({
               cy={cy}
               r={r}
               fill={actual ? '#ffe3e3' : '#fff'}
-              stroke="#ff2d2d"
+              stroke={color}
               strokeWidth={actual ? 3 : 2}
               className="pointer-events-auto cursor-grab"
               onMouseDown={(e) => agarrar(e, i)}
@@ -195,7 +253,7 @@ export default function RecorridoOverlay({
               <title>{`Punto ${i + 1} · segundo ${p.t.toFixed(2)}`}</title>
             </circle>
             {/* punto central macizo, el corazón del nodo */}
-            <circle cx={cx} cy={cy} r={actual ? 3 : 2} fill="#ff2d2d" className="pointer-events-none" />
+            <circle cx={cx} cy={cy} r={actual ? 3 : 2} fill={color} className="pointer-events-none" />
           </g>
         )
       })}

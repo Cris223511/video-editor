@@ -116,6 +116,15 @@ export interface RecorteRel {
   der: number
   arr: number
   aba: number
+  // forma del recorte dentro del recuadro. rectángulo es el de siempre; elipse
+  // inscribe un óvalo en el recuadro. sin definir equivale a rectángulo
+  forma?: 'rectangulo' | 'elipse'
+  // suavizado del borde hacia transparente, de 0 a 100. con 0 el corte es limpio;
+  // subiéndolo, el borde se difumina y deja ver lo que hay debajo. aplica al óvalo
+  difuminado?: number
+  // viñeta blanca por dentro, de 0 a 100. tiñe el borde interior de blanco en vez
+  // de dejarlo transparente, para el efecto de foto antigua. cero la apaga
+  vinetaBlanca?: number
 }
 
 export interface Track {

@@ -3,24 +3,20 @@ import Icon, { NombreIcono } from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
 import { useEditorStore, Herramienta } from '../../store/useEditorStore'
 
+// el riel de la izquierda se queda solo con lo que es de todo el proyecto o con
+// lo de crear elementos nuevos. la configuración de cada clip o elemento (color,
+// efectos, velocidad, transiciones, recortar, transformar) se mudó al panel
+// contextual de la derecha, que aparece al seleccionarlo
 export const herramientas: { id: Herramienta; icono: NombreIcono; etiqueta: string }[] = [
   { id: 'proyecto', icono: 'logo', etiqueta: 'Proyecto' },
-  { id: 'transiciones', icono: 'transiciones', etiqueta: 'Transiciones' },
   { id: 'lienzo', icono: 'lienzo', etiqueta: 'Lienzo' },
   { id: 'marco', icono: 'marco', etiqueta: 'Marco' },
   { id: 'texto', icono: 'texto', etiqueta: 'Texto' },
   { id: 'figura', icono: 'figura', etiqueta: 'Figura' },
   { id: 'dibujar', icono: 'dibujar', etiqueta: 'Dibujar' },
-  { id: 'borrador', icono: 'papelera', etiqueta: 'Borrador' },
-  { id: 'transformar', icono: 'transformar', etiqueta: 'Transformar' },
-  // recortar salió del riel: es una acción sobre lo que ya está elegido, así que
-  // vive en la barra de opciones de la selección y en la tecla C. el panel sigue
-  // existiendo y se abre desde ahí
-  { id: 'audio', icono: 'audio', etiqueta: 'Audio' },
   { id: 'censura', icono: 'censura', etiqueta: 'Censura' },
-  { id: 'velocidad', icono: 'velocidad', etiqueta: 'Velocidad' },
-  { id: 'tono', icono: 'tono', etiqueta: 'Tono' },
-  { id: 'efectos', icono: 'efectos', etiqueta: 'Efectos' },
+  { id: 'audio', icono: 'audio', etiqueta: 'Audio' },
+  { id: 'borrador', icono: 'papelera', etiqueta: 'Borrador' },
 ]
 
 // clave con la que se recuerda entre visitas si el riel quedó ancho o estrecho.

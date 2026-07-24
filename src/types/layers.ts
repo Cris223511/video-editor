@@ -44,6 +44,10 @@ export interface CapaBase {
   // tiempo; no cambia qué queda delante de qué (eso lo deciden el orden y los
   // botones de traer al frente o enviar atrás). sin definir equivale a la fila 0
   nivel?: number
+  // color con el que se pinta el recorrido de movimiento (la línea y los nodos)
+  // sobre el visor, para poder distinguirlo bien del fondo mientras se edita. sin
+  // definir se usa el celeste de marca de siempre
+  colorRuta?: string
 }
 
 export interface CapaTexto extends CapaBase {

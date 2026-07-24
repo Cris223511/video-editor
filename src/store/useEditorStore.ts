@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { Track, Clip, AjusteTono, Transicion, PistaMeta, EfectoClip, Encuadre } from '../types/timeline'
 import { MediaAsset } from '../types/media'
-import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto, CapaTrazo } from '../types/layers'
+import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto, CapaTrazo, KeyframePos } from '../types/layers'
 import { RegionAudio, ClipAudio } from '../types/audio'
 import { Marco } from '../types/marco'
 import { tonoNeutro } from '../lib/color/tono'
@@ -13,7 +13,7 @@ import {
   crearCapaTrazo,
 } from '../lib/layers/defaults'
 import { simplificarRecorrido } from '../lib/layers/motion'
-import { duracionTotal } from '../lib/timeline/clips'
+import { duracionTotal, duracionProyecto } from '../lib/timeline/clips'
 
 // estado del clip al empezar un arrastre de recorte o de velocidad. arrastrar
 // midiendo el desplazamiento total desde este punto de partida, en vez de sumar
@@ -129,6 +129,11 @@ interface EstadoEditor {
   altoFilaTexto: number
   altoFilaImagen: number
   setAltoCarril: (carril: 'audio' | 'texto' | 'imagen', alto: number) => void
+  // ancho de la columna de cabeceras de la línea de tiempo, ajustable arrastrando
+  // su borde. es una preferencia de vista, no del documento, así que no entra en el
+  // historial ni se guarda por proyecto
+  anchoCabeceras: number
+  setAnchoCabeceras: (ancho: number) => void
   // en qué orden se apilan las tres secciones de la línea de tiempo, de arriba
   // abajo. de fábrica el video manda arriba, luego el audio y al final el texto y
   // las figuras, pero se puede reordenar a gusto
@@ -144,6 +149,11 @@ interface EstadoEditor {
   capaSeleccionada: string | null
   regionSeleccionada: string | null
   herramienta: Herramienta
+  // categoría abierta del panel contextual de la derecha. es de vista, no del
+  // documento, pero vive en el store para que los overlays del visor (el recuadro
+  // de recorte, por ejemplo) sepan cuándo aparecer al abrirla desde ahí
+  categoriaClip: string | null
+  setCategoriaClip: (c: string | null) => void
   pxPorSegundo: number
   // ancho útil en píxeles del área de clips, medido en vivo desde la interfaz.
   // sirve para calcular el zoom que encuadra un video recién soltado sin que el
@@ -263,6 +273,10 @@ interface EstadoEditor {
   agregarNivelTexto: () => void
   agregarNivelImagen: () => void
   agregarNivelAudio: () => void
+  // permuta dos filas del carril de audio: todo lo que vive en una pasa a la otra
+  // y viceversa. sirve para arrastrar un nivel entero arriba o abajo y decidir cuál
+  // va primero, sin tener que mover sus bloques uno por uno
+  intercambiarNivelAudio: (a: number, b: number) => void
   // lleva una capa a otra fila del carril de texto, o un audio o región a otra del
   // de audio. si la fila destino es la última vacía, el carril crece solo para
   // dejar de nuevo una libre encima
@@ -360,9 +374,21 @@ interface EstadoEditor {
   desplazarCapa: (id: string, dx: number, dy: number) => void
   registrarPunto: (id: string, playhead: number, x: number, y: number) => void
   quitarMovimiento: (id: string) => void
+  // escala un dibujo alrededor del centro de lo trazado, para poder redimensionarlo
+  // por sus tiradores como una imagen. mueve los puntos, así el exportador queda al día
+  escalarTrazo: (id: string, factor: number) => void
   // el recorrido grabado se puede retocar después: mover un nodo o borrarlo
   moverKeyframe: (id: string, indice: number, x: number, y: number) => void
   quitarKeyframe: (id: string, indice: number) => void
+  // añade un nodo en el instante t (relativo al arranque de la capa) con su posición,
+  // para el pincel que mete puntos pulsando sobre la línea del recorrido
+  insertarKeyframe: (id: string, t: number, x: number, y: number) => void
+  // ablanda el recorrido llevando cada nodo hacia el promedio de sus vecinos
+  suavizarCapa: (id: string) => void
+  // modo pincel de nodos: con él activo, pulsar sobre la línea añade un punto y
+  // pulsar sobre un nodo lo borra, con el cursor en forma de mira
+  editandoNodos: boolean
+  setEditandoNodos: (v: boolean) => void
   // fija los tiradores de curvatura de un nodo (la tangente de la curva a su
   // paso). con undefined en ambos, el nodo vuelve a calcular su tangente solo
   setTiradorNodo: (id: string, indice: number, hx?: number, hy?: number) => void
@@ -382,6 +408,28 @@ interface EstadoEditor {
   setCuentaEnCurso: (n: number | null) => void
   // momento en el que arrancó la grabación, para mostrar el tiempo transcurrido
   inicioGrabacion: number | null
+  // qué capa se está grabando ahora mismo. sirve para que la reproducción ensanche
+  // su bloque cuadro a cuadro mientras dura la toma, aunque el cursor no se mueva
+  capaGrabando: string | null
+  // una sesión de grabación está abierta desde que se pulsa grabar hasta que se
+  // guarda o se cancela. dentro de ella se puede pausar y reanudar cuantas veces
+  // haga falta, moviendo o cambiando el elemento entre medias
+  grabacionActiva: boolean
+  // copia del recorrido y del sitio del elemento al abrir la toma, por si se
+  // cancela: así descartar deja la capa tal como estaba antes de grabar
+  respaldoGrabacion: { id: string; keyframes: KeyframePos[]; duracion: number; x: number; y: number } | null
+  // abre la toma sobre una capa: guarda el respaldo y deja todo listo para que la
+  // cuenta regresiva y la reproducción arranquen la captura
+  iniciarGrabacion: (id: string) => void
+  // suelta el cursor o el espacio pausan la captura sin cerrar la toma
+  pausarGrabacion: () => void
+  reanudarGrabacion: () => void
+  // cierra la toma quedándose con lo grabado, o descartándolo y volviendo al respaldo
+  guardarGrabacion: () => void
+  cancelarGrabacion: () => void
+  // estira el bloque de la capa que se graba hasta el cabezal, para que no se corte
+  // ni el elemento desaparezca mientras la toma avanza
+  crecerCapaGrabando: (playhead: number) => void
 
   dibujandoMascara: boolean
   setDibujandoMascara: (v: boolean) => void
@@ -411,6 +459,7 @@ interface EstadoEditor {
   recortarAudio: (id: string, lado: 'inicio' | 'fin', deltaSegundos: number) => void
   quitarAudio: (id: string) => void
   setVolumenAudio: (id: string, volumen: number) => void
+  setFundidoAudio: (id: string, cambios: { fundidoEntrada?: number; fundidoSalida?: number }) => void
   // borra en cascada todo lo que use un medio que se quita del proyecto: sus
   // clips de video, los audios importados desde él y las capas de imagen creadas
   // a partir de su object url. la url hace falta porque las capas de imagen no
@@ -577,6 +626,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'agregarNivelTexto',
   'agregarNivelImagen',
   'agregarNivelAudio',
+  'intercambiarNivelAudio',
   'moverCapaNivel',
   'insertarNivelTexto',
   'insertarNivelImagen',
@@ -609,9 +659,14 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'recortarCapaTiempo',
   'desplazarCapa',
   'registrarPunto',
+  'guardarGrabacion',
+  'cancelarGrabacion',
   'quitarMovimiento',
+  'escalarTrazo',
   'moverKeyframe',
   'quitarKeyframe',
+  'insertarKeyframe',
+  'suavizarCapa',
   'setTiradorNodo',
   'simplificarCapa',
   'anadirTrazo',
@@ -630,6 +685,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'recortarAudio',
   'quitarAudio',
   'setVolumenAudio',
+  'setFundidoAudio',
   'quitarUsosDeAsset',
   'setLienzo',
   'setLienzoAuto',
@@ -648,8 +704,27 @@ const MAX_PISTAS = 6
 // repartir bloques solapados sin que la línea de tiempo crezca de forma absurda
 const MAX_NIVELES = 6
 const ALTO_PISTA_BASE = 64
-const ALTO_FILA_MIN = 24
 const ALTO_FILA_MAX = 120
+// altura con la que nace cada carril, que además es su mínimo: se puede agrandar
+// arrastrando pero no achicar por debajo de esto, porque más pequeño el rótulo y
+// la onda ya no se leen. cada tipo trae la suya
+const ALTO_FILA_DEF: Record<'audio' | 'texto' | 'imagen', number> = {
+  audio: 32,
+  texto: 36,
+  imagen: 36,
+}
+
+// primera fila del carril de texto y figuras que no tiene ninguna capa (las
+// imágenes viven en su propio carril, así que no cuentan). se usa al crear un
+// texto o una figura para que se reparta por niveles en vez de amontonarse
+function nivelLibreTexto(capas: { tipo: string; nivel?: number }[]): number {
+  const ocupados = new Set(capas.filter((c) => c.tipo !== 'imagen').map((c) => c.nivel ?? 0))
+  let destino = 0
+  while (destino < MAX_NIVELES - 1 && ocupados.has(destino)) destino++
+  return destino
+}
+const ANCHO_CABECERAS_MIN = 120
+const ANCHO_CABECERAS_MAX = 360
 const ALTO_PISTA_MIN = 40
 const ALTO_PISTA_MAX = 160
 const entre01 = (v: number) => Math.max(0, Math.min(1, v))
@@ -749,6 +824,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   altoFilaAudio: 32,
   altoFilaTexto: 36,
   altoFilaImagen: 36,
+  anchoCabeceras: 176,
   ordenCarriles: ['video', 'audio', 'imagen', 'texto'],
   capas: [],
   playhead: 0,
@@ -761,7 +837,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   borradorGrosor: 24,
   menuContextual: null,
   regionSeleccionada: null,
-  herramienta: 'transiciones',
+  herramienta: 'proyecto',
+  categoriaClip: null,
   pxPorSegundo: PX_POR_SEGUNDO_DEFECTO,
   anchoTimeline: 0,
   setAnchoTimeline: (px) => set({ anchoTimeline: px }),
@@ -878,6 +955,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       audioRegiones: [],
       audios: [],
       grabandoMovimiento: false,
+      grabacionActiva: false,
+      capaGrabando: null,
+      respaldoGrabacion: null,
       dibujandoMascara: false,
       insercionPista: null,
       guiaImantado: null,
@@ -1599,11 +1679,16 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   setAltoCarril: (carril, alto) =>
     set(() => {
-      const a = Math.round(Math.min(ALTO_FILA_MAX, Math.max(ALTO_FILA_MIN, alto)))
+      // el suelo es la altura por defecto de ese carril: no se puede achicar por
+      // debajo de como nace, solo agrandar hasta el tope
+      const a = Math.round(Math.min(ALTO_FILA_MAX, Math.max(ALTO_FILA_DEF[carril], alto)))
       if (carril === 'audio') return { altoFilaAudio: a }
       if (carril === 'imagen') return { altoFilaImagen: a }
       return { altoFilaTexto: a }
     }),
+
+  setAnchoCabeceras: (ancho) =>
+    set({ anchoCabeceras: Math.round(Math.min(ANCHO_CABECERAS_MAX, Math.max(ANCHO_CABECERAS_MIN, ancho))) }),
 
   renombrarPista: (indice, nombre) =>
     set((s) => {
@@ -1694,6 +1779,24 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   agregarNivelAudio: () =>
     set((s) => (s.nivelesAudio >= MAX_NIVELES ? {} : { nivelesAudio: s.nivelesAudio + 1 })),
 
+  intercambiarNivelAudio: (a, b) =>
+    set((s) => {
+      if (a === b) return {}
+      // cada audio o región que esté en una de las dos filas se manda a la otra;
+      // el resto se queda quieto. como es una permuta, mover arriba y luego abajo
+      // deja todo como estaba
+      const permutar = <T extends { nivel?: number }>(x: T): T => {
+        const n = x.nivel ?? 0
+        if (n === a) return { ...x, nivel: b }
+        if (n === b) return { ...x, nivel: a }
+        return x
+      }
+      return {
+        audios: s.audios.map(permutar),
+        audioRegiones: s.audioRegiones.map(permutar),
+      }
+    }),
+
   moverCapaNivel: (id, nivel) =>
     set((s) => {
       const destino = Math.max(0, Math.min(MAX_NIVELES - 1, nivel))
@@ -1769,13 +1872,19 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   agregarTexto: () =>
     set((s) => {
-      const capa = crearCapaTexto(s.playhead, s.resolucion.alto)
+      // igual que al separar un audio: la capa nueva busca la primera fila libre
+      // del carril de texto y figuras en vez de amontonarse en la de abajo, así los
+      // elementos se reparten por niveles y no se pisan. si todas están ocupadas se
+      // abre una nueva hasta el tope
+      const destino = nivelLibreTexto(s.capas)
+      const capa = { ...crearCapaTexto(s.playhead, s.resolucion.alto), nivel: destino }
       return {
         capas: [...s.capas, capa],
         capaSeleccionada: capa.id,
         capasSeleccionadas: [capa.id],
         clipSeleccionado: null,
         herramienta: 'texto',
+        nivelesTexto: Math.max(s.nivelesTexto, destino + 1),
       }
     }),
 
@@ -1814,13 +1923,17 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   agregarFigura: (forma, x, y) =>
     set((s) => {
-      const capa = crearCapaFigura(s.playhead, forma, x, y)
+      // se reparte por niveles como el texto, para que una figura nueva no caiga
+      // encima de lo que ya hay en la fila de abajo
+      const destino = nivelLibreTexto(s.capas)
+      const capa = { ...crearCapaFigura(s.playhead, forma, x, y), nivel: destino }
       return {
         capas: [...s.capas, capa],
         capaSeleccionada: capa.id,
         capasSeleccionadas: [capa.id],
         clipSeleccionado: null,
         herramienta: 'figura',
+        nivelesTexto: Math.max(s.nivelesTexto, destino + 1),
       }
     }),
 
@@ -2037,26 +2150,101 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     })),
 
   setGrabandoMovimiento: (v) =>
+    // interruptor crudo de captura. la simplificación del recorrido ya no ocurre
+    // aquí: una toma se pausa y se reanuda varias veces, y reducir los puntos en
+    // cada pausa perdería resolución. eso se hace una sola vez, al guardar la toma
+    set({ grabandoMovimiento: v, inicioGrabacion: v ? performance.now() : null }),
+
+  capaGrabando: null,
+  grabacionActiva: false,
+  respaldoGrabacion: null,
+
+  iniciarGrabacion: (id) =>
     set((s) => {
-      // al parar de grabar, el recorrido recién capturado se simplifica solo: se
-      // graba a pulso y quedan cientos de puntos que hay que reducir para poder
-      // editarlos. al arrancar se guarda el instante, para el cronómetro
-      if (!v && s.grabandoMovimiento) {
-        const id = s.capaSeleccionada
-        return {
-          grabandoMovimiento: false,
-          inicioGrabacion: null,
-          capas: s.capas.map((c) =>
-            c.id === id && c.keyframes.length > 2
-              ? { ...c, keyframes: simplificarRecorrido(c.keyframes) }
-              : c,
-          ),
-        }
-      }
+      const capa = s.capas.find((c) => c.id === id)
+      if (!capa) return {}
       return {
-        grabandoMovimiento: v,
-        inicioGrabacion: v ? performance.now() : null,
+        grabacionActiva: true,
+        capaGrabando: id,
+        capaSeleccionada: id,
+        // se guarda cómo estaba la capa para poder descartar la toma entera
+        respaldoGrabacion: {
+          id,
+          keyframes: capa.keyframes.map((k) => ({ ...k })),
+          duracion: capa.duracion,
+          x: capa.x,
+          y: capa.y,
+        },
       }
+    }),
+
+  pausarGrabacion: () => {
+    set({ grabandoMovimiento: false, inicioGrabacion: null })
+    get().pausar()
+  },
+
+  reanudarGrabacion: () => {
+    set({ grabandoMovimiento: true, inicioGrabacion: performance.now() })
+    get().reproducir()
+  },
+
+  guardarGrabacion: () => {
+    get().pausar()
+    set((s) => {
+      const id = s.capaGrabando
+      return {
+        grabandoMovimiento: false,
+        grabacionActiva: false,
+        capaGrabando: null,
+        respaldoGrabacion: null,
+        inicioGrabacion: null,
+        // ya cerrada la toma se reduce el recorrido grabado a pulso a los puntos que
+        // definen su forma, para poder editarlo nodo a nodo
+        capas: s.capas.map((c) =>
+          c.id === id && c.keyframes.length > 2
+            ? { ...c, keyframes: simplificarRecorrido(c.keyframes) }
+            : c,
+        ),
+      }
+    })
+  },
+
+  cancelarGrabacion: () => {
+    get().pausar()
+    set((s) => {
+      const r = s.respaldoGrabacion
+      return {
+        grabandoMovimiento: false,
+        grabacionActiva: false,
+        capaGrabando: null,
+        respaldoGrabacion: null,
+        inicioGrabacion: null,
+        // se devuelve la capa a como estaba antes de abrir la toma
+        capas: r
+          ? s.capas.map((c) =>
+              c.id === r.id ? { ...c, keyframes: r.keyframes, duracion: r.duracion, x: r.x, y: r.y } : c,
+            )
+          : s.capas,
+      }
+    })
+  },
+
+  crecerCapaGrabando: (playhead) =>
+    set((s) => {
+      const id = s.capaGrabando
+      if (!id) return {}
+      let cambio = false
+      const capas = s.capas.map((c) => {
+        if (c.id !== id) return c
+        // se estira un pelín por delante del cabezal (no justo hasta él), para que el
+        // elemento no parpadee en el borde: el cabezal avanza un cuadro cada vez y si
+        // el bloque acabara exactamente en él, quedaría un instante fuera de rango
+        const dentro = Math.max(0, playhead - c.inicio) + 0.2
+        if (dentro <= c.duracion) return c
+        cambio = true
+        return { ...c, duracion: dentro }
+      })
+      return cambio ? { capas } : {}
     }),
 
   simplificarCapa: (id) =>
@@ -2097,17 +2285,46 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     set((s) => ({
       capas: s.capas.map((c) => {
         if (c.id !== id) return c
-        const t = Math.max(0, Math.min(playhead - c.inicio, c.duracion))
+        // el punto va en el instante del cabezal, medido desde el arranque de la
+        // capa. si el movimiento dura más que el bloque, el bloque se estira para
+        // abarcarlo (el recorrido manda), en vez de recortar los puntos al final
+        const dentro = Math.max(0, playhead - c.inicio)
+        const duracion = Math.max(c.duracion, dentro)
+        const t = dentro
         const punto = { t, x: entre01(x), y: entre01(y) }
         const otros = c.keyframes.filter((k) => Math.abs(k.t - t) > 0.03)
         const keyframes = [...otros, punto].sort((a, b) => a.t - b.t)
-        return { ...c, keyframes }
+        return { ...c, duracion, keyframes }
       }),
     })),
 
   quitarMovimiento: (id) =>
     set((s) => ({
       capas: s.capas.map((c) => (c.id === id ? { ...c, keyframes: [] } : c)),
+    })),
+
+  escalarTrazo: (id, factor) =>
+    set((s) => ({
+      capas: s.capas.map((c) => {
+        if (c.id !== id || c.tipo !== 'trazo') return c
+        let minx = Infinity
+        let miny = Infinity
+        let maxx = -Infinity
+        let maxy = -Infinity
+        for (const tr of c.trazos)
+          for (const p of tr) {
+            if (p.x < minx) minx = p.x
+            if (p.y < miny) miny = p.y
+            if (p.x > maxx) maxx = p.x
+            if (p.y > maxy) maxy = p.y
+          }
+        if (!isFinite(minx)) return c
+        const cx = (minx + maxx) / 2
+        const cy = (miny + maxy) / 2
+        const f = Math.max(0.05, factor)
+        const trazos = c.trazos.map((tr) => tr.map((p) => ({ x: cx + (p.x - cx) * f, y: cy + (p.y - cy) * f })))
+        return { ...c, trazos }
+      }),
     })),
 
   moverKeyframe: (id, indice, x, y) =>
@@ -2135,6 +2352,48 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       ),
     })),
 
+  // mete un nodo nuevo en el recorrido en el instante t (relativo al arranque de la
+  // capa) con la posición dada. sirve para el pincel de nodos: pulsar sobre la línea
+  // añade un punto por donde pasar, y la curva se reacomoda para respetarlo
+  insertarKeyframe: (id, t, x, y) =>
+    set((s) => ({
+      capas: s.capas.map((c) => {
+        if (c.id !== id) return c
+        const punto = { t: Math.max(0, t), x: entre01(x), y: entre01(y) }
+        // si cae casi encima de otro, se sustituye en vez de amontonar dos nodos
+        const otros = c.keyframes.filter((k) => Math.abs(k.t - punto.t) > 0.02)
+        const keyframes = [...otros, punto].sort((a, b) => a.t - b.t)
+        return { ...c, keyframes }
+      }),
+    })),
+
+  // suaviza el recorrido redondeando la posición de cada nodo hacia el promedio de
+  // sus vecinos. es el equivalente rápido a repasar la línea a mano para quitarle
+  // los temblores, sin tener que tocar los tiradores uno por uno. los extremos se
+  // quedan donde están para no acortar ni alargar el trazo
+  suavizarCapa: (id) =>
+    set((s) => ({
+      capas: s.capas.map((c) => {
+        if (c.id !== id || c.keyframes.length < 3) return c
+        const k = c.keyframes
+        const keyframes = k.map((p, i) => {
+          if (i === 0 || i === k.length - 1) return { ...p, hx: undefined, hy: undefined }
+          const a = k[i - 1]
+          const b = k[i + 1]
+          // media ponderada: el propio nodo pesa la mitad y cada vecino un cuarto,
+          // así se ablanda el pico sin que el trazo se despegue de por donde iba
+          return {
+            ...p,
+            x: entre01(p.x * 0.5 + a.x * 0.25 + b.x * 0.25),
+            y: entre01(p.y * 0.5 + a.y * 0.25 + b.y * 0.25),
+            hx: undefined,
+            hy: undefined,
+          }
+        })
+        return { ...c, keyframes }
+      }),
+    })),
+
   setTiradorNodo: (id, indice, hx, hy) =>
     set((s) => ({
       capas: s.capas.map((c) =>
@@ -2154,6 +2413,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   velocidadGrabacion: 0.5,
   setVelocidadGrabacion: (v) => set({ velocidadGrabacion: v }),
+
+  editandoNodos: false,
+  setEditandoNodos: (v) => set({ editandoNodos: v }),
 
   setDibujandoMascara: (v) => set({ dibujandoMascara: v }),
 
@@ -2299,6 +2561,11 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       audios: s.audios.map((a) => (a.id === id ? { ...a, volumen: Math.max(0, Math.min(2, volumen)) } : a)),
     })),
 
+  setFundidoAudio: (id, cambios) =>
+    set((s) => ({
+      audios: s.audios.map((a) => (a.id === id ? { ...a, ...cambios } : a)),
+    })),
+
   quitarUsosDeAsset: (assetId, url) =>
     set((s) => {
       // se van todos los rastros del medio en la línea de tiempo: los clips que
@@ -2323,6 +2590,15 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
           audios.some((a) => a.id === s.regionSeleccionada))
           ? s.regionSeleccionada
           : null
+      // si al retirar el medio ya no queda ningún clip de video, la fila de video
+      // vuelve a una sola: los niveles extra que se hubieran abierto se quedaban
+      // vacíos y sin sentido. solo se toca la pista de video; los carriles de
+      // texto, audio e imagen conservan lo suyo. si todavía queda algún clip, no se
+      // reordena nada, para respetar los niveles que el usuario montó a mano
+      const sinClips = clips.length === 0
+      const pistasBase = sinClips
+        ? { numPistas: 1, altosPista: [64], pistasMeta: [metaPista(1)] }
+        : {}
       return {
         pista: { ...s.pista, clips },
         audios,
@@ -2331,8 +2607,11 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         capaSeleccionada,
         regionSeleccionada,
         playhead: Math.min(s.playhead, duracionTotal(clips)),
+        ...pistasBase,
       }
     }),
+
+  setCategoriaClip: (c) => set({ categoriaClip: c }),
 
   setHerramienta: (h) =>
     set((s) => ({
@@ -2365,7 +2644,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   reproducir: () =>
     set((s) => {
-      const total = duracionTotal(s.pista.clips)
+      // la duración cuenta también las capas y los audios, así que un montaje sin
+      // ningún video (solo un texto o un dibujo) también se puede reproducir
+      const total = duracionProyecto(s.pista.clips, s.capas, s.audios, s.audioRegiones)
       if (total === 0) return {}
       const playhead = s.playhead >= total ? 0 : s.playhead
       return { reproduciendo: true, playhead }

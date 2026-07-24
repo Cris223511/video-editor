@@ -30,14 +30,12 @@ export function alturasOnda(semilla: string, n: number): number[] {
   return alturas
 }
 
-// dibuja una lista de alturas (0..1) como líneas verticales finas pegadas al
-// borde de arriba. cada línea mide un píxel y va a paso fijo desde la izquierda,
-// sin estirarse para llenar el ancho: si sobra sitio, el patrón simplemente se
-// repite. antes iban centradas y repartidas con justify-between, que al ensanchar
-// el bloque separaba las líneas y deformaba la onda
+// dibuja una lista de alturas (0..1) como líneas verticales finas y centradas.
+// cada línea mide un píxel de ancho y crece desde el eje horizontal, así que la
+// franja se lee como el waveform de un editor de audio y no como bloques anchos
 function LineasOnda({ alturas, color }: { alturas: number[]; color: string }) {
   return (
-    <div className="pointer-events-none absolute inset-0 flex items-start gap-px overflow-hidden px-1">
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-between overflow-hidden px-1">
       {alturas.map((h, i) => (
         <span
           key={i}

@@ -1,14 +1,13 @@
-import { useEffect, useRef } from 'react'
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { CapaTrazo } from '../../../types/layers'
-import { Campo, Deslizador, ColorCampo } from '../../../components/ui/Controls'
+import { Campo, Deslizador, ColorCampo, BOTON_AGREGAR } from '../../../components/ui/Controls'
 import MotionControls from './MotionControls'
 
 // panel del lápiz libre. con la herramienta activa se pinta arrastrando sobre el
 // visor; cada trazo se suma a la capa de dibujo en curso. desde aquí se eligen el
 // color y el grosor, se abre un dibujo nuevo o se corrige lo pintado
-export default function DibujarPanel() {
+export default function DibujarPanel({ ocultarAgregar = false }: { ocultarAgregar?: boolean } = {}) {
   const capas = useEditorStore((s) => s.capas)
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const agregarTrazo = useEditorStore((s) => s.agregarTrazo)
@@ -25,22 +24,14 @@ export default function DibujarPanel() {
     if (capa) actualizarCapa(capa.id, { [campo]: valor } as Partial<CapaTrazo>)
   }
 
-  // entrar al lápiz ya deja un dibujo listo. antes hacía falta pasar por una
-  // pantalla que solo explicaba la herramienta y obligaba a pulsar un botón
-  // para ver los controles, y ese paso extra sobraba
-  const yaCreado = useRef(false)
-  useEffect(() => {
-    // el doble montaje de StrictMode en desarrollo dispararía esto dos veces; el
-    // pestillo garantiza que solo nazca un elemento al abrir el panel vacío
-    if (yaCreado.current) return
-    yaCreado.current = true
-    if (!capa) agregarTrazo()
-    // solo interesa el arranque del panel, no cada cambio de capa
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   return (
     <div className="flex flex-col gap-4">
+      {!ocultarAgregar && (
+        <button onClick={() => agregarTrazo()} className={BOTON_AGREGAR}>
+          <Icon name="dibujar" size={16} /> {capa ? 'Empezar otro dibujo' : 'Nuevo dibujo'}
+        </button>
+      )}
+
       {capa && (
         <>
           <Campo etiqueta="Color">
@@ -73,13 +64,6 @@ export default function DibujarPanel() {
           )}
 
           <MotionControls capa={capa} />
-
-          <button
-            onClick={() => agregarTrazo()}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-black/10 py-2 text-sm font-medium transition-colors hover:border-brand hover:text-brand dark:border-white/10"
-          >
-            <Icon name="dibujar" size={16} /> Empezar otro dibujo
-          </button>
 
           <button
             onClick={() => quitarCapa(capa.id)}

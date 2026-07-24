@@ -2,7 +2,7 @@ import { Clip, PistaMeta } from '../../types/timeline'
 import { Capa } from '../../types/layers'
 import { Marco } from '../../types/marco'
 import { RegionAudio, ClipAudio } from '../../types/audio'
-import { clipEnTiempo, duracionTotal } from '../timeline/clips'
+import { clipEnTiempo, duracionProyecto } from '../timeline/clips'
 import { gananciaEn, fundidoEn } from '../audio/ganancia'
 import { usaMatriz, matrizTono, tablasColor, stdDeviationsDesenfoque } from '../color/tono'
 import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../color/mezcla'
@@ -120,7 +120,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
       datos.pistasMeta.forEach((m, i) => {
         if (m.oculta) ocultas.add(i)
       })
-      const total = duracionTotal(clips)
+      const total = duracionProyecto(clips, datos.capas, datos.audios, datos.audioRegiones)
       if (total <= 0) {
         reject(new Error('No hay nada que exportar.'))
         return

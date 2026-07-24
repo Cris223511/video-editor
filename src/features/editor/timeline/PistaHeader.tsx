@@ -159,7 +159,7 @@ export default function PistaHeader({ indice, alto }: { indice: number; alto: nu
     >
       <div className="flex items-center gap-1">
         <NombreEditable valor={nombre} onGuardar={(n) => renombrarPista(indice, n)} />
-        <div className="ml-auto flex items-center opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        <div className="ml-auto flex items-center">
           <BotonPista
             etiqueta="Subir el nivel"
             disabled={!puedeSubir}

@@ -1,8 +1,8 @@
-import { Maximize2, Minimize2 } from 'lucide-react'
+import { Maximize2, Minimize2, RotateCcw, RotateCw } from 'lucide-react'
 import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
 import { useEditorStore } from '../../store/useEditorStore'
-import { duracionTotal } from '../../lib/timeline/clips'
+import { duracionProyecto } from '../../lib/timeline/clips'
 import { formatearDuracion } from '../../lib/format/duracion'
 
 // controles de reproducción bajo el visor: volver al inicio, reproducir o
@@ -15,12 +15,23 @@ export default function PlaybackControls({
   onAlternarCompleto?: () => void
 }) {
   const clips = useEditorStore((s) => s.pista.clips)
+  const capas = useEditorStore((s) => s.capas)
+  const audios = useEditorStore((s) => s.audios)
+  const audioRegiones = useEditorStore((s) => s.audioRegiones)
   const playhead = useEditorStore((s) => s.playhead)
   const reproduciendo = useEditorStore((s) => s.reproduciendo)
   const alternar = useEditorStore((s) => s.alternarReproduccion)
   const irA = useEditorStore((s) => s.irA)
-  const total = duracionTotal(clips)
+  const total = duracionProyecto(clips, capas, audios, audioRegiones)
   const vacio = total === 0
+
+  // saltos de cinco segundos, recortados a los extremos del montaje. el de
+  // retroceder solo se apaga si el cabezal ya está en el arranque; desde el
+  // segundo dos sí retrocede y aterriza en el cero, no se bloquea por no llegar a
+  // cinco. igual el de avanzar respecto al final
+  const SALTO = 5
+  const puedeAtras = !vacio && playhead > 0.001
+  const puedeAdelante = !vacio && playhead < total - 0.001
 
   return (
     <div
@@ -40,12 +51,30 @@ export default function PlaybackControls({
         <Icon name="inicio" size={18} />
       </button>
       <button
+        onClick={() => irA(Math.max(0, playhead - SALTO))}
+        title="Retroceder 5 segundos"
+        disabled={!puedeAtras}
+        className="relative grid h-9 w-9 place-items-center rounded-lg text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)] disabled:pointer-events-none disabled:opacity-40"
+      >
+        <RotateCcw size={19} />
+        <span className="absolute text-[8px] font-bold leading-none">5</span>
+      </button>
+      <button
         onClick={alternar}
         title={reproduciendo ? 'Pausar' : 'Reproducir'}
         disabled={vacio}
         className="grid h-11 w-11 place-items-center rounded-full bg-brand text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95 disabled:opacity-40"
       >
         <Icon name={reproduciendo ? 'pausa' : 'play'} size={20} />
+      </button>
+      <button
+        onClick={() => irA(Math.min(total, playhead + SALTO))}
+        title="Avanzar 5 segundos"
+        disabled={!puedeAdelante}
+        className="relative grid h-9 w-9 place-items-center rounded-lg text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)] disabled:pointer-events-none disabled:opacity-40"
+      >
+        <RotateCw size={19} />
+        <span className="absolute text-[8px] font-bold leading-none">5</span>
       </button>
       <div className="min-w-[104px] text-center font-mono text-sm tabular-nums text-[color:var(--muted)]">
         {formatearDuracion(playhead)} / {formatearDuracion(total)}

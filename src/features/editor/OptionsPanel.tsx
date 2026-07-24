@@ -7,7 +7,6 @@ import { useToast } from '../../components/ui/ToastProvider'
 import { useCongelarAncho } from './useCongelarAncho'
 import { useEditorStore, Herramienta } from '../../store/useEditorStore'
 import { useProjectStore } from '../../store/useProjectStore'
-import { bufferAWav } from '../../lib/audio/wav'
 import { herramientas } from './RielHerramientas'
 import { Campo, Deslizador } from '../../components/ui/Controls'
 import TextPanel from './panels/TextPanel'
@@ -65,7 +64,7 @@ function TransicionCapa() {
   )
 }
 
-function Transiciones() {
+export function Transiciones() {
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const clips = useEditorStore((s) => s.pista.clips)
@@ -80,10 +79,13 @@ function Transiciones() {
 
   const clip = clips.find((c) => c.id === clipSeleccionado) ?? null
 
-  // saca el audio del video a un clip propio en la pista de sonido. el navegador
-  // decodifica la pista de sonido del archivo, se empaqueta en WAV y se coloca
-  // debajo, vinculado al video (se mueven juntos y borrar el video se lo lleva).
-  // mientras dura la decodificación se enciende el cargador, que puede tardar
+  // saca el audio del video a un clip propio en la pista de sonido. en vez de
+  // decodificar el mp4 entero (decodeAudioData falla en muchos videos con imagen,
+  // que era el motivo de que "no ocurriera nada"), el audio separado reutiliza el
+  // propio archivo del video y suena por un <audio> con su url, que reproduce solo
+  // la pista de sonido. funciona con cualquier video que el navegador sepa abrir.
+  // el clip nuevo queda vinculado al video: se mueven juntos y borrar el video se
+  // lo lleva. el video de origen queda mudo para que el sonido no salga dos veces
   async function separar() {
     if (!clip || separando) return
     const asset = medios.find((m) => m.id === clip.assetId)
@@ -91,22 +93,19 @@ function Transiciones() {
     setSeparando(true)
     useProjectStore.setState({ preparando: true })
     try {
-      const datos = await asset.file.arrayBuffer()
-      const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-      const ctx = new Ctor()
-      const buffer = await ctx.decodeAudioData(datos)
-      ctx.close().catch(() => {})
-      const wav = bufferAWav(buffer)
-      const url = URL.createObjectURL(wav)
+      // un respiro para que el cargador alcance a verse aunque el trabajo sea casi
+      // instantáneo, así queda claro que algo pasó
+      await new Promise((r) => setTimeout(r, 250))
+      const url = URL.createObjectURL(asset.file)
       const idAudioAsset = crypto.randomUUID()
       agregarMedio({
         id: idAudioAsset,
         clase: 'audio',
-        file: new File([wav], `audio-${asset.nombre}.wav`, { type: 'audio/wav' }),
+        file: asset.file,
         nombre: `Audio de ${asset.nombre}`,
-        tamano: wav.size,
-        tipo: 'audio/wav',
-        duracion: buffer.duration,
+        tamano: asset.tamano,
+        tipo: asset.tipo,
+        duracion: asset.duracion,
         ancho: 0,
         alto: 0,
         url,
@@ -118,13 +117,13 @@ function Transiciones() {
         inicio: clip.inicio,
         duracion: clip.duracion,
         recorteInicio: clip.recorteInicio,
-        duracionFuente: buffer.duration,
+        duracionFuente: asset.duracion,
         volumen: 1,
         vinculadoA: clip.id,
       })
       mostrar('success', 'Audio separado a la pista de sonido.')
     } catch {
-      mostrar('error', 'Este video no tiene audio o no se pudo separar.')
+      mostrar('error', 'No se pudo separar el audio de este video.')
     } finally {
       setSeparando(false)
       useProjectStore.setState({ preparando: false })

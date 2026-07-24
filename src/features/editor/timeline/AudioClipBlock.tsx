@@ -198,7 +198,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
   return (
     <Tooltip texto={asset?.nombre ?? 'Audio'} retardo={2000} lado="arriba">
     <motion.div
-      layout="position"
+      layout={interactuando ? false : 'position'}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={audio.nivel ?? 0}
       onMouseDown={iniciarMover}

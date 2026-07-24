@@ -415,12 +415,13 @@ export default function PortadaView() {
         <Aparece className={`mx-auto w-full ${ANCHO_CONTENIDO} ${RELLENO}`}>
           <div
             className="relative overflow-hidden rounded-3xl px-6 py-16 text-center sm:py-20"
-            // el azul iba del profundo del pie, que ya no se usa en ningún otro
-            // sitio y quedaba despegado del resto. ahora sale del mismo --accent
-            // que tiñe la página, oscurecido sobre el fondo del tema
+            // tarjeta en azul oscuro navy, el mismo del pie en modo oscuro, no un
+            // celeste chillón: se ve elegante tanto en claro como en oscuro y el
+            // texto blanco con los halos resalta encima. una pizca de marca en la
+            // esquina superior le da vida sin aclararlo
             style={{
               background:
-                'linear-gradient(160deg, rgb(var(--accent) / 0.22) 0%, rgb(9 16 30) 55%, rgb(6 12 24) 100%)',
+                'linear-gradient(150deg, rgb(var(--profundo-2)) 0%, rgb(var(--profundo)) 55%, rgb(5 13 34) 100%)',
             }}
           >
             <span

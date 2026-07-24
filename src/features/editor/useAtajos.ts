@@ -111,7 +111,15 @@ export function useAtajos() {
       switch (e.key) {
         case ' ':
           e.preventDefault()
-          st.alternarReproduccion()
+          // con una toma de movimiento abierta, el espacio la pausa y la reanuda en
+          // lugar de reproducir el proyecto: uno graba, para para reacomodar el
+          // elemento y sigue, sin salir de la grabación
+          if (st.grabacionActiva) {
+            if (st.grabandoMovimiento) st.pausarGrabacion()
+            else st.reanudarGrabacion()
+          } else {
+            st.alternarReproduccion()
+          }
           return
 
         case 'z':

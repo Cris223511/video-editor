@@ -1,8 +1,8 @@
-import { ReactNode, useEffect, useRef } from 'react'
+import { ReactNode } from 'react'
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { CapaCensura } from '../../../types/layers'
-import { Campo, Deslizador, Segmentado } from '../../../components/ui/Controls'
+import { Campo, Deslizador, Segmentado, BOTON_AGREGAR } from '../../../components/ui/Controls'
 import MotionControls from './MotionControls'
 
 // tecla suelta del recordatorio de atajos, con el aspecto de una tecla física
@@ -20,7 +20,7 @@ function Tecla({ children }: { children: ReactNode }) {
 // panel de censura: forma (círculo, rectángulo o pincel), efecto (pixelar,
 // difuminar o transparente), intensidad y recorrido. con el pincel se dibuja la
 // máscara libremente sobre el video
-export default function CensuraPanel() {
+export default function CensuraPanel({ ocultarAgregar = false }: { ocultarAgregar?: boolean } = {}) {
   const capas = useEditorStore((s) => s.capas)
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const agregarCensura = useEditorStore((s) => s.agregarCensura)
@@ -38,28 +38,13 @@ export default function CensuraPanel() {
     if (capa) actualizarCapa(capa.id, { [campo]: valor } as Partial<CapaCensura>)
   }
 
-  // la herramienta se abre con un elemento ya puesto y sus controles a la vista.
-  // el paso previo que solo describía la herramienta y pedía pulsar un botón
-  // estorbaba más de lo que ayudaba
-  const yaCreado = useRef(false)
-  useEffect(() => {
-    // el doble montaje de StrictMode en desarrollo dispararía esto dos veces; el
-    // pestillo garantiza que solo nazca un elemento al abrir el panel vacío
-    if (yaCreado.current) return
-    yaCreado.current = true
-    if (!capa) agregarCensura()
-    // interesa únicamente el montaje del panel
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   return (
     <div className="flex flex-col gap-4">
-      <button
-        onClick={agregarCensura}
-        className="inline-flex items-center justify-center gap-2 rounded-lg border border-black/10 py-2 text-sm font-medium transition-colors hover:border-brand hover:text-brand dark:border-white/10"
-      >
-        <Icon name="mas" size={16} /> Agregar otra censura
-      </button>
+      {!ocultarAgregar && (
+        <button onClick={agregarCensura} className={BOTON_AGREGAR}>
+          <Icon name="mas" size={16} /> {capa ? 'Agregar otra censura' : 'Agregar censura'}
+        </button>
+      )}
 
       {capa && (
         <>

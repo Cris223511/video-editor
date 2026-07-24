@@ -336,6 +336,23 @@ html.tema-en-transicion * {
   }
 }
 
+/* cada número de la cuenta regresiva entra grande y opaco y se va encogiendo y
+   apagando en el segundo que dura, para que el conteo se sienta vivo */
+@keyframes cuenta-pulso {
+  0% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+  20% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.82);
+    opacity: 0.55;
+  }
+}
+
 /* las tres barras del cargador suben y bajan desfasadas, despacio */
 @keyframes barra-carga {
   0%,

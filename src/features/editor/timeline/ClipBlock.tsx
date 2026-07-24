@@ -291,7 +291,7 @@ export default function ClipBlock({
   return (
     <Tooltip texto={nombre} retardo={2000} lado="arriba">
     <motion.div
-      layout="position"
+      layout={interactuando ? false : 'position'}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={clip.pista}
       onMouseDown={iniciarMover}

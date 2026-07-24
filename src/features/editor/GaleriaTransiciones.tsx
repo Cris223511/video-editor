@@ -122,7 +122,7 @@ function Demo({
       height={ALTO}
       onMouseEnter={arrancar}
       onMouseLeave={parar}
-      className="aspect-video w-full rounded-md bg-black grayscale transition-[filter] duration-300 group-hover/muestra:grayscale-0"
+      className="aspect-video w-full rounded-md bg-black"
     />
   )
 }

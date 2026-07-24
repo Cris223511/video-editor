@@ -10,10 +10,12 @@ export interface Guia {
 // equivale a unos ocho píxeles en un visor de tamaño corriente
 export const IMAN = 0.008
 
-// los tres puntos que interesan de una caja en cada eje: sus dos bordes y su
-// centro. con eso se cubren las alineaciones que de verdad se usan
+// los tres puntos que interesan de una caja en cada eje: su centro y sus dos
+// bordes. el centro va primero a propósito: cuando un elemento del tamaño del
+// lienzo se centra, sus bordes tocan los del lienzo y su centro toca el centro a
+// la vez, y en ese empate queremos que gane la guía del centro, no la del borde
 function referencias(centro: number, medida: number) {
-  return [centro - medida / 2, centro, centro + medida / 2]
+  return [centro, centro - medida / 2, centro + medida / 2]
 }
 
 export interface CajaGuia {

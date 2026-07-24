@@ -34,6 +34,15 @@ function huella() {
     e.pistasMeta,
     e.nivelesTexto,
     e.nivelesAudio,
+    e.nivelesImagen,
+    e.ordenCarriles,
+    e.altoFilaTexto,
+    e.altoFilaAudio,
+    e.altoFilaImagen,
+    e.nombreCarrilTexto,
+    e.nombreCarrilAudio,
+    e.nombreCarrilImagen,
+    e.anchoCabeceras,
     e.capas,
     e.audioRegiones,
     e.audios,
@@ -115,6 +124,23 @@ export function useAutoguardado(activo: boolean) {
         if (resto > 0) window.setTimeout(apagar, resto)
         else apagar()
       }
+    }
+
+    // en cuanto el editor abre con contenido que todavía no está en disco (acabas
+    // de importar un video y entraste al editor, o vienes de refrescar), se guarda
+    // de una vez, sin esperar al primer cambio ni encender el punto de "sin
+    // guardar". así el proyecto queda a salvo desde el minuto uno: si refrescas
+    // enseguida, tu video sigue ahí
+    if (useProjectStore.getState().guardadoEn === null) {
+      const ed0 = useEditorStore.getState()
+      const pr0 = useProjectStore.getState()
+      const hayAlgo =
+        pr0.medios.length > 0 ||
+        ed0.pista.clips.length > 0 ||
+        ed0.capas.length > 0 ||
+        ed0.audios.length > 0 ||
+        ed0.audioRegiones.length > 0
+      if (hayAlgo) window.setTimeout(intentarGuardar, 0)
     }
 
     const quitarEditor = useEditorStore.subscribe(revisar)

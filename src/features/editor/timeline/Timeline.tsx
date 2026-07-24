@@ -3,11 +3,12 @@ import { motion } from 'framer-motion'
 import Icon from '../../../components/ui/Icon'
 import Tooltip from '../../../components/ui/Tooltip'
 import BarraGlobales from '../BarraGlobales'
+import { OndaAudio } from './AudioBlock'
 import FantasmaArrastre from './FantasmaArrastre'
 import { TIPO_ARRASTRE } from '../MediaLibrary'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
-import { duracionTotal } from '../../../lib/timeline/clips'
+import { duracionProyecto } from '../../../lib/timeline/clips'
 import { formatearDuracion } from '../../../lib/format/duracion'
 import TimeRuler from './TimeRuler'
 import ClipBlock from './ClipBlock'
@@ -19,13 +20,13 @@ import AudioBlock from './AudioBlock'
 import AudioClipBlock from './AudioClipBlock'
 import CarrilHeader from './CarrilHeader'
 import AgregarNivelGuia from './AgregarNivelGuia'
+import GuiaEntreCarriles from './GuiaEntreCarriles'
 import { resolverDestinoVertical } from './destinoVertical'
 
 const MIN = 0.1
-// ancho de la columna fija de cabeceras (w-44) y el hueco que la separa de las
-// filas (gap-2), en píxeles. se restan del ancho visible para saber cuánto
-// espacio real les queda a las filas y así llenarlo sin dejar franjas muertas
-const ANCHO_CABECERAS = 176
+// hueco entre la columna de cabeceras y las filas (gap-2), en píxeles. junto con
+// el ancho de la columna (ajustable, vive en el store) se resta del ancho visible
+// para saber cuánto espacio real les queda a las filas y llenarlo sin franjas muertas
 const HUECO_COLUMNAS = 12
 // alto de la regla de tiempo, replicado en la columna de cabeceras para que las
 // filas de ambas columnas queden a la misma altura
@@ -98,8 +99,11 @@ export default function Timeline({
   const altoFilaTexto = useEditorStore((s) => s.altoFilaTexto)
   const altoFilaImagen = useEditorStore((s) => s.altoFilaImagen)
   const setAltoCarril = useEditorStore((s) => s.setAltoCarril)
+  const anchoCabeceras = useEditorStore((s) => s.anchoCabeceras)
+  const setAnchoCabeceras = useEditorStore((s) => s.setAnchoCabeceras)
   const agregarNivelTexto = useEditorStore((s) => s.agregarNivelTexto)
   const agregarNivelAudio = useEditorStore((s) => s.agregarNivelAudio)
+  const intercambiarNivelAudio = useEditorStore((s) => s.intercambiarNivelAudio)
   const ordenCarriles = useEditorStore((s) => s.ordenCarriles)
   const moverCarril = useEditorStore((s) => s.moverCarril)
   const playhead = useEditorStore((s) => s.playhead)
@@ -111,6 +115,7 @@ export default function Timeline({
   const limpiarSeleccion = useEditorStore((s) => s.limpiarSeleccion)
   const dividirEnCabezal = useEditorStore((s) => s.dividirEnCabezal)
   const numPistas = useEditorStore((s) => s.numPistas)
+  const insertarPistaEn = useEditorStore((s) => s.insertarPistaEn)
   const altosPista = useEditorStore((s) => s.altosPista)
   const pistasMeta = useEditorStore((s) => s.pistasMeta)
   // separación entre dos niveles marcada mientras se arrastra un clip: si no es
@@ -144,7 +149,39 @@ export default function Timeline({
   // se enciende mientras se arrastra el cabezal para mostrar su etiqueta de
   // tiempo junto a la manija
   const [cabezalActivo, setCabezalActivo] = useState(false)
-  const total = duracionTotal(clips)
+  const total = duracionProyecto(clips, capas, audios, audioRegiones)
+
+  // añade un nivel al carril indicado, usado por la guía que sale entre grupos
+  const NOMBRE_CARRIL: Record<string, string> = {
+    video: 'Video',
+    audio: nombreCarrilAudio,
+    imagen: nombreCarrilImagen,
+    texto: nombreCarrilTexto,
+  }
+  const agregarNivelDe = (carril: string) => {
+    if (carril === 'audio') agregarNivelAudio()
+    else if (carril === 'imagen') agregarNivelImagen()
+    else if (carril === 'texto') agregarNivelTexto()
+    else if (carril === 'video') insertarPistaEn(numPistas)
+  }
+
+  // arrastre del borde derecho de la columna de cabeceras para ensancharla o
+  // estrecharla. así los nombres largos dejan de quedar cortados. el store acota el
+  // valor entre su mínimo y su máximo
+  const estirarCabeceras = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const inicioX = e.clientX
+    const original = anchoCabeceras
+    const mover = (ev: globalThis.MouseEvent) => setAnchoCabeceras(original + (ev.clientX - inicioX))
+    const soltar = () => {
+      window.removeEventListener('mousemove', mover)
+      window.removeEventListener('mouseup', soltar)
+      document.body.style.cursor = ''
+    }
+    document.body.style.cursor = 'ew-resize'
+    window.addEventListener('mousemove', mover)
+    window.addEventListener('mouseup', soltar)
+  }
 
   // arranca el arrastre que cambia el alto de las filas de un carril. el mismo
   // gesto que el de las pistas de video: se sigue el cursor en vertical y el store
@@ -163,6 +200,39 @@ export default function Timeline({
     window.addEventListener('mousemove', mover)
     window.addEventListener('mouseup', soltar)
   }
+  // arrastre de una fila de audio para reordenarla entre las demás. las filas se
+  // pintan de arriba abajo con el nivel más alto primero, así que subir el cursor
+  // permuta con la fila de encima (un nivel más) y bajarlo con la de abajo. se
+  // lleva un índice vivo del nivel que se agarra para que arrastrar varios pasos
+  // seguidos no se quede pegado al nivel de partida
+  const reordenarNivelAudio = (nivel: number) => (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    let actual = nivel
+    let baseY = e.clientY
+    const paso = altoFilaAudio + GAP_FILAS
+    document.body.style.cursor = 'grabbing'
+    const mover = (ev: globalThis.MouseEvent) => {
+      const dy = ev.clientY - baseY
+      if (dy < -paso / 2 && actual < nivelesAudio - 1) {
+        intercambiarNivelAudio(actual, actual + 1)
+        actual += 1
+        baseY -= paso
+      } else if (dy > paso / 2 && actual > 0) {
+        intercambiarNivelAudio(actual, actual - 1)
+        actual -= 1
+        baseY += paso
+      }
+    }
+    const soltar = () => {
+      document.body.style.cursor = ''
+      window.removeEventListener('mousemove', mover)
+      window.removeEventListener('mouseup', soltar)
+    }
+    window.addEventListener('mousemove', mover)
+    window.addEventListener('mouseup', soltar)
+  }
+
   const anchoContenido = Math.max(total * pxPorSegundo + 200, anchoVisible || 600)
 
   // instantes a los que se imantan clips y capas: el cero, el cabezal y los
@@ -259,7 +329,7 @@ export default function Timeline({
     const medir = () => {
       // a las filas les queda el ancho del contenedor menos la columna de
       // cabeceras y el hueco que las separa; ese es el espacio que deben cubrir
-      const util = Math.max(0, cont.clientWidth - ANCHO_CABECERAS - HUECO_COLUMNAS)
+      const util = Math.max(0, cont.clientWidth - anchoCabeceras - HUECO_COLUMNAS)
       setAnchoVisible(util)
       // el mismo ancho se comparte con el store, que lo usa para encuadrar el
       // zoom al soltar un video
@@ -269,7 +339,7 @@ export default function Timeline({
     ro.observe(cont)
     medir()
     return () => ro.disconnect()
-  }, [setAnchoTimeline])
+  }, [setAnchoTimeline, anchoCabeceras])
 
   function moverCabezal(clientX: number) {
     const zona = contenidoRef.current
@@ -463,8 +533,9 @@ export default function Timeline({
               el grupo deja que las guías de «insertar nivel» asomen al pasar el
               cursor por las separaciones */}
           <div
-            className="group/cols sticky left-0 z-40 w-44 shrink-0"
+            className="group/cols sticky left-0 z-40 shrink-0"
             style={{
+              width: anchoCabeceras,
               background: 'rgb(var(--surface))',
               // la columna va por encima de las capas del área de pistas (cabezal,
               // guías, scrubber) con un z alto, para que ninguna de esas líneas se
@@ -480,7 +551,19 @@ export default function Timeline({
                 filas de la derecha. las cabeceras se ven siempre, aunque el carril
                 esté vacío, para que se entienda que ese espacio existe */}
             {ordenCarriles.map((carril, i) => (
-              <div key={carril} style={{ marginTop: i === 0 ? 8 : SEP_SECCION }}>
+              <motion.div
+                key={carril}
+                layout="position"
+                transition={DESLIZA}
+                className="relative"
+                style={{ marginTop: i === 0 ? 8 : SEP_SECCION }}
+              >
+                {i > 0 && (
+                  <GuiaEntreCarriles
+                    etiqueta={NOMBRE_CARRIL[ordenCarriles[i - 1]] ?? ordenCarriles[i - 1]}
+                    onInsertar={() => agregarNivelDe(ordenCarriles[i - 1])}
+                  />
+                )}
                 {carril === 'video' && (
                   <div className="relative flex flex-col" style={{ gap: HUECO_PISTA }}>
                     {filas.map((p) => (
@@ -496,6 +579,7 @@ export default function Timeline({
                     icono="texto"
                     titulo={nombreCarrilTexto}
                     onRenombrar={(n) => renombrarCarril('texto', n)}
+                    onReordenar={(dir) => moverCarril('texto', dir)}
                     acento="#f59e0b"
                     alto={altoCarril(nivelesTexto, altoFilaTexto)}
                     onEstirar={estirarCarril('texto', altoFilaTexto)}
@@ -510,6 +594,7 @@ export default function Timeline({
                     icono="musica"
                     titulo={nombreCarrilAudio}
                     onRenombrar={(n) => renombrarCarril('audio', n)}
+                    onReordenar={(dir) => moverCarril('audio', dir)}
                     acento="#10b981"
                     alto={altoCarril(nivelesAudio, altoFilaAudio)}
                     onEstirar={estirarCarril('audio', altoFilaAudio)}
@@ -524,6 +609,7 @@ export default function Timeline({
                     icono="imagen"
                     titulo={nombreCarrilImagen}
                     onRenombrar={(n) => renombrarCarril('imagen', n)}
+                    onReordenar={(dir) => moverCarril('imagen', dir)}
                     acento="#38bdf8"
                     alto={altoCarril(nivelesImagen, altoFilaImagen)}
                     onEstirar={estirarCarril('imagen', altoFilaImagen)}
@@ -533,8 +619,17 @@ export default function Timeline({
                     onBajar={i < ordenCarriles.length - 1 ? () => moverCarril('imagen', 1) : undefined}
                   />
                 )}
-              </div>
+              </motion.div>
             ))}
+
+            {/* tirador del borde derecho: arrastrándolo se ensancha o estrecha la
+                columna de cabeceras, para que quepan los nombres largos */}
+            <div
+              onMouseDown={estirarCabeceras}
+              title="Arrastra para cambiar el ancho"
+              className="absolute inset-y-0 right-0 z-50 w-1.5 cursor-ew-resize opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover/cols:opacity-60"
+              style={{ background: 'rgb(var(--brand) / 0.8)' }}
+            />
           </div>
 
           <div
@@ -555,7 +650,7 @@ export default function Timeline({
           {/* las filas siguen el mismo orden que la columna de cabeceras, para que
               cada sección quede enfrente de su rótulo pase lo que pase */}
           {ordenCarriles.map((carril, i) => (
-            <div key={carril} style={{ marginTop: i === 0 ? 8 : SEP_SECCION }}>
+            <motion.div key={carril} layout="position" transition={DESLIZA} style={{ marginTop: i === 0 ? 8 : SEP_SECCION }}>
               {carril === 'video' && (
                 <>
               {/* niveles de video, del más alto al más bajo */}
@@ -592,7 +687,7 @@ export default function Timeline({
                         opacity: oculta ? 0.4 : 1,
                       }}
                     >
-                      {vacio && p === 0 && clips.length === 0 && (
+                      {vacio && (
                         <div className="flex h-full items-center gap-2.5 px-6 text-xs text-[color:var(--muted)]">
                           <Icon name="subir" size={14} />
                           <span className="leading-relaxed">
@@ -712,9 +807,31 @@ export default function Timeline({
                     <div
                       key={`audio-${n}`}
                       data-nivel-audio={n}
-                      className="relative overflow-hidden rounded-lg"
+                      className="group relative overflow-hidden rounded-lg"
                       style={{ height: altoFilaAudio, background: 'rgb(var(--border) / 0.05)' }}
                     >
+                      {/* agarre para reordenar la fila entera cuando hay más de un
+                          nivel de audio. asoma al pasar el cursor y se arrastra
+                          arriba o abajo para decidir cuál va primero, moviendo de una
+                          vez todo lo que tenga esa fila */}
+                      {nivelesAudio > 1 && (
+                        <div
+                          onMouseDown={reordenarNivelAudio(n)}
+                          title="Arrastra para reordenar esta fila de audio"
+                          className="absolute left-0 top-1/2 z-20 flex h-7 w-4 -translate-y-1/2 cursor-grab items-center justify-center rounded-r opacity-0 transition-opacity duration-150 hover:!opacity-100 group-hover:opacity-70 active:cursor-grabbing"
+                          style={{ background: 'rgb(var(--surface))' }}
+                        >
+                          <span className="grid grid-cols-2 gap-x-0.5 gap-y-[3px]">
+                            {Array.from({ length: 6 }).map((_, i) => (
+                              <span
+                                key={i}
+                                className="h-0.5 w-0.5 rounded-full"
+                                style={{ background: 'rgb(var(--muted))' }}
+                              />
+                            ))}
+                          </span>
+                        </div>
+                      )}
                       {filaVacia ? (
                         <>
                           {/* rótulo a la izquierda, limpio */}
@@ -722,17 +839,18 @@ export default function Timeline({
                             <Icon name="musica" size={13} />
                             <span>Añadir audio</span>
                           </div>
-                          {/* líneas por defecto pegadas al borde de arriba y repetidas
-                              a paso fijo: ni centradas ni estiradas, para que una fila
-                              larga no deforme el patrón */}
-                          <div
-                            className="pointer-events-none absolute top-0 right-0 h-2/3"
-                            style={{
-                              left: ANCHO_ROTULO_AUDIO,
-                              backgroundImage:
-                                'repeating-linear-gradient(90deg, rgb(var(--border) / 0.4) 0 1px, transparent 1px 5px)',
-                            }}
-                          />
+                          {/* onda tenue de fondo, arrancando pasado el rótulo, para
+                              que la fila vacía se lea como una pista de audio y no como
+                              una banda plana. cada fila lleva su propia semilla para que
+                              su dibujo no sea idéntico al de al lado */}
+                          <div className="absolute inset-y-0 right-0" style={{ left: ANCHO_ROTULO_AUDIO }}>
+                            <OndaAudio
+                              semilla={`fondo-audio-${n}`}
+                              color="rgb(var(--border) / 0.5)"
+                              opacidad={0.35}
+                              barras={Math.max(80, Math.floor((anchoContenido - ANCHO_ROTULO_AUDIO) / 2))}
+                            />
+                          </div>
                         </>
                       ) : (
                         <>
@@ -758,7 +876,7 @@ export default function Timeline({
               </div>
                 </>
               )}
-            </div>
+            </motion.div>
           ))}
 
           {/* guía de inserción: la línea celeste que cruza la pista mientras se

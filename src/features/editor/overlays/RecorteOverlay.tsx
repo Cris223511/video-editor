@@ -42,6 +42,7 @@ const AGARRES: { id: string; lados: Lado[]; x: number; y: number; cursor: string
 // agarres se ajusta cada lado. lo que se recorta se ve igual en el archivo
 export default function RecorteOverlay() {
   const herramienta = useEditorStore((s) => s.herramienta)
+  const categoriaClip = useEditorStore((s) => s.categoriaClip)
   const clips = useEditorStore((s) => s.pista.clips)
   const capas = useEditorStore((s) => s.capas)
   const playhead = useEditorStore((s) => s.playhead)
@@ -51,6 +52,7 @@ export default function RecorteOverlay() {
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const recortarClipImagen = useEditorStore((s) => s.recortarClipImagen)
   const actualizarCapa = useEditorStore((s) => s.actualizarCapa)
+  const limpiarSeleccion = useEditorStore((s) => s.limpiarSeleccion)
   const medios = useProjectStore((s) => s.medios)
 
   const rootRef = useRef<HTMLDivElement>(null)
@@ -93,7 +95,8 @@ export default function RecorteOverlay() {
   const objetivo = !capaImagen && activo && activo.id === clipSeleccionado ? activo : null
   const asset = objetivo ? medios.find((a) => a.id === objetivo.assetId) : null
 
-  const activa = herramienta === 'recortar' && rect.w > 0 && (capaImagen || (objetivo && asset))
+  const enRecorte = herramienta === 'recortar' || categoriaClip === 'recortar'
+  const activa = enRecorte && rect.w > 0 && (capaImagen || (objetivo && asset))
   if (!activa) {
     return <div ref={rootRef} className="pointer-events-none absolute inset-0" />
   }
@@ -207,7 +210,15 @@ export default function RecorteOverlay() {
   }
 
   return (
-    <div ref={rootRef} className="absolute inset-0 z-40">
+    <div
+      ref={rootRef}
+      className="absolute inset-0 z-40"
+      // pulsar la zona oscurecida de fuera del recuadro suelta la selección del
+      // clip. como el recorte ya se guardó al ajustarlo, esto solo cierra la
+      // herramienta y deja ver el resultado limpio, sin tener que buscar un botón.
+      // el recuadro y sus agarres cortan la propagación, así que solo salta aquí
+      onMouseDown={() => limpiarSeleccion()}
+    >
       {/* zona de agarre del centro: pone la manito y mueve el recorte entero. va
           debajo de los agarres, así que tirar de un borde sigue redimensionando */}
       <div

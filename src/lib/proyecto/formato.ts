@@ -1,5 +1,5 @@
 import { Capa } from '../../types/layers'
-import { Clip } from '../../types/timeline'
+import { Clip, PistaMeta } from '../../types/timeline'
 import { MediaAsset, ClaseMedio } from '../../types/media'
 import { RegionAudio, ClipAudio } from '../../types/audio'
 import { Marco } from '../../types/marco'
@@ -46,6 +46,22 @@ export interface ProyectoGuardado {
     clips: Clip[]
     numPistas: number
     altosPista: number[]
+    // todo lo que define los carriles multipista. va opcional para que un proyecto
+    // guardado antes de esto se abra sin romper, cayendo a los valores por defecto.
+    // sin guardarlo, reordenar carriles, sumar o borrar niveles y renombrar se
+    // perdían al refrescar, que es justo lo que hay que evitar
+    pistasMeta?: PistaMeta[]
+    nivelesTexto?: number
+    nivelesAudio?: number
+    nivelesImagen?: number
+    altoFilaTexto?: number
+    altoFilaAudio?: number
+    altoFilaImagen?: number
+    nombreCarrilTexto?: string
+    nombreCarrilAudio?: string
+    nombreCarrilImagen?: string
+    anchoCabeceras?: number
+    ordenCarriles?: ('video' | 'audio' | 'texto' | 'imagen')[]
     capas: Capa[]
     audioRegiones: RegionAudio[]
     audios?: ClipAudio[]

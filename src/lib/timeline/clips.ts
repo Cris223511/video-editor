@@ -21,3 +21,21 @@ export function clipEnTiempo(clips: Clip[], t: number, ocultas?: Set<number>): C
 export function duracionTotal(clips: Clip[]): number {
   return clips.reduce((max, c) => Math.max(max, c.inicio + c.duracion), 0)
 }
+
+// duración del proyecto entero, contando además de los clips de video las capas
+// (texto, figura, imagen, dibujo, censura) y los audios y franjas. así un montaje
+// hecho solo con elementos de la app, sin ningún video subido, tiene duración: la
+// línea de tiempo se extiende, se reproduce y se exporta hasta donde llega el
+// último elemento
+export function duracionProyecto(
+  clips: Clip[],
+  capas: { inicio: number; duracion: number }[] = [],
+  audios: { inicio: number; duracion: number }[] = [],
+  regiones: { inicio: number; duracion: number }[] = [],
+): number {
+  let max = duracionTotal(clips)
+  for (const c of capas) max = Math.max(max, c.inicio + c.duracion)
+  for (const a of audios) max = Math.max(max, a.inicio + a.duracion)
+  for (const r of regiones) max = Math.max(max, r.inicio + r.duracion)
+  return max
+}

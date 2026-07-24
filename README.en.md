@@ -1,12 +1,14 @@
 <p align="center">
-  <img src="public/logo.png" alt="Video Editor logo" width="110">
+  <img src="public/logo.png" alt="Video Editor logo" width="120">
 </p>
 
 <h1 align="center">Video Editor</h1>
 
 <p align="center">
-  A full video editor that runs entirely in your browser.<br>
-  No installs, no accounts, and your files never leave your device.
+  <b>A video editor that runs entirely in the browser.</b> Build the timeline across
+  several levels, grade the color with wheels and curves, censor what moves, add text,
+  images and shapes, and export the finished file.
+  <i>Nothing to install, and your videos never leave your computer.</i>
 </p>
 
 <p align="center">
@@ -14,115 +16,238 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Cris223511/video-editor/releases/latest"><img src="https://img.shields.io/github/v/release/Cris223511/video-editor?label=version&color=1861ff" alt="latest version"></a>
+  <a href="https://github.com/Cris223511/video-editor/releases/latest"><img src="https://img.shields.io/github/v/release/Cris223511/video-editor?label=release&color=1861ff" alt="latest release"></a>
   <img src="https://img.shields.io/badge/React-18-1861ff" alt="react 18">
   <img src="https://img.shields.io/badge/TypeScript-5-1861ff" alt="typescript 5">
   <img src="https://img.shields.io/badge/Vite-5-1861ff" alt="vite 5">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
 </p>
 
-<p align="center">
-  <b><a href="https://video-editor-plus.vercel.app">Open the app</a></b>
-</p>
-
 ---
 
-## What it is
+## Live demo
 
-Video Editor builds a video from start to finish in the browser. You import the files, cut and arrange the clips, grade color, censor moving subjects, add text, images, shapes and audio, and export the result. All processing happens on your device: no frame is uploaded to any server.
+Video Editor runs **right in the browser**, with nothing to install:
 
-It is meant to solve a specific video the same day, a quick cut with music, a vertical piece for social, a screen tutorial or an interview where a face needs hiding. It does not replace a desktop suite; it handles everyday work and keeps it direct, with no installs, no accounts, no watermarks and no paid features.
+| Version | Link | Status |
+| ------- | ---- | ------ |
+| 2.0.0 | **[video-editor-plus.vercel.app](https://video-editor-plus.vercel.app)** | Available |
+
+> Open it and start editing, no account or download needed. What changed in each version is in the [changelog](CHANGELOG.md).
+
+## How it works
+
+All the work happens inside the browser. You import the files, edit and export without a single frame leaving your computer, with nothing to install and no account to create. It is free and open source, with every feature available.
+
+It is meant for anyone with one specific video to sort out the same day: a trim with music, a vertical piece for social media, a recorded screen tutorial, an interview where a face or a license plate has to be covered. It covers everyday work in a direct way, rather than replacing a desktop suite.
 
 ## Features
 
-**Import.** Video in MP4, WebM, MOV, MKV, M4V and OGV up to 1.5 GB, images in PNG, JPG, WebP, GIF, AVIF and more, and audio in MP3, WAV, OGG, M4A, FLAC or OPUS. Before adding a file, its type, size and real binary signature are checked, not just the extension.
+### Import and media
 
-**Timeline.** Up to six video levels plus dedicated lanes for text and shapes, images and audio. Each lane has several rows, an adjustable height by dragging its edge and an editable name. Trimming is non-destructive, clips split at the playhead, snap to each other, run from 0.25x to 4x and close the gaps left when you delete.
+- **Validated import:** you drag or pick videos and images, and before they join the project their type, their size and their *real binary signature* are checked, not just the extension. The accepted formats are MP4, WebM, MOV, MKV, AVI, M4V and OGV, with a cap of 1.5 GB per file.
+- **Media library:** imported files stay to one side with their thumbnail, resolution, duration and weight, ready to bring onto the timeline when you need them.
+- **No quantity limit:** the project takes as many media files as your computer can handle, just like a desktop editor.
 
-**Transitions.** Twenty-one across five families: fades, wipes, shapes, pushes and zooms. They work for clips and for any standalone element too, a text, a shape, an image or a drawing enters with the one you pick. Duration is set right on the timeline by dragging the entry wedge.
+### Timeline
 
-**Color.** Three tonal-zone wheels for shadows, midtones and highlights, four per-channel curves and the exposure, contrast, saturation, temperature and tint adjustments. It works on video clips and on images, and the correction can fade in instead of being full from the first frame.
+- **Up to six video levels:** clips stack on independent tracks and move from one to another without losing their place in time. The top level is the one you see, and each adjusts its height by pulling its bottom edge.
+- **Lanes for text, images and audio:** besides video, there is a lane for text and shapes, one for images and one for audio, each with several rows to separate elements that overlap in time. A new row appears with the lane button or by dropping a block below the last one, and every lane keeps its own row height and an editable name.
+- **Trimming and splitting:** set each clip's in and out points by dragging its edges, or cut the clip wherever the playhead is. Trimming is non-destructive, so the material you left out is still there if you change your mind.
+- **Magnetic dragging:** clips snap to the start, to the playhead and to the edges of other clips, layers and audio regions, so they fit together without leaving thousandth-of-a-second gaps.
+- **Speed per clip:** from 0.25x to 4x, with quick presets for the usual values. The clip keeps the same piece of video and its footprint on the track is recalculated automatically.
+- **Closing empty gaps:** when a gap is left between two clips it is marked with a dashed border, and closing it pulls everything behind it on that level forward by exactly its length. The other levels are untouched, so the sync does not break.
+- **Alignment guides:** moving a layer over the preview brings up guides that snap it to the center and edges of the canvas, and to those of the other layers as well. Holding **Alt** turns snapping off, for when something has to sit right next to a guide.
+- **Timeline zoom:** zoom in to work on detail or out to see the whole edit, with the buttons, the keys or **Ctrl** and the mouse wheel, which keeps the second under the cursor fixed in place.
+- **Frame strip:** each clip shows its content as thumbnails spread along its duration, not a single stretched image, so you recognize it at a glance without playing it.
 
-**Motion censoring.** Circle, rectangle or free brush, with pixelation, blur or full cover. The path is recorded by dragging the element over the video, with slow motion to follow something fast, then corrected node by node. The same motion applies to text, images, shapes and drawings.
+### Transitions
 
-**Layers.** Text with its own fonts, outline, shadow, background and neon; images with crop and color; geometric shapes; freehand drawing; and ten decorative frames around the canvas.
+There are **twenty-one transitions**, grouped into five families and described as data in a single catalog. That is what guarantees that what you see while editing is identical to what comes out exported, because the preview and the compositor run the same engine.
 
-**Audio.** Master project volume, volume regions per range to lower the music where someone speaks, and splitting a video's audio to its own track.
+- **No transition:** the hard cut, one shot starting right where the previous one ends.
+- **Fades:** cross fade with the previous shot, fade to black and fade to white.
+- **Wipes:** right, left, up, down and diagonal, with the edge of the cut slightly softened so it does not look cheap.
+- **Shapes and openings:** blinds, horizontal doors, vertical doors, circular wipe, diamond and thirds.
+- **Zooms and pushes:** push in all four directions, zoom in and zoom out.
 
-**Canvas and export.** Six aspect ratios or automatic fit to the first video, with band fill by color or by the video itself scaled up and blurred. Export happens in the browser at 24, 30 or 60 fps, in MP4 with a WebM fallback, with progress and cancel.
+The gallery has its own search, which ignores case and accents, and each sample runs the real transition when you hover over it. The duration goes from 0.2 to 2 seconds and can also be set by pulling the edge of the transition on the timeline itself.
 
-**Projects.** They save themselves in the browser with the videos inside, list with search and pagination, and can be packed into a `.veproj` file to move to another machine.
+The same gallery is not only for clips. A text, a shape, an image or a drawing also enters with the transition you pick, with its own duration and its wedge on the timeline. And on a video clip, the color grade and the effects can fade in over the first seconds instead of being full from the first frame.
 
-One idea runs through the whole editor: what you see is what you export. The viewer and the compositor share the same color, transition and render engine, so the final file matches your edit. And with Ctrl and the mouse wheel you zoom into the viewer, anchored to the cursor, to place a small censor or text precisely.
+### Color grading
+
+- **Wheels per tonal range:** three independent wheels for shadows, midtones and highlights. You drag toward the color you want to give each range, **Shift** fine-tunes the movement and a double click returns the wheel to the center.
+- **Curves per channel:** four editable curves, a master one for luminance and one each for the red, green and blue channels. Points are added with a click, bent by dragging and removed with a double click.
+- **Tone adjustments:** exposure, contrast, saturation, temperature and tint, all from -100 to 100.
+
+Everything is applied live on the preview and reaches the exported file unchanged, because the wheels travel as a per-channel curve instead of being recomputed separately.
+
+### Motion censorship
+
+- **Three shapes:** circle, rectangle or free brush, which you use to draw the mask over the video itself and set the stroke width.
+- **Three effects:** pixelate, blur or cover completely, with adjustable intensity on the first two.
+- **Path recorded with the cursor:** you play the video and drag the element following whatever you want to cover. Every instant is stored as a point.
+- **Slow motion while recording:** the video can play at half or quarter speed while the recording lasts, which is what makes it possible to follow a face or a plate moving fast. The path is stored in the video's real time, not the slowed-down one.
+- **Editable path:** the track is drawn over the preview and any node can be dragged to correct where it goes, or removed with a double click. A single point can also be added at the playhead position.
+
+Motion is not exclusive to censorship: text, images, shapes and drawings are animated with the same controls.
+
+### Layers over the video
+
+- **Text:** content, twelve typefaces previewed in their own lettering, size from 8 to 400 px, bold, italic, underline, alignment, color and opacity. It also takes its own background with color and opacity, an outline with color and width, and a shadow.
+- **Images:** logos and photos on top, in their own timeline lane, sized from 3 to 200 % of the canvas width, with independent cropping on each of the four sides and adjustable opacity. When resized they keep their proportion, and holding Shift deforms them freely. PNG, JPG, WebP, GIF, BMP and AVIF up to 20 MB are accepted, with their binary signature checked too.
+- **Shapes:** rectangle, rounded, ellipse, triangle, star, line and arrow, with independent fill and border, or color and width in the case of the line and the arrow.
+- **Frame:** ten decorative styles around the video, among them solid, double, dashed, dotted, rounded with adjustable radius, shadow, neon, gradient, vignette and polaroid.
+
+Every layer is moved and resized with eight handles in the preview, keeping its proportions if you hold **Shift**, and on the timeline you decide from which second to which second it appears.
+
+### Audio
+
+- **Overall volume** for the project, from 0 to 200 %, with a mute button that remembers the previous level.
+- **Volume regions:** you add a stretch, place it and trim it on the timeline, and give it its own gain between 0 and 200 %. Handy for dropping the music right where somebody speaks, or for muting just one fragment.
+
+### Canvas
+
+- **Six aspect ratios:** 16:9, 9:16, 1:1, 4:5, 4:3 and 3:4, or automatic fitting to the dimensions of the first video.
+- **Filling the bands:** when the video does not cover the whole canvas, the leftover areas are filled with a color of your choosing or with the video itself, enlarged and blurred, with adjustable blur. This is the usual way to place a vertical shot on a landscape canvas without leaving two flat strips.
+
+### Export
+
+- **All inside the browser:** the project plays back drawing each frame onto a canvas at the chosen resolution, the audio is mixed with Web Audio and everything is recorded together with MediaRecorder.
+- **Format depending on the browser:** MP4 with H.264 and AAC is preferred, and if the browser does not support it, it falls back to WebM with VP9 or VP8. The file downloads on its own when it finishes.
+- **24, 30 or 60 frames per second,** chosen before starting.
+- **No quality loss:** the bitrate is derived from the resolution, with a 40 Mbps ceiling, and the audio stays in sync.
+- **Progress and cancellation:** you see the percentage advance and can stop halfway. Because it happens in real time, a one-minute video takes about a minute to export.
+
+### Saved projects
+
+- **Saved in the browser itself:** projects live in IndexedDB with their videos included, not as text, so they survive closing the tab. A project keeps its identity between saves, so saving again updates the same one instead of leaving copies behind.
+- **Autosave** four seconds after the last change that matters, with a notice in the top bar when there are pending changes and another one before closing the tab. Moving the playhead or switching tools does not trigger a save.
+- **Download and import:** a project is packed into a `.veproj` file with its media inside, ready to take to another computer and open again. On import it gets a new identity, so bringing it in twice does not overwrite what you already had.
+- **Listing with search,** which ignores case and accents, four sort criteria (newest, oldest and by name in both directions) and pagination six at a time. Each card shows the cover, duration, number of media files and the creation and last-edited dates.
+- **Duplicate, download and delete** from the card itself, with a confirmation before deleting because the stored videos go with it.
+- **Details sheet:** each project opens a sheet with what is known about it and its files, from the clips, levels and layers to the output resolution and aspect ratio, the space used and, for each media file, its dimensions, orientation, duration, format and megapixels.
+- **Its own address:** every open project has its link, so you can reload the page or bookmark it without losing track of which one you were working on.
+- **Space warning:** the application checks how much the browser reserves on the computer and how much you have used, to warn you before a save is rejected for lack of room.
+
+### Presentation site
+
+The application does not start in the editor, but on a site that explains what it does and lets you try it before importing anything.
+
+- **Home page with demos that really work:** the color wheels, eight of the twenty-one transitions, the censorship with its draggable box, the preview controls and the canvas ratio change. These are not recorded videos, they run the same engine as the editor.
+- **A tour of the tools,** which advances on its own until you touch one, with the editing and export represented in animated mockups.
+- **Frequently asked questions** and a step-by-step of how a video is built from start to finish.
+- **User manual** on its own page, covering editing, color, layers, censorship, saving and exporting step by step, plus the shortcut table.
+- **Terms and conditions** and **privacy policy,** written to be understood on a single read, with a side index generated from the sections themselves that marks how far you have read.
+
+### Interface
+
+- **Light and dark theme,** with light by default and a fade between the two instead of an abrupt jump.
+- **Eleven tools** on a fixed side rail: project, properties, canvas, frame, text, image, shape, audio, censorship, speed and tone. It stays visible even if you collapse the panel.
+- **Contextual options panel:** each tool shows only its own controls, and what you adjust is visible in the preview as you move it. Selecting a clip, a layer or a region opens its tool directly.
+- **Adjustable panels,** to give more room to the preview or the timeline depending on what you are doing.
+- **Everything local:** *no accounts, no watermarks, no paid features.*
 
 ## Keyboard shortcuts
 
 | Action | Shortcut |
-| --- | --- |
-| Play or pause | `Space` |
+| ------ | -------- |
+| Play or pause | `Spacebar` |
 | Split at the playhead | `S` |
-| Delete the selection | `Delete` or `Backspace` |
-| Copy and paste | `Ctrl+C` and `Ctrl+V` |
-| Undo and redo | `Ctrl+Z` and `Ctrl+Y` |
+| Delete the selection (clip, layer or audio region) | `Del` or `Backspace` |
 | Move the playhead one frame | `←` and `→` |
 | Move the playhead one second | `Shift` + `←` or `→` |
-| Jump to start or end | `Home` and `End` |
-| Zoom the timeline | `+` and `-` |
-| Zoom the viewer around the cursor | `Ctrl` + scroll |
-| Clear the selection | `Esc` |
+| Go to the start or the end | `Home` and `End` |
+| Zoom the timeline in or out | `+` and `-`, or `Ctrl` + mouse wheel |
+| Drop the selection | `Esc` |
 
-There is no save shortcut because the project saves itself. While typing in a field, shortcuts do not fire. With a censor selected, the arrows adjust its box instead of moving the playhead.
+There is no save shortcut because you do not need one: the project saves itself on every change. While you are typing in a text field the shortcuts do not fire, so the spacebar writes a space instead of splitting the video.
 
-## Run locally
+## Requirements
 
-Requires Node.js 18 or newer.
+A recent desktop browser based on Chromium or Firefox. There is nothing to install, no permissions to grant, and no need to stay connected once the page has loaded. To save projects it helps to have free disk space, because they include the full videos.
 
-```bash
+## Running locally
+
+You only need **Node.js 18** or later.
+
+```
 npm install
 npm run dev
 ```
 
-Vite serves the app at `http://localhost:5173`. To build the production output into `dist` use `npm run build`, which also type-checks, and `npm run preview` serves that build locally.
+Vite serves the application at `http://localhost:5173`.
 
-## How it is built
+## Commands
 
-The UI is React 18 with TypeScript, bundled with Vite and styled with Tailwind. State lives in Zustand and routing in React Router, with Framer Motion and Lenis for motion. Dialogs, menus and resizable panels rely on Radix, Embla and react-resizable-panels.
+| Command | What it does |
+| ------- | ------------ |
+| `npm run dev` | Development server with hot reload. |
+| `npm run build` | Type-checks and builds the production version into `dist`. |
+| `npm run preview` | Serves the build result locally. |
 
-Rendering and recording use Canvas, Web Audio and MediaRecorder, and saved projects go to IndexedDB. The whole editing engine (validation, media analysis, color, transitions, compositor and export) lives in `src/lib`, separate from the UI, so the logic does not depend on React.
+## Technology
 
-<details>
-<summary>Project structure</summary>
+| Component | Tool | What it is used for |
+| --------- | ---- | ------------------- |
+| Interface | [React 18](https://react.dev/) and [TypeScript 5](https://www.typescriptlang.org/) | The application and its components, strictly typed |
+| Bundling | [Vite 5](https://vite.dev/) | Development server and production build |
+| Styles | [Tailwind CSS](https://tailwindcss.com/) | The design and the light or dark theme |
+| State | [Zustand](https://zustand-demo.pmnd.rs/) | The project, editor, theme and view state |
+| Routing | [React Router](https://reactrouter.com/) | One address per view, reloadable and shareable |
+| Animation | [Framer Motion](https://www.framer.com/motion/) and [Lenis](https://lenis.darkroom.engineering/) | Interface transitions and the site's smooth scrolling |
+| Components | [Radix UI](https://www.radix-ui.com/), [Embla](https://www.embla-carousel.com/), [react-resizable-panels](https://github.com/bvaughn/react-resizable-panels) | Dialogs, accordions, menus, carousels and adjustable panels |
+| UI details | [lucide-react](https://lucide.dev/), [react-colorful](https://omgovich.github.io/react-colorful/), [Sonner](https://sonner.emilkowal.ski/) | Vector icons, color pickers and notices |
+| Typefaces | Inter and Plus Jakarta Sans | Served from the package itself, never requested from third parties |
+| Export | Canvas, Web Audio and MediaRecorder | Video render and recording, all in the browser |
+| Storage | IndexedDB | Saved projects with their media |
+
+The editing engine (validation, media analysis, color, transitions, compositor and export) lives in `src/lib`, **separate from the interface** in `src/components` and `src/features`, so the logic does not depend on React.
+
+## Project structure
 
 ```
 video-editor/
 ├── index.html
 ├── vite.config.ts            COOP/COEP headers in case WebCodecs is used later
 ├── vercel.json               the same headers in production
+├── tailwind.config.js
 └── src/
     ├── main.tsx              entry point
-    ├── rutasDef.ts           all routes in one place
+    ├── App.tsx               root of the application
+    ├── rutas.tsx             router and the address of each view
+    ├── rutasDef.ts           the addresses in a single place
+    ├── index.css             theme tokens and base styles
     ├── config/               version, limits and accepted formats
-    ├── types/                domain types
+    ├── types/                domain types (media, layers, audio, frame, time)
     ├── lib/                  engine with no react dependency
     │   ├── validation/       file validation (type, size, signature)
     │   ├── media/            video analysis and thumbnails
-    │   ├── layers/           layers, motion and geometry
+    │   ├── layers/           layers, motion, geometry and guides
     │   ├── color/            wheels, curves and tone adjustments
-    │   ├── transiciones/     catalog, engine and element entrance
-    │   ├── audio/            per-region gain
+    │   ├── transiciones/     catalog, engine and painting
+    │   ├── audio/            gain per region
     │   ├── timeline/         timeline calculations
-    │   ├── proyecto/         store, packaging and session
-    │   └── export/           compositor and export
-    ├── store/                global state
-    ├── components/           icons, controls, site pieces and layout
-    └── features/             site, import, projects and editor
+    │   ├── proyecto/         storage, packaging and session
+    │   ├── export/           compositor and export
+    │   ├── scroll/           the site's smooth scrolling
+    │   └── format/           formatting helpers
+    ├── store/                global state (theme, project, editor, view)
+    ├── components/
+    │   ├── ui/               icons, notices, controls, wheels and curves
+    │   ├── sitio/            pieces and demos for the presentation site
+    │   └── layout/           top bar, navigation and footer
+    └── features/
+        ├── sitio/            home page, manual, legal pages and not found
+        ├── import/           import screen
+        ├── proyectos/        listing and details of saved projects
+        └── editor/           preview, panels, timeline and export
 ```
-
-</details>
 
 ## Privacy
 
-> Your videos are processed entirely on your device. Nothing is uploaded to any server, while editing or exporting. There are no accounts, no tracking and no analytics. Saved projects live in your browser's storage, and deleting them from the app removes them for real.
+> **Your videos are processed entirely on your computer.** Nothing is uploaded to any server, neither while you edit nor when you export. There are no accounts, no tracking and no analytics. The projects you save stay in your own browser's storage, and deleting them from the application really does remove them.
 
 ## Contributing
 
@@ -130,4 +255,4 @@ Bug reports and ideas are welcome in the [issues](https://github.com/Cris223511/
 
 ## License
 
-**MIT** © [Cris223511](https://github.com/Cris223511). Full text in [LICENSE](LICENSE).
+**MIT** © [Cris223511](https://github.com/Cris223511). You can use it, modify it and share it freely. The full text is in the [LICENSE](LICENSE) file.

@@ -4,7 +4,7 @@ import Modal from '../../components/ui/Modal'
 import { useAppStore } from '../../store/useAppStore'
 import { useEditorStore } from '../../store/useEditorStore'
 import { useProjectStore } from '../../store/useProjectStore'
-import { duracionTotal } from '../../lib/timeline/clips'
+import { duracionProyecto } from '../../lib/timeline/clips'
 import { formatearDuracion } from '../../lib/format/duracion'
 import { formatearBytes } from '../../lib/format/bytes'
 import { exportarProyecto, ControlExport, elegirMime, bitrateVideo } from '../../lib/export/exportar'
@@ -52,7 +52,7 @@ export default function ExportDialog() {
 
   const estado = useEditorStore.getState()
   const medios = useProjectStore.getState().medios
-  const total = duracionTotal(estado.pista.clips)
+  const total = duracionProyecto(estado.pista.clips, estado.capas, estado.audios, estado.audioRegiones)
   const { ancho, alto } = estado.resolucion
 
   // formato probable de salida, deducido del mismo mime que elegirá la grabadora

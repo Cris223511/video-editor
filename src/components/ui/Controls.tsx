@@ -1,7 +1,12 @@
 import { ReactNode, useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 import { HexColorPicker } from 'react-colorful'
 import { Ayuda } from './Tooltip'
+
+// estilo común de los botones que agregan un elemento (texto, censura, figura,
+// dibujo). van con nuestro celeste primario relleno, igual en claro y en oscuro,
+// en vez del fondo blanco de borde fino que se veía básico
+export const BOTON_AGREGAR =
+  'inline-flex items-center justify-center gap-2 rounded-lg bg-brand py-2 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95'
 
 // controles reutilizables de los paneles de opciones. todos comparten el mismo
 // radio, la misma reacción al pasar el cursor y la posibilidad de llevar una
@@ -106,22 +111,57 @@ export function Deslizador({
 export function ColorCampo({ valor, onChange }: { valor: string; onChange: (v: string) => void }) {
   const [abierto, setAbierto] = useState(false)
   const caja = useRef<HTMLDivElement>(null)
+  // color que muestra la rueda mientras se arrastra. se mantiene local y se vuelca
+  // al proyecto acompasado a los fotogramas, no en cada micro-movimiento del cursor.
+  // así el resto de la app deja de re-renderizarse a lo loco durante el arrastre
+  const [local, setLocal] = useState(valor)
+  const raf = useRef<number | null>(null)
 
-  // un clic fuera cierra la rueda, que es lo que cualquiera espera
+  // cuando el valor llega de fuera (deshacer, otro control) la rueda se pone al día
+  useEffect(() => {
+    setLocal(valor)
+  }, [valor])
+
+  // vuelca al proyecto una sola vez por fotograma como mucho, para no atragantar la
+  // app durante un arrastre continuo
+  function empujar(v: string) {
+    setLocal(v)
+    if (raf.current) cancelAnimationFrame(raf.current)
+    raf.current = requestAnimationFrame(() => {
+      raf.current = null
+      onChange(v)
+    })
+  }
+
+  useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current) }, [])
+
+  // la rueda se cierra solo con Escape o con un clic fuera de ella. nunca por soltar
+  // el cursor a media edición: por eso el botón de la muestra solo abre (ver abajo),
+  // así el clic que a veces genera el navegador al terminar un arrastre no la cierra
   useEffect(() => {
     if (!abierto) return
     const fuera = (e: MouseEvent) => {
       if (caja.current && !caja.current.contains(e.target as Node)) setAbierto(false)
     }
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAbierto(false)
+    }
     document.addEventListener('mousedown', fuera)
-    return () => document.removeEventListener('mousedown', fuera)
+    document.addEventListener('keydown', tecla)
+    return () => {
+      document.removeEventListener('mousedown', fuera)
+      document.removeEventListener('keydown', tecla)
+    }
   }, [abierto])
 
   return (
     <div ref={caja} className="relative flex items-center gap-2">
+      {/* la muestra solo ABRE la rueda; cerrar es cosa de Escape o de un clic fuera.
+          al terminar un arrastre dentro de la rueda el navegador dispara a veces un
+          clic sobre esta muestra, y si aquí se alternara, ese clic la cerraba sola */}
       <button
         type="button"
-        onClick={() => setAbierto((v) => !v)}
+        onClick={() => setAbierto(true)}
         aria-label="Elegir color"
         className="h-9 w-11 shrink-0 rounded-lg border transition-transform duration-200 hover:scale-105 active:scale-95"
         style={{ background: valor, borderColor: 'rgb(var(--border) / 0.2)' }}
@@ -134,23 +174,21 @@ export function ColorCampo({ valor, onChange }: { valor: string; onChange: (v: s
         style={{ borderColor: 'rgb(var(--border) / 0.15)' }}
       />
 
-      <AnimatePresence>
-        {abierto && (
-          <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            transition={{ duration: 0.16, ease: 'easeOut' }}
-            className="absolute left-0 top-full z-50 mt-2 rounded-xl p-3 shadow-xl"
-            style={{
-              background: 'rgb(var(--surface))',
-              border: '1px solid rgb(var(--border) / 0.14)',
-            }}
-          >
-            <HexColorPicker color={valor} onChange={onChange} />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* el desplegable va con una animación de entrada por css, no con
+          AnimatePresence: bajo los re-renders rápidos del arrastre, el montaje y
+          desmontaje de framer-motion llegaba a sacar la rueda de en medio */}
+      {abierto && (
+        <div
+          className="absolute left-0 top-full z-50 mt-2 rounded-xl p-3 shadow-xl"
+          style={{
+            background: 'rgb(var(--surface))',
+            border: '1px solid rgb(var(--border) / 0.14)',
+            animation: 'fundido-in 0.16s ease-out',
+          }}
+        >
+          <HexColorPicker color={local} onChange={empujar} />
+        </div>
+      )}
     </div>
   )
 }

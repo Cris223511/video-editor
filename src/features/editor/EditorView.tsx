@@ -5,6 +5,7 @@ import RielHerramientas from './RielHerramientas'
 import MediaLibrary from './MediaLibrary'
 import Preview from './Preview'
 import PlaybackControls from './PlaybackControls'
+import PanelClip from './PanelClip'
 import OptionsPanel from './OptionsPanel'
 import Timeline from './timeline/Timeline'
 import MenuContextual from './MenuContextual'
@@ -170,6 +171,11 @@ export default function EditorView() {
                 </Panel>
               </PanelGroup>
             </div>
+
+            {/* panel contextual del elemento elegido, pegado a la derecha del
+                visor. reserva su sitio siempre para que seleccionar no empuje la
+                vista de golpe, y sus controles crecen con suavidad al abrirse */}
+            {!visorCompleto && <PanelClip />}
 
           </div>
         </Panel>

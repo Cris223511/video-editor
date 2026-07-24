@@ -1,8 +1,8 @@
-import { ReactNode, useEffect, useRef } from 'react'
+import { ReactNode } from 'react'
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { CapaTexto } from '../../../types/layers'
-import { Campo, Deslizador, ColorCampo, Interruptor, Segmentado } from '../../../components/ui/Controls'
+import { Campo, Deslizador, ColorCampo, Interruptor, Segmentado, BOTON_AGREGAR } from '../../../components/ui/Controls'
 import Selector from '../../../components/ui/Selector'
 import MotionControls from './MotionControls'
 import { cristal } from '../../../components/sitio/cristal'
@@ -78,7 +78,7 @@ function BotonEstilo({
 // editor de la capa de texto seleccionada: contenido, tipografía, color, estilo,
 // fondo, contorno, sombra y brillo. la posición y la franja de tiempo se ajustan
 // en el visor y en la línea de tiempo
-export default function TextPanel() {
+export default function TextPanel({ ocultarAgregar = false }: { ocultarAgregar?: boolean } = {}) {
   const capas = useEditorStore((s) => s.capas)
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const agregarTexto = useEditorStore((s) => s.agregarTexto)
@@ -93,28 +93,13 @@ export default function TextPanel() {
     if (capa) actualizarCapa(capa.id, { [campo]: valor } as Partial<CapaTexto>)
   }
 
-  // la herramienta se abre con un elemento ya puesto y sus controles a la vista.
-  // el paso previo que solo describía la herramienta y pedía pulsar un botón
-  // estorbaba más de lo que ayudaba
-  const yaCreado = useRef(false)
-  useEffect(() => {
-    // el doble montaje de StrictMode en desarrollo dispararía esto dos veces; el
-    // pestillo garantiza que solo nazca un elemento al abrir el panel vacío
-    if (yaCreado.current) return
-    yaCreado.current = true
-    if (!capa) agregarTexto()
-    // interesa únicamente el montaje del panel
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   return (
     <div className="flex flex-col gap-4">
-      <button
-        onClick={agregarTexto}
-        className="inline-flex items-center justify-center gap-2 rounded-lg border border-black/10 py-2 text-sm font-medium transition-colors hover:border-brand hover:text-brand dark:border-white/10"
-      >
-        <Icon name="mas" size={16} /> Agregar otro texto
-      </button>
+      {!ocultarAgregar && (
+        <button onClick={agregarTexto} className={BOTON_AGREGAR}>
+          <Icon name="mas" size={16} /> {capa ? 'Agregar otro texto' : 'Agregar texto'}
+        </button>
+      )}
 
       {capa && (
         <>

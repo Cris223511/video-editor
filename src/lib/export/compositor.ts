@@ -43,6 +43,35 @@ function auxDesenfoque(w: number, h: number): HTMLCanvasElement {
   return lienzoDesenfoque
 }
 
+// lienzo aparte para el recorte en óvalo con difuminado o viñeta: el clip se pinta
+// aquí, se enmascara con la silueta suave y luego se vuelca sobre el principal, que
+// es la única forma de que el borde se funda a transparente sin agujerear el fondo
+let lienzoRecorte: HTMLCanvasElement | null = null
+function auxRecorte(w: number, h: number): HTMLCanvasElement {
+  if (!lienzoRecorte) lienzoRecorte = document.createElement('canvas')
+  if (lienzoRecorte.width !== w) lienzoRecorte.width = w
+  if (lienzoRecorte.height !== h) lienzoRecorte.height = h
+  return lienzoRecorte
+}
+
+// gradiente radial del óvalo, de negro sólido a transparente según el difuminado.
+// sirve tanto para la máscara del recorte como para confinar la viñeta blanca
+function gradienteOvalo(
+  ctx: CanvasRenderingContext2D,
+  difuminado: number,
+  colorDentro: string,
+  colorFuera: string,
+): CanvasGradient {
+  // el gradiente se traza en un espacio escalado para que el óvalo sea un círculo,
+  // así los dos radios se respetan. lo aplica quien llama dentro de su propio scale
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1)
+  const solido = Math.max(0, Math.min(1, 1 - difuminado / 100))
+  g.addColorStop(0, colorDentro)
+  g.addColorStop(solido, colorDentro)
+  g.addColorStop(1, colorFuera)
+  return g
+}
+
 function rectRedondeado(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   const rr = Math.min(r, w / 2, h / 2)
   ctx.beginPath()
@@ -542,34 +571,66 @@ export function dibujarFotograma(
         ctx.restore()
       }
 
+      // el recorte en óvalo con difuminado o con viñeta no se puede resolver con un
+      // simple recorte del lienzo (el borde suave agujerearía el fondo), así que en
+      // ese caso el clip se pinta en un lienzo aparte, se le pone la máscara suave y
+      // luego se vuelca sobre el principal. el rectángulo y el óvalo limpio siguen
+      // yendo con un recorte normal, sin lienzo extra
+      const rec = clip.recorte
+      const usaMascara = !!(
+        rec &&
+        rec.forma === 'elipse' &&
+        ((rec.difuminado ?? 0) > 0 || (rec.vinetaBlanca ?? 0) > 0)
+      )
+      let dst = ctx
+      let rctx: CanvasRenderingContext2D | null = null
+      if (usaMascara) {
+        const rl = auxRecorte(ancho, alto)
+        rctx = rl.getContext('2d')
+        if (rctx) {
+          rctx.setTransform(1, 0, 0, 1, 0, 0)
+          rctx.clearRect(0, 0, ancho, alto)
+          dst = rctx
+        }
+      }
+
       // el giro y el espejo del clip se aplican solo al video en sí, no al relleno
       // de fondo, igual que en el visor. va en su propio save para que la
       // transformación no se filtre a lo que se dibuje después
-      ctx.save()
-      aplicarTransformCanvas(ctx, dx + dw / 2, dy + dh / 2, {
+      dst.save()
+      aplicarTransformCanvas(dst, dx + dw / 2, dy + dh / 2, {
         rotacion: enc.rotacion,
         espejoH: enc.espejoH,
         espejoV: enc.espejoV,
       })
 
-      // recorte de la imagen: se limita el dibujo al recuadro que queda, dentro del
-      // mismo bloque de la transformación para que gire y voltee con el video. lo de
-      // fuera no se pinta y deja ver el fondo, igual que el inset del visor
-      const rec = clip.recorte
-      if (rec && (rec.izq || rec.der || rec.arr || rec.aba)) {
-        ctx.beginPath()
-        ctx.rect(dx + rec.izq * dw, dy + rec.arr * dh, dw * (1 - rec.izq - rec.der), dh * (1 - rec.arr - rec.aba))
-        ctx.clip()
+      // recorte duro (rectángulo o óvalo limpio): se limita el dibujo al recuadro
+      // que queda. lo de fuera no se pinta y deja ver el fondo. el óvalo con borde
+      // suave no recorta aquí, su máscara se aplica después sobre el lienzo aparte
+      if (rec && !usaMascara) {
+        dst.beginPath()
+        if (rec.forma === 'elipse') {
+          dst.ellipse(
+            dx + ((rec.izq + (1 - rec.der)) / 2) * dw,
+            dy + ((rec.arr + (1 - rec.aba)) / 2) * dh,
+            Math.max(0.5, ((1 - rec.der - rec.izq) / 2) * dw),
+            Math.max(0.5, ((1 - rec.aba - rec.arr) / 2) * dh),
+            0,
+            0,
+            Math.PI * 2,
+          )
+          dst.clip()
+        } else if (rec.izq || rec.der || rec.arr || rec.aba) {
+          dst.rect(dx + rec.izq * dw, dy + rec.arr * dh, dw * (1 - rec.izq - rec.der), dh * (1 - rec.arr - rec.aba))
+          dst.clip()
+        }
       }
 
       // el color se resuelve como en el visor: funciones nativas más, si hay
       // temperatura o ruedas, el filtro svg de color. el desenfoque de movimiento
-      // no puede ir en la misma cadena de ctx.filter (dejaría el canvas negro),
-      // así que cuando lo hay se pinta en dos pasadas conservando el mismo orden
-      // que el visor: primero el video con su color, después ese resultado con el
-      // desenfoque solo
-      // aparición progresiva del color y los efectos: se mezclan hacia lo neutro
-      // según cuánto lleve el clip en pantalla, igual que en el visor
+      // no puede ir en la misma cadena de filter (dejaría el canvas negro), así que
+      // cuando lo hay se pinta en dos pasadas: primero el video con su color, luego
+      // ese resultado con el desenfoque solo. aparición progresiva incluida
       const mixEf = mixEntradaEfecto(clip.inicio, clip.transicionEfecto, t)
       const tonoEf = mezclarTono(clip.tono, mixEf)
       const efectos = mezclarEfectos(clip.efectos ?? [], mixEf)
@@ -581,8 +642,6 @@ export function dibujarFotograma(
         if (actx) {
           actx.setTransform(1, 0, 0, 1, 0, 0)
           actx.clearRect(0, 0, ancho, alto)
-          // los efectos del catálogo son funciones css corrientes, así que se
-          // encadenan aquí mismo; el desenfoque de movimiento sigue yendo aparte
           {
             const base = hayColor ? filtroCss(tonoEf, `tonoexp-${clip.id}`, []) : ''
             const ef = cssEfectos(efectos)
@@ -590,22 +649,58 @@ export function dibujarFotograma(
           }
           actx.drawImage(video, dx, dy, dw, dh)
           actx.filter = 'none'
-          ctx.filter = `url(#blurexp-${clip.id})`
-          ctx.drawImage(aux, 0, 0)
-          ctx.filter = 'none'
+          dst.filter = `url(#blurexp-${clip.id})`
+          dst.drawImage(aux, 0, 0)
+          dst.filter = 'none'
         }
       } else {
         {
           const base = hayColor ? filtroCss(tonoEf, `tonoexp-${clip.id}`, []) : ''
           const ef = cssEfectos(efectos)
           const cadena = `${base} ${ef}`.trim()
-          if (cadena) ctx.filter = cadena
+          if (cadena) dst.filter = cadena
         }
-        ctx.drawImage(video, dx, dy, dw, dh)
-        ctx.filter = 'none'
+        dst.drawImage(video, dx, dy, dw, dh)
+        dst.filter = 'none'
       }
       // cierra el espejo del video
-      ctx.restore()
+      dst.restore()
+
+      // óvalo con borde suave: se tiñe la viñeta blanca sobre el contenido, luego se
+      // recorta todo con la silueta difuminada, y el resultado se vuelca al lienzo
+      // principal respetando el alfa del clip
+      if (usaMascara && rctx && rec) {
+        const rl = rctx.canvas
+        const cx = dx + ((rec.izq + (1 - rec.der)) / 2) * dw
+        const cy = dy + ((rec.arr + (1 - rec.aba)) / 2) * dh
+        const rx = Math.max(0.5, ((1 - rec.der - rec.izq) / 2) * dw)
+        const ry = Math.max(0.5, ((1 - rec.aba - rec.arr) / 2) * dh)
+        if ((rec.vinetaBlanca ?? 0) > 0) {
+          rctx.save()
+          rctx.translate(cx, cy)
+          rctx.scale(rx, ry)
+          const gv = rctx.createRadialGradient(0, 0, 0, 0, 0, 1)
+          const a = (rec.vinetaBlanca ?? 0) / 100
+          gv.addColorStop(0, 'rgba(255,255,255,0)')
+          gv.addColorStop(0.42, 'rgba(255,255,255,0)')
+          gv.addColorStop(1, `rgba(255,255,255,${a})`)
+          rctx.fillStyle = gv
+          rctx.beginPath()
+          rctx.arc(0, 0, 1, 0, Math.PI * 2)
+          rctx.fill()
+          rctx.restore()
+        }
+        rctx.save()
+        rctx.globalCompositeOperation = 'destination-in'
+        rctx.translate(cx, cy)
+        rctx.scale(rx, ry)
+        rctx.fillStyle = gradienteOvalo(rctx, rec.difuminado ?? 0, 'rgba(0,0,0,1)', 'rgba(0,0,0,0)')
+        rctx.beginPath()
+        rctx.arc(0, 0, 1, 0, Math.PI * 2)
+        rctx.fill()
+        rctx.restore()
+        ctx.drawImage(rl, 0, 0)
+      }
       ctx.restore()
     }
 

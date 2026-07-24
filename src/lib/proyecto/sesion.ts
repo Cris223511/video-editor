@@ -57,6 +57,21 @@ export function capturarProyecto(id: string, creado: number, portada: string): P
       clips: ed.pista.clips,
       numPistas: ed.numPistas,
       altosPista: ed.altosPista,
+      // el estado completo de los carriles: cuántos niveles hay de cada tipo, su
+      // orden, sus alturas y nombres, y el ancho de la columna de cabeceras. así
+      // reordenar, añadir o borrar filas y renombrar sobrevive a un refresco
+      pistasMeta: ed.pistasMeta,
+      nivelesTexto: ed.nivelesTexto,
+      nivelesAudio: ed.nivelesAudio,
+      nivelesImagen: ed.nivelesImagen,
+      altoFilaTexto: ed.altoFilaTexto,
+      altoFilaAudio: ed.altoFilaAudio,
+      altoFilaImagen: ed.altoFilaImagen,
+      nombreCarrilTexto: ed.nombreCarrilTexto,
+      nombreCarrilAudio: ed.nombreCarrilAudio,
+      nombreCarrilImagen: ed.nombreCarrilImagen,
+      anchoCabeceras: ed.anchoCabeceras,
+      ordenCarriles: ed.ordenCarriles,
       capas: ed.capas,
       audioRegiones: ed.audioRegiones,
       audios: ed.audios,
@@ -117,6 +132,21 @@ export async function abrirSesion(id: string): Promise<boolean> {
     // se cae a un solo nivel en lugar de dejar la línea de tiempo vacía
     numPistas: e.numPistas ?? 1,
     altosPista: e.altosPista ?? [64],
+    // los carriles se rearman tal como quedaron. un proyecto viejo que no traiga
+    // estos campos cae a un solo nivel de cada tipo y al orden por defecto, que es
+    // como se comportaba antes de guardarlos
+    ...(e.pistasMeta ? { pistasMeta: e.pistasMeta } : {}),
+    nivelesTexto: e.nivelesTexto ?? 1,
+    nivelesAudio: e.nivelesAudio ?? 1,
+    nivelesImagen: e.nivelesImagen ?? 1,
+    ...(e.altoFilaTexto ? { altoFilaTexto: e.altoFilaTexto } : {}),
+    ...(e.altoFilaAudio ? { altoFilaAudio: e.altoFilaAudio } : {}),
+    ...(e.altoFilaImagen ? { altoFilaImagen: e.altoFilaImagen } : {}),
+    ...(e.nombreCarrilTexto ? { nombreCarrilTexto: e.nombreCarrilTexto } : {}),
+    ...(e.nombreCarrilAudio ? { nombreCarrilAudio: e.nombreCarrilAudio } : {}),
+    ...(e.nombreCarrilImagen ? { nombreCarrilImagen: e.nombreCarrilImagen } : {}),
+    ...(e.anchoCabeceras ? { anchoCabeceras: e.anchoCabeceras } : {}),
+    ordenCarriles: e.ordenCarriles ?? ['video', 'audio', 'imagen', 'texto'],
     capas: e.capas ?? [],
     audioRegiones: e.audioRegiones ?? [],
     audios: e.audios ?? [],
