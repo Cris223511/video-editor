@@ -305,6 +305,11 @@ interface EstadoEditor {
   // la imagen siga al cursor uno a uno en vez de ir con retraso
   moviendoVisor: boolean
   setMoviendoVisor: (v: boolean) => void
+  // recorte rápido: se enciende al hacer doble clic sobre un clip que ya tiene un
+  // recorte, para editarlo en el visor sin abrir el panel de la derecha. un clic
+  // simple no lo activa (solo selecciona), y se apaga al soltar la selección
+  recorteRapido: boolean
+  setRecorteRapido: (v: boolean) => void
   alternarSilencioPista: (indice: number) => void
   alternarOcultarPista: (indice: number) => void
   alternarBloquearPista: (indice: number) => void
@@ -967,6 +972,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       insercionPista: null,
       guiaImantado: null,
       moviendoVisor: false,
+      recorteRapido: false,
       pasado: [],
       futuro: [],
     }),
@@ -1572,6 +1578,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       capasSeleccionadas: [],
       regionSeleccionada: null,
       bloquesSeleccionados: [],
+      // soltar la selección cierra también el recorte rápido del visor
+      recorteRapido: false,
     }),
 
   // el nivel nuevo aparece encima de los demás, vacío y con el alto estándar y
@@ -1619,6 +1627,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   moviendoVisor: false,
   setMoviendoVisor: (v) => set({ moviendoVisor: v }),
+
+  recorteRapido: false,
+  setRecorteRapido: (v) => set({ recorteRapido: v }),
 
   // al eliminar un nivel se van con él sus clips, y los que estaban por encima
   // bajan una posición para que no queden filas huecas en medio. su alto y sus
@@ -2631,6 +2642,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       // grabando algo que nadie había empezado ahí
       grabandoMovimiento: false,
       dibujandoMascara: h === 'censura' ? s.dibujandoMascara : false,
+      // abrir cualquier herramienta cierra el recorte rápido; el recorte pasa a
+      // gobernarse por la herramienta o la categoría elegida
+      recorteRapido: false,
     })),
 
   setLienzo: (ancho, alto) => set({ resolucion: { ancho, alto }, lienzoManual: true }),

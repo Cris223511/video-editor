@@ -43,6 +43,7 @@ const AGARRES: { id: string; lados: Lado[]; x: number; y: number; cursor: string
 export default function RecorteOverlay() {
   const herramienta = useEditorStore((s) => s.herramienta)
   const categoriaClip = useEditorStore((s) => s.categoriaClip)
+  const recorteRapido = useEditorStore((s) => s.recorteRapido)
   const clips = useEditorStore((s) => s.pista.clips)
   const capas = useEditorStore((s) => s.capas)
   const playhead = useEditorStore((s) => s.playhead)
@@ -98,7 +99,7 @@ export default function RecorteOverlay() {
   const objetivo = !capaImagen && activo && activo.id === clipSeleccionado ? activo : null
   const asset = objetivo ? medios.find((a) => a.id === objetivo.assetId) : null
 
-  const enRecorte = herramienta === 'recortar' || categoriaClip === 'recortar'
+  const enRecorte = herramienta === 'recortar' || categoriaClip === 'recortar' || recorteRapido
   const activa = enRecorte && rect.w > 0 && (capaImagen || (objetivo && asset))
   if (!activa) {
     return <div ref={rootRef} className="pointer-events-none absolute inset-0" />
@@ -140,12 +141,19 @@ export default function RecorteOverlay() {
   // la forma (rectángulo, círculo, óvalo) vive en el recorte del clip de video; la
   // imagen por ahora solo recorta en rectángulo, así que ahí se queda en rectángulo
   const forma = (objetivo?.recorte?.forma ?? 'rectangulo') as 'rectangulo' | 'elipse' | 'circulo'
+  // las dos formas redondas (círculo nítido y círculo con borde difuminado) se
+  // comportan igual al medir y redimensionar: nacen redondas y con Alt se pueden
+  // estirar a un óvalo. lo único que cambia entre ellas es el borde
+  const esRedondo = forma === 'circulo' || forma === 'elipse'
   const nativoW = capaImagen ? capaImagen.anchoNatural : asset?.ancho ?? 0
   const nativoH = capaImagen ? capaImagen.altoNatural : asset?.alto ?? 0
   const pxW = Math.round((1 - rec.izq - rec.der) * nativoW)
   const pxH = Math.round((1 - rec.arr - rec.aba) * nativoH)
-  // el círculo se muestra por su diámetro; el resto, ancho por alto
-  const etiquetaTam = forma === 'circulo' ? `⌀ ${Math.min(pxW, pxH)} px` : `${pxW} × ${pxH} px`
+  // una forma redonda perfecta se muestra por su diámetro; el resto, ancho por alto.
+  // si un redondo se estiró a óvalo con Alt, deja de ser cuadrado y también va con
+  // ancho por alto
+  const redondoPerfecto = esRedondo && Math.abs(pxW - pxH) <= 2
+  const etiquetaTam = redondoPerfecto ? `⌀ ${Math.min(pxW, pxH)} px` : `${pxW} × ${pxH} px`
 
   // deja el recorte cuadrado en pantalla (mismo tamaño en píxeles de visor por los
   // dos ejes) alrededor de su centro, que es lo que hace que el óvalo salga como un
@@ -177,10 +185,11 @@ export default function RecorteOverlay() {
     if (!root) return
     const rr = root.getBoundingClientRect()
     const mover = (ev: globalThis.MouseEvent) => {
-      // el círculo se redimensiona a la vez por ancho y alto para seguir siendo
-      // redondo: el radio sale de la distancia del cursor al centro, y siempre
-      // queda un círculo perfecto centrado en su sitio
-      if (forma === 'circulo') {
+      // una forma redonda se redimensiona a la vez por ancho y alto para mantenerse
+      // redonda: el radio sale de la distancia del cursor al centro, y queda un
+      // círculo perfecto centrado en su sitio. con Alt se rompe esa regla y se pasa
+      // al ajuste libre por lado, que es como se estira a un óvalo
+      if (esRedondo && !ev.altKey) {
         const cxpx = caja.x + ((rec.izq + (1 - rec.der)) / 2) * caja.w
         const cypx = caja.y + ((rec.arr + (1 - rec.aba)) / 2) * caja.h
         const dxp = Math.abs(ev.clientX - rr.left - cxpx)
@@ -197,11 +206,11 @@ export default function RecorteOverlay() {
         if (lado === 'arr') cambios.arr = fy
         if (lado === 'aba') cambios.aba = 1 - fy
       }
-      // con alt el recorte crece o encoge por los dos costados a la vez, midiendo
-      // desde el centro. arrastrar un lado mueve también el de enfrente lo mismo,
-      // así que el encuadre se cierra sin descentrarse y hay que apuntar a un solo
-      // borde en lugar de ir corrigiendo los dos por turnos
-      if (ev.altKey) {
+      // en el rectángulo, Alt cierra el recuadro por los dos costados a la vez,
+      // midiendo desde el centro. en las formas redondas Alt hace lo contrario: en
+      // vez de mantenerlas redondas, libera el lado que se arrastra para poder
+      // estirarlas a óvalo, así que ahí no se refleja el borde de enfrente
+      if (ev.altKey && !esRedondo) {
         if (cambios.izq !== undefined) cambios.der = cambios.izq
         if (cambios.der !== undefined && cambios.izq === undefined) cambios.izq = cambios.der
         if (cambios.arr !== undefined) cambios.aba = cambios.arr
@@ -313,15 +322,16 @@ export default function RecorteOverlay() {
           top: crop.y,
           width: crop.w,
           height: crop.h,
-          // en el círculo el hueco se redondea del todo, y la misma sombra tapa el
-          // resto con esa silueta, así se ve el recorte redondo de verdad
-          borderRadius: forma === 'circulo' ? '50%' : undefined,
+          // en las formas redondas el hueco se redondea del todo, y la misma sombra
+          // tapa el resto con esa silueta, así se ve el recorte redondo de verdad
+          // (con Alt convertido en óvalo, el 50% da una elipse, que es lo correcto)
+          borderRadius: esRedondo ? '50%' : undefined,
           boxShadow: '0 0 0 100vmax rgba(0, 0, 0, 0.5)',
         }}
       >
-        {/* guías de tercios, finísimas, para encuadrar como en una cámara. en el
-            círculo estorban, así que ahí no salen */}
-        {forma !== 'circulo' && (
+        {/* guías de tercios, finísimas, para encuadrar como en una cámara. en las
+            formas redondas estorban, así que ahí no salen */}
+        {!esRedondo && (
           <div className="absolute inset-0">
             <div className="absolute left-1/3 top-0 h-full w-px bg-white/25" />
             <div className="absolute left-2/3 top-0 h-full w-px bg-white/25" />

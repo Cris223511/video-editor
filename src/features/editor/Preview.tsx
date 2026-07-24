@@ -58,6 +58,7 @@ export default function Preview() {
   // y ajustarlo; la sombra del overlay de recorte es la que oscurece esa parte
   const herramienta = useEditorStore((s) => s.herramienta)
   const categoriaClip = useEditorStore((s) => s.categoriaClip)
+  const recorteRapido = useEditorStore((s) => s.recorteRapido)
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
   const irA = useEditorStore((s) => s.irA)
   const pausar = useEditorStore((s) => s.pausar)
@@ -979,7 +980,8 @@ export default function Preview() {
                 // la oscurece la sombra del overlay, para poder cuadrar el recorte
                 // viendo lo que se descarta. al cerrar el recorte, vuelve a aplicarse
                 const editandoRecorte =
-                  (herramienta === 'recortar' || categoriaClip === 'recortar') && clipSeleccionado === c.id
+                  (herramienta === 'recortar' || categoriaClip === 'recortar' || recorteRapido) &&
+                  clipSeleccionado === c.id
                 const recEstilo = editandoRecorte
                   ? { clipPath: undefined, maskImage: undefined, WebkitMaskImage: undefined }
                   : estiloRecorte(c.recorte)

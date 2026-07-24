@@ -6,6 +6,7 @@ import { rectClip, encuadreDe } from '../../../lib/timeline/encuadre'
 import { clipEnTiempo } from '../../../lib/timeline/clips'
 import { Ancla, redimensionar } from '../../../lib/layers/resize'
 import { Guia, imantar } from '../../../lib/layers/guias'
+import { hayRecorte } from '../../../lib/layers/recorteMascara'
 import Tiradores from './Tiradores'
 import ManijaGiro, { anguloGiro } from './ManijaGiro'
 
@@ -21,8 +22,8 @@ export default function ClipOverlay() {
   const pistasMeta = useEditorStore((s) => s.pistasMeta)
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
   const actualizarEncuadre = useEditorStore((s) => s.actualizarEncuadre)
-  const resetEncuadre = useEditorStore((s) => s.resetEncuadre)
   const setMoviendoVisor = useEditorStore((s) => s.setMoviendoVisor)
+  const setRecorteRapido = useEditorStore((s) => s.setRecorteRapido)
   const medios = useProjectStore((s) => s.medios)
 
   const rootRef = useRef<HTMLDivElement>(null)
@@ -108,6 +109,11 @@ export default function ClipOverlay() {
     ancla: Ancla,
     caja: { x: number; y: number; w: number; h: number },
     escalaBase: number,
+    // desfase del centro del recorte respecto al centro del video, en fracción del
+    // lienzo. cuando el clip está recortado, los tiradores rodean el recorte, así
+    // que el redimensionado se calcula sobre esa caja y luego se recoloca el video
+    // para que el recorte quede anclado donde estaba, en vez de saltar a un lado
+    desfase: { x: number; y: number } = { x: 0, y: 0 },
   ) {
     e.stopPropagation()
     e.preventDefault()
@@ -116,7 +122,11 @@ export default function ClipOverlay() {
       const p = normalizar(ev)
       const n = redimensionar(caja, ancla, p.x, p.y, true, 0.02)
       const factor = caja.w > 0 ? n.w / caja.w : 1
-      actualizarEncuadre(id, { x: n.x, y: n.y, escala: escalaBase * factor })
+      actualizarEncuadre(id, {
+        x: n.x - desfase.x * factor,
+        y: n.y - desfase.y * factor,
+        escala: escalaBase * factor,
+      })
     }
     const soltar = () => {
       setMoviendoVisor(false)
@@ -173,6 +183,20 @@ export default function ClipOverlay() {
     width: r.dw * (1 - rec.izq - rec.der),
     height: r.dh * (1 - rec.arr - rec.aba),
   }
+  // desfase del centro del recorte respecto al centro del video, y la caja del
+  // recorte en fracción del lienzo. sobre esta caja se calcula el redimensionado
+  // cuando el clip está recortado, para que los tiradores (que rodean el recorte)
+  // escalen la imagen sin desplazarla de sitio
+  const desfaseRecorte = {
+    x: ((rec.izq - rec.der) / 2) * (r.dw / rect.w),
+    y: ((rec.arr - rec.aba) / 2) * (r.dh / rect.h),
+  }
+  const cajaRecorte = {
+    x: enc.x + desfaseRecorte.x,
+    y: enc.y + desfaseRecorte.y,
+    w: (r.dw / rect.w) * (1 - rec.izq - rec.der),
+    h: (r.dh / rect.h) * (1 - rec.arr - rec.aba),
+  }
 
   return (
     <div ref={rootRef} className="pointer-events-none absolute inset-0">
@@ -192,7 +216,10 @@ export default function ClipOverlay() {
         onMouseDown={(e) => iniciarArrastre(e, activo.id, { x: enc.x, y: enc.y }, { w: caja.w, h: caja.h })}
         onDoubleClick={(e) => {
           e.stopPropagation()
-          resetEncuadre(activo.id)
+          // doble clic sobre un clip ya recortado abre su recorte en el visor para
+          // retocarlo, sin desplegar el panel de la derecha. si no tiene recorte, no
+          // pasa nada (antes esto recolocaba y agrandaba el video, que no era lo pedido)
+          if (hayRecorte(activo.recorte)) setRecorteRapido(true)
         }}
         className="pointer-events-auto absolute cursor-move rounded-[2px] outline outline-2 outline-brand"
         style={{
@@ -205,7 +232,9 @@ export default function ClipOverlay() {
           transform: enc.rotacion ? `rotate(${enc.rotacion}deg)` : undefined,
         }}
       >
-        <Tiradores onAgarrar={(a, e) => iniciarRedimension(e, activo.id, a, caja, enc.escala)} />
+        <Tiradores
+          onAgarrar={(a, e) => iniciarRedimension(e, activo.id, a, cajaRecorte, enc.escala, desfaseRecorte)}
+        />
         <ManijaGiro onAgarrar={(e) => iniciarGiroClip(e, activo.id)} />
       </div>
     </div>

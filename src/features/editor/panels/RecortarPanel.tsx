@@ -17,12 +17,15 @@ export default function RecortarPanel() {
 
   const clip = clips.find((c) => c.id === clipSeleccionado)
 
-  // al pasar a círculo, el recorte se cuadra alrededor de su centro para que salga
-  // redondo de verdad. el lado cuadrado se saca del más corto de los dos, usando la
-  // resolución del video (su aspecto), que es como se ve en pantalla
+  // al pasar a una forma redonda (círculo nítido o círculo difuminado), el recorte
+  // se cuadra alrededor de su centro para que salga redondo de verdad. el lado
+  // cuadrado se saca del más corto de los dos, usando la resolución del video (su
+  // aspecto), que es como se ve en pantalla. el círculo difuminado nace además con
+  // algo de degradado en el borde, que es lo que lo distingue del nítido
   function elegirForma(v: 'rectangulo' | 'elipse' | 'circulo') {
     if (!clip) return
-    if (v !== 'circulo') {
+    const redondo = v === 'circulo' || v === 'elipse'
+    if (!redondo) {
       recortarClipImagen(clip.id, { forma: v })
       return
     }
@@ -37,12 +40,14 @@ export default function RecortarPanel() {
     const nh = dPx / ah
     const cxf = ((r.izq ?? 0) + (1 - (r.der ?? 0))) / 2
     const cyf = ((r.arr ?? 0) + (1 - (r.aba ?? 0))) / 2
+    const degradado = v === 'elipse' && !(clip.recorte?.difuminado ?? 0) ? { difuminado: 40 } : {}
     recortarClipImagen(clip.id, {
-      forma: 'circulo',
+      forma: v,
       izq: cxf - nw / 2,
       der: 1 - (cxf + nw / 2),
       arr: cyf - nh / 2,
       aba: 1 - (cyf + nh / 2),
+      ...degradado,
     })
   }
 
@@ -73,7 +78,7 @@ export default function RecortarPanel() {
           opciones={[
             { valor: 'rectangulo', etiqueta: 'Rectángulo' },
             { valor: 'circulo', etiqueta: 'Círculo' },
-            { valor: 'elipse', etiqueta: 'Óvalo' },
+            { valor: 'elipse', etiqueta: 'Difuminado' },
           ]}
           onChange={(v) => elegirForma(v as 'rectangulo' | 'elipse' | 'circulo')}
         />
@@ -106,9 +111,18 @@ export default function RecortarPanel() {
       )}
 
       <p className="text-[11px] leading-relaxed text-[color:var(--muted)]">
-        Con <b className="text-brand">Alt</b> el recuadro se cierra por los dos costados a la vez,
-        midiendo desde el centro. La tecla <b className="text-brand">C</b> abre esta herramienta
-        sobre lo que tengas elegido.
+        {esOvalo ? (
+          <>
+            El círculo y el difuminado nacen redondos. Con <b className="text-brand">Alt</b> se libera
+            el lado que arrastras y puedes estirarlos a un óvalo.{' '}
+          </>
+        ) : (
+          <>
+            Con <b className="text-brand">Alt</b> el recuadro se cierra por los dos costados a la vez,
+            midiendo desde el centro.{' '}
+          </>
+        )}
+        La tecla <b className="text-brand">C</b> abre esta herramienta sobre lo que tengas elegido.
       </p>
 
       {hayRecorte(rec) && (
