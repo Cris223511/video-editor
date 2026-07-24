@@ -60,6 +60,7 @@ export default function EffectsPanel() {
   const actualizarEfecto = useEditorStore((s) => s.actualizarEfecto)
   const quitarEfecto = useEditorStore((s) => s.quitarEfecto)
   const reordenarEfecto = useEditorStore((s) => s.reordenarEfecto)
+  const reemplazarEfecto = useEditorStore((s) => s.reemplazarEfecto)
   const setTransicionEfecto = useEditorStore((s) => s.setTransicionEfecto)
 
   const medios = useProjectStore((s) => s.medios)
@@ -76,6 +77,9 @@ export default function EffectsPanel() {
   // qué fila tiene abierto su panel de ajustes. solo una a la vez, para no llenar
   // todo de mandos flotantes
   const [ajustesDe, setAjustesDe] = useState<string | null>(null)
+  // fila que está esperando su reemplazo: mientras hay una, el catálogo cambia ese
+  // efecto en lugar de sumar uno nuevo. null cuando no se está reemplazando nada
+  const [reemplazandoId, setReemplazandoId] = useState<string | null>(null)
 
   if (!clip) {
     return (
@@ -90,9 +94,22 @@ export default function EffectsPanel() {
 
   // al elegir una muestra del catálogo se suma ese efecto como una capa nueva. si ya
   // estaba puesto no se agrega otra vez: para tener otro se elige una muestra
-  // distinta, y así clicar varias veces la misma no llena la lista de repetidos
+  // distinta, y así clicar varias veces la misma no llena la lista de repetidos.
+  // si hay una fila esperando reemplazo, la muestra elegida cambia ese efecto en su
+  // sitio en vez de agregar uno al final
   function elegir(id: string) {
     if (!clip) return
+    if (reemplazandoId) {
+      const actual = efectos.find((e) => e.id === reemplazandoId)
+      // reemplazar por el mismo o por otro que ya esté en la lista no tiene sentido
+      if (!actual || claveEfecto(actual) === claveCatalogo(id) || puestos.has(claveCatalogo(id))) {
+        setReemplazandoId(null)
+        return
+      }
+      reemplazarEfecto(clip.id, reemplazandoId, { ...crearEfecto(id), id: reemplazandoId })
+      setReemplazandoId(null)
+      return
+    }
     if (puestos.has(claveCatalogo(id))) return
     agregarEfecto(clip.id, crearEfecto(id))
   }
@@ -105,6 +122,8 @@ export default function EffectsPanel() {
         videoUrl={videoUrl}
         tiempo={tiempoFrame}
         puestos={puestos}
+        reemplazando={!!reemplazandoId}
+        onCancelarReemplazo={() => setReemplazandoId(null)}
         onElegir={elegir}
       />
 
@@ -127,11 +146,17 @@ export default function EffectsPanel() {
                   primero={i === 0}
                   ultimo={i === efectos.length - 1}
                   abierto={ajustesDe === e.id}
+                  reemplazando={reemplazandoId === e.id}
                   onAbrir={() => setAjustesDe((prev) => (prev === e.id ? null : e.id))}
+                  onReemplazar={() => {
+                    setReemplazandoId((prev) => (prev === e.id ? null : e.id))
+                    setAjustesDe(null)
+                  }}
                   onCambiar={(cambios) => actualizarEfecto(clip.id, e.id, cambios)}
                   onQuitar={() => {
                     quitarEfecto(clip.id, e.id)
                     if (ajustesDe === e.id) setAjustesDe(null)
+                    if (reemplazandoId === e.id) setReemplazandoId(null)
                   }}
                   onSubir={() => reordenarEfecto(clip.id, e.id, -1)}
                   onBajar={() => reordenarEfecto(clip.id, e.id, 1)}
@@ -181,7 +206,9 @@ function FilaEfecto({
   primero,
   ultimo,
   abierto,
+  reemplazando,
   onAbrir,
+  onReemplazar,
   onCambiar,
   onQuitar,
   onSubir,
@@ -191,7 +218,9 @@ function FilaEfecto({
   primero: boolean
   ultimo: boolean
   abierto: boolean
+  reemplazando: boolean
   onAbrir: () => void
+  onReemplazar: () => void
   onCambiar: (cambios: Partial<EfectoClip>) => void
   onQuitar: () => void
   onSubir: () => void
@@ -226,7 +255,11 @@ function FilaEfecto({
       <div
         className={[
           'flex items-center gap-2 rounded-xl border p-2.5 transition-colors',
-          abierto ? 'border-brand' : 'border-black/10 dark:border-white/10',
+          reemplazando
+            ? 'border-brand ring-2 ring-brand/40'
+            : abierto
+              ? 'border-brand'
+              : 'border-black/10 dark:border-white/10',
         ].join(' ')}
       >
         {/* flechas de reordenar, apiladas como en la cabecera de un carril */}
@@ -263,6 +296,19 @@ function FilaEfecto({
             ].join(' ')}
           >
             <Icon name="ajustes" size={15} />
+          </button>
+        </Tooltip>
+        <Tooltip texto={reemplazando ? 'Cancelar el reemplazo' : 'Reemplazar por otro efecto'} lado="izquierda">
+          <button
+            onClick={onReemplazar}
+            aria-label="Reemplazar el efecto"
+            aria-pressed={reemplazando}
+            className={[
+              'interactivo grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors',
+              reemplazando ? 'bg-brand text-white' : 'text-[color:var(--muted)] hover:bg-brand/10 hover:text-brand',
+            ].join(' ')}
+          >
+            <Icon name="reemplazar" size={15} />
           </button>
         </Tooltip>
         <Tooltip texto="Quitar el efecto" lado="izquierda">
@@ -342,12 +388,16 @@ function Catalogo({
   videoUrl,
   tiempo,
   puestos,
+  reemplazando,
+  onCancelarReemplazo,
   onElegir,
 }: {
   miniatura?: string
   videoUrl?: string
   tiempo: number
   puestos: Set<string>
+  reemplazando: boolean
+  onCancelarReemplazo: () => void
   onElegir: (id: string) => void
 }) {
   const [categoria, setCategoria] = useState(CATEGORIAS_EFECTO[0].id)
@@ -361,7 +411,22 @@ function Catalogo({
 
   return (
     <div className="flex flex-col gap-3">
-      <span className="text-xs font-medium text-[color:var(--muted)]">Catálogo de efectos</span>
+      {/* mientras se reemplaza, el título del catálogo cambia por un aviso claro con
+          su botón de cancelar, para que se note que la próxima muestra sustituye en
+          vez de agregar */}
+      {reemplazando ? (
+        <div className="flex items-center justify-between gap-2 rounded-lg bg-brand/10 px-2.5 py-1.5">
+          <span className="text-[11px] font-medium text-brand">Elige el efecto de reemplazo</span>
+          <button
+            onClick={onCancelarReemplazo}
+            className="interactivo text-[11px] font-medium text-[color:var(--muted)] hover:text-brand"
+          >
+            Cancelar
+          </button>
+        </div>
+      ) : (
+        <span className="text-xs font-medium text-[color:var(--muted)]">Catálogo de efectos</span>
+      )}
       <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
         {CATEGORIAS_EFECTO.map((c) => (
           <button
