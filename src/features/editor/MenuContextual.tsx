@@ -15,6 +15,7 @@ import {
   Waves,
 } from 'lucide-react'
 import { useEditorStore, Herramienta } from '../../store/useEditorStore'
+import { useSepararAudio } from './useSepararAudio'
 
 // una entrada del menú. separadorAntes dibuja una raya encima para agrupar, y
 // peligro pinta en rojo lo que destruye algo
@@ -45,6 +46,7 @@ export default function MenuContextual() {
   const audios = useEditorStore((s) => s.audios)
   const audioRegiones = useEditorStore((s) => s.audioRegiones)
   const portapapeles = useEditorStore((s) => s.portapapeles)
+  const { separar } = useSepararAudio()
 
   const caja = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
@@ -121,7 +123,7 @@ export default function MenuContextual() {
         desactivada: !!clip.mudo,
         onElegir: con(() => st.alternarSilencioClip(clip.id)),
       },
-      { id: 'separar', etiqueta: 'Separar el audio', icono: <Waves size={15} />, desactivada: !!clip.mudo, onElegir: con(() => { st.seleccionar(clip.id); st.setHerramienta('audio') }) },
+      { id: 'separar', etiqueta: 'Separar el audio', icono: <Waves size={15} />, desactivada: !!clip.mudo, onElegir: con(() => separar(clip)) },
       { id: 'borrar', etiqueta: 'Borrar', icono: <Trash2 size={15} />, atajo: 'Supr', peligro: true, separadorAntes: true, onElegir: con(() => st.quitarClip(clip.id)) },
     )
   }

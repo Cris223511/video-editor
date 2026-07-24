@@ -22,6 +22,7 @@ export default function ClipOverlay() {
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
   const actualizarEncuadre = useEditorStore((s) => s.actualizarEncuadre)
   const resetEncuadre = useEditorStore((s) => s.resetEncuadre)
+  const setMoviendoVisor = useEditorStore((s) => s.setMoviendoVisor)
   const medios = useProjectStore((s) => s.medios)
 
   const rootRef = useRef<HTMLDivElement>(null)
@@ -74,6 +75,7 @@ export default function ClipOverlay() {
     tamCaja: { w: number; h: number },
   ) {
     e.stopPropagation()
+    setMoviendoVisor(true)
     const inicio = normalizar(e.nativeEvent)
     const mover = (ev: globalThis.MouseEvent) => {
       const p = normalizar(ev)
@@ -89,6 +91,7 @@ export default function ClipOverlay() {
     }
     const soltar = () => {
       setGuias([])
+      setMoviendoVisor(false)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
@@ -108,6 +111,7 @@ export default function ClipOverlay() {
   ) {
     e.stopPropagation()
     e.preventDefault()
+    setMoviendoVisor(true)
     const mover = (ev: globalThis.MouseEvent) => {
       const p = normalizar(ev)
       const n = redimensionar(caja, ancla, p.x, p.y, true, 0.02)
@@ -115,6 +119,7 @@ export default function ClipOverlay() {
       actualizarEncuadre(id, { x: n.x, y: n.y, escala: escalaBase * factor })
     }
     const soltar = () => {
+      setMoviendoVisor(false)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
@@ -132,10 +137,12 @@ export default function ClipOverlay() {
     const cr = cajaEl.getBoundingClientRect()
     const cx = cr.left + cr.width / 2
     const cy = cr.top + cr.height / 2
+    setMoviendoVisor(true)
     const mover = (ev: globalThis.MouseEvent) => {
       actualizarEncuadre(id, { rotacion: anguloGiro(cx, cy, ev) })
     }
     const soltar = () => {
+      setMoviendoVisor(false)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
@@ -156,6 +163,16 @@ export default function ClipOverlay() {
   const r = rectClip(asset.ancho, asset.alto, rect.w, rect.h, enc)
   // caja del clip en fracción del lienzo, que es lo que espera el redimensionado
   const caja = { x: enc.x, y: enc.y, w: r.dw / rect.w, h: r.dh / rect.h }
+  // si el clip está recortado, el contorno de selección se ciñe al área que queda
+  // (lo que de verdad se ve), no al tamaño completo del video. así los tiradores
+  // rodean lo recortado y no un marco más grande que la imagen
+  const rec = activo.recorte ?? { izq: 0, der: 0, arr: 0, aba: 0 }
+  const cajaVista = {
+    left: rect.ox + r.dx + rec.izq * r.dw,
+    top: rect.oy + r.dy + rec.arr * r.dh,
+    width: r.dw * (1 - rec.izq - rec.der),
+    height: r.dh * (1 - rec.arr - rec.aba),
+  }
 
   return (
     <div ref={rootRef} className="pointer-events-none absolute inset-0">
@@ -179,10 +196,10 @@ export default function ClipOverlay() {
         }}
         className="pointer-events-auto absolute cursor-move rounded-[2px] outline outline-2 outline-brand"
         style={{
-          left: rect.ox + r.dx,
-          top: rect.oy + r.dy,
-          width: r.dw,
-          height: r.dh,
+          left: cajaVista.left,
+          top: cajaVista.top,
+          width: cajaVista.width,
+          height: cajaVista.height,
           // la caja gira con el video alrededor de su centro, para que la selección
           // acompañe a la imagen rotada
           transform: enc.rotacion ? `rotate(${enc.rotacion}deg)` : undefined,

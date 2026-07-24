@@ -41,7 +41,12 @@ export function mezclarTono(t: AjusteTono, mix: number): AjusteTono {
 export function mezclarEfectos(efectos: EfectoClip[], mix: number): EfectoClip[] {
   if (mix >= 1) return efectos
   const m = Math.max(0, mix)
-  return efectos.map((e) => ({ ...e, intensidad: e.intensidad * m }))
+  return efectos.map((e) => {
+    // la nitidez y el brillo llevan sus dos mandos propios en lugar de una sola
+    // intensidad, así que su aparición progresiva escala los dos a la vez
+    if (e.tipo === 'nitidez-brillo') return { ...e, nitidez: e.nitidez * m, brillo: e.brillo * m }
+    return { ...e, intensidad: e.intensidad * m }
+  })
 }
 
 // factor de aparición del color y los efectos de un clip en un instante dado. sin

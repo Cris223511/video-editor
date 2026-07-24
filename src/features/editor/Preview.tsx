@@ -1,4 +1,4 @@
-import { Fragment, MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { createElement, Fragment, ReactElement, MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '../../components/ui/Icon'
 import CapasOverlay from './overlays/CapasOverlay'
 import ClipOverlay from './overlays/ClipOverlay'
@@ -27,6 +27,18 @@ import {
 } from '../../lib/color/tono'
 import { anterior, posterior, pintarTransicion, progreso, progresoSalida } from '../../lib/transiciones/pintar'
 import { cssEfectos } from '../../lib/efectos/catalogo'
+import { paramsNB, nodosFiltroNB, NodoFiltro } from '../../lib/efectos/nitidezBrillo'
+
+// pinta un nodo del filtro de nitidez y brillo (y sus hijos) como elemento svg.
+// la receta viene en datos desde el helper, la misma que usa la exportación, así
+// que el visor y el archivo salen idénticos
+function pintarNodoNB(n: NodoFiltro, clave: number): ReactElement {
+  return createElement(
+    n.tag,
+    { key: clave, ...n.attrs },
+    n.children?.map((h, i) => pintarNodoNB(h, i)),
+  )
+}
 import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../../lib/color/mezcla'
 import { estiloRecorte, vinetaRecorte } from '../../lib/layers/recorteMascara'
 import { buscarTransicion } from '../../lib/transiciones/catalogo'
@@ -40,6 +52,13 @@ export default function Preview() {
   const clips = useEditorStore((s) => s.pista.clips)
   const playhead = useEditorStore((s) => s.playhead)
   const reproduciendo = useEditorStore((s) => s.reproduciendo)
+  const moviendoVisor = useEditorStore((s) => s.moviendoVisor)
+  // mientras se edita el recorte de un clip, ese clip se muestra entero (sin
+  // aplicar todavía el recorte al video), para poder ver lo que se va a dejar fuera
+  // y ajustarlo; la sombra del overlay de recorte es la que oscurece esa parte
+  const herramienta = useEditorStore((s) => s.herramienta)
+  const categoriaClip = useEditorStore((s) => s.categoriaClip)
+  const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
   const irA = useEditorStore((s) => s.irA)
   const pausar = useEditorStore((s) => s.pausar)
   const seleccionar = useEditorStore((s) => s.seleccionar)
@@ -356,6 +375,25 @@ export default function Preview() {
       const v = videosRef.current.get(act.id)
       if (!v) {
         raf = requestAnimationFrame(paso)
+        return
+      }
+      // fin del clip, en el tiempo del video (fin del recorte) y en el del montaje.
+      // si este clip es lo último de la línea de tiempo y su video ya se terminó, la
+      // reproducción se detiene aquí y se queda clavada en el último fotograma. sin
+      // esta guarda, un video que acaba un pelín antes de que el cabezal alcance el
+      // total se volvía a mandar reproducir, y darle play a un video ya terminado lo
+      // reinicia desde cero: de ahí que la reproducción "volviera sola al inicio"
+      const finUsoClip = act.recorteInicio + act.duracion * act.velocidad
+      const finClip = act.inicio + act.duracion
+      if (!grabando && finClip >= total - 0.02 && (v.ended || v.currentTime >= finUsoClip - 0.03)) {
+        v.pause()
+        irA(total)
+        pausar()
+        videosRef.current.forEach((el) => {
+          if (!el.paused) el.pause()
+        })
+        const fondoFin = fondoRef.current
+        if (fondoFin && !fondoFin.paused) fondoFin.pause()
         return
       }
       clipsOrdenados.forEach((c) => {
@@ -753,7 +791,7 @@ export default function Preview() {
       const mix = mixEntradaEfecto(c.inicio, c.transicionEfecto, playhead)
       return { clip: c, tono: mezclarTono(c.tono, mix), efectos: mezclarEfectos(c.efectos ?? [], mix) }
     })
-    .filter((x) => usaMatriz(x.tono) || hayEfectoFiltro(x.efectos))
+    .filter((x) => usaMatriz(x.tono) || hayEfectoFiltro(x.efectos) || paramsNB(x.efectos))
 
   const hayContenido = clipsOrdenados.length > 0 || hayCapas
 
@@ -936,9 +974,17 @@ export default function Preview() {
                 // clip-path duro y el óvalo con una máscara radial que, difuminada,
                 // deja el borde suave y transparente. la viñeta blanca opcional va
                 // en una capa aparte encima, recortada por la misma silueta
-                const recEstilo = estiloRecorte(c.recorte)
+                // mientras la herramienta de recortar está abierta sobre este clip,
+                // el recorte no se aplica al video: se ve entero y la parte de fuera
+                // la oscurece la sombra del overlay, para poder cuadrar el recorte
+                // viendo lo que se descarta. al cerrar el recorte, vuelve a aplicarse
+                const editandoRecorte =
+                  (herramienta === 'recortar' || categoriaClip === 'recortar') && clipSeleccionado === c.id
+                const recEstilo = editandoRecorte
+                  ? { clipPath: undefined, maskImage: undefined, WebkitMaskImage: undefined }
+                  : estiloRecorte(c.recorte)
                 const clipPath = recEstilo.clipPath
-                const vineta = vinetaRecorte(c.recorte)
+                const vineta = editandoRecorte ? null : vinetaRecorte(c.recorte)
                 return (
                   <Fragment key={c.id}>
                   <video
@@ -971,13 +1017,29 @@ export default function Preview() {
                       // así que el suavizado css sobra y solo dejaría estela; sin esa
                       // transición sí conviene, para que aplicar un color a mano entre
                       // con calma
-                      transition: mezclaEfecto.animando
-                        ? 'transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1)'
-                        : 'filter 320ms cubic-bezier(0.4, 0, 0.2, 1), transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1)',
-                      filter:
-                        esTonoNeutro(mezclaEfecto.tono) && !hayEfectoFiltro(mezclaEfecto.efectos)
-                          ? undefined
-                          : `${filtroCss(mezclaEfecto.tono, `tono-${c.id}`, mezclaEfecto.efectos)} ${cssEfectos(mezclaEfecto.efectos)}`.trim(),
+                      // al arrastrar, redimensionar o girar el elemento en el visor
+                      // se quita el suavizado del transform para que siga al cursor
+                      // uno a uno; fuera de ese gesto vuelve la transición que hace
+                      // que aplicar un giro o un encuadre a mano entre con calma
+                      transition: moviendoVisor
+                        ? 'filter 320ms cubic-bezier(0.4, 0, 0.2, 1)'
+                        : mezclaEfecto.animando
+                          ? 'transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1)'
+                          : 'filter 320ms cubic-bezier(0.4, 0, 0.2, 1), transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1)',
+                      filter: (() => {
+                        const partes: string[] = []
+                        // color y desenfoque de movimiento van juntos en el filtro
+                        // svg del clip; sin ellos no hace falta esa parte
+                        if (!esTonoNeutro(mezclaEfecto.tono) || hayEfectoFiltro(mezclaEfecto.efectos)) {
+                          partes.push(filtroCss(mezclaEfecto.tono, `tono-${c.id}`, mezclaEfecto.efectos))
+                        }
+                        const css = cssEfectos(mezclaEfecto.efectos)
+                        if (css) partes.push(css)
+                        // la nitidez y el brillo se enganchan al final, en su propio
+                        // filtro, para que afilen y hagan resplandecer lo ya corregido
+                        if (paramsNB(mezclaEfecto.efectos)) partes.push(`url(#nb-${c.id})`)
+                        return partes.join(' ') || undefined
+                      })(),
                     }}
                   />
                   {/* viñeta blanca interior del óvalo, si la lleva. sigue el mismo
@@ -1018,8 +1080,15 @@ export default function Preview() {
                   {filtrosClip.map(({ clip: c, tono, efectos }) => {
                     const tablas = tablasColor(tono)
                     const desenfoques = stdDeviationsDesenfoque(efectos)
+                    const nb = paramsNB(efectos)
                     return (
-                      <filter key={c.id} id={`tono-${c.id}`} colorInterpolationFilters="sRGB">
+                      <Fragment key={c.id}>
+                      {nb && (
+                        <filter id={`nb-${c.id}`} colorInterpolationFilters="sRGB">
+                          {nodosFiltroNB(nb).map((n, i) => pintarNodoNB(n, i))}
+                        </filter>
+                      )}
+                      <filter id={`tono-${c.id}`} colorInterpolationFilters="sRGB">
                         {usaMatriz(tono) && (
                           <feColorMatrix type="matrix" values={matrizTono(tono)} />
                         )}
@@ -1039,6 +1108,7 @@ export default function Preview() {
                           <feGaussianBlur key={i} stdDeviation={sd} edgeMode="duplicate" />
                         ))}
                       </filter>
+                      </Fragment>
                     )
                   })}
                 </defs>

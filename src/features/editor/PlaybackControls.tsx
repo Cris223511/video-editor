@@ -42,40 +42,48 @@ export default function PlaybackControls({
         visorCompleto ? 'mt-3' : 'border-t border-black/10 dark:border-white/10',
       ].join(' ')}
     >
-      <button
-        onClick={() => irA(0)}
-        title="Ir al inicio"
-        disabled={vacio}
-        className="grid h-9 w-9 place-items-center rounded-lg text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)] disabled:opacity-40"
-      >
-        <Icon name="inicio" size={18} />
-      </button>
-      <button
-        onClick={() => irA(Math.max(0, playhead - SALTO))}
-        title="Retroceder 5 segundos"
-        disabled={!puedeAtras}
-        className="relative grid h-9 w-9 place-items-center rounded-lg text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)] disabled:pointer-events-none disabled:opacity-40"
-      >
-        <RotateCcw size={19} />
-        <span className="absolute text-[8px] font-bold leading-none">5</span>
-      </button>
-      <button
-        onClick={alternar}
-        title={reproduciendo ? 'Pausar' : 'Reproducir'}
-        disabled={vacio}
-        className="grid h-11 w-11 place-items-center rounded-full bg-brand text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95 disabled:opacity-40"
-      >
-        <Icon name={reproduciendo ? 'pausa' : 'play'} size={20} />
-      </button>
-      <button
-        onClick={() => irA(Math.min(total, playhead + SALTO))}
-        title="Avanzar 5 segundos"
-        disabled={!puedeAdelante}
-        className="relative grid h-9 w-9 place-items-center rounded-lg text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)] disabled:pointer-events-none disabled:opacity-40"
-      >
-        <RotateCw size={19} />
-        <span className="absolute text-[8px] font-bold leading-none">5</span>
-      </button>
+      <Tooltip texto="Ir al inicio" lado="arriba">
+        <button
+          onClick={() => irA(0)}
+          aria-label="Ir al inicio"
+          disabled={vacio}
+          className="grid h-9 w-9 place-items-center rounded-lg text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)] disabled:opacity-40"
+        >
+          <Icon name="inicio" size={18} />
+        </button>
+      </Tooltip>
+      <Tooltip texto="Retroceder 5 segundos" lado="arriba">
+        <button
+          onClick={() => irA(Math.max(0, playhead - SALTO))}
+          aria-label="Retroceder 5 segundos"
+          disabled={!puedeAtras}
+          className="relative grid h-9 w-9 place-items-center rounded-lg text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)] disabled:pointer-events-none disabled:opacity-40"
+        >
+          <RotateCcw size={19} />
+          <span className="absolute text-[8px] font-bold leading-none">5</span>
+        </button>
+      </Tooltip>
+      <Tooltip texto={reproduciendo ? 'Pausar' : 'Reproducir'} atajo="Espacio" lado="arriba">
+        <button
+          onClick={alternar}
+          aria-label={reproduciendo ? 'Pausar' : 'Reproducir'}
+          disabled={vacio}
+          className="grid h-11 w-11 place-items-center rounded-full bg-brand text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95 disabled:opacity-40"
+        >
+          <Icon name={reproduciendo ? 'pausa' : 'play'} size={20} />
+        </button>
+      </Tooltip>
+      <Tooltip texto="Avanzar 5 segundos" lado="arriba">
+        <button
+          onClick={() => irA(Math.min(total, playhead + SALTO))}
+          aria-label="Avanzar 5 segundos"
+          disabled={!puedeAdelante}
+          className="relative grid h-9 w-9 place-items-center rounded-lg text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)] disabled:pointer-events-none disabled:opacity-40"
+        >
+          <RotateCw size={19} />
+          <span className="absolute text-[8px] font-bold leading-none">5</span>
+        </button>
+      </Tooltip>
       <div className="min-w-[104px] text-center font-mono text-sm tabular-nums text-[color:var(--muted)]">
         {formatearDuracion(playhead)} / {formatearDuracion(total)}
       </div>

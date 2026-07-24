@@ -27,13 +27,17 @@ function filtroMuestra(t: AjusteTono): string {
 export default function PresetsColor({
   tono,
   miniatura,
+  videoUrl,
   onAplicar,
 }: {
   tono: AjusteTono
   miniatura?: string
+  // si el clip es de video, su url para reproducir la muestra al pasar el cursor
+  videoUrl?: string
   onAplicar: (t: AjusteTono) => void
 }) {
   const [categoria, setCategoria] = useState(CATEGORIAS_PRESET[0].id)
+  const [encima, setEncima] = useState<string | null>(null)
   const actual = CATEGORIAS_PRESET.find((c) => c.id === categoria) ?? CATEGORIAS_PRESET[0]
 
   const fondo = miniatura
@@ -65,25 +69,40 @@ export default function PresetsColor({
         ))}
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {actual.presets.map((p) => {
           const puesto = presetAplicado(tono, p)
           return (
             <button
               key={p.id}
               onClick={() => onAplicar(p.tono)}
+              onMouseEnter={() => setEncima(p.id)}
+              onMouseLeave={() => setEncima(null)}
               title={p.nombre}
               className="group flex flex-col gap-1 text-left"
             >
               <span
                 className={[
-                  'block h-12 w-full overflow-hidden rounded-lg border transition-all duration-150',
+                  'relative block h-14 w-full overflow-hidden rounded-lg border transition-all duration-150',
                   puesto
                     ? 'border-brand ring-2 ring-brand/40'
                     : 'border-black/10 group-hover:border-brand dark:border-white/10',
                 ].join(' ')}
                 style={{ ...fondo, filter: filtroMuestra(p.tono) }}
-              />
+              >
+                {/* al pasar el cursor, la muestra reproduce el propio video con el
+                    color ya aplicado (el filtro de arriba lo tiñe por ser su hijo) */}
+                {encima === p.id && videoUrl && (
+                  <video
+                    src={videoUrl}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                )}
+              </span>
               <span
                 className={[
                   'truncate text-[10px] leading-tight transition-colors',

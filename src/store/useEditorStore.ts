@@ -300,6 +300,11 @@ interface EstadoEditor {
   // mueve o recorta un bloque. queda en null cuando no hay ningún enganche activo
   guiaImantado: number | null
   setGuiaImantado: (segundo: number | null) => void
+  // true mientras se arrastra, redimensiona o recorta un elemento en el visor. el
+  // visor lo usa para quitar el suavizado del transform durante el gesto, para que
+  // la imagen siga al cursor uno a uno en vez de ir con retraso
+  moviendoVisor: boolean
+  setMoviendoVisor: (v: boolean) => void
   alternarSilencioPista: (indice: number) => void
   alternarOcultarPista: (indice: number) => void
   alternarBloquearPista: (indice: number) => void
@@ -961,6 +966,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       dibujandoMascara: false,
       insercionPista: null,
       guiaImantado: null,
+      moviendoVisor: false,
       pasado: [],
       futuro: [],
     }),
@@ -1610,6 +1616,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   setArrastreVivo: (a) => set({ arrastreVivo: a }),
   setGuiaImantado: (segundo) => set({ guiaImantado: segundo }),
+
+  moviendoVisor: false,
+  setMoviendoVisor: (v) => set({ moviendoVisor: v }),
 
   // al eliminar un nivel se van con él sus clips, y los que estaban por encima
   // bajan una posición para que no queden filas huecas en medio. su alto y sus
@@ -2678,6 +2687,14 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   for (const nombre of ACCIONES_DOCUMENTO) {
     const original = tabla[nombre]
     tabla[nombre] = (...args: unknown[]) => {
+      // tocar el clip mientras corre (ponerle un efecto, cambiarle el color, moverlo,
+      // lo que sea) detiene la reproducción: uno quiere ver el cambio quieto, no que
+      // siga pasando el video por debajo. la grabación de movimiento se queda fuera a
+      // propósito, porque ahí sí se edita a la vez que se reproduce
+      const st = get()
+      if (st.reproduciendo && !st.grabandoMovimiento && !st.grabacionActiva) {
+        set({ reproduciendo: false })
+      }
       preparar()
       return original(...args)
     }

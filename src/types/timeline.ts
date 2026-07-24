@@ -36,7 +36,22 @@ export interface EfectoFiltro {
   intensidad: number // 0 a 100
 }
 
-export type EfectoClip = { id: string } & (EfectoDesenfoque | EfectoFiltro)
+// realce de nitidez más un resplandor en las luces, el aspecto marcado y brillante
+// de los clips de juego. lleva dos mandos aparte porque son cosas distintas: la
+// nitidez afila los bordes (convolución) y el brillo difumina las zonas claras y
+// las suma encima (bloom). se resuelve con un filtro svg, igual que el desenfoque
+// de movimiento, así que se ve idéntico en el visor y en el archivo exportado
+export interface EfectoNitidezBrillo {
+  tipo: 'nitidez-brillo'
+  nitidez: number // 0 a 100
+  brillo: number // 0 a 100
+}
+
+export type EfectoClip = { id: string } & (
+  | EfectoDesenfoque
+  | EfectoFiltro
+  | EfectoNitidezBrillo
+)
 
 // encuadre del clip dentro del lienzo. x e y son el centro del video en
 // coordenadas del lienzo, de 0 a 1, con 0.5 en el medio; escala multiplica el
@@ -117,8 +132,9 @@ export interface RecorteRel {
   arr: number
   aba: number
   // forma del recorte dentro del recuadro. rectángulo es el de siempre; elipse
-  // inscribe un óvalo en el recuadro. sin definir equivale a rectángulo
-  forma?: 'rectangulo' | 'elipse'
+  // inscribe un óvalo en el recuadro; círculo es un óvalo obligado a ser redondo
+  // (el recuadro se mantiene cuadrado en pantalla). sin definir equivale a rectángulo
+  forma?: 'rectangulo' | 'elipse' | 'circulo'
   // suavizado del borde hacia transparente, de 0 a 100. con 0 el corte es limpio;
   // subiéndolo, el borde se difumina y deja ver lo que hay debajo. aplica al óvalo
   difuminado?: number

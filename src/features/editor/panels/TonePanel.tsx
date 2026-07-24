@@ -86,6 +86,18 @@ export default function TonePanel() {
     aplicar({ ruedas: { ...ruedas, [zona]: p } })
   }
 
+  // devuelve las tres ruedas al centro sin tocar el resto de la corrección, con
+  // copias frescas de cada punto para no compartir referencia con la constante
+  function restablecerRuedas() {
+    aplicar({
+      ruedas: {
+        sombras: { ...RUEDAS_NEUTRAS.sombras },
+        medios: { ...RUEDAS_NEUTRAS.medios },
+        altas: { ...RUEDAS_NEUTRAS.altas },
+      },
+    })
+  }
+
   function cambiarCurva(c: keyof Curvas, p: PuntoCurva[]) {
     aplicar({ curvas: { ...curvas, [c]: p } })
   }
@@ -106,9 +118,10 @@ export default function TonePanel() {
 
   // miniatura del material elegido, para que las muestras se vean sobre el propio
   // video en lugar de sobre un ejemplo cualquiera
-  const miniatura = clip
-    ? medios.find((m) => m.id === clip.assetId)?.miniatura
-    : capaImagen?.src
+  const medioClip = clip ? medios.find((m) => m.id === clip.assetId) : undefined
+  const miniatura = clip ? medioClip?.miniatura : capaImagen?.src
+  // el video del clip, para reproducir cada muestra de color al pasar el cursor
+  const videoUrl = medioClip?.clase === 'video' ? medioClip.url : undefined
 
   return (
     <div className="flex flex-col gap-4">
@@ -118,12 +131,18 @@ export default function TonePanel() {
         </div>
         {/* un preset solo rellena los ajustes de abajo, así que después se puede
             seguir afinando a mano sin perder nada */}
-        <PresetsColor tono={tono} miniatura={miniatura} onAplicar={(t) => aplicar(t)} />
+        <PresetsColor tono={tono} miniatura={miniatura} videoUrl={videoUrl} onAplicar={(t) => aplicar(t)} />
       </div>
 
       <div>
-        <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="mb-2 flex items-center justify-between gap-2">
           <span className="text-xs font-medium text-[color:var(--muted)]">Ruedas de color</span>
+          <button
+            onClick={restablecerRuedas}
+            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-[color:var(--muted)] transition-colors hover:text-brand"
+          >
+            <Icon name="restablecer" size={14} /> Restablecer ruedas
+          </button>
         </div>
         <div className="flex justify-between gap-2">
           {ZONAS.map((z) => (

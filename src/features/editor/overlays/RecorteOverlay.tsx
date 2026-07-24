@@ -57,6 +57,9 @@ export default function RecorteOverlay() {
 
   const rootRef = useRef<HTMLDivElement>(null)
   const [tam, setTam] = useState({ w: 0, h: 0 })
+  // ejes en los que el recorte quedó centrado mientras se arrastra, para pintar la
+  // línea guía que ayuda a cuadrarlo, igual que al mover el elemento entero
+  const [guias, setGuias] = useState<('x' | 'y')[]>([])
 
   useEffect(() => {
     const el = rootRef.current
@@ -131,6 +134,33 @@ export default function RecorteOverlay() {
     h: caja.h * (1 - rec.arr - rec.aba),
   }
 
+  // forma elegida y tamaño del recorte en píxeles reales del material (no de la
+  // pantalla), para mostrarlo como referencia mientras se ajusta. el video sale de
+  // su resolución nativa; la imagen, de la suya
+  // la forma (rectángulo, círculo, óvalo) vive en el recorte del clip de video; la
+  // imagen por ahora solo recorta en rectángulo, así que ahí se queda en rectángulo
+  const forma = (objetivo?.recorte?.forma ?? 'rectangulo') as 'rectangulo' | 'elipse' | 'circulo'
+  const nativoW = capaImagen ? capaImagen.anchoNatural : asset?.ancho ?? 0
+  const nativoH = capaImagen ? capaImagen.altoNatural : asset?.alto ?? 0
+  const pxW = Math.round((1 - rec.izq - rec.der) * nativoW)
+  const pxH = Math.round((1 - rec.arr - rec.aba) * nativoH)
+  // el círculo se muestra por su diámetro; el resto, ancho por alto
+  const etiquetaTam = forma === 'circulo' ? `⌀ ${Math.min(pxW, pxH)} px` : `${pxW} × ${pxH} px`
+
+  // deja el recorte cuadrado en pantalla (mismo tamaño en píxeles de visor por los
+  // dos ejes) alrededor de su centro, que es lo que hace que el óvalo salga como un
+  // círculo perfecto. el radio se acota para no salirse de la caja del elemento
+  function recorteCircular(radioPx: number): Partial<typeof CERO> {
+    const cxf = (rec.izq + (1 - rec.der)) / 2
+    const cyf = (rec.arr + (1 - rec.aba)) / 2
+    const maxPx = Math.min(cxf, 1 - cxf) * caja.w
+    const maxPy = Math.min(cyf, 1 - cyf) * caja.h
+    const r = Math.max(6, Math.min(radioPx, maxPx, maxPy))
+    const hw = r / caja.w
+    const hh = r / caja.h
+    return { izq: cxf - hw, der: 1 - (cxf + hw), arr: cyf - hh, aba: 1 - (cyf + hh) }
+  }
+
   // guarda el recorte en el objetivo que corresponda: la imagen lo lleva como un
   // campo de la capa (acotado aquí); el clip usa su acción del store, que ya acota
   function aplicarRecorte(cambios: Partial<typeof CERO>) {
@@ -147,6 +177,17 @@ export default function RecorteOverlay() {
     if (!root) return
     const rr = root.getBoundingClientRect()
     const mover = (ev: globalThis.MouseEvent) => {
+      // el círculo se redimensiona a la vez por ancho y alto para seguir siendo
+      // redondo: el radio sale de la distancia del cursor al centro, y siempre
+      // queda un círculo perfecto centrado en su sitio
+      if (forma === 'circulo') {
+        const cxpx = caja.x + ((rec.izq + (1 - rec.der)) / 2) * caja.w
+        const cypx = caja.y + ((rec.arr + (1 - rec.aba)) / 2) * caja.h
+        const dxp = Math.abs(ev.clientX - rr.left - cxpx)
+        const dyp = Math.abs(ev.clientY - rr.top - cypx)
+        aplicarRecorte(recorteCircular(Math.max(dxp, dyp)))
+        return
+      }
       const fx = (ev.clientX - rr.left - caja.x) / caja.w
       const fy = (ev.clientY - rr.top - caja.y) / caja.h
       const cambios: Partial<typeof CERO> = {}
@@ -187,13 +228,33 @@ export default function RecorteOverlay() {
     const inicioX = e.clientX
     const inicioY = e.clientY
     const base = { ...rec }
+    // umbral de imantado al centro, en fracción de la caja. cerca de esa distancia
+    // el recorte se pega al centro y sale la guía
+    const IMAN = 0.02
     const mover = (ev: globalThis.MouseEvent) => {
       const dx = (ev.clientX - inicioX) / caja.w
       const dy = (ev.clientY - inicioY) / caja.h
       // el desplazamiento se recorta al hueco que queda a cada lado, así el ancho
       // y el alto del recorte se mantienen exactos mientras se arrastra
-      const mx = Math.max(-base.izq, Math.min(base.der, dx))
-      const my = Math.max(-base.arr, Math.min(base.aba, dy))
+      let mx = Math.max(-base.izq, Math.min(base.der, dx))
+      let my = Math.max(-base.arr, Math.min(base.aba, dy))
+      // imantado al centro: si el recorte queda casi centrado en un eje, se clava en
+      // el centro (izquierda = derecha, o arriba = abajo) y se enciende la guía. con
+      // Alt se desactiva por si hay que colocarlo justo al lado sin que salte
+      const marcas: ('x' | 'y')[] = []
+      if (!ev.altKey) {
+        const desplazadoX = base.izq + mx - (base.der - mx) // izq - der resultante
+        if (Math.abs(desplazadoX) < IMAN * 2) {
+          mx = (base.der - base.izq) / 2
+          marcas.push('x')
+        }
+        const desplazadoY = base.arr + my - (base.aba - my)
+        if (Math.abs(desplazadoY) < IMAN * 2) {
+          my = (base.aba - base.arr) / 2
+          marcas.push('y')
+        }
+      }
+      setGuias(marcas)
       aplicarRecorte({
         izq: base.izq + mx,
         der: base.der - mx,
@@ -202,6 +263,7 @@ export default function RecorteOverlay() {
       })
     }
     const soltar = () => {
+      setGuias([])
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
@@ -219,6 +281,20 @@ export default function RecorteOverlay() {
       // el recuadro y sus agarres cortan la propagación, así que solo salta aquí
       onMouseDown={() => limpiarSeleccion()}
     >
+      {/* líneas guía del centrado, visibles solo mientras se arrastra el recorte y
+          queda cuadrado en ese eje. cruzan la caja del elemento por su mitad */}
+      {guias.includes('x') && (
+        <div
+          className="pointer-events-none absolute z-10"
+          style={{ left: caja.x + caja.w / 2, top: caja.y, width: 1, height: caja.h, background: '#ff3ba7' }}
+        />
+      )}
+      {guias.includes('y') && (
+        <div
+          className="pointer-events-none absolute z-10"
+          style={{ left: caja.x, top: caja.y + caja.h / 2, width: caja.w, height: 1, background: '#ff3ba7' }}
+        />
+      )}
       {/* zona de agarre del centro: pone la manito y mueve el recorte entero. va
           debajo de los agarres, así que tirar de un borde sigue redimensionando */}
       <div
@@ -237,16 +313,29 @@ export default function RecorteOverlay() {
           top: crop.y,
           width: crop.w,
           height: crop.h,
+          // en el círculo el hueco se redondea del todo, y la misma sombra tapa el
+          // resto con esa silueta, así se ve el recorte redondo de verdad
+          borderRadius: forma === 'circulo' ? '50%' : undefined,
           boxShadow: '0 0 0 100vmax rgba(0, 0, 0, 0.5)',
         }}
       >
-        {/* guías de tercios, finísimas, para encuadrar como en una cámara */}
-        <div className="absolute inset-0">
-          <div className="absolute left-1/3 top-0 h-full w-px bg-white/25" />
-          <div className="absolute left-2/3 top-0 h-full w-px bg-white/25" />
-          <div className="absolute left-0 top-1/3 h-px w-full bg-white/25" />
-          <div className="absolute left-0 top-2/3 h-px w-full bg-white/25" />
-        </div>
+        {/* guías de tercios, finísimas, para encuadrar como en una cámara. en el
+            círculo estorban, así que ahí no salen */}
+        {forma !== 'circulo' && (
+          <div className="absolute inset-0">
+            <div className="absolute left-1/3 top-0 h-full w-px bg-white/25" />
+            <div className="absolute left-2/3 top-0 h-full w-px bg-white/25" />
+            <div className="absolute left-0 top-1/3 h-px w-full bg-white/25" />
+            <div className="absolute left-0 top-2/3 h-px w-full bg-white/25" />
+          </div>
+        )}
+        {/* tamaño del recorte en píxeles reales, arriba del recuadro */}
+        <span
+          className="absolute -top-6 left-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-white"
+          style={{ background: 'rgba(8,12,24,0.75)' }}
+        >
+          {etiquetaTam}
+        </span>
       </div>
 
       {/* agarres blancos por lados y esquinas */}

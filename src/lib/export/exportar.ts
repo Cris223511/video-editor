@@ -6,6 +6,7 @@ import { clipEnTiempo, duracionProyecto } from '../timeline/clips'
 import { gananciaEn, fundidoEn } from '../audio/ganancia'
 import { usaMatriz, matrizTono, tablasColor, stdDeviationsDesenfoque } from '../color/tono'
 import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../color/mezcla'
+import { paramsNB, nodosFiltroNB, NodoFiltro } from '../efectos/nitidezBrillo'
 import { dibujarFotograma, Escena } from './compositor'
 
 export interface DatosExport {
@@ -175,6 +176,23 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
         })
         return filtroB
       }
+      // pinta un nodo del grafo de nitidez y brillo (con sus hijos) como elemento del
+      // dom. es la misma receta en datos que usa el visor, así el archivo sale igual
+      const construirNodoNB = (n: NodoFiltro): Element => {
+        const el = document.createElementNS(NS, n.tag)
+        for (const [k, v] of Object.entries(n.attrs)) el.setAttribute(k, v)
+        n.children?.forEach((h) => el.appendChild(construirNodoNB(h)))
+        return el
+      }
+      const construirFiltroNB = (id: string, efectos: typeof clips[number]['efectos']) => {
+        const p = paramsNB(efectos ?? [])
+        if (!p) return null
+        const filtro = document.createElementNS(NS, 'filter')
+        filtro.setAttribute('id', id)
+        filtro.setAttribute('color-interpolation-filters', 'sRGB')
+        nodosFiltroNB(p).forEach((n) => filtro.appendChild(construirNodoNB(n)))
+        return filtro
+      }
 
       // filtros svg de tono (temperatura y tinte) referenciados por el compositor
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
@@ -188,6 +206,8 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
         if (fTono) defs.appendChild(fTono)
         const fBlur = construirFiltroBlur(`blurexp-${c.id}`, c.efectos)
         if (fBlur) defs.appendChild(fBlur)
+        const fNB = construirFiltroNB(`nbexp-${c.id}`, c.efectos)
+        if (fNB) defs.appendChild(fNB)
       })
 
       // rehace las defs de un clip con el tono y los efectos ya mezclados por su
@@ -199,10 +219,14 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
           const mix = mixEntradaEfecto(c.inicio, c.transicionEfecto, t)
           defs.querySelector(`#tonoexp-${c.id}`)?.remove()
           defs.querySelector(`#blurexp-${c.id}`)?.remove()
+          defs.querySelector(`#nbexp-${c.id}`)?.remove()
           const fTono = construirFiltroTono(`tonoexp-${c.id}`, mezclarTono(c.tono, mix))
           if (fTono) defs.appendChild(fTono)
-          const fBlur = construirFiltroBlur(`blurexp-${c.id}`, mezclarEfectos(c.efectos ?? [], mix))
+          const efectosMix = mezclarEfectos(c.efectos ?? [], mix)
+          const fBlur = construirFiltroBlur(`blurexp-${c.id}`, efectosMix)
           if (fBlur) defs.appendChild(fBlur)
+          const fNB = construirFiltroNB(`nbexp-${c.id}`, efectosMix)
+          if (fNB) defs.appendChild(fNB)
         }
       }
       // las imágenes de capa también corrigen color por el mismo camino que los

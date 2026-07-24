@@ -1,6 +1,7 @@
 import Icon from '../../../components/ui/Icon'
 import SinSeleccion from '../../../components/ui/SinSeleccion'
 import { useEditorStore } from '../../../store/useEditorStore'
+import { useProjectStore } from '../../../store/useProjectStore'
 import { Campo, Deslizador, Segmentado } from '../../../components/ui/Controls'
 import { hayRecorte } from '../../../lib/layers/recorteMascara'
 
@@ -12,8 +13,38 @@ export default function RecortarPanel() {
   const clips = useEditorStore((s) => s.pista.clips)
   const recortarClipImagen = useEditorStore((s) => s.recortarClipImagen)
   const resetRecorteClipImagen = useEditorStore((s) => s.resetRecorteClipImagen)
+  const medios = useProjectStore((s) => s.medios)
 
   const clip = clips.find((c) => c.id === clipSeleccionado)
+
+  // al pasar a círculo, el recorte se cuadra alrededor de su centro para que salga
+  // redondo de verdad. el lado cuadrado se saca del más corto de los dos, usando la
+  // resolución del video (su aspecto), que es como se ve en pantalla
+  function elegirForma(v: 'rectangulo' | 'elipse' | 'circulo') {
+    if (!clip) return
+    if (v !== 'circulo') {
+      recortarClipImagen(clip.id, { forma: v })
+      return
+    }
+    const asset = medios.find((m) => m.id === clip.assetId)
+    const aw = asset?.ancho || 1
+    const ah = asset?.alto || 1
+    const r = clip.recorte ?? { izq: 0, der: 0, arr: 0, aba: 0 }
+    const cwFrac = 1 - (r.izq ?? 0) - (r.der ?? 0)
+    const chFrac = 1 - (r.arr ?? 0) - (r.aba ?? 0)
+    const dPx = Math.min(cwFrac * aw, chFrac * ah)
+    const nw = dPx / aw
+    const nh = dPx / ah
+    const cxf = ((r.izq ?? 0) + (1 - (r.der ?? 0))) / 2
+    const cyf = ((r.arr ?? 0) + (1 - (r.aba ?? 0))) / 2
+    recortarClipImagen(clip.id, {
+      forma: 'circulo',
+      izq: cxf - nw / 2,
+      der: 1 - (cxf + nw / 2),
+      arr: cyf - nh / 2,
+      aba: 1 - (cyf + nh / 2),
+    })
+  }
 
   if (!clip) {
     return (
@@ -26,7 +57,8 @@ export default function RecortarPanel() {
 
   const rec = clip.recorte
   const forma = rec?.forma ?? 'rectangulo'
-  const esElipse = forma === 'elipse'
+  // el difuminado y la viñeta valen tanto para el óvalo como para el círculo
+  const esOvalo = forma === 'elipse' || forma === 'circulo'
 
   return (
     <div className="flex flex-col gap-4">
@@ -40,13 +72,14 @@ export default function RecortarPanel() {
           valor={forma}
           opciones={[
             { valor: 'rectangulo', etiqueta: 'Rectángulo' },
+            { valor: 'circulo', etiqueta: 'Círculo' },
             { valor: 'elipse', etiqueta: 'Óvalo' },
           ]}
-          onChange={(v) => recortarClipImagen(clip.id, { forma: v as 'rectangulo' | 'elipse' })}
+          onChange={(v) => elegirForma(v as 'rectangulo' | 'elipse' | 'circulo')}
         />
       </Campo>
 
-      {esElipse && (
+      {esOvalo && (
         <>
           {/* el borde del óvalo se difumina hacia transparente, así que lo de debajo
               (fondo o capas) asoma por los lados en lugar de un corte seco */}

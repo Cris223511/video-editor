@@ -1,12 +1,9 @@
-import { useState } from 'react'
 import GaleriaTransiciones from './GaleriaTransiciones'
 import SinSeleccion from '../../components/ui/SinSeleccion'
 import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
-import { useToast } from '../../components/ui/ToastProvider'
 import { useCongelarAncho } from './useCongelarAncho'
 import { useEditorStore, Herramienta } from '../../store/useEditorStore'
-import { useProjectStore } from '../../store/useProjectStore'
 import { herramientas } from './RielHerramientas'
 import { Campo, Deslizador } from '../../components/ui/Controls'
 import TextPanel from './panels/TextPanel'
@@ -68,67 +65,9 @@ export function Transiciones() {
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const clips = useEditorStore((s) => s.pista.clips)
-  const quitarClip = useEditorStore((s) => s.quitarClip)
   const setTransicion = useEditorStore((s) => s.setTransicion)
-  const setTransicionEfecto = useEditorStore((s) => s.setTransicionEfecto)
-  const separarAudio = useEditorStore((s) => s.separarAudio)
-  const medios = useProjectStore((s) => s.medios)
-  const agregarMedio = useProjectStore((s) => s.agregar)
-  const { mostrar } = useToast()
-  const [separando, setSeparando] = useState(false)
 
   const clip = clips.find((c) => c.id === clipSeleccionado) ?? null
-
-  // saca el audio del video a un clip propio en la pista de sonido. en vez de
-  // decodificar el mp4 entero (decodeAudioData falla en muchos videos con imagen,
-  // que era el motivo de que "no ocurriera nada"), el audio separado reutiliza el
-  // propio archivo del video y suena por un <audio> con su url, que reproduce solo
-  // la pista de sonido. funciona con cualquier video que el navegador sepa abrir.
-  // el clip nuevo queda vinculado al video: se mueven juntos y borrar el video se
-  // lo lleva. el video de origen queda mudo para que el sonido no salga dos veces
-  async function separar() {
-    if (!clip || separando) return
-    const asset = medios.find((m) => m.id === clip.assetId)
-    if (!asset) return
-    setSeparando(true)
-    useProjectStore.setState({ preparando: true })
-    try {
-      // un respiro para que el cargador alcance a verse aunque el trabajo sea casi
-      // instantáneo, así queda claro que algo pasó
-      await new Promise((r) => setTimeout(r, 250))
-      const url = URL.createObjectURL(asset.file)
-      const idAudioAsset = crypto.randomUUID()
-      agregarMedio({
-        id: idAudioAsset,
-        clase: 'audio',
-        file: asset.file,
-        nombre: `Audio de ${asset.nombre}`,
-        tamano: asset.tamano,
-        tipo: asset.tipo,
-        duracion: asset.duracion,
-        ancho: 0,
-        alto: 0,
-        url,
-        miniatura: '',
-      })
-      separarAudio(clip.id, {
-        id: crypto.randomUUID(),
-        assetId: idAudioAsset,
-        inicio: clip.inicio,
-        duracion: clip.duracion,
-        recorteInicio: clip.recorteInicio,
-        duracionFuente: asset.duracion,
-        volumen: 1,
-        vinculadoA: clip.id,
-      })
-      mostrar('success', 'Audio separado a la pista de sonido.')
-    } catch {
-      mostrar('error', 'No se pudo separar el audio de este video.')
-    } finally {
-      setSeparando(false)
-      useProjectStore.setState({ preparando: false })
-    }
-  }
 
   if (!clip) {
     // sin clip pero con una capa elegida, esta misma sección gobierna su entrada
@@ -141,83 +80,26 @@ export function Transiciones() {
     )
   }
 
+  // esta sección es solo la transición de entrada del plano. separar el audio y
+  // borrar el clip viven en el menú del clic derecho, y la aparición gradual del
+  // color y los efectos en el panel de efectos, que es a donde pertenecen
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3">
-        <span className="text-sm font-medium">Transición de entrada</span>
-        <GaleriaTransiciones
-          actual={clip.transicion.tipo}
-          onElegir={(t) => setTransicion(clip.id, { tipo: t })}
-        />
-        {clip.transicion.tipo !== 'ninguna' && (
-          <Campo etiqueta={`Duración (${clip.transicion.duracion.toFixed(1)} s)`}>
-            <Deslizador
-              valor={Math.round(clip.transicion.duracion * 10)}
-              min={2}
-              max={20}
-              onChange={(v) => setTransicion(clip.id, { duracion: v / 10 })}
-            />
-          </Campo>
-        )}
-      </div>
-
-      {/* aparición del color y los efectos del clip. es independiente de la
-          transición de entrada del plano: aquí lo que entra poco a poco es la
-          corrección de color y los efectos aplicados, no el video en sí */}
-      <div className="flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/10">
-        <label className="flex cursor-pointer items-center justify-between gap-2">
-          <span className="text-sm font-medium">El color y los efectos aparecen</span>
-          <input
-            type="checkbox"
-            checked={!!clip.transicionEfecto}
-            onChange={(e) => setTransicionEfecto(clip.id, e.target.checked ? 0.6 : 0)}
-            className="h-4 w-4 accent-brand"
+    <div className="flex flex-col gap-3">
+      <span className="text-sm font-medium">Transición de entrada</span>
+      <GaleriaTransiciones
+        actual={clip.transicion.tipo}
+        onElegir={(t) => setTransicion(clip.id, { tipo: t })}
+      />
+      {clip.transicion.tipo !== 'ninguna' && (
+        <Campo etiqueta={`Duración (${clip.transicion.duracion.toFixed(1)} s)`}>
+          <Deslizador
+            valor={Math.round(clip.transicion.duracion * 10)}
+            min={2}
+            max={20}
+            onChange={(v) => setTransicion(clip.id, { duracion: v / 10 })}
           />
-        </label>
-        <p className="text-[13px] leading-relaxed text-[color:var(--muted)]">
-          Con esto la corrección de color y los efectos del clip no están a pleno desde el primer
-          fotograma, sino que se asientan durante los primeros segundos.
-        </p>
-        {!!clip.transicionEfecto && (
-          <Campo etiqueta={`Duración (${clip.transicionEfecto.toFixed(1)} s)`}>
-            <Deslizador
-              valor={Math.round(clip.transicionEfecto * 10)}
-              min={2}
-              max={30}
-              onChange={(v) => setTransicionEfecto(clip.id, v / 10)}
-            />
-          </Campo>
-        )}
-      </div>
-
-      {/* separar el audio del video a la pista de sonido. una vez separado, el
-          video queda mudo y el botón deja de ofrecerse */}
-      <div className="flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/10">
-        <span className="text-sm font-medium">Audio del video</span>
-        {clip.mudo ? (
-          <p className="text-[13px] leading-relaxed text-[color:var(--muted)]">
-            El audio de este video ya está separado en la pista de sonido, abajo. Muévelo o bórralo
-            desde ahí; si borras el video, su audio se va con él.
-          </p>
-        ) : (
-          <button
-            onClick={separar}
-            disabled={separando}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-black/10 py-2 text-sm font-medium transition-colors hover:border-brand hover:text-brand disabled:opacity-50 dark:border-white/10"
-          >
-            <Icon name="musica" size={16} />
-            {separando ? 'Separando...' : 'Separar audio'}
-          </button>
-        )}
-      </div>
-
-      <button
-        onClick={() => quitarClip(clip.id)}
-        className="mt-1 inline-flex items-center justify-center gap-2 rounded-lg border border-rose-500/40 py-2 text-sm font-medium text-rose-500 transition-colors hover:bg-rose-500/10"
-      >
-        <Icon name="papelera" size={16} />
-        Quitar clip
-      </button>
+        </Campo>
+      )}
     </div>
   )
 }

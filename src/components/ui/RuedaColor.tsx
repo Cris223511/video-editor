@@ -34,7 +34,24 @@ export default function RuedaColor({
     if (!capturado) return
     const radio = diametro / 2
 
+    // la captura del puntero se pide recién cuando el gesto es un arrastre de
+    // verdad, no en el primer clic. si se pidiera al pulsar, el segundo clic de un
+    // doble clic caía con el puntero ya bloqueado y no se registraba, así que la
+    // rueda nunca volvía al centro. con este umbral, un clic o un doble clic sin
+    // desplazamiento no llegan a bloquear nada
+    let bloqueado = false
+    let acumX = 0
+    let acumY = 0
+
     const mover = (ev: globalThis.MouseEvent) => {
+      if (!bloqueado) {
+        acumX += ev.movementX
+        acumY += ev.movementY
+        if (Math.hypot(acumX, acumY) < 4) return
+        bloqueado = true
+        const p = ref.current?.requestPointerLock() as unknown as Promise<void> | undefined
+        if (p && typeof p.catch === 'function') p.catch(() => {})
+      }
       const paso = ev.shiftKey ? SENSIBILIDAD_FINA : SENSIBILIDAD
       let x = actual.current.x + (ev.movementX / radio) * paso
       let y = actual.current.y + (ev.movementY / radio) * paso
@@ -71,12 +88,9 @@ export default function RuedaColor({
 
   function agarrar(e: ReactMouseEvent) {
     e.preventDefault()
+    // solo se marca el gesto como activo; la captura del puntero se pide después,
+    // cuando el cursor se mueve de verdad, para no romper el doble clic
     setCapturado(true)
-    // en algunos navegadores devuelve una promesa que se rechaza si el gesto no
-    // se considera válido; en ese caso el arrastre sigue funcionando igual, solo
-    // que con el cursor a la vista
-    const p = ref.current?.requestPointerLock() as unknown as Promise<void> | undefined
-    if (p && typeof p.catch === 'function') p.catch(() => {})
   }
 
   const centrada = Math.abs(valor.x) < 0.001 && Math.abs(valor.y) < 0.001

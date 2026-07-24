@@ -10,6 +10,7 @@ import { fundidoEn } from '../audio/ganancia'
 import { estiloEntrada, progresoEntrada } from '../transiciones/entrada'
 import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../color/mezcla'
 import { cssEfectos } from '../efectos/catalogo'
+import { paramsNB } from '../efectos/nitidezBrillo'
 import { encuadreDe, rectClip } from '../timeline/encuadre'
 import { aplicarTransformCanvas } from '../layers/transform'
 
@@ -41,6 +42,18 @@ function auxDesenfoque(w: number, h: number): HTMLCanvasElement {
   if (lienzoDesenfoque.width !== w) lienzoDesenfoque.width = w
   if (lienzoDesenfoque.height !== h) lienzoDesenfoque.height = h
   return lienzoDesenfoque
+}
+
+// segundo lienzo auxiliar, para cuando hay que encadenar dos filtros svg en el
+// mismo clip (por ejemplo desenfoque de movimiento y luego nitidez y brillo): cada
+// filtro svg necesita su propia pasada, y no se puede filtrar un canvas sobre sí
+// mismo, así que el resultado de una pasada aterriza aquí antes de la siguiente
+let lienzoSegundo: HTMLCanvasElement | null = null
+function auxSegundo(w: number, h: number): HTMLCanvasElement {
+  if (!lienzoSegundo) lienzoSegundo = document.createElement('canvas')
+  if (lienzoSegundo.width !== w) lienzoSegundo.width = w
+  if (lienzoSegundo.height !== h) lienzoSegundo.height = h
+  return lienzoSegundo
 }
 
 // lienzo aparte para el recorte en óvalo con difuminado o viñeta: el clip se pinta
@@ -577,9 +590,10 @@ export function dibujarFotograma(
       // luego se vuelca sobre el principal. el rectángulo y el óvalo limpio siguen
       // yendo con un recorte normal, sin lienzo extra
       const rec = clip.recorte
+      const ovaloRec = rec?.forma === 'elipse' || rec?.forma === 'circulo'
       const usaMascara = !!(
         rec &&
-        rec.forma === 'elipse' &&
+        ovaloRec &&
         ((rec.difuminado ?? 0) > 0 || (rec.vinetaBlanca ?? 0) > 0)
       )
       let dst = ctx
@@ -609,7 +623,7 @@ export function dibujarFotograma(
       // suave no recorta aquí, su máscara se aplica después sobre el lienzo aparte
       if (rec && !usaMascara) {
         dst.beginPath()
-        if (rec.forma === 'elipse') {
+        if (ovaloRec) {
           dst.ellipse(
             dx + ((rec.izq + (1 - rec.der)) / 2) * dw,
             dy + ((rec.arr + (1 - rec.aba)) / 2) * dh,
@@ -636,21 +650,41 @@ export function dibujarFotograma(
       const efectos = mezclarEfectos(clip.efectos ?? [], mixEf)
       const hayColor = !esTonoNeutro(tonoEf)
       const hayDesenfoque = hayEfectoFiltro(efectos)
-      if (hayDesenfoque) {
+      const hayNB = !!paramsNB(efectos)
+      if (hayDesenfoque || hayNB) {
+        // cada filtro svg va en su propia pasada, porque mezclarlo con las funciones
+        // nativas en el mismo ctx.filter deja el fotograma en negro. primero el video
+        // con su color y sus efectos css, luego, si toca, el desenfoque, y por último
+        // la nitidez y el brillo. el resultado de cada pasada aterriza en un lienzo
+        // aparte, ya que no se puede filtrar un canvas sobre sí mismo
         const aux = auxDesenfoque(ancho, alto)
         const actx = aux.getContext('2d')
         if (actx) {
           actx.setTransform(1, 0, 0, 1, 0, 0)
           actx.clearRect(0, 0, ancho, alto)
-          {
-            const base = hayColor ? filtroCss(tonoEf, `tonoexp-${clip.id}`, []) : ''
-            const ef = cssEfectos(efectos)
-            actx.filter = `${base} ${ef}`.trim() || 'none'
-          }
+          const base = hayColor ? filtroCss(tonoEf, `tonoexp-${clip.id}`, []) : ''
+          const ef = cssEfectos(efectos)
+          actx.filter = `${base} ${ef}`.trim() || 'none'
           actx.drawImage(video, dx, dy, dw, dh)
           actx.filter = 'none'
-          dst.filter = `url(#blurexp-${clip.id})`
-          dst.drawImage(aux, 0, 0)
+
+          let fuente: HTMLCanvasElement = aux
+          if (hayDesenfoque) {
+            const aux2 = auxSegundo(ancho, alto)
+            const a2 = aux2.getContext('2d')
+            if (a2) {
+              a2.setTransform(1, 0, 0, 1, 0, 0)
+              a2.clearRect(0, 0, ancho, alto)
+              a2.filter = `url(#blurexp-${clip.id})`
+              a2.drawImage(fuente, 0, 0)
+              a2.filter = 'none'
+              fuente = aux2
+            }
+          }
+          // pasada final al lienzo del clip: con nitidez y brillo se aplica su filtro,
+          // y si no lo hay, se vuelca lo que traiga la fuente tal cual
+          dst.filter = hayNB ? `url(#nbexp-${clip.id})` : 'none'
+          dst.drawImage(fuente, 0, 0)
           dst.filter = 'none'
         }
       } else {

@@ -20,6 +20,21 @@ const p = (i: number) => Math.max(0, Math.min(1, i / 100))
 
 export const CATEGORIAS_EFECTO: CategoriaEfecto[] = [
   {
+    // realce: los efectos que no salen de un filtro css suelto (nitidez por máscara
+    // y desenfoque de movimiento). la muestra es solo una aproximación para elegir a
+    // ojo; el efecto de verdad lo arma el panel con sus propios mandos al aplicarlo
+    id: 'realce',
+    nombre: 'Realce',
+    efectos: [
+      {
+        id: 'nitidez-brillo',
+        nombre: 'Nítido y brilloso',
+        css: (i) => `contrast(${1 + p(i) * 0.35}) brightness(${1 + p(i) * 0.16}) saturate(${1 + p(i) * 0.22})`,
+      },
+      { id: 'desenfoque-movimiento', nombre: 'Desenfoque', css: (i) => `blur(${(p(i) * 3).toFixed(2)}px)` },
+    ],
+  },
+  {
     id: 'luz',
     nombre: 'Luz',
     efectos: [

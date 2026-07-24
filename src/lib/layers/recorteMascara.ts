@@ -12,6 +12,12 @@ export function geometriaRecorte(rec: RecorteRel) {
 
 // ¿el recorte tiene algo que aplicar? cuenta tanto el recuadro como la forma de
 // óvalo, el difuminado o la viñeta, que existen aunque no se haya movido el marco
+// el círculo comparte máscara con el óvalo; lo que lo hace redondo es que el
+// recuadro se mantiene cuadrado, no una forma distinta
+function esOvalo(rec: RecorteRel): boolean {
+  return rec.forma === 'elipse' || rec.forma === 'circulo'
+}
+
 export function hayRecorte(rec?: RecorteRel): boolean {
   if (!rec) return false
   return !!(
@@ -19,7 +25,7 @@ export function hayRecorte(rec?: RecorteRel): boolean {
     rec.der ||
     rec.arr ||
     rec.aba ||
-    rec.forma === 'elipse' ||
+    esOvalo(rec) ||
     rec.difuminado ||
     rec.vinetaBlanca
   )
@@ -39,7 +45,7 @@ function ovaloCss(rec: RecorteRel, difuminado: number): string {
 // con difuminado, deja el borde suave y transparente para que se vea lo de debajo
 export function estiloRecorte(rec?: RecorteRel): { clipPath?: string; maskImage?: string; WebkitMaskImage?: string } {
   if (!hayRecorte(rec) || !rec) return {}
-  if (rec.forma === 'elipse') {
+  if (esOvalo(rec)) {
     const m = ovaloCss(rec, rec.difuminado ?? 0)
     return { maskImage: m, WebkitMaskImage: m }
   }
@@ -50,7 +56,7 @@ export function estiloRecorte(rec?: RecorteRel): { clipPath?: string; maskImage?
 // centro transparente al borde del óvalo, con la intensidad como opacidad, y se
 // recorta por la misma silueta para no salirse
 export function vinetaRecorte(rec?: RecorteRel): { background: string; maskImage: string; WebkitMaskImage: string } | null {
-  if (!rec || !rec.vinetaBlanca || rec.forma !== 'elipse') return null
+  if (!rec || !rec.vinetaBlanca || !esOvalo(rec)) return null
   const { cx, cy, rx, ry } = geometriaRecorte(rec)
   const a = (rec.vinetaBlanca / 100).toFixed(3)
   const bg = `radial-gradient(ellipse ${(rx * 100).toFixed(2)}% ${(ry * 100).toFixed(2)}% at ${(cx * 100).toFixed(2)}% ${(cy * 100).toFixed(2)}%, rgba(255,255,255,0) 42%, rgba(255,255,255,${a}) 100%)`
