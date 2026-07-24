@@ -1,9 +1,14 @@
+import { useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ChevronUp, ChevronDown } from 'lucide-react'
 import SinSeleccion from '../../../components/ui/SinSeleccion'
 import Icon from '../../../components/ui/Icon'
+import Tooltip from '../../../components/ui/Tooltip'
+import MuestraVideo from '../../../components/ui/MuestraVideo'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { Campo, Deslizador, Segmentado } from '../../../components/ui/Controls'
-import { useState } from 'react'
 import { useProjectStore } from '../../../store/useProjectStore'
+import { EfectoClip } from '../../../types/timeline'
 import { CATEGORIAS_EFECTO, buscarEfecto, esFiltro } from '../../../lib/efectos/catalogo'
 
 // valores de partida al añadir el desenfoque: intensidad media y barrido
@@ -14,15 +19,47 @@ const DESENFOQUE_INICIAL = {
   angulo: 0,
 }
 
-// panel de efectos del clip seleccionado. de momento solo el desenfoque de
-// movimiento, pero la lista está pensada para encadenar varios efectos: cada uno
-// se añade, se regula en vivo y se quita por separado
+// nombre visible de un efecto ya puesto, para la etiqueta de su fila
+function nombreEfecto(e: EfectoClip): string {
+  if (e.tipo === 'nitidez-brillo') return 'Nítido y brilloso'
+  if (esFiltro(e)) return buscarEfecto(e.filtro)?.nombre ?? 'Efecto'
+  return 'Desenfoque de movimiento'
+}
+
+// identidad de un efecto, para no ponerlo dos veces. el desenfoque y la nitidez son
+// únicos; los filtros se distinguen por cuál es
+function claveEfecto(e: EfectoClip): string {
+  if (e.tipo === 'filtro') return `filtro:${e.filtro}`
+  if (e.tipo === 'desenfoque-movimiento') return 'desenfoque'
+  return 'nitidez-brillo'
+}
+
+// misma identidad pero calculada desde el id de una muestra del catálogo
+function claveCatalogo(id: string): string {
+  if (id === 'nitidez-brillo') return 'nitidez-brillo'
+  if (id === 'desenfoque-movimiento') return 'desenfoque'
+  return `filtro:${id}`
+}
+
+// crea el efecto que corresponde a una muestra del catálogo, con sus valores de
+// arranque. cada tipo guarda sus propios mandos
+function crearEfecto(id: string): EfectoClip {
+  if (id === 'nitidez-brillo') return { id: crypto.randomUUID(), tipo: 'nitidez-brillo', nitidez: 55, brillo: 35 }
+  if (id === 'desenfoque-movimiento') return { id: crypto.randomUUID(), ...DESENFOQUE_INICIAL }
+  return { id: crypto.randomUUID(), tipo: 'filtro', filtro: id, intensidad: 50 }
+}
+
+// panel de efectos del clip. arriba el catálogo para elegir; abajo los efectos ya
+// puestos, en filas apiladas como capas. el orden se puede cambiar y cada efecto se
+// regula, se reemplaza o se quita por su cuenta
 export default function EffectsPanel() {
   const clips = useEditorStore((s) => s.pista.clips)
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
+  const playhead = useEditorStore((s) => s.playhead)
   const agregarEfecto = useEditorStore((s) => s.agregarEfecto)
   const actualizarEfecto = useEditorStore((s) => s.actualizarEfecto)
   const quitarEfecto = useEditorStore((s) => s.quitarEfecto)
+  const reordenarEfecto = useEditorStore((s) => s.reordenarEfecto)
   const setTransicionEfecto = useEditorStore((s) => s.setTransicionEfecto)
 
   const medios = useProjectStore((s) => s.medios)
@@ -32,6 +69,13 @@ export default function EffectsPanel() {
   // el video del clip, para reproducir la muestra al pasar el cursor. solo si el
   // medio es de video; una imagen no tiene qué reproducir
   const videoUrl = medioClip?.clase === 'video' ? medioClip.url : undefined
+  // segundo del archivo que se está viendo en el visor, para que las muestras
+  // arranquen en ese mismo frame y no desde el principio
+  const tiempoFrame = clip ? Math.max(0, clip.recorteInicio + (playhead - clip.inicio) * clip.velocidad) : 0
+
+  // qué fila tiene abierto su panel de ajustes. solo una a la vez, para no llenar
+  // todo de mandos flotantes
+  const [ajustesDe, setAjustesDe] = useState<string | null>(null)
 
   if (!clip) {
     return (
@@ -42,109 +86,63 @@ export default function EffectsPanel() {
   }
 
   const efectos = clip.efectos ?? []
+  const puestos = new Set(efectos.map(claveEfecto))
+
+  // al elegir una muestra del catálogo se suma ese efecto como una capa nueva. si ya
+  // estaba puesto no se agrega otra vez: para tener otro se elige una muestra
+  // distinta, y así clicar varias veces la misma no llena la lista de repetidos
+  function elegir(id: string) {
+    if (!clip) return
+    if (puestos.has(claveCatalogo(id))) return
+    agregarEfecto(clip.id, crearEfecto(id))
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      {efectos.length === 0 && (
-        <p className="text-[13px] italic leading-relaxed text-[color:var(--muted)]">
-          Todavía no hay ningún efecto en este clip. Añade un desenfoque de movimiento para dar
-          sensación de velocidad; se combina sin problema con la cámara lenta.
-        </p>
-      )}
+      {/* catálogo arriba: de aquí se eligen los efectos */}
+      <Catalogo
+        miniatura={miniatura}
+        videoUrl={videoUrl}
+        tiempo={tiempoFrame}
+        puestos={puestos}
+        onElegir={elegir}
+      />
 
-      {efectos.map((e) => {
-        return (
-          <div
-            key={e.id}
-            className="flex flex-col gap-3 rounded-xl border p-3"
-            style={{ borderColor: 'rgb(var(--border) / 0.14)' }}
-          >
-            <div className="flex items-center gap-2">
-              <Icon name="efectos" size={15} className="text-brand" />
-              <span className="text-sm font-medium">
-                {e.tipo === 'nitidez-brillo'
-                  ? 'Nítido y brilloso'
-                  : esFiltro(e)
-                    ? (buscarEfecto(e.filtro)?.nombre ?? 'Efecto')
-                    : 'Desenfoque de movimiento'}
-              </span>
-              <button
-                onClick={() => quitarEfecto(clip.id, e.id)}
-                aria-label="Quitar efecto"
-                className="interactivo -mr-1 ml-auto grid h-7 w-7 place-items-center rounded-lg text-[color:var(--muted)] hover:text-rose-500"
-              >
-                <Icon name="papelera" size={15} />
-              </button>
-            </div>
-
-            {/* la nitidez y el brillo van con sus dos mandos propios; el resto de
-                efectos se gobiernan con un solo nivel */}
-            {e.tipo === 'nitidez-brillo' ? (
-              <>
-                <Campo etiqueta={`Nitidez (${Math.round(e.nitidez)})`}>
-                  <Deslizador
-                    valor={e.nitidez}
-                    min={0}
-                    max={100}
-                    onChange={(v) => actualizarEfecto(clip.id, e.id, { nitidez: v })}
-                  />
-                </Campo>
-                <Campo etiqueta={`Brillo (${Math.round(e.brillo)})`}>
-                  <Deslizador
-                    valor={e.brillo}
-                    min={0}
-                    max={100}
-                    onChange={(v) => actualizarEfecto(clip.id, e.id, { brillo: v })}
-                  />
-                </Campo>
-              </>
-            ) : (
-              <>
-                <Campo etiqueta="Nivel" valor={e.intensidad}>
-                  <Deslizador
-                    valor={e.intensidad}
-                    min={0}
-                    max={100}
-                    onChange={(v) => actualizarEfecto(clip.id, e.id, { intensidad: v })}
-                  />
-                </Campo>
-
-                {/* la dirección y el ángulo solo tienen sentido en el desenfoque; los
-                    del catálogo se gobiernan únicamente con su nivel */}
-                {!esFiltro(e) && (
-                  <>
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xs font-medium text-[color:var(--muted)]">Dirección</span>
-                      <Segmentado
-                        valor={e.angulo >= 45 && e.angulo <= 135 ? 'vertical' : 'horizontal'}
-                        opciones={[
-                          { valor: 'horizontal', etiqueta: 'Horizontal' },
-                          { valor: 'vertical', etiqueta: 'Vertical' },
-                        ]}
-                        onChange={(v) =>
-                          actualizarEfecto(clip.id, e.id, { angulo: v === 'vertical' ? 90 : 0 })
-                        }
-                      />
-                    </div>
-                    <Campo etiqueta={`Ángulo (${Math.round(e.angulo)}°)`}>
-                      <Deslizador
-                        valor={Math.round(e.angulo)}
-                        min={0}
-                        max={180}
-                        onChange={(v) => actualizarEfecto(clip.id, e.id, { angulo: v })}
-                      />
-                    </Campo>
-                  </>
-                )}
-              </>
-            )}
+      {/* efectos aplicados, en filas apiladas como capas. el de más abajo es el
+          último que se aplica, sobre el resultado de los de arriba */}
+      <div className="flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/10">
+        <span className="text-xs font-medium text-[color:var(--muted)]">Efectos aplicados</span>
+        {efectos.length === 0 ? (
+          <p className="text-[13px] italic leading-relaxed text-[color:var(--muted)]">
+            Todavía no hay efectos. Elige uno del catálogo de arriba y aparecerá aquí como una capa
+            que puedes regular, mover o quitar.
+          </p>
+        ) : (
+          <div className="relative flex flex-col gap-1.5">
+            <AnimatePresence initial={false}>
+              {efectos.map((e, i) => (
+                <FilaEfecto
+                  key={e.id}
+                  efecto={e}
+                  primero={i === 0}
+                  ultimo={i === efectos.length - 1}
+                  abierto={ajustesDe === e.id}
+                  onAbrir={() => setAjustesDe((prev) => (prev === e.id ? null : e.id))}
+                  onCambiar={(cambios) => actualizarEfecto(clip.id, e.id, cambios)}
+                  onQuitar={() => {
+                    quitarEfecto(clip.id, e.id)
+                    if (ajustesDe === e.id) setAjustesDe(null)
+                  }}
+                  onSubir={() => reordenarEfecto(clip.id, e.id, -1)}
+                  onBajar={() => reordenarEfecto(clip.id, e.id, 1)}
+                />
+              ))}
+            </AnimatePresence>
           </div>
-        )
-      })}
+        )}
+      </div>
 
-      {/* aparición gradual del color y los efectos del clip. antes vivía en el
-          panel de transiciones, donde no pegaba; su sitio es acá, junto a los
-          efectos y el color que hace entrar poco a poco */}
+      {/* aparición gradual del color y los efectos del clip */}
       <div className="flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/10">
         <label className="flex cursor-pointer items-center justify-between gap-2">
           <span className="text-sm font-medium">El color y los efectos aparecen</span>
@@ -170,38 +168,186 @@ export default function EffectsPanel() {
           </Campo>
         )}
       </div>
-
-      {/* catálogo. cada muestra enseña el efecto ya puesto sobre el propio
-          material; al pasar el cursor sube a su intensidad plena y al salir vuelve
-          a la mitad, que es como se aplica al elegirlo. la nitidez y el desenfoque
-          viven en la categoría «Realce»: al elegirlos se crea su efecto propio con
-          sus mandos, no un filtro css suelto */}
-      <Catalogo
-        miniatura={miniatura}
-        videoUrl={videoUrl}
-        onElegir={(id) => {
-          if (id === 'nitidez-brillo') {
-            agregarEfecto(clip.id, { id: crypto.randomUUID(), tipo: 'nitidez-brillo', nitidez: 55, brillo: 35 })
-          } else if (id === 'desenfoque-movimiento') {
-            agregarEfecto(clip.id, { id: crypto.randomUUID(), ...DESENFOQUE_INICIAL })
-          } else {
-            agregarEfecto(clip.id, { id: crypto.randomUUID(), tipo: 'filtro', filtro: id, intensidad: 50 })
-          }
-        }}
-      />
     </div>
   )
 }
 
-// rejilla del catálogo, repartida en subcategorías
+// una fila de la lista de efectos: su nombre, el botón de ajustes que abre sus
+// mandos por encima, el de quitar y las flechas para moverlo de posición. el
+// movimiento entre filas se anima solo con la disposición de framer, con la misma
+// curva que usan los bloques de la línea de tiempo
+function FilaEfecto({
+  efecto,
+  primero,
+  ultimo,
+  abierto,
+  onAbrir,
+  onCambiar,
+  onQuitar,
+  onSubir,
+  onBajar,
+}: {
+  efecto: EfectoClip
+  primero: boolean
+  ultimo: boolean
+  abierto: boolean
+  onAbrir: () => void
+  onCambiar: (cambios: Partial<EfectoClip>) => void
+  onQuitar: () => void
+  onSubir: () => void
+  onBajar: () => void
+}) {
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -6 }}
+      transition={{ layout: { duration: 0.28, ease: [0.16, 1, 0.3, 1] }, duration: 0.2 }}
+      className="relative"
+    >
+      {/* mandos del efecto, flotando por encima de la fila como una burbuja. se abre
+          hacia arriba, que es donde hay sitio, y no empuja al resto de las filas */}
+      <AnimatePresence>
+        {abierto && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.98 }}
+            transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            className="panel absolute bottom-full left-0 right-0 z-30 mb-2 flex flex-col gap-3 rounded-xl p-3 shadow-xl"
+            style={{ border: '1px solid rgb(var(--border) / 0.16)' }}
+          >
+            <MandosEfecto efecto={efecto} onCambiar={onCambiar} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div
+        className={[
+          'flex items-center gap-2 rounded-xl border p-2.5 transition-colors',
+          abierto ? 'border-brand' : 'border-black/10 dark:border-white/10',
+        ].join(' ')}
+      >
+        {/* flechas de reordenar, apiladas como en la cabecera de un carril */}
+        <div className="flex shrink-0 flex-col">
+          <button
+            onClick={onSubir}
+            disabled={primero}
+            aria-label="Subir el efecto"
+            className="interactivo grid h-4 w-5 place-items-center rounded text-[color:var(--muted)] hover:text-brand disabled:pointer-events-none disabled:opacity-25"
+          >
+            <ChevronUp size={13} />
+          </button>
+          <button
+            onClick={onBajar}
+            disabled={ultimo}
+            aria-label="Bajar el efecto"
+            className="interactivo grid h-4 w-5 place-items-center rounded text-[color:var(--muted)] hover:text-brand disabled:pointer-events-none disabled:opacity-25"
+          >
+            <ChevronDown size={13} />
+          </button>
+        </div>
+
+        <Icon name="efectos" size={15} className="shrink-0 text-brand" />
+        <span className="flex-1 truncate text-sm font-medium">{nombreEfecto(efecto)}</span>
+
+        <Tooltip texto="Ajustes del efecto" lado="izquierda">
+          <button
+            onClick={onAbrir}
+            aria-label="Ajustes del efecto"
+            aria-expanded={abierto}
+            className={[
+              'interactivo grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors',
+              abierto ? 'bg-brand text-white' : 'text-[color:var(--muted)] hover:bg-brand/10 hover:text-brand',
+            ].join(' ')}
+          >
+            <Icon name="ajustes" size={15} />
+          </button>
+        </Tooltip>
+        <Tooltip texto="Quitar el efecto" lado="izquierda">
+          <button
+            onClick={onQuitar}
+            aria-label="Quitar el efecto"
+            className="interactivo -mr-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[color:var(--muted)] hover:text-rose-500"
+          >
+            <Icon name="papelera" size={15} />
+          </button>
+        </Tooltip>
+      </div>
+    </motion.div>
+  )
+}
+
+// mandos de un efecto según su tipo. la nitidez y el brillo llevan dos deslizadores;
+// el desenfoque su nivel más dirección y ángulo; el resto de filtros, solo el nivel
+function MandosEfecto({
+  efecto,
+  onCambiar,
+}: {
+  efecto: EfectoClip
+  onCambiar: (cambios: Partial<EfectoClip>) => void
+}) {
+  if (efecto.tipo === 'nitidez-brillo') {
+    return (
+      <>
+        <Campo etiqueta={`Nitidez (${Math.round(efecto.nitidez)})`}>
+          <Deslizador valor={efecto.nitidez} min={0} max={100} onChange={(v) => onCambiar({ nitidez: v })} />
+        </Campo>
+        <Campo etiqueta={`Brillo (${Math.round(efecto.brillo)})`}>
+          <Deslizador valor={efecto.brillo} min={0} max={100} onChange={(v) => onCambiar({ brillo: v })} />
+        </Campo>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <Campo etiqueta="Nivel" valor={efecto.intensidad}>
+        <Deslizador valor={efecto.intensidad} min={0} max={100} onChange={(v) => onCambiar({ intensidad: v })} />
+      </Campo>
+
+      {/* la dirección y el ángulo solo tienen sentido en el desenfoque */}
+      {efecto.tipo === 'desenfoque-movimiento' && (
+        <>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-[color:var(--muted)]">Dirección</span>
+            <Segmentado
+              valor={efecto.angulo >= 45 && efecto.angulo <= 135 ? 'vertical' : 'horizontal'}
+              opciones={[
+                { valor: 'horizontal', etiqueta: 'Horizontal' },
+                { valor: 'vertical', etiqueta: 'Vertical' },
+              ]}
+              onChange={(v) => onCambiar({ angulo: v === 'vertical' ? 90 : 0 })}
+            />
+          </div>
+          <Campo etiqueta={`Ángulo (${Math.round(efecto.angulo)}°)`}>
+            <Deslizador
+              valor={Math.round(efecto.angulo)}
+              min={0}
+              max={180}
+              onChange={(v) => onCambiar({ angulo: v })}
+            />
+          </Campo>
+        </>
+      )}
+    </>
+  )
+}
+
+// rejilla del catálogo, repartida en subcategorías. las muestras ya puestas se
+// marcan y no se vuelven a agregar al pulsarlas
 function Catalogo({
   miniatura,
   videoUrl,
+  tiempo,
+  puestos,
   onElegir,
 }: {
   miniatura?: string
-  // si el clip es de video, su url para reproducir la muestra al pasar el cursor
   videoUrl?: string
+  tiempo: number
+  puestos: Set<string>
   onElegir: (id: string) => void
 }) {
   const [categoria, setCategoria] = useState(CATEGORIAS_EFECTO[0].id)
@@ -210,12 +356,11 @@ function Catalogo({
   const fondo = miniatura
     ? { backgroundImage: `url(${miniatura})`, backgroundSize: 'cover', backgroundPosition: 'center' }
     : {
-        backgroundImage:
-          'linear-gradient(135deg, #3b82f6 0%, #22d3ee 35%, #a3e635 65%, #fbbf24 100%)',
+        backgroundImage: 'linear-gradient(135deg, #3b82f6 0%, #22d3ee 35%, #a3e635 65%, #fbbf24 100%)',
       }
 
   return (
-    <div className="flex flex-col gap-3 border-t border-black/10 pt-3 dark:border-white/10">
+    <div className="flex flex-col gap-3">
       <span className="text-xs font-medium text-[color:var(--muted)]">Catálogo de efectos</span>
       <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
         {CATEGORIAS_EFECTO.map((c) => (
@@ -233,38 +378,47 @@ function Catalogo({
         ))}
       </div>
       <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(104px,1fr))]">
-        {actual.efectos.map((e) => (
-          <button
-            key={e.id}
-            onClick={() => onElegir(e.id)}
-            onMouseEnter={() => setEncima(e.id)}
-            onMouseLeave={() => setEncima(null)}
-            title={e.nombre}
-            className="group flex flex-col gap-1 text-left"
-          >
-            <span
-              className="relative block h-16 w-full overflow-hidden rounded-lg border border-black/10 transition-all duration-200 group-hover:border-brand dark:border-white/10"
-              style={{ ...fondo, filter: e.css(encima === e.id ? 100 : 50) }}
+        {actual.efectos.map((e) => {
+          const puesto = puestos.has(claveCatalogo(e.id))
+          return (
+            <button
+              key={e.id}
+              onClick={() => onElegir(e.id)}
+              onMouseEnter={() => setEncima(e.id)}
+              onMouseLeave={() => setEncima(null)}
+              title={puesto ? `${e.nombre} (ya aplicado)` : e.nombre}
+              className="group flex flex-col gap-1 text-left"
             >
-              {/* al pasar el cursor, la muestra deja de ser un fotograma quieto y
-                  reproduce el propio video con el efecto ya aplicado (el filtro de
-                  arriba tiñe también a este video, que es su hijo) */}
-              {encima === e.id && videoUrl && (
-                <video
-                  src={videoUrl}
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  className="absolute inset-0 h-full w-full object-cover"
-                />
-              )}
-            </span>
-            <span className="truncate text-[10px] leading-tight text-[color:var(--muted)]">
-              {e.nombre}
-            </span>
-          </button>
-        ))}
+              <span
+                className={[
+                  'relative block h-16 w-full overflow-hidden rounded-lg border transition-all duration-200',
+                  puesto ? 'border-brand ring-2 ring-brand/40' : 'border-black/10 group-hover:border-brand dark:border-white/10',
+                ].join(' ')}
+                style={{ ...fondo, filter: e.css(encima === e.id ? 100 : 50) }}
+              >
+                {/* al pasar el cursor la muestra reproduce el propio video con el
+                    efecto ya aplicado, desde el frame que se ve en el visor */}
+                {encima === e.id && videoUrl && (
+                  <MuestraVideo src={videoUrl} tiempo={tiempo} className="absolute inset-0 h-full w-full object-cover" />
+                )}
+                {/* señal de que ese efecto ya está en la lista */}
+                {puesto && (
+                  <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-brand text-white shadow">
+                    <Icon name="check" size={12} />
+                  </span>
+                )}
+              </span>
+              <span
+                className={[
+                  'truncate text-[10px] leading-tight',
+                  puesto ? 'font-medium text-brand' : 'text-[color:var(--muted)]',
+                ].join(' ')}
+              >
+                {e.nombre}
+              </span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )

@@ -214,6 +214,8 @@ interface EstadoEditor {
   agregarEfecto: (id: string, efecto: EfectoClip) => void
   actualizarEfecto: (id: string, efectoId: string, cambios: Partial<EfectoClip>) => void
   quitarEfecto: (id: string, efectoId: string) => void
+  reordenarEfecto: (id: string, efectoId: string, dir: -1 | 1) => void
+  reemplazarEfecto: (id: string, efectoId: string, nuevo: EfectoClip) => void
   setTransicion: (id: string, cambios: Partial<Transicion>) => void
   // duración de aparición del color y los efectos del clip; 0 la apaga
   setTransicionEfecto: (id: string, duracion: number) => void
@@ -617,6 +619,8 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'agregarEfecto',
   'actualizarEfecto',
   'quitarEfecto',
+  'reordenarEfecto',
+  'reemplazarEfecto',
   'setTransicion',
   'setTransicionEfecto',
   'setTransicionSalida',
@@ -1492,6 +1496,39 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         ...s.pista,
         clips: s.pista.clips.map((c) =>
           c.id === id ? { ...c, efectos: (c.efectos ?? []).filter((e) => e.id !== efectoId) } : c,
+        ),
+      },
+    })),
+
+  // sube o baja un efecto una posición en la lista. el orden importa porque los
+  // efectos se aplican en cadena, uno sobre el resultado del anterior, igual que
+  // capas apiladas
+  reordenarEfecto: (id, efectoId, dir) =>
+    set((s) => ({
+      pista: {
+        ...s.pista,
+        clips: s.pista.clips.map((c) => {
+          if (c.id !== id) return c
+          const efs = [...(c.efectos ?? [])]
+          const i = efs.findIndex((e) => e.id === efectoId)
+          const j = i + dir
+          if (i < 0 || j < 0 || j >= efs.length) return c
+          ;[efs[i], efs[j]] = [efs[j], efs[i]]
+          return { ...c, efectos: efs }
+        }),
+      },
+    })),
+
+  // cambia un efecto por otro sin moverlo de sitio: el nuevo ocupa la misma
+  // posición que el viejo, que es lo que se espera al reemplazar una capa
+  reemplazarEfecto: (id, efectoId, nuevo) =>
+    set((s) => ({
+      pista: {
+        ...s.pista,
+        clips: s.pista.clips.map((c) =>
+          c.id === id
+            ? { ...c, efectos: (c.efectos ?? []).map((e) => (e.id === efectoId ? nuevo : e)) }
+            : c,
         ),
       },
     })),
