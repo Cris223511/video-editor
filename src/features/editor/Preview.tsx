@@ -976,12 +976,19 @@ export default function Preview() {
                 // deja el borde suave y transparente. la viñeta blanca opcional va
                 // en una capa aparte encima, recortada por la misma silueta
                 // mientras la herramienta de recortar está abierta sobre este clip,
-                // el recorte no se aplica al video: se ve entero y la parte de fuera
-                // la oscurece la sombra del overlay, para poder cuadrar el recorte
-                // viendo lo que se descarta. al cerrar el recorte, vuelve a aplicarse
+                // el recorte duro no se aplica al video: se ve entero y la parte de
+                // fuera la oscurece la sombra del overlay, para poder cuadrar viendo
+                // lo que se descarta. pero si el recorte lleva borde difuminado o
+                // viñeta, sí se aplica la máscara mientras se edita, porque solo así
+                // se ve en vivo cómo va quedando ese difuminado al mover sus mandos
+                const recorteSuave = !!(
+                  c.recorte &&
+                  ((c.recorte.difuminado ?? 0) > 0 || (c.recorte.vinetaBlanca ?? 0) > 0)
+                )
                 const editandoRecorte =
                   (herramienta === 'recortar' || categoriaClip === 'recortar' || recorteRapido) &&
-                  clipSeleccionado === c.id
+                  clipSeleccionado === c.id &&
+                  !recorteSuave
                 const recEstilo = editandoRecorte
                   ? { clipPath: undefined, maskImage: undefined, WebkitMaskImage: undefined }
                   : estiloRecorte(c.recorte)

@@ -240,13 +240,25 @@ export function useAtajos() {
           st.aplicarZoom(1 / 1.3)
           return
 
-        case 'Escape':
-          // suelta la selección, salvo que se esté grabando un recorrido o
-          // dibujando una máscara, donde Escape ya tiene su propio cometido
+        case 'Escape': {
+          // grabando un recorrido o dibujando una máscara, Escape tiene su cometido
           if (st.grabandoMovimiento || st.dibujandoMascara) return
+          // si se está en modo recorte (por la tecla C, por la categoría del panel o
+          // por el doble clic), Escape sale del recorte pero deja el clip SELECCIONADO
+          // como estaba, y además apaga la herramienta de recortar para que un clic
+          // posterior sobre el clip lo seleccione normal en vez de reabrir el recorte
+          const enRecorte =
+            st.herramienta === 'recortar' || st.categoriaClip === 'recortar' || st.recorteRapido
+          if (enRecorte) {
+            if (st.herramienta === 'recortar') st.setHerramienta('proyecto')
+            if (st.categoriaClip === 'recortar') st.setCategoriaClip(null)
+            if (st.recorteRapido) st.setRecorteRapido(false)
+            return
+          }
           st.seleccionar(null)
           st.seleccionarCapa(null)
           return
+        }
       }
     }
 
