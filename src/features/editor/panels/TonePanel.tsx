@@ -43,6 +43,7 @@ const CONTROLES: { campo: CampoNumerico; etiqueta: string }[] = [
 export default function TonePanel() {
   const clips = useEditorStore((s) => s.pista.clips)
   const capas = useEditorStore((s) => s.capas)
+  const playhead = useEditorStore((s) => s.playhead)
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const setTono = useEditorStore((s) => s.setTono)
@@ -128,6 +129,9 @@ export default function TonePanel() {
   const miniatura = clip ? medioClip?.miniatura : capaImagen?.src
   // el video del clip, para reproducir cada muestra de color al pasar el cursor
   const videoUrl = medioClip?.clase === 'video' ? medioClip.url : undefined
+  // segundo del archivo que se ve ahora en el visor: el frame del clip bajo el
+  // cabezal, contando su punto de entrada y su velocidad. las muestras arrancan ahí
+  const tiempoFrame = clip ? Math.max(0, clip.recorteInicio + (playhead - clip.inicio) * clip.velocidad) : 0
 
   return (
     <div className="flex flex-col gap-4">
@@ -137,7 +141,7 @@ export default function TonePanel() {
         </div>
         {/* un preset solo rellena los ajustes de abajo, así que después se puede
             seguir afinando a mano sin perder nada */}
-        <PresetsColor tono={tono} miniatura={miniatura} videoUrl={videoUrl} onAplicar={(t) => aplicar(t)} />
+        <PresetsColor tono={tono} miniatura={miniatura} videoUrl={videoUrl} tiempo={tiempoFrame} onAplicar={(t) => aplicar(t)} />
       </div>
 
       <div>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AjusteTono } from '../../../types/timeline'
+import MuestraVideo from '../../../components/ui/MuestraVideo'
 
 import { CATEGORIAS_PRESET, presetAplicado } from '../../../lib/color/presets'
 
@@ -28,12 +29,16 @@ export default function PresetsColor({
   tono,
   miniatura,
   videoUrl,
+  tiempo = 0,
   onAplicar,
 }: {
   tono: AjusteTono
   miniatura?: string
   // si el clip es de video, su url para reproducir la muestra al pasar el cursor
   videoUrl?: string
+  // segundo del archivo que se está viendo en el visor, para que la muestra arranque
+  // desde ese mismo frame y no desde el principio
+  tiempo?: number
   onAplicar: (t: AjusteTono) => void
 }) {
   const [categoria, setCategoria] = useState(CATEGORIAS_PRESET[0].id)
@@ -95,14 +100,7 @@ export default function PresetsColor({
                 {/* al pasar el cursor, la muestra reproduce el propio video con el
                     color ya aplicado (el filtro de arriba lo tiñe por ser su hijo) */}
                 {encima === p.id && videoUrl && (
-                  <video
-                    src={videoUrl}
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    className="absolute inset-0 h-full w-full object-cover"
-                  />
+                  <MuestraVideo src={videoUrl} tiempo={tiempo} className="absolute inset-0 h-full w-full object-cover" />
                 )}
               </span>
               <span
