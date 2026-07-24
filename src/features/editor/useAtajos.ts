@@ -29,6 +29,10 @@ export function useAtajos() {
   useEffect(() => {
     function alPulsar(e: KeyboardEvent) {
       if (escribiendo(e.target)) return
+      // con una ventana emergente abierta, los atajos del editor se callan: mover el
+      // cabezal, borrar o duplicar mientras se lee un modal no tiene sentido y era
+      // otra forma del mismo despiste. radix marca el diálogo abierto en el dom
+      if (document.querySelector('[role="dialog"],[role="alertdialog"]')) return
       const st = useEditorStore.getState()
       const total = duracionTotal(st.pista.clips)
       const largo = e.shiftKey ? PASO_LARGO : PASO

@@ -73,11 +73,23 @@ export default function Modal({
                   corregir, y a la animación solo le queda aparecer y crecer. */}
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4"
+                // corta la propagación de todo lo que pase dentro del modal (en fase
+                // de burbuja, para no estorbar lo de adentro). este modal vive en un
+                // portal en el body, pero en el árbol de react sigue colgando de donde
+                // se declaró (por ejemplo de un bloque de la línea de tiempo), y react
+                // hace burbujear sus eventos por ese árbol, no por el dom. sin esto,
+                // pulsar o arrastrar dentro del modal llegaba al onMouseDown de ese
+                // bloque y lo movía. frenándolo aquí, ningún modal de la aplicación
+                // vuelve a tocar lo que tiene detrás
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseUp={(e) => e.stopPropagation()}
                 onMouseDown={(e) => {
                   abajoEnFondo.current = e.target === e.currentTarget
+                  e.stopPropagation()
                 }}
                 onClick={(e) => {
                   if (e.target === e.currentTarget && abajoEnFondo.current) onCerrar()
+                  e.stopPropagation()
                 }}
               >
                 <motion.div
