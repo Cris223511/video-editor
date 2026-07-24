@@ -205,6 +205,29 @@ export default function PanelClip() {
             ))}
           </div>
         )}
+
+        {/* flecha al fondo del sub-riel para abrir o cerrar el panel de controles,
+            igual que la del riel de la izquierda. plegado apunta hacia la izquierda,
+            que es hacia donde se despliega; abierto gira y apunta a la derecha para
+            invitar a recogerlo. abre la primera categoría cuando no hay ninguna a la
+            vista, así basta un clic para tener los controles delante */}
+        {hayAlgo && (
+          <Tooltip texto={abierta ? 'Cerrar el panel' : 'Desplegar el panel'} lado="izquierda">
+            <button
+              onClick={() => setActiva(abierta ? null : categorias[0].id)}
+              aria-label={abierta ? 'Cerrar el panel' : 'Desplegar el panel'}
+              aria-expanded={!!abierta}
+              className="interactivo mt-auto grid h-9 w-10 place-items-center rounded-lg text-[color:var(--muted)] hover:bg-brand/10 hover:text-brand"
+            >
+              <Icon
+                name="desplegar"
+                size={18}
+                className="transition-transform duration-300"
+                style={{ transform: abierta ? 'none' : 'rotate(180deg)' }}
+              />
+            </button>
+          </Tooltip>
+        )}
       </div>
     </div>
   )
