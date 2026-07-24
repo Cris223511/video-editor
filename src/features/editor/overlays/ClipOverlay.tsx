@@ -74,6 +74,11 @@ export default function ClipOverlay() {
     id: string,
     base: { x: number; y: number },
     tamCaja: { w: number; h: number },
+    // desfase del centro del recorte respecto al centro del video, en fracción del
+    // lienzo. con un clip recortado lo que se ve (y lo que hay que imantar) es la
+    // caja del recorte, desplazada respecto al video; sin recorte queda en cero y
+    // todo funciona igual que antes
+    desfase: { x: number; y: number } = { x: 0, y: 0 },
   ) {
     e.stopPropagation()
     setMoviendoVisor(true)
@@ -86,9 +91,14 @@ export default function ClipOverlay() {
         actualizarEncuadre(id, bruto)
         return
       }
-      const r = imantar({ x: bruto.x, y: bruto.y, w: tamCaja.w, h: tamCaja.h }, [])
+      // se imanta la caja del recorte, que es el marco visible, y no el video
+      // completo: sus bordes son los que se alinean con los del lienzo y donde deben
+      // salir las guías laterales. se lleva el centro al del recorte, se imanta y se
+      // devuelve al centro del video restando el mismo desfase
+      const centroRec = { x: bruto.x + desfase.x, y: bruto.y + desfase.y }
+      const r = imantar({ x: centroRec.x, y: centroRec.y, w: tamCaja.w, h: tamCaja.h }, [])
       setGuias(r.guias)
-      actualizarEncuadre(id, { x: r.x, y: r.y })
+      actualizarEncuadre(id, { x: r.x - desfase.x, y: r.y - desfase.y })
     }
     const soltar = () => {
       setGuias([])
@@ -171,8 +181,6 @@ export default function ClipOverlay() {
 
   const enc = encuadreDe(activo)
   const r = rectClip(asset.ancho, asset.alto, rect.w, rect.h, enc)
-  // caja del clip en fracción del lienzo, que es lo que espera el redimensionado
-  const caja = { x: enc.x, y: enc.y, w: r.dw / rect.w, h: r.dh / rect.h }
   // si el clip está recortado, el contorno de selección se ciñe al área que queda
   // (lo que de verdad se ve), no al tamaño completo del video. así los tiradores
   // rodean lo recortado y no un marco más grande que la imagen
@@ -213,7 +221,9 @@ export default function ClipOverlay() {
         />
       ))}
       <div
-        onMouseDown={(e) => iniciarArrastre(e, activo.id, { x: enc.x, y: enc.y }, { w: caja.w, h: caja.h })}
+        onMouseDown={(e) =>
+          iniciarArrastre(e, activo.id, { x: enc.x, y: enc.y }, { w: cajaRecorte.w, h: cajaRecorte.h }, desfaseRecorte)
+        }
         onDoubleClick={(e) => {
           e.stopPropagation()
           // doble clic sobre un clip ya recortado abre su recorte en el visor para
