@@ -52,7 +52,6 @@ export default function Preview() {
   const clips = useEditorStore((s) => s.pista.clips)
   const playhead = useEditorStore((s) => s.playhead)
   const reproduciendo = useEditorStore((s) => s.reproduciendo)
-  const moviendoVisor = useEditorStore((s) => s.moviendoVisor)
   // mientras se edita el recorte de un clip, ese clip se muestra entero (sin
   // aplicar todavía el recorte al video), para poder ver lo que se va a dejar fuera
   // y ajustarlo; la sombra del overlay de recorte es la que oscurece esa parte
@@ -1018,23 +1017,17 @@ export default function Preview() {
                       clipPath,
                       maskImage: recEstilo.maskImage,
                       WebkitMaskImage: recEstilo.WebkitMaskImage,
-                      // el color y el giro entran progresivamente. aplicar un estilo
-                      // o rotar noventa grados cambiaba la imagen de un fotograma al
-                      // siguiente y el salto se notaba mucho
-                      // mientras el color y los efectos aparecen (su transición
-                      // propia), la mezcla ya cambia el filtro fotograma a fotograma,
-                      // así que el suavizado css sobra y solo dejaría estela; sin esa
-                      // transición sí conviene, para que aplicar un color a mano entre
-                      // con calma
-                      // al arrastrar, redimensionar o girar el elemento en el visor
-                      // se quita el suavizado del transform para que siga al cursor
-                      // uno a uno; fuera de ese gesto vuelve la transición que hace
-                      // que aplicar un giro o un encuadre a mano entre con calma
-                      transition: moviendoVisor
-                        ? 'filter 320ms cubic-bezier(0.4, 0, 0.2, 1)'
-                        : mezclaEfecto.animando
-                          ? 'transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1)'
-                          : 'filter 320ms cubic-bezier(0.4, 0, 0.2, 1), transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1)',
+                      // el filtro de color nunca se suaviza: al arrastrar un
+                      // deslizador de tono (exposición, contraste, temperatura...) o
+                      // regular un efecto, el cambio tiene que verse pegado al cursor,
+                      // no arrastrarse un tercio de segundo por detrás. el único
+                      // suavizado que queda es el del transform, y solo durante la
+                      // aparición progresiva del clip, que es una animación automática
+                      // suya. cuando el usuario mueve, gira o escala el elemento a mano
+                      // (desde el visor o desde un deslizador) responde uno a uno
+                      transition: mezclaEfecto.animando
+                        ? 'transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1)'
+                        : undefined,
                       filter: (() => {
                         const partes: string[] = []
                         // color y desenfoque de movimiento van juntos en el filtro
