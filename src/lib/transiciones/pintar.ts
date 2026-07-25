@@ -231,6 +231,29 @@ export function pintarTransicion(
       return
     }
 
+    case 'flash-camara': {
+      // como tomar una foto con flash: un leve desenfoque de movimiento a cada lado y
+      // un fogonazo blanco muy agudo justo en el corte, más brusco que el flash normal
+      const maxB = Math.min(ancho, alto) * 0.03
+      if (p < 0.5) {
+        const k = p / 0.5
+        if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, `blur(${(maxB * k).toFixed(2)}px) brightness(${(1 + 0.25 * k).toFixed(3)})`, 1 + 0.03 * k)
+      } else {
+        const k = 1 - (p - 0.5) / 0.5
+        if (entrante) conFiltro(ctx, ancho, alto, entrante, pintar, `blur(${(maxB * k).toFixed(2)}px) brightness(${(1 + 0.25 * k).toFixed(3)})`, 1 + 0.03 * k)
+      }
+      // el fogonazo: pico agudo y saturado justo en la mitad
+      const velo = Math.max(0, 1 - Math.abs(p - 0.5) / 0.32)
+      if (velo > 0) {
+        ctx.save()
+        ctx.globalAlpha = Math.min(1, Math.pow(velo, 0.55) * 1.9)
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(0, 0, ancho, alto)
+        ctx.restore()
+      }
+      return
+    }
+
     case 'zoom-desenfoque': {
       const maxB = Math.min(ancho, alto) * 0.045
       if (p < 0.5) {

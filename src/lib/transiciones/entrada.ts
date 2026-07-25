@@ -54,6 +54,7 @@ export function estiloEntrada(tipo: string, p: number): EstiloEntrada {
     case 'desenfoque':
     case 'resplandor':
     case 'flash':
+    case 'flash-camara':
       return { opacidad: f, escala: 1, tx: 0, ty: 0 }
     case 'zoom-desenfoque':
       // el golpe de zoom sí tiene sentido en una capa: entra creciendo un poco

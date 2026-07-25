@@ -27,6 +27,7 @@ export type Tecnica =
   | 'flash' // un golpe de luz blanca en el corte
   | 'zoom-desenfoque' // acercón brusco con desenfoque, tipo golpe de cámara
   | 'barrido-movimiento' // latigazo lateral desenfocado de un plano al otro
+  | 'flash-camara' // fogonazo blanco de foto con flash, con algo de desenfoque
 
 // forma del recorte para las transiciones de máscara. el progreso va de 0 a 1
 export type Forma =
@@ -257,6 +258,13 @@ export const CATALOGO: Transicion[] = [
     grupo: 'desenfoques',
     tecnica: 'flash',
     descripcion: 'Un golpe de luz blanca justo en el corte entre los dos planos.',
+  },
+  {
+    id: 'flash-camara',
+    nombre: 'Flash de cámara',
+    grupo: 'desenfoques',
+    tecnica: 'flash-camara',
+    descripcion: 'Como una foto con flash: un fogonazo blanco en el corte y un leve desenfoque de movimiento a cada lado.',
   },
   {
     id: 'golpe-zoom',

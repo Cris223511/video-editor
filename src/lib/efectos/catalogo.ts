@@ -82,6 +82,19 @@ export const CATEGORIAS_EFECTO: CategoriaEfecto[] = [
       { id: 'toxico', nombre: 'Tóxico', css: (i) => `hue-rotate(${Math.round(p(i) * 80)}deg) saturate(${1 + p(i) * 0.9})` },
     ],
   },
+  {
+    // looks dramáticos, sobre todo en blanco y negro de mucho contraste, con las
+    // luces reventadas y las sombras cerradas, el aire de vídeo nocturno de coches
+    id: 'cine',
+    nombre: 'Cine',
+    efectos: [
+      { id: 'noir', nombre: 'Noir', css: (i) => `grayscale(1) contrast(${1 + p(i) * 0.8}) brightness(${1 - p(i) * 0.08})` },
+      { id: 'infrarrojo', nombre: 'Infrarrojo', css: (i) => `grayscale(1) contrast(${1 + p(i) * 1.1}) brightness(${1 + p(i) * 0.28})` },
+      { id: 'ceniza', nombre: 'Ceniza', css: (i) => `grayscale(1) contrast(${1 + p(i) * 0.6}) brightness(${1 - p(i) * 0.2})` },
+      { id: 'contraste-duro', nombre: 'Alto contraste', css: (i) => `contrast(${1 + p(i) * 1.2}) saturate(${1 + p(i) * 0.25})` },
+      { id: 'plata', nombre: 'Plata fría', css: (i) => `grayscale(${1 - p(i) * 0.15}) contrast(${1 + p(i) * 0.5}) hue-rotate(${Math.round(-p(i) * 12)}deg) brightness(${1 + p(i) * 0.06})` },
+    ],
+  },
 ]
 
 export function buscarEfecto(id: string): EfectoCatalogo | undefined {
