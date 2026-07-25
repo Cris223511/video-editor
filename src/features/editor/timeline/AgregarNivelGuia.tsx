@@ -50,7 +50,14 @@ export default function AgregarNivelGuia() {
         return (
           <div
             key={k}
-            onMouseEnter={() => setActiva(k)}
+            // solo se enciende al pasar el cursor de verdad, sin ningún botón
+            // pulsado. si se está arrastrando algo (reordenar una fila, mover un
+            // clip) el cursor cruza estas franjas con el botón apretado, y ahí no se
+            // está insertando nada: sacar la línea de «insertar un nivel» en ese
+            // momento confundía. buttons distinto de cero delata ese arrastre
+            onMouseEnter={(e) => {
+              if (e.buttons === 0) setActiva(k)
+            }}
             onMouseLeave={() => setActiva((a) => (a === k ? null : a))}
             className="absolute inset-x-0 z-40 flex items-center justify-center"
             // la franja sensible se apoya un poco por debajo del borde de la
