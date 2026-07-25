@@ -7,7 +7,10 @@
 // el trabajo
 
 const ALTO = 64 // alto de cada fotograma en píxeles; el ancho sale del aspecto
-const CANTIDAD = 24 // suficientes para que la tira se lea sin tardar demasiado
+// cuántos fotogramas se muestrean del video. cuantos más, más detalle tiene la
+// tira al acercar el zoom, a cambio de tardar un poco más en extraerse. cuarenta
+// y ocho da una tira densa que se lee como una película, no como un pase de fotos
+const CANTIDAD = 48
 
 export interface Tira {
   // fotogramas en orden, repartidos por igual a lo largo del video

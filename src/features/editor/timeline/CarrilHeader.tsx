@@ -102,9 +102,12 @@ export default function CarrilHeader({
         title={onReordenar ? 'Arrastra para reordenar la sección' : undefined}
         className={[
           'grid h-6 w-6 shrink-0 place-items-center rounded-md',
+          // el fondo de «botón» y el cursor de arrastre solo salen si la sección se
+          // puede reordenar de verdad. donde no se puede (el audio) queda el icono
+          // suelto, sin ese círculo que invitaba a arrastrar algo que no se movía
           onReordenar ? 'cursor-grab active:cursor-grabbing' : '',
         ].join(' ')}
-        style={{ background: `${acento}22`, color: acento }}
+        style={{ background: onReordenar ? `${acento}22` : 'transparent', color: acento }}
       >
         <Icon name={icono} size={14} />
       </span>

@@ -311,6 +311,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
 
   return (
     <div
+      data-bloque-id={region.id}
       onMouseDown={iniciarMover}
       // el botón derecho abre el menú de este bloque en el punto donde se pulsó
       onContextMenu={(e) => {

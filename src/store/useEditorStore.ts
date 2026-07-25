@@ -3,6 +3,8 @@ import { Track, Clip, AjusteTono, Transicion, PistaMeta, EfectoClip, Encuadre } 
 import { claveEfecto } from '../lib/efectos/catalogo'
 import { MediaAsset } from '../types/media'
 import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto, CapaTrazo, KeyframePos } from '../types/layers'
+import { Impacto, TipoImpacto } from '../types/impacto'
+import { COLOR_IMPACTO_DEF, DUR_IMPACTO_DEF, FUERZA_IMPACTO_DEF } from '../lib/impactos/catalogo'
 import { RegionAudio, ClipAudio } from '../types/audio'
 import { Marco } from '../types/marco'
 import { tonoNeutro } from '../lib/color/tono'
@@ -96,8 +98,10 @@ export type Herramienta =
   | 'recortar'
   | 'borrador'
 
-// las tres secciones que conviven en la línea de tiempo, cada una con sus filas
-export type Carril = 'video' | 'audio' | 'texto' | 'imagen'
+// las tres secciones que conviven en la línea de tiempo, cada una con sus filas.
+// las figuras y las imágenes dejaron de tener carril propio: ahora viven dentro
+// de las pistas de video, como un clip más, y su campo nivel apunta a esa pista
+export type Carril = 'video' | 'audio' | 'texto'
 
 interface EstadoEditor {
   pista: Track
@@ -108,28 +112,24 @@ interface EstadoEditor {
   // metadatos de cada nivel, en el mismo orden que altosPista. lo que decide si
   // un nivel suena, se ve o se puede tocar vive aquí
   pistasMeta: PistaMeta[]
-  // cuántas filas muestra el carril de texto y figuras y cuántas el de audio.
-  // arrancan en 1 y crecen cuando el usuario añade una, para repartir en varias
-  // alturas los bloques que se pisan en el tiempo. cada capa, región o audio
-  // guarda en su campo nivel en qué fila cae
+  // cuántas filas muestra el carril de texto y cuántas el de audio. arrancan en 1
+  // y crecen cuando el usuario añade una, para repartir en varias alturas los
+  // bloques que se pisan en el tiempo. cada capa, región o audio guarda en su
+  // campo nivel en qué fila cae. las figuras y las imágenes ya no cuentan aquí:
+  // su nivel apunta a una pista de video
   nivelesTexto: number
   nivelesAudio: number
-  // el carril de imágenes es independiente del de texto y figuras: las imágenes
-  // dejaron de mezclarse con ellos y tienen sus propias filas
-  nivelesImagen: number
   // nombres de los carriles de texto y audio, editables como el de una pista de
   // video. viven en el documento para guardarse y entrar en el historial
   nombreCarrilTexto: string
   nombreCarrilAudio: string
-  nombreCarrilImagen: string
-  renombrarCarril: (carril: 'texto' | 'audio' | 'imagen', nombre: string) => void
-  // alto de cada fila de los carriles de audio, texto e imagen, ajustable por el
-  // usuario igual que el de una pista de video. cada carril lleva el suyo, así que
-  // estirar uno no toca a los demás
+  renombrarCarril: (carril: 'texto' | 'audio', nombre: string) => void
+  // alto de cada fila de los carriles de audio y texto, ajustable por el usuario
+  // igual que el de una pista de video. cada carril lleva el suyo, así que estirar
+  // uno no toca al otro
   altoFilaAudio: number
   altoFilaTexto: number
-  altoFilaImagen: number
-  setAltoCarril: (carril: 'audio' | 'texto' | 'imagen', alto: number) => void
+  setAltoCarril: (carril: 'audio' | 'texto', alto: number) => void
   // ancho de la columna de cabeceras de la línea de tiempo, ajustable arrastrando
   // su borde. es una preferencia de vista, no del documento, así que no entra en el
   // historial ni se guarda por proyecto
@@ -237,6 +237,9 @@ interface EstadoEditor {
   bloquesSeleccionados: string[]
   alternarBloque: (id: string) => void
   limpiarBloques: () => void
+  // marca de golpe un conjunto de bloques, reemplazando lo que hubiera. la usa el
+  // recuadro de arrastre de la línea de tiempo al soltar
+  marcarBloques: (ids: string[]) => void
   // menú que sale al pulsar con el botón derecho sobre un bloque de la línea de
   // tiempo. guarda dónde se pulsó y sobre qué, y de ahí sale lo que se ofrece
   menuContextual: { x: number; y: number; tipo: 'clip' | 'capa' | 'audio' | 'region'; id: string } | null
@@ -244,6 +247,22 @@ interface EstadoEditor {
   cerrarMenuContextual: () => void
   // borra de una vez todos los bloques marcados, sea cual sea su tipo
   quitarBloques: (ids: string[]) => void
+
+  // impactos: efectos momentáneos que viven encima de un clip (un rebote, un
+  // flash, una sacudida). se arrastran desde el panel derecho a un clip y afectan
+  // a todo lo que se ve en ese instante. su bolita se selecciona aparte de los
+  // clips y capas, y al elegirla se abre su editor en el panel de la derecha
+  impactos: Impacto[]
+  impactoSeleccionado: string | null
+  // crea un impacto en el segundo t con el tipo indicado (rebote por defecto). el
+  // t sale de dónde se soltó la bolita sobre el clip
+  agregarImpacto: (t: number, tipo?: TipoImpacto) => void
+  moverImpacto: (id: string, t: number) => void
+  // cambia cuánto dura, arrastrando la rayita de debajo de la bolita
+  recortarImpacto: (id: string, duracion: number) => void
+  actualizarImpacto: (id: string, cambios: Partial<Impacto>) => void
+  quitarImpacto: (id: string) => void
+  seleccionarImpacto: (id: string | null) => void
   // desplaza en el tiempo todos los bloques marcados a la vez, sumando el mismo
   // salto a cada uno. ninguno baja de cero, y si uno topa con el arranque el resto
   // se frena con él para no descuadrar el conjunto
@@ -276,20 +295,19 @@ interface EstadoEditor {
   // tramos no se coman el sonido entero
   setFundido: (id: string, lado: 'entrada' | 'salida', segundos: number) => void
   agregarNivelTexto: () => void
-  agregarNivelImagen: () => void
   agregarNivelAudio: () => void
   // permuta dos filas del carril de audio: todo lo que vive en una pasa a la otra
   // y viceversa. sirve para arrastrar un nivel entero arriba o abajo y decidir cuál
   // va primero, sin tener que mover sus bloques uno por uno
   intercambiarNivelAudio: (a: number, b: number) => void
   // lleva una capa a otra fila del carril de texto, o un audio o región a otra del
-  // de audio. si la fila destino es la última vacía, el carril crece solo para
-  // dejar de nuevo una libre encima
+  // de audio. si la capa es figura o imagen, el nivel apunta a una pista de video
+  // y se lleva ahí. si la fila destino es la última vacía, el carril crece solo
+  // para dejar de nuevo una libre encima
   moverCapaNivel: (id: string, nivel: number) => void
   // abre una fila nueva encima de la indicada y muda ahí el bloque. las filas por
   // encima suben un puesto, igual que hace la inserción de niveles de video
   insertarNivelTexto: (nivel: number, id: string) => void
-  insertarNivelImagen: (nivel: number, id: string) => void
   insertarNivelAudio: (nivel: number, id: string) => void
   moverAudioNivel: (id: string, nivel: number) => void
   // guía celeste que aparece mientras se arrastra un clip sobre la separación
@@ -522,15 +540,13 @@ type Documento = Pick<
   | 'pistasMeta'
   | 'nivelesTexto'
   | 'nivelesAudio'
-  | 'nivelesImagen'
   | 'nombreCarrilTexto'
   | 'nombreCarrilAudio'
-  | 'nombreCarrilImagen'
   | 'altoFilaAudio'
   | 'altoFilaTexto'
-  | 'altoFilaImagen'
   | 'ordenCarriles'
   | 'capas'
+  | 'impactos'
   | 'marco'
   | 'volumenGlobal'
   | 'audioRegiones'
@@ -554,16 +570,14 @@ function tomarDocumento(s: EstadoEditor): Documento {
     pistasMeta: s.pistasMeta,
     nivelesTexto: s.nivelesTexto,
     nivelesAudio: s.nivelesAudio,
-    nivelesImagen: s.nivelesImagen,
     nombreCarrilTexto: s.nombreCarrilTexto,
     nombreCarrilAudio: s.nombreCarrilAudio,
-    nombreCarrilImagen: s.nombreCarrilImagen,
     altoFilaAudio: s.altoFilaAudio,
     altoFilaTexto: s.altoFilaTexto,
-    altoFilaImagen: s.altoFilaImagen,
     ordenCarriles: s.ordenCarriles,
     audios: s.audios,
     capas: s.capas,
+    impactos: s.impactos,
     marco: s.marco,
     volumenGlobal: s.volumenGlobal,
     audioRegiones: s.audioRegiones,
@@ -629,6 +643,11 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'setTransicion',
   'setTransicionEfecto',
   'setTransicionSalida',
+  'agregarImpacto',
+  'moverImpacto',
+  'recortarImpacto',
+  'actualizarImpacto',
+  'quitarImpacto',
   'dividirEnCabezal',
   'cerrarHueco',
   'agregarPista',
@@ -643,12 +662,10 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'moverBloques',
   'moverCarril',
   'agregarNivelTexto',
-  'agregarNivelImagen',
   'agregarNivelAudio',
   'intercambiarNivelAudio',
   'moverCapaNivel',
   'insertarNivelTexto',
-  'insertarNivelImagen',
   'insertarNivelAudio',
   'moverAudioNivel',
   'alternarSilencioPista',
@@ -727,17 +744,18 @@ const ALTO_FILA_MAX = 120
 // altura con la que nace cada carril, que además es su mínimo: se puede agrandar
 // arrastrando pero no achicar por debajo de esto, porque más pequeño el rótulo y
 // la onda ya no se leen. cada tipo trae la suya
-const ALTO_FILA_DEF: Record<'audio' | 'texto' | 'imagen', number> = {
+const ALTO_FILA_DEF: Record<'audio' | 'texto', number> = {
   audio: 32,
   texto: 36,
-  imagen: 36,
 }
 
-// primera fila del carril de texto y figuras que no tiene ninguna capa (las
-// imágenes viven en su propio carril, así que no cuentan). se usa al crear un
-// texto o una figura para que se reparta por niveles en vez de amontonarse
+// primera fila del carril de texto que no tiene ninguna capa. solo cuentan las
+// capas que de verdad viven en ese carril (texto, censura y dibujo): las figuras
+// y las imágenes se fueron a las pistas de video. se usa al crear un texto para
+// que se reparta por niveles en vez de amontonarse
 function nivelLibreTexto(capas: { tipo: string; nivel?: number }[]): number {
-  const ocupados = new Set(capas.filter((c) => c.tipo !== 'imagen').map((c) => c.nivel ?? 0))
+  const enCarrilTexto = (t: string) => t !== 'imagen' && t !== 'figura'
+  const ocupados = new Set(capas.filter((c) => enCarrilTexto(c.tipo)).map((c) => c.nivel ?? 0))
   let destino = 0
   while (destino < MAX_NIVELES - 1 && ocupados.has(destino)) destino++
   return destino
@@ -836,15 +854,12 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   pistasMeta: [metaPista(1)],
   nivelesTexto: 1,
   nivelesAudio: 1,
-  nivelesImagen: 1,
-  nombreCarrilTexto: 'Texto y figuras',
+  nombreCarrilTexto: 'Texto',
   nombreCarrilAudio: 'Audio',
-  nombreCarrilImagen: 'Imágenes',
   altoFilaAudio: 32,
   altoFilaTexto: 36,
-  altoFilaImagen: 36,
   anchoCabeceras: 176,
-  ordenCarriles: ['video', 'audio', 'imagen', 'texto'],
+  ordenCarriles: ['video', 'audio', 'texto'],
   capas: [],
   playhead: 0,
   reproduciendo: false,
@@ -856,6 +871,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   borradorGrosor: 24,
   menuContextual: null,
   regionSeleccionada: null,
+  impactos: [],
+  impactoSeleccionado: null,
   herramienta: 'proyecto',
   categoriaClip: null,
   pxPorSegundo: PX_POR_SEGUNDO_DEFECTO,
@@ -949,19 +966,19 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       altosPista: [64],
       pistasMeta: [metaPista(1)],
       nivelesTexto: 1,
-      nivelesImagen: 1,
       altoFilaAudio: 32,
       altoFilaTexto: 36,
-      altoFilaImagen: 36,
       nivelesAudio: 1,
-      ordenCarriles: ['video', 'audio', 'imagen', 'texto'],
+      ordenCarriles: ['video', 'audio', 'texto'],
       capas: [],
+      impactos: [],
       playhead: 0,
       reproduciendo: false,
       clipSeleccionado: null,
       capaSeleccionada: null,
       capasSeleccionadas: [],
       regionSeleccionada: null,
+      impactoSeleccionado: null,
       pxPorSegundo: PX_POR_SEGUNDO_DEFECTO,
       resolucion: { ancho: 1920, alto: 1080 },
       resolucionAuto: { ancho: 1920, alto: 1080 },
@@ -988,19 +1005,6 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   agregarDesdeAsset: (asset, destino) =>
     set((s) => {
-      // una imagen no ocupa un nivel de video: entra como capa desde el cabezal,
-      // con una duración corta que se ajusta si el montaje termina antes, igual
-      // que la imagen que se coloca desde su propio panel
-      if (asset.clase === 'imagen') {
-        const capa = crearCapaImagen(s.playhead, asset.url, asset.ancho, asset.alto)
-        const DUR_IMAGEN = 5
-        const fin = duracionTotal(s.pista.clips)
-        const disponible = fin > s.playhead ? fin - s.playhead : DUR_IMAGEN
-        // nunca por debajo de cuatro segundos, aunque el montaje termine antes
-        capa.duracion = Math.max(4, Math.min(DUR_IMAGEN, disponible))
-        return { capas: [...s.capas, capa], capaSeleccionada: capa.id, clipSeleccionado: null }
-      }
-
       // un audio importado va a la pista de sonido como un clip propio, pegado al
       // final de lo que ya haya ahí, con su duración completa y a volumen normal
       if (asset.clase === 'audio') {
@@ -1023,6 +1027,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       let altosPista = s.altosPista
       let pistasMeta = s.pistasMeta
       let clipsPrevios = s.pista.clips
+      // las figuras e imágenes que ya viven en pistas de video se corren igual que
+      // los clips cuando se abre una pista nueva por debajo de ellas
+      let capasPrevias = s.capas
       let pistaDestino = destino?.pista ?? 0
 
       // cuando se suelta sobre una separación se abre allí un nivel, empujando
@@ -1033,6 +1040,11 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       if (quiereInsertar) {
         const k = Math.max(0, Math.min(s.numPistas, destino!.insertarEn!))
         clipsPrevios = clipsPrevios.map((c) => (c.pista >= k ? { ...c, pista: c.pista + 1 } : c))
+        capasPrevias = capasPrevias.map((c) =>
+          (c.tipo === 'figura' || c.tipo === 'imagen') && (c.nivel ?? 0) >= k
+            ? { ...c, nivel: (c.nivel ?? 0) + 1 }
+            : c,
+        )
         altosPista = [...altosPista]
         altosPista.splice(k, 0, ALTO_PISTA_BASE)
         pistasMeta = [...pistasMeta]
@@ -1042,6 +1054,29 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       } else {
         // sin inserción, el destino se sujeta al rango de niveles existentes
         pistaDestino = Math.max(0, Math.min(s.numPistas - 1, pistaDestino))
+      }
+
+      // una imagen entra como capa que vive en la pista de video de destino: se
+      // dibuja siempre encima del video, pero en la línea de tiempo ocupa esa
+      // pista como un bloque más. dura unos pocos segundos, ajustándose si el
+      // montaje termina antes
+      if (asset.clase === 'imagen') {
+        const capa = crearCapaImagen(s.playhead, asset.url, asset.ancho, asset.alto)
+        capa.nivel = pistaDestino
+        const DUR_IMAGEN = 5
+        const fin = duracionTotal(clipsPrevios)
+        const disponible = fin > s.playhead ? fin - s.playhead : DUR_IMAGEN
+        capa.duracion = Math.max(4, Math.min(DUR_IMAGEN, disponible))
+        return {
+          numPistas,
+          altosPista,
+          pistasMeta,
+          pista: { ...s.pista, clips: clipsPrevios },
+          capas: [...capasPrevias, capa],
+          capaSeleccionada: capa.id,
+          capasSeleccionadas: [capa.id],
+          clipSeleccionado: null,
+        }
       }
 
       // el medio entra al final de SU nivel de destino, no del proyecto entero,
@@ -1076,6 +1111,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         altosPista,
         pistasMeta,
         pista: { ...s.pista, clips: nuevosClips },
+        capas: capasPrevias,
         clipSeleccionado: clip.id,
         capaSeleccionada: null,
         pxPorSegundo: encaje ?? s.pxPorSegundo,
@@ -1092,6 +1128,68 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     })),
 
   limpiarBloques: () => set({ bloquesSeleccionados: [] }),
+
+  marcarBloques: (ids) =>
+    set({
+      bloquesSeleccionados: ids,
+      // el recuadro reemplaza cualquier selección de uno solo, para que el menú y
+      // los atajos operen sobre el conjunto y no sobre un elemento suelto de antes
+      clipSeleccionado: null,
+      capaSeleccionada: null,
+      capasSeleccionadas: [],
+      regionSeleccionada: null,
+      impactoSeleccionado: null,
+    }),
+
+  agregarImpacto: (t, tipo = 'rebote') =>
+    set((s) => {
+      const impacto: Impacto = {
+        id: crypto.randomUUID(),
+        t: Math.max(0, t),
+        duracion: DUR_IMPACTO_DEF,
+        tipo,
+        intensidad: FUERZA_IMPACTO_DEF,
+        color: COLOR_IMPACTO_DEF,
+      }
+      return {
+        impactos: [...s.impactos, impacto],
+        impactoSeleccionado: impacto.id,
+        // al soltar una bolita se suelta cualquier otra selección, para que el panel
+        // derecho pase a mostrar el editor del impacto
+        clipSeleccionado: null,
+        capaSeleccionada: null,
+        capasSeleccionadas: [],
+        regionSeleccionada: null,
+      }
+    }),
+
+  moverImpacto: (id, t) =>
+    set((s) => ({ impactos: s.impactos.map((im) => (im.id === id ? { ...im, t: Math.max(0, t) } : im)) })),
+
+  recortarImpacto: (id, duracion) =>
+    set((s) => ({
+      // nunca por debajo de una décima: menos que eso no se ve ni se puede agarrar
+      impactos: s.impactos.map((im) => (im.id === id ? { ...im, duracion: Math.max(0.1, duracion) } : im)),
+    })),
+
+  actualizarImpacto: (id, cambios) =>
+    set((s) => ({ impactos: s.impactos.map((im) => (im.id === id ? { ...im, ...cambios } : im)) })),
+
+  quitarImpacto: (id) =>
+    set((s) => ({
+      impactos: s.impactos.filter((im) => im.id !== id),
+      impactoSeleccionado: s.impactoSeleccionado === id ? null : s.impactoSeleccionado,
+    })),
+
+  seleccionarImpacto: (id) =>
+    set((s) => ({
+      impactoSeleccionado: id,
+      // elegir una bolita suelta el resto de selecciones
+      clipSeleccionado: id ? null : s.clipSeleccionado,
+      capaSeleccionada: id ? null : s.capaSeleccionada,
+      capasSeleccionadas: id ? [] : s.capasSeleccionadas,
+      regionSeleccionada: id ? null : s.regionSeleccionada,
+    })),
 
   abrirMenuContextual: (m) => set({ menuContextual: m }),
   cerrarMenuContextual: () => set({ menuContextual: null }),
@@ -1653,6 +1751,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       capaSeleccionada: id ? null : s.capaSeleccionada,
       capasSeleccionadas: id ? [] : s.capasSeleccionadas,
       regionSeleccionada: id ? null : s.regionSeleccionada,
+      impactoSeleccionado: id ? null : s.impactoSeleccionado,
     })),
 
   limpiarSeleccion: () =>
@@ -1661,6 +1760,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       capaSeleccionada: null,
       capasSeleccionadas: [],
       regionSeleccionada: null,
+      impactoSeleccionado: null,
       bloquesSeleccionados: [],
       // soltar la selección cierra también el recorte rápido del visor
       recorteRapido: false,
@@ -1683,24 +1783,34 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   // su campo pista, altos y metadatos) se corren igual para no descuadrarse. si
   // llega un clip, se le muda al nivel recién nacido; así soltar entre dos pistas
   // crea la fila y deja el clip dentro de una sola pasada
-  insertarPistaEn: (indice, clipId) =>
+  insertarPistaEn: (indice, id) =>
     set((s) => {
       if (s.numPistas >= MAX_PISTAS) return {}
       const k = Math.max(0, Math.min(s.numPistas, indice))
+      // el id que llega puede ser de un clip o de una figura o imagen (que ahora
+      // viven en pistas de video). se muda ese elemento a la pista recién nacida y
+      // todo lo que estaba en ese índice o por encima sube un puesto
       const clips = s.pista.clips.map((c) => {
-        if (clipId && c.id === clipId) return { ...c, pista: k }
+        if (id && c.id === id) return { ...c, pista: k }
         return c.pista >= k ? { ...c, pista: c.pista + 1 } : c
+      })
+      const capas = s.capas.map((c) => {
+        if (c.tipo !== 'figura' && c.tipo !== 'imagen') return c
+        if (id && c.id === id) return { ...c, nivel: k }
+        return (c.nivel ?? 0) >= k ? { ...c, nivel: (c.nivel ?? 0) + 1 } : c
       })
       const altosPista = [...s.altosPista]
       altosPista.splice(k, 0, ALTO_PISTA_BASE)
       const pistasMeta = [...s.pistasMeta]
       pistasMeta.splice(k, 0, metaPista(s.numPistas + 1))
+      const esCapa = s.capas.some((c) => c.id === id)
       return {
         numPistas: s.numPistas + 1,
         altosPista,
         pistasMeta,
         pista: { ...s.pista, clips },
-        clipSeleccionado: clipId ?? s.clipSeleccionado,
+        capas,
+        clipSeleccionado: esCapa ? s.clipSeleccionado : (id ?? s.clipSeleccionado),
       }
     }),
 
@@ -1724,15 +1834,27 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       const clips = s.pista.clips
         .filter((c) => c.pista !== indice)
         .map((c) => (c.pista > indice ? { ...c, pista: c.pista - 1 } : c))
+      // las figuras e imágenes de esa pista se van con ella, igual que los clips;
+      // las de pistas superiores bajan un puesto para no quedar descolgadas
+      const capas = s.capas
+        .filter((c) => !((c.tipo === 'figura' || c.tipo === 'imagen') && (c.nivel ?? 0) === indice))
+        .map((c) =>
+          (c.tipo === 'figura' || c.tipo === 'imagen') && (c.nivel ?? 0) > indice
+            ? { ...c, nivel: (c.nivel ?? 0) - 1 }
+            : c,
+        )
       const altosPista = s.altosPista.filter((_, i) => i !== indice)
       const pistasMeta = s.pistasMeta.filter((_, i) => i !== indice)
       const seguiaVivo = clips.some((c) => c.id === s.clipSeleccionado)
+      const capaViva = capas.some((c) => c.id === s.capaSeleccionada)
       return {
         numPistas: s.numPistas - 1,
         altosPista,
         pistasMeta,
         pista: { ...s.pista, clips },
+        capas,
         clipSeleccionado: seguiaVivo ? s.clipSeleccionado : null,
+        capaSeleccionada: capaViva ? s.capaSeleccionada : null,
         playhead: Math.min(s.playhead, duracionTotal(clips)),
       }
     }),
@@ -1766,18 +1888,26 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
             ? { ...c, pista: indice }
             : c,
       )
+      // las figuras e imágenes viajan con su pista igual que los clips: si estaban
+      // en una de las dos filas que se permutan, cambian de nivel para seguirla
+      const capas = s.capas.map((c) => {
+        if (c.tipo !== 'figura' && c.tipo !== 'imagen') return c
+        const n = c.nivel ?? 0
+        if (n === indice) return { ...c, nivel: otro }
+        if (n === otro) return { ...c, nivel: indice }
+        return c
+      })
       const altosPista = [...s.altosPista]
       ;[altosPista[indice], altosPista[otro]] = [altosPista[otro], altosPista[indice]]
       const pistasMeta = [...s.pistasMeta]
       ;[pistasMeta[indice], pistasMeta[otro]] = [pistasMeta[otro], pistasMeta[indice]]
-      return { pista: { ...s.pista, clips }, altosPista, pistasMeta }
+      return { pista: { ...s.pista, clips }, capas, altosPista, pistasMeta }
     }),
 
   renombrarCarril: (carril, nombre) =>
     set(() => {
       const limpio = nombre.slice(0, 40)
       if (carril === 'texto') return { nombreCarrilTexto: limpio }
-      if (carril === 'imagen') return { nombreCarrilImagen: limpio }
       return { nombreCarrilAudio: limpio }
     }),
 
@@ -1787,7 +1917,6 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       // debajo de como nace, solo agrandar hasta el tope
       const a = Math.round(Math.min(ALTO_FILA_MAX, Math.max(ALTO_FILA_DEF[carril], alto)))
       if (carril === 'audio') return { altoFilaAudio: a }
-      if (carril === 'imagen') return { altoFilaImagen: a }
       return { altoFilaTexto: a }
     }),
 
@@ -1877,9 +2006,6 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   agregarNivelTexto: () =>
     set((s) => (s.nivelesTexto >= MAX_NIVELES ? {} : { nivelesTexto: s.nivelesTexto + 1 })),
 
-  agregarNivelImagen: () =>
-    set((s) => (s.nivelesImagen >= MAX_NIVELES ? {} : { nivelesImagen: s.nivelesImagen + 1 })),
-
   agregarNivelAudio: () =>
     set((s) => (s.nivelesAudio >= MAX_NIVELES ? {} : { nivelesAudio: s.nivelesAudio + 1 })),
 
@@ -1903,15 +2029,18 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   moverCapaNivel: (id, nivel) =>
     set((s) => {
+      const capa = s.capas.find((c) => c.id === id)
+      if (!capa) return {}
+      // una figura o imagen se mueve entre pistas de video: su nivel apunta a una
+      // de ellas y se sujeta al rango existente, sin abrir filas de texto
+      if (capa.tipo === 'figura' || capa.tipo === 'imagen') {
+        const destino = Math.max(0, Math.min(s.numPistas - 1, nivel))
+        return { capas: s.capas.map((c) => (c.id === id ? { ...c, nivel: destino } : c)) }
+      }
+      // texto, dibujo y censura se reparten por las filas del carril de texto; al
+      // caer en la última vacía, el carril crece para dejar otra libre encima
       const destino = Math.max(0, Math.min(MAX_NIVELES - 1, nivel))
       const capas = s.capas.map((c) => (c.id === id ? { ...c, nivel: destino } : c))
-      // el carril que crece depende del tipo: una imagen empuja el de imágenes, el
-      // resto (texto, figura, dibujo, censura) empuja el de texto. así cada uno
-      // conserva siempre una fila libre encima donde seguir separando
-      const capa = s.capas.find((c) => c.id === id)
-      if (capa?.tipo === 'imagen') {
-        return { capas, nivelesImagen: Math.max(s.nivelesImagen, Math.min(MAX_NIVELES, destino + 1)) }
-      }
       return { capas, nivelesTexto: Math.max(s.nivelesTexto, Math.min(MAX_NIVELES, destino + 1)) }
     }),
 
@@ -1921,25 +2050,11 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       const corte = Math.max(0, Math.min(s.nivelesTexto, nivel))
       return {
         nivelesTexto: s.nivelesTexto + 1,
-        // solo se recolocan las capas del carril de texto; las imágenes viven en
-        // el suyo y no deben moverse al abrir una fila aquí
+        // solo se recolocan las capas del carril de texto; las figuras y las
+        // imágenes viven en las pistas de video y no deben moverse al abrir una
+        // fila aquí
         capas: s.capas.map((c) => {
-          if (c.tipo === 'imagen') return c
-          if (c.id === id) return { ...c, nivel: corte }
-          const n = c.nivel ?? 0
-          return n >= corte ? { ...c, nivel: n + 1 } : c
-        }),
-      }
-    }),
-
-  insertarNivelImagen: (nivel, id) =>
-    set((s) => {
-      if (s.nivelesImagen >= MAX_NIVELES) return {}
-      const corte = Math.max(0, Math.min(s.nivelesImagen, nivel))
-      return {
-        nivelesImagen: s.nivelesImagen + 1,
-        capas: s.capas.map((c) => {
-          if (c.tipo !== 'imagen') return c
+          if (c.tipo === 'imagen' || c.tipo === 'figura') return c
           if (c.id === id) return { ...c, nivel: corte }
           const n = c.nivel ?? 0
           return n >= corte ? { ...c, nivel: n + 1 } : c
@@ -1995,6 +2110,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   agregarImagen: (src, anchoNatural, altoNatural) =>
     set((s) => {
       const capa = crearCapaImagen(s.playhead, src, anchoNatural, altoNatural)
+      // la imagen vive en una pista de video: nace en la de más arriba, que es la
+      // que queda encima de todo en el visor
+      capa.nivel = s.numPistas - 1
       // una imagen recién puesta ocupa unos pocos segundos, no todo el proyecto:
       // arranca con una duración corta y, si el video ya colocado termina antes,
       // se ajusta hasta ese final para no sobrar por el borde derecho
@@ -2027,17 +2145,15 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   agregarFigura: (forma, x, y) =>
     set((s) => {
-      // se reparte por niveles como el texto, para que una figura nueva no caiga
-      // encima de lo que ya hay en la fila de abajo
-      const destino = nivelLibreTexto(s.capas)
-      const capa = { ...crearCapaFigura(s.playhead, forma, x, y), nivel: destino }
+      // la figura vive en una pista de video: nace en la de más arriba, que es la
+      // que queda encima de todo en el visor
+      const capa = { ...crearCapaFigura(s.playhead, forma, x, y), nivel: s.numPistas - 1 }
       return {
         capas: [...s.capas, capa],
         capaSeleccionada: capa.id,
         capasSeleccionadas: [capa.id],
         clipSeleccionado: null,
         herramienta: 'figura',
-        nivelesTexto: Math.max(s.nivelesTexto, destino + 1),
       }
     }),
 
@@ -2187,6 +2303,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         capasSeleccionadas: conjunto,
         clipSeleccionado: null,
         regionSeleccionada: null,
+        impactoSeleccionado: null,
         // al elegir una sola capa se abre su herramienta; sumando al conjunto no
         // se cambia de panel, para no sacar al usuario de donde estaba
         herramienta: !aditivo && capa ? herrCapa : s.herramienta,
@@ -2607,6 +2724,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       regionSeleccionada: id,
       clipSeleccionado: null,
       capaSeleccionada: null,
+      impactoSeleccionado: id ? null : s.impactoSeleccionado,
       herramienta: id ? 'audio' : s.herramienta,
     })),
 
@@ -2647,7 +2765,16 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
           const dMin = -a.recorteInicio
           const dMax = a.duracion - DURACION_MINIMA_CAPA
           const d = Math.max(dMin, Math.min(delta, dMax))
-          return { ...a, inicio: Math.max(0, a.inicio + d), duracion: fin - Math.max(0, a.inicio + d), recorteInicio: a.recorteInicio + d }
+          // a dónde llevaría el borde izquierdo. si cae antes del cero (el audio ya
+          // está pegado a la izquierda) no se puede correr más para allá, así que ese
+          // sobrante se convierte en crecer por la derecha: se recupera el principio
+          // recortado empujando el resto del audio hacia adelante, en vez de que no
+          // pase nada. la posición en la fuente por la derecha no cambia
+          const inicioIdeal = a.inicio + d
+          const nuevoInicio = Math.max(0, inicioIdeal)
+          const sobranteIzq = nuevoInicio - inicioIdeal // >= 0 solo cuando toca el cero
+          const nuevoFin = fin + sobranteIzq
+          return { ...a, inicio: nuevoInicio, duracion: nuevoFin - nuevoInicio, recorteInicio: a.recorteInicio + d }
         }
         const tope = a.duracionFuente - a.recorteInicio
         return { ...a, duracion: Math.max(DURACION_MINIMA_CAPA, Math.min(tope, a.duracion + delta)) }

@@ -91,19 +91,14 @@ export default function Timeline({
   const nivelesAudio = useEditorStore((s) => s.nivelesAudio)
   const nombreCarrilTexto = useEditorStore((s) => s.nombreCarrilTexto)
   const nombreCarrilAudio = useEditorStore((s) => s.nombreCarrilAudio)
-  const nombreCarrilImagen = useEditorStore((s) => s.nombreCarrilImagen)
   const renombrarCarril = useEditorStore((s) => s.renombrarCarril)
-  const nivelesImagen = useEditorStore((s) => s.nivelesImagen)
-  const agregarNivelImagen = useEditorStore((s) => s.agregarNivelImagen)
   const altoFilaAudio = useEditorStore((s) => s.altoFilaAudio)
   const altoFilaTexto = useEditorStore((s) => s.altoFilaTexto)
-  const altoFilaImagen = useEditorStore((s) => s.altoFilaImagen)
   const setAltoCarril = useEditorStore((s) => s.setAltoCarril)
   const anchoCabeceras = useEditorStore((s) => s.anchoCabeceras)
   const setAnchoCabeceras = useEditorStore((s) => s.setAnchoCabeceras)
   const agregarNivelTexto = useEditorStore((s) => s.agregarNivelTexto)
   const agregarNivelAudio = useEditorStore((s) => s.agregarNivelAudio)
-  const intercambiarNivelAudio = useEditorStore((s) => s.intercambiarNivelAudio)
   const ordenCarriles = useEditorStore((s) => s.ordenCarriles)
   const moverCarril = useEditorStore((s) => s.moverCarril)
   const playhead = useEditorStore((s) => s.playhead)
@@ -113,6 +108,7 @@ export default function Timeline({
   const aplicarZoom = useEditorStore((s) => s.aplicarZoom)
   const setAnchoTimeline = useEditorStore((s) => s.setAnchoTimeline)
   const limpiarSeleccion = useEditorStore((s) => s.limpiarSeleccion)
+  const marcarBloques = useEditorStore((s) => s.marcarBloques)
   const dividirEnCabezal = useEditorStore((s) => s.dividirEnCabezal)
   const numPistas = useEditorStore((s) => s.numPistas)
   const insertarPistaEn = useEditorStore((s) => s.insertarPistaEn)
@@ -149,18 +145,20 @@ export default function Timeline({
   // se enciende mientras se arrastra el cabezal para mostrar su etiqueta de
   // tiempo junto a la manija
   const [cabezalActivo, setCabezalActivo] = useState(false)
+  // recuadro de selección múltiple: se dibuja al arrastrar desde una zona vacía de
+  // la línea de tiempo y, al soltar, marca todos los bloques que toca. es el mismo
+  // gesto que el marquee del visor, pero aquí opera sobre los bloques de tiempo
+  const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const total = duracionProyecto(clips, capas, audios, audioRegiones)
 
   // añade un nivel al carril indicado, usado por la guía que sale entre grupos
   const NOMBRE_CARRIL: Record<string, string> = {
     video: 'Video',
     audio: nombreCarrilAudio,
-    imagen: nombreCarrilImagen,
     texto: nombreCarrilTexto,
   }
   const agregarNivelDe = (carril: string) => {
     if (carril === 'audio') agregarNivelAudio()
-    else if (carril === 'imagen') agregarNivelImagen()
     else if (carril === 'texto') agregarNivelTexto()
     else if (carril === 'video') insertarPistaEn(numPistas)
   }
@@ -187,7 +185,7 @@ export default function Timeline({
   // gesto que el de las pistas de video: se sigue el cursor en vertical y el store
   // acota el valor a su mínimo y máximo. cada carril lleva su propio alto, así que
   // estirar uno no arrastra a los de al lado
-  const estirarCarril = (carril: 'audio' | 'texto' | 'imagen', altoActual: number) => (e: React.MouseEvent) => {
+  const estirarCarril = (carril: 'audio' | 'texto', altoActual: number) => (e: React.MouseEvent) => {
     e.preventDefault()
     const inicioY = e.clientY
     const mover = (ev: globalThis.MouseEvent) => setAltoCarril(carril, altoActual + (ev.clientY - inicioY))
@@ -201,38 +199,6 @@ export default function Timeline({
     window.addEventListener('mouseup', soltar)
   }
   // arrastre de una fila de audio para reordenarla entre las demás. las filas se
-  // pintan de arriba abajo con el nivel más alto primero, así que subir el cursor
-  // permuta con la fila de encima (un nivel más) y bajarlo con la de abajo. se
-  // lleva un índice vivo del nivel que se agarra para que arrastrar varios pasos
-  // seguidos no se quede pegado al nivel de partida
-  const reordenarNivelAudio = (nivel: number) => (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    let actual = nivel
-    let baseY = e.clientY
-    const paso = altoFilaAudio + GAP_FILAS
-    document.body.style.cursor = 'grabbing'
-    const mover = (ev: globalThis.MouseEvent) => {
-      const dy = ev.clientY - baseY
-      if (dy < -paso / 2 && actual < nivelesAudio - 1) {
-        intercambiarNivelAudio(actual, actual + 1)
-        actual += 1
-        baseY -= paso
-      } else if (dy > paso / 2 && actual > 0) {
-        intercambiarNivelAudio(actual, actual - 1)
-        actual -= 1
-        baseY += paso
-      }
-    }
-    const soltar = () => {
-      document.body.style.cursor = ''
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
-    }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
-  }
-
   const anchoContenido = Math.max(total * pxPorSegundo + 200, anchoVisible || 600)
 
   // instantes a los que se imantan clips y capas: el cero, el cabezal y los
@@ -400,11 +366,51 @@ export default function Timeline({
     setHoverSeg(Math.max(0, (e.clientX - rect.left) / pxPorSegundo))
   }
 
-  // punto donde el fondo vacío suelta la selección. los clips, capas y regiones
-  // cortan la propagación en su propio mousedown, así que solo llega aquí el
-  // clic en una zona libre
-  function deseleccionarFondo() {
-    limpiarSeleccion()
+  // arrastrar desde una zona vacía de la línea de tiempo dibuja un recuadro y, al
+  // soltar, marca todos los bloques que toca. un clic seco (sin arrastrar) suelta
+  // la selección, como antes. los clips, capas, audios y franjas cortan la
+  // propagación en su propio mousedown, así que este gesto solo nace en zona libre
+  function iniciarMarquee(e: React.MouseEvent) {
+    if (e.button !== 0) return
+    const cont = contenidoRef.current
+    if (!cont) return
+    const r = cont.getBoundingClientRect()
+    const x0 = e.clientX
+    const y0 = e.clientY
+    let movido = false
+    const mover = (ev: globalThis.MouseEvent) => {
+      if (Math.abs(ev.clientX - x0) > 3 || Math.abs(ev.clientY - y0) > 3) movido = true
+      setMarquee({
+        x: Math.min(x0, ev.clientX) - r.left,
+        y: Math.min(y0, ev.clientY) - r.top,
+        w: Math.abs(ev.clientX - x0),
+        h: Math.abs(ev.clientY - y0),
+      })
+    }
+    const soltar = (ev: globalThis.MouseEvent) => {
+      window.removeEventListener('mousemove', mover)
+      window.removeEventListener('mouseup', soltar)
+      setMarquee(null)
+      if (!movido) {
+        limpiarSeleccion()
+        return
+      }
+      const mx0 = Math.min(x0, ev.clientX)
+      const my0 = Math.min(y0, ev.clientY)
+      const mx1 = Math.max(x0, ev.clientX)
+      const my1 = Math.max(y0, ev.clientY)
+      const ids: string[] = []
+      cont.querySelectorAll('[data-bloque-id]').forEach((el) => {
+        const b = el.getBoundingClientRect()
+        const cruza = !(b.right < mx0 || b.left > mx1 || b.bottom < my0 || b.top > my1)
+        const id = (el as HTMLElement).getAttribute('data-bloque-id')
+        if (cruza && id && !ids.includes(id)) ids.push(id)
+      })
+      if (ids.length) marcarBloques(ids)
+      else limpiarSeleccion()
+    }
+    window.addEventListener('mousemove', mover)
+    window.addEventListener('mouseup', soltar)
   }
 
   // altura, dentro del contenido de la pista, de la separación donde nacería el
@@ -594,7 +600,6 @@ export default function Timeline({
                     icono="musica"
                     titulo={nombreCarrilAudio}
                     onRenombrar={(n) => renombrarCarril('audio', n)}
-                    onReordenar={(dir) => moverCarril('audio', dir)}
                     acento="#10b981"
                     alto={altoCarril(nivelesAudio, altoFilaAudio)}
                     onEstirar={estirarCarril('audio', altoFilaAudio)}
@@ -602,21 +607,6 @@ export default function Timeline({
                     puedeAgregar={nivelesAudio < 6}
                     onSubir={i > 0 ? () => moverCarril('audio', -1) : undefined}
                     onBajar={i < ordenCarriles.length - 1 ? () => moverCarril('audio', 1) : undefined}
-                  />
-                )}
-                {carril === 'imagen' && (
-                  <CarrilHeader
-                    icono="imagen"
-                    titulo={nombreCarrilImagen}
-                    onRenombrar={(n) => renombrarCarril('imagen', n)}
-                    onReordenar={(dir) => moverCarril('imagen', dir)}
-                    acento="#38bdf8"
-                    alto={altoCarril(nivelesImagen, altoFilaImagen)}
-                    onEstirar={estirarCarril('imagen', altoFilaImagen)}
-                    onAgregar={agregarNivelImagen}
-                    puedeAgregar={nivelesImagen < 6}
-                    onSubir={i > 0 ? () => moverCarril('imagen', -1) : undefined}
-                    onBajar={i < ordenCarriles.length - 1 ? () => moverCarril('imagen', 1) : undefined}
                   />
                 )}
               </motion.div>
@@ -637,7 +627,7 @@ export default function Timeline({
             onDragOver={alArrastrarMedioEncima}
             onDragLeave={alSalirMedio}
             onDrop={alSoltar}
-            onMouseDown={deseleccionarFondo}
+            onMouseDown={iniciarMarquee}
             onMouseMove={seguirScrubber}
             onMouseLeave={() => setHoverSeg(null)}
             className="relative shrink-0 rounded-lg"
@@ -657,7 +647,13 @@ export default function Timeline({
               <div ref={filasRef} data-tracks className="flex flex-col" style={{ gap: HUECO_PISTA }}>
                 {filas.map((p) => {
                   const fila = porPista.get(p)
-                  const vacio = !fila || fila.clips.length === 0
+                  // las figuras e imágenes de esta pista de video: se dibujan como
+                  // bloques dentro de la fila, junto a los clips, aunque en el visor
+                  // siempre queden por encima del video
+                  const capasFila = capas.filter(
+                    (c) => (c.tipo === 'figura' || c.tipo === 'imagen') && (c.nivel ?? 0) === p,
+                  )
+                  const vacio = (!fila || fila.clips.length === 0) && capasFila.length === 0
                   const oculta = pistasMeta[p]?.oculta
                   // esta fila es la que recibiría el medio que se arrastra ahora mismo
                   const resaltada = pistaResaltada === p
@@ -718,6 +714,10 @@ export default function Timeline({
                           />
                         )
                       })}
+                      {/* figuras e imágenes de esta pista, encima de los clips */}
+                      {capasFila.map((c) => (
+                        <CapaBlock key={c.id} capa={c} pxPorSegundo={pxPorSegundo} puntos={puntos} />
+                      ))}
                     </motion.div>
                   )
                 })}
@@ -726,15 +726,17 @@ export default function Timeline({
               )}
               {carril === 'texto' && (
                 <>
-              {/* carril de capas (texto y figuras), ahora con varias filas para
-                  separar bloques que se solapan en el tiempo. cada fila lleva su
+              {/* carril de texto, dibujo y censura, con varias filas para separar
+                  bloques que se solapan en el tiempo. cada fila lleva su
                   data-nivel-texto, que es lo que leen los bloques al soltarlos para
-                  saber a qué fila mudarse. la fila más alta encabeza la pila. el
-                  margen superior es el mismo SEP_SECCION que en la columna izquierda
-                  para que ambas cuadren */}
+                  saber a qué fila mudarse. la fila más alta encabeza la pila. las
+                  figuras y las imágenes ya no viven aquí: se fueron a las pistas de
+                  video */}
               <div className="flex flex-col" style={{ gap: GAP_FILAS }}>
                 {Array.from({ length: nivelesTexto }, (_, i) => nivelesTexto - 1 - i).map((n) => {
-                  const propias = capas.filter((c) => c.tipo !== 'imagen' && (c.nivel ?? 0) === n)
+                  const propias = capas.filter(
+                    (c) => c.tipo !== 'imagen' && c.tipo !== 'figura' && (c.nivel ?? 0) === n,
+                  )
                   const filaVacia = propias.length === 0
                   return (
                     <div
@@ -747,37 +749,6 @@ export default function Timeline({
                         <div className="pointer-events-none flex h-full items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
                           <Icon name="texto" size={13} />
                           <span>Añadir texto</span>
-                        </div>
-                      )}
-                      {propias.map((c) => (
-                        <CapaBlock key={c.id} capa={c} pxPorSegundo={pxPorSegundo} puntos={puntos} />
-                      ))}
-                    </div>
-                  )
-                })}
-              </div>
-                </>
-              )}
-              {carril === 'imagen' && (
-                <>
-              {/* carril propio de las imágenes, con la misma mecánica de filas que
-                  el de texto pero leyendo data-nivel-imagen. así una imagen ya no
-                  comparte pista con los textos y figuras */}
-              <div className="flex flex-col" style={{ gap: GAP_FILAS }}>
-                {Array.from({ length: nivelesImagen }, (_, i) => nivelesImagen - 1 - i).map((n) => {
-                  const propias = capas.filter((c) => c.tipo === 'imagen' && (c.nivel ?? 0) === n)
-                  const filaVacia = propias.length === 0
-                  return (
-                    <div
-                      key={`imagen-${n}`}
-                      data-nivel-imagen={n}
-                      className="relative overflow-hidden rounded-lg"
-                      style={{ height: altoFilaImagen, background: 'rgb(var(--border) / 0.05)' }}
-                    >
-                      {filaVacia && (
-                        <div className="pointer-events-none flex h-full items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
-                          <Icon name="imagen" size={13} />
-                          <span>Añadir imagen</span>
                         </div>
                       )}
                       {propias.map((c) => (
@@ -810,28 +781,6 @@ export default function Timeline({
                       className="group relative overflow-hidden rounded-lg"
                       style={{ height: altoFilaAudio, background: 'rgb(var(--border) / 0.05)' }}
                     >
-                      {/* agarre para reordenar la fila entera cuando hay más de un
-                          nivel de audio. asoma al pasar el cursor y se arrastra
-                          arriba o abajo para decidir cuál va primero, moviendo de una
-                          vez todo lo que tenga esa fila */}
-                      {nivelesAudio > 1 && (
-                        <div
-                          onMouseDown={reordenarNivelAudio(n)}
-                          title="Arrastra para reordenar esta fila de audio"
-                          className="absolute left-0 top-1/2 z-20 flex h-7 w-4 -translate-y-1/2 cursor-grab items-center justify-center rounded-r opacity-0 transition-opacity duration-150 hover:!opacity-100 group-hover:opacity-70 active:cursor-grabbing"
-                          style={{ background: 'rgb(var(--surface))' }}
-                        >
-                          <span className="grid grid-cols-2 gap-x-0.5 gap-y-[3px]">
-                            {Array.from({ length: 6 }).map((_, i) => (
-                              <span
-                                key={i}
-                                className="h-0.5 w-0.5 rounded-full"
-                                style={{ background: 'rgb(var(--muted))' }}
-                              />
-                            ))}
-                          </span>
-                        </div>
-                      )}
                       {filaVacia ? (
                         <>
                           {/* rótulo a la izquierda, limpio */}
@@ -915,6 +864,20 @@ export default function Timeline({
                 left: guiaImantado * pxPorSegundo,
                 background: '#f472b6',
                 boxShadow: '0 0 6px rgba(244,114,182,0.8)',
+              }}
+            />
+          )}
+
+          {/* recuadro azul de selección múltiple, el mismo gesto que en el visor */}
+          {marquee && marquee.w > 2 && marquee.h > 2 && (
+            <div
+              className="pointer-events-none absolute z-40 rounded-[2px] border border-brand"
+              style={{
+                left: marquee.x,
+                top: marquee.y,
+                width: marquee.w,
+                height: marquee.h,
+                background: 'rgb(24 97 255 / 0.14)',
               }}
             />
           )}

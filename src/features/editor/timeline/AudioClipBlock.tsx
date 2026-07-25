@@ -187,7 +187,12 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
       const bordeFinal = enganche ? enganche.punto : bordeBruto
       setGuiaImantado(enganche ? enganche.guia : null)
       recortarAudio(audio.id, lado, bordeFinal - ultimoBorde)
-      ultimoBorde = bordeFinal
+      // se toma el borde REAL tras aplicar el recorte, no el que pedía el cursor. si
+      // el arrastre se pasó del tope, el borde se quedó donde topó; al retroceder, el
+      // recorte no arranca a achicar hasta que el cursor vuelve a ese borde real, sin
+      // la zona muerta de antes
+      const real = useEditorStore.getState().audios.find((x) => x.id === audio.id)
+      ultimoBorde = real ? (lado === 'inicio' ? real.inicio : real.inicio + real.duracion) : bordeFinal
     }
     const soltar = () => {
       setGuiaImantado(null)
@@ -207,6 +212,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
       layout={interactuando ? false : 'position'}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={audio.nivel ?? 0}
+      data-bloque-id={audio.id}
       onMouseDown={iniciarMover}
       // el botón derecho abre el menú de este bloque en el punto donde se pulsó
       onContextMenu={(e) => {

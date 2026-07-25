@@ -1,4 +1,5 @@
 import { Capa } from '../../types/layers'
+import { Impacto } from '../../types/impacto'
 import { Clip, PistaMeta } from '../../types/timeline'
 import { MediaAsset, ClaseMedio } from '../../types/media'
 import { RegionAudio, ClipAudio } from '../../types/audio'
@@ -63,6 +64,9 @@ export interface ProyectoGuardado {
     anchoCabeceras?: number
     ordenCarriles?: ('video' | 'audio' | 'texto' | 'imagen')[]
     capas: Capa[]
+    // impactos: los efectos momentáneos puestos sobre los clips. opcional para que
+    // un proyecto guardado antes de existir se abra sin ellos
+    impactos?: Impacto[]
     audioRegiones: RegionAudio[]
     audios?: ClipAudio[]
     volumenGlobal: number

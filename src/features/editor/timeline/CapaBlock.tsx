@@ -8,6 +8,7 @@ import TransicionCapaBlock from './TransicionCapaBlock'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
 import { nivelBajoCursor, separacionBajoCursor, porDebajoDelUltimo } from './nivelCursor'
+import { resolverDestinoVertical } from './destinoVertical'
 
 interface Props {
   capa: Capa
@@ -28,10 +29,15 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
   const alternarBloque = useEditorStore((s) => s.alternarBloque)
   const insertarNivelTexto = useEditorStore((s) => s.insertarNivelTexto)
-  const insertarNivelImagen = useEditorStore((s) => s.insertarNivelImagen)
+  const insertarPistaEn = useEditorStore((s) => s.insertarPistaEn)
+  const setInsercionPista = useEditorStore((s) => s.setInsercionPista)
   const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
   const moverBloques = useEditorStore((s) => s.moverBloques)
   const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(capa.id))
+  // las figuras y las imágenes viven ahora en las pistas de video, así que su
+  // arrastre vertical usa el mismo sistema que los clips, no el de las filas de
+  // texto. el resto de capas (texto, dibujo, censura) sigue en el carril de texto
+  const esDePistaVideo = capa.tipo === 'figura' || capa.tipo === 'imagen'
 
   // durante un gesto propio (mover o recortar) el bloque sigue al cursor sin
   // suavizado, para no ir por detrás del ratón; en reposo se anima su posición
@@ -84,6 +90,14 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     let ultimoX = e.clientX
     let ultimoY = e.clientY
     const startY = e.clientY
+    // para una figura o imagen, la pila de pistas de video que resuelve el destino
+    // vertical, la misma que usan los clips. se busca una sola vez al arrancar
+    const stack = esDePistaVideo
+      ? ((e.currentTarget as HTMLElement).closest('[data-tracks]') as HTMLElement | null)
+      : null
+    // separación entre pistas señalada ahora mismo (solo figuras e imágenes), para
+    // no repetir llamadas idénticas al store y saber al soltar si hay que crear una
+    let insercionActual: number | null = null
     // cuánto hay que mover en vertical para que el gesto cuente como cambio de nivel;
     // por debajo de esto es solo horizontal y no sale la etiqueta que sigue al cursor
     const UMBRAL_VERT = 14
@@ -121,6 +135,27 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
         moverBloques(grupo, inicioOriginal + (ev.clientX - startX) / pxPorSegundo - capa.inicio)
         return
       }
+      // una figura o imagen resuelve su pista de video en vivo, igual que un clip:
+      // si el cursor apunta a una separación se enciende la guía y el bloque espera
+      // al soltado; si cae sobre una fila, se muda a esa pista al momento
+      if (esDePistaVideo && stack && Math.abs(ev.clientY - startY) > UMBRAL_VERT) {
+        const v = resolverDestinoVertical(stack, ev.clientY, useEditorStore.getState().numPistas)
+        if (v.insercion !== null) {
+          if (v.insercion !== insercionActual) {
+            insercionActual = v.insercion
+            setInsercionPista(v.insercion)
+          }
+        } else {
+          if (insercionActual !== null) {
+            insercionActual = null
+            setInsercionPista(null)
+          }
+          if (v.destino !== null && v.destino !== (capa.nivel ?? 0)) moverCapaNivel(idGesto, v.destino)
+        }
+      } else if (esDePistaVideo && insercionActual !== null) {
+        insercionActual = null
+        setInsercionPista(null)
+      }
       const dx = (ev.clientX - startX) / pxPorSegundo
       const bruto = Math.max(0, inicioOriginal + dx)
       const { inicio, guia } = imantarMover(bruto, capa.duracion, puntos, umbral, propios)
@@ -133,21 +168,28 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       if (!movido && conAlt) alternarBloque(capa.id)
       setGuiaImantado(null)
       setInteractuando(false)
-      // si se soltó sobre la juntura entre dos filas se abre una nueva ahí y el
-      // bloque estrena ese carril; si cayó dentro de una fila, se muda a ella
-      // una imagen se mueve por su propio carril; el resto (texto, figura, dibujo,
-      // censura) por el de texto. cada uno lee su atributo de fila
-      const attr = capa.tipo === 'imagen' ? 'nivelImagen' : 'nivelTexto'
-      const insertar = capa.tipo === 'imagen' ? insertarNivelImagen : insertarNivelTexto
-      const junta = separacionBajoCursor(ultimoX, ultimoY, attr)
+      // una figura o imagen: si el gesto acabó sobre una separación, ahí nace una
+      // pista de video y el bloque aterriza dentro. si cayó sobre una fila, ya se
+      // mudó en vivo, así que no queda nada por hacer
+      if (esDePistaVideo) {
+        if (insercionActual !== null) insertarPistaEn(insercionActual, idGesto)
+        setInsercionPista(null)
+        window.removeEventListener('mousemove', mover)
+        window.removeEventListener('mouseup', soltar)
+        return
+      }
+      // el resto (texto, dibujo, censura) se mueve por las filas del carril de
+      // texto: si se soltó sobre la juntura entre dos filas se abre una nueva ahí y
+      // el bloque estrena ese nivel; si cayó dentro de una fila, se muda a ella
+      const junta = separacionBajoCursor(ultimoX, ultimoY, 'nivelTexto')
       if (junta !== null) {
-        insertar(junta, idGesto)
-      } else if (porDebajoDelUltimo(ultimoX, ultimoY, attr)) {
+        insertarNivelTexto(junta, idGesto)
+      } else if (porDebajoDelUltimo(ultimoX, ultimoY, 'nivelTexto')) {
         // soltado bajo la última fila: nace un nivel nuevo en el fondo y el bloque
         // se queda en él
-        insertar(0, idGesto)
+        insertarNivelTexto(0, idGesto)
       } else {
-        const destino = nivelBajoCursor(ultimoX, ultimoY, attr)
+        const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelTexto')
         if (destino !== null) moverCapaNivel(idGesto, destino)
       }
       window.removeEventListener('mousemove', mover)
@@ -177,7 +219,10 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       const bordeFinal = enganche ? enganche.punto : bordeBruto
       setGuiaImantado(enganche ? enganche.guia : null)
       recortarCapaTiempo(capa.id, lado, bordeFinal - ultimoBorde)
-      ultimoBorde = bordeFinal
+      // se sigue el borde real tras aplicar, no el que pedía el cursor: si el arrastre
+      // se pasó del tope, al retroceder no se achica hasta volver a ese borde real
+      const real = useEditorStore.getState().capas.find((x) => x.id === capa.id)
+      ultimoBorde = real ? (lado === 'inicio' ? real.inicio : real.inicio + real.duracion) : bordeFinal
     }
     const soltar = () => {
       setGuiaImantado(null)
@@ -212,6 +257,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       layout={interactuando ? false : 'position'}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={capa.nivel ?? 0}
+      data-bloque-id={capa.id}
       onMouseDown={iniciarMover}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes(TIPO_TRANSICION)) {

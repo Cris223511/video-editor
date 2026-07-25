@@ -63,16 +63,14 @@ export function capturarProyecto(id: string, creado: number, portada: string): P
       pistasMeta: ed.pistasMeta,
       nivelesTexto: ed.nivelesTexto,
       nivelesAudio: ed.nivelesAudio,
-      nivelesImagen: ed.nivelesImagen,
       altoFilaTexto: ed.altoFilaTexto,
       altoFilaAudio: ed.altoFilaAudio,
-      altoFilaImagen: ed.altoFilaImagen,
       nombreCarrilTexto: ed.nombreCarrilTexto,
       nombreCarrilAudio: ed.nombreCarrilAudio,
-      nombreCarrilImagen: ed.nombreCarrilImagen,
       anchoCabeceras: ed.anchoCabeceras,
       ordenCarriles: ed.ordenCarriles,
       capas: ed.capas,
+      impactos: ed.impactos,
       audioRegiones: ed.audioRegiones,
       audios: ed.audios,
       volumenGlobal: ed.volumenGlobal,
@@ -138,16 +136,24 @@ export async function abrirSesion(id: string): Promise<boolean> {
     ...(e.pistasMeta ? { pistasMeta: e.pistasMeta } : {}),
     nivelesTexto: e.nivelesTexto ?? 1,
     nivelesAudio: e.nivelesAudio ?? 1,
-    nivelesImagen: e.nivelesImagen ?? 1,
     ...(e.altoFilaTexto ? { altoFilaTexto: e.altoFilaTexto } : {}),
     ...(e.altoFilaAudio ? { altoFilaAudio: e.altoFilaAudio } : {}),
-    ...(e.altoFilaImagen ? { altoFilaImagen: e.altoFilaImagen } : {}),
     ...(e.nombreCarrilTexto ? { nombreCarrilTexto: e.nombreCarrilTexto } : {}),
     ...(e.nombreCarrilAudio ? { nombreCarrilAudio: e.nombreCarrilAudio } : {}),
-    ...(e.nombreCarrilImagen ? { nombreCarrilImagen: e.nombreCarrilImagen } : {}),
     ...(e.anchoCabeceras ? { anchoCabeceras: e.anchoCabeceras } : {}),
-    ordenCarriles: e.ordenCarriles ?? ['video', 'audio', 'imagen', 'texto'],
-    capas: e.capas ?? [],
+    // el carril de imágenes desapareció: si un proyecto viejo lo trae en su orden,
+    // se quita para no dejar una sección fantasma. las figuras e imágenes de esos
+    // proyectos traen su nivel del viejo carril; se sujeta al rango de pistas de
+    // video para que caigan dentro de una existente
+    ordenCarriles: (e.ordenCarriles ?? ['video', 'audio', 'texto']).filter(
+      (c): c is 'video' | 'audio' | 'texto' => c !== 'imagen',
+    ),
+    capas: (e.capas ?? []).map((c) =>
+      (c.tipo === 'figura' || c.tipo === 'imagen')
+        ? { ...c, nivel: Math.max(0, Math.min((e.numPistas ?? 1) - 1, c.nivel ?? 0)) }
+        : c,
+    ),
+    impactos: e.impactos ?? [],
     audioRegiones: e.audioRegiones ?? [],
     audios: e.audios ?? [],
     volumenGlobal: e.volumenGlobal ?? 1,

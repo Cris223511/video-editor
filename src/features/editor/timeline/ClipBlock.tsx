@@ -11,6 +11,9 @@ import PropiedadesClip from './PropiedadesClip'
 import TransicionBlock from './TransicionBlock'
 import { TIPO_TRANSICION } from '../GaleriaTransiciones'
 import { TIPO_EFECTO, crearEfecto } from '../../../lib/efectos/catalogo'
+import { TIPO_IMPACTO } from '../../../lib/impactos/catalogo'
+import { TipoImpacto } from '../../../types/impacto'
+import ImpactoDot from './ImpactoDot'
 import { resolverDestinoVertical } from './destinoVertical'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
 
@@ -46,6 +49,12 @@ export default function ClipBlock({
   const seleccionar = useEditorStore((s) => s.seleccionar)
   const setTransicion = useEditorStore((s) => s.setTransicion)
   const ponerEfectoEncima = useEditorStore((s) => s.ponerEfectoEncima)
+  const agregarImpacto = useEditorStore((s) => s.agregarImpacto)
+  // los impactos que caen dentro del tramo de este clip: se dibujan encima como
+  // bolitas. se filtran por su segundo, que es lo que decide sobre qué clip van
+  const impactosDelClip = useEditorStore((s) =>
+    s.impactos.filter((im) => im.t >= clip.inicio && im.t < clip.inicio + clip.duracion),
+  )
   const moverClip = useEditorStore((s) => s.moverClip)
   const duplicarClip = useEditorStore((s) => s.duplicarClip)
   const recortarClip = useEditorStore((s) => s.recortarClip)
@@ -74,6 +83,9 @@ export default function ClipBlock({
   // se enciende al arrastrar una muestra de efecto sobre el clip, para avisar de que
   // al soltar ese efecto queda en nivel 1, por encima de los demás
   const [efectoEncima, setEfectoEncima] = useState(false)
+  // se enciende al arrastrar una bolita de impacto sobre el clip, para avisar de
+  // que al soltar quedará puesta ahí
+  const [impactoEncima, setImpactoEncima] = useState(false)
   // controla la ventana de propiedades del clip, que enseña un resumen de solo
   // lectura de todo lo que se le aplicó (velocidad, color, efectos, transición)
   const [verPropiedades, setVerPropiedades] = useState(false)
@@ -319,6 +331,19 @@ export default function ClipBlock({
       alSoltarTransicion(e)
       return
     }
+    // una bolita de impacto soltada sobre el clip: nace en el segundo donde cayó
+    // el cursor. se acota al tramo del clip para que no quede fuera de él
+    const tipoImpacto = e.dataTransfer.getData(TIPO_IMPACTO)
+    if (tipoImpacto) {
+      e.preventDefault()
+      e.stopPropagation()
+      setImpactoEncima(false)
+      const rect = e.currentTarget.getBoundingClientRect()
+      const dentro = (e.clientX - rect.left) / pxPorSegundo
+      const t = Math.min(clip.inicio + clip.duracion - 0.01, Math.max(clip.inicio, clip.inicio + dentro))
+      agregarImpacto(t, tipoImpacto as TipoImpacto)
+      return
+    }
     const idEfecto = e.dataTransfer.getData(TIPO_EFECTO)
     if (idEfecto) {
       e.preventDefault()
@@ -335,6 +360,7 @@ export default function ClipBlock({
       layout={interactuando ? false : 'position'}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={clip.pista}
+      data-bloque-id={clip.id}
       onMouseDown={iniciarMover}
       // el botón derecho abre el menú de este bloque en el punto donde se pulsó
       onContextMenu={(e) => {
@@ -349,12 +375,16 @@ export default function ClipBlock({
         } else if (e.dataTransfer.types.includes(TIPO_EFECTO)) {
           e.preventDefault()
           if (!efectoEncima) setEfectoEncima(true)
+        } else if (e.dataTransfer.types.includes(TIPO_IMPACTO)) {
+          e.preventDefault()
+          if (!impactoEncima) setImpactoEncima(true)
         }
       }}
       onDragLeave={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node)) {
           setTransicionEncima(false)
           setEfectoEncima(false)
+          setImpactoEncima(false)
         }
       }}
       onDrop={alSoltar}
@@ -395,6 +425,7 @@ export default function ClipBlock({
         >
           <FrameStrip
             tira={tira}
+            inicio={clip.inicio}
             ancho={ancho}
             alto={altoPista}
             recorteInicio={clip.recorteInicio}
@@ -406,6 +437,16 @@ export default function ClipBlock({
 
       <TransicionBlock clip={clip} pxPorSegundo={pxPorSegundo} />
       <TransicionBlock clip={clip} pxPorSegundo={pxPorSegundo} lado="salida" />
+
+      {/* las bolitas de impacto que caen sobre este clip, encima de todo */}
+      {impactosDelClip.map((im) => (
+        <ImpactoDot key={im.id} impacto={im} clip={clip} pxPorSegundo={pxPorSegundo} />
+      ))}
+
+      {/* aviso de que se va a soltar una bolita de impacto encima */}
+      {impactoEncima && (
+        <div className="pointer-events-none absolute inset-0 z-20 rounded-lg ring-2 ring-inset ring-sky-400" />
+      )}
 
       {/* señal de que se está soltando una transición encima: un aro azul y una
           franja en el borde de entrada, que es donde va a colocarse */}
