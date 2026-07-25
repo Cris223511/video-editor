@@ -109,6 +109,7 @@ export default function Timeline({
   const setAnchoTimeline = useEditorStore((s) => s.setAnchoTimeline)
   const limpiarSeleccion = useEditorStore((s) => s.limpiarSeleccion)
   const marcarBloques = useEditorStore((s) => s.marcarBloques)
+  const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
   const dividirEnCabezal = useEditorStore((s) => s.dividirEnCabezal)
   const numPistas = useEditorStore((s) => s.numPistas)
   const insertarPistaEn = useEditorStore((s) => s.insertarPistaEn)
@@ -166,37 +167,37 @@ export default function Timeline({
   // arrastre del borde derecho de la columna de cabeceras para ensancharla o
   // estrecharla. así los nombres largos dejan de quedar cortados. el store acota el
   // valor entre su mínimo y su máximo
-  const estirarCabeceras = (e: React.MouseEvent) => {
+  const estirarCabeceras = (e: React.PointerEvent) => {
     e.preventDefault()
     const inicioX = e.clientX
     const original = anchoCabeceras
-    const mover = (ev: globalThis.MouseEvent) => setAnchoCabeceras(original + (ev.clientX - inicioX))
+    const mover = (ev: globalThis.PointerEvent) => setAnchoCabeceras(original + (ev.clientX - inicioX))
     const soltar = () => {
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
       document.body.style.cursor = ''
     }
     document.body.style.cursor = 'ew-resize'
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   // arranca el arrastre que cambia el alto de las filas de un carril. el mismo
   // gesto que el de las pistas de video: se sigue el cursor en vertical y el store
   // acota el valor a su mínimo y máximo. cada carril lleva su propio alto, así que
   // estirar uno no arrastra a los de al lado
-  const estirarCarril = (carril: 'audio' | 'texto', altoActual: number) => (e: React.MouseEvent) => {
+  const estirarCarril = (carril: 'audio' | 'texto', altoActual: number) => (e: React.PointerEvent) => {
     e.preventDefault()
     const inicioY = e.clientY
-    const mover = (ev: globalThis.MouseEvent) => setAltoCarril(carril, altoActual + (ev.clientY - inicioY))
+    const mover = (ev: globalThis.PointerEvent) => setAltoCarril(carril, altoActual + (ev.clientY - inicioY))
     const soltar = () => {
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
       document.body.style.cursor = ''
     }
     document.body.style.cursor = 'ns-resize'
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
   // arrastre de una fila de audio para reordenarla entre las demás. las filas se
   const anchoContenido = Math.max(total * pxPorSegundo + 200, anchoVisible || 600)
@@ -317,7 +318,7 @@ export default function Timeline({
   // el cabezal se puede arrastrar agarrando su manija superior, además de
   // pulsando en la regla. el gesto reutiliza moverCabezal, así que el cabezal
   // sigue al cursor mientras se mantiene pulsado
-  function arrastrarCabezal(e: MouseEvent) {
+  function arrastrarCabezal(e: React.PointerEvent) {
     e.stopPropagation()
     e.preventDefault()
     // mover el cabezal a mano pausa la reproducción: uno agarra la línea para
@@ -325,19 +326,19 @@ export default function Timeline({
     pausar()
     setCabezalActivo(true)
     moverCabezal(e.clientX)
-    const mover = (ev: globalThis.MouseEvent) => moverCabezal(ev.clientX)
+    const mover = (ev: globalThis.PointerEvent) => moverCabezal(ev.clientX)
     const soltar = () => {
       setCabezalActivo(false)
       document.body.style.cursor = ''
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
     document.body.style.cursor = 'grabbing'
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
-  function alPresionarRegla(e: MouseEvent) {
+  function alPresionarRegla(e: React.PointerEvent) {
     // la regla mueve el cabezal, no cambia la selección: por eso corta la
     // propagación antes de que el clic llegue al deseleccionado del fondo
     e.stopPropagation()
@@ -346,14 +347,14 @@ export default function Timeline({
     pausar()
     setCabezalActivo(true)
     moverCabezal(e.clientX)
-    const mover = (ev: globalThis.MouseEvent) => moverCabezal(ev.clientX)
+    const mover = (ev: globalThis.PointerEvent) => moverCabezal(ev.clientX)
     const soltar = () => {
       setCabezalActivo(false)
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   // sigue el cursor por la zona de la línea de tiempo y guarda el segundo bajo
@@ -370,7 +371,7 @@ export default function Timeline({
   // soltar, marca todos los bloques que toca. un clic seco (sin arrastrar) suelta
   // la selección, como antes. los clips, capas, audios y franjas cortan la
   // propagación en su propio mousedown, así que este gesto solo nace en zona libre
-  function iniciarMarquee(e: React.MouseEvent) {
+  function iniciarMarquee(e: React.PointerEvent) {
     if (e.button !== 0) return
     const cont = contenidoRef.current
     if (!cont) return
@@ -378,7 +379,7 @@ export default function Timeline({
     const x0 = e.clientX
     const y0 = e.clientY
     let movido = false
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       if (Math.abs(ev.clientX - x0) > 3 || Math.abs(ev.clientY - y0) > 3) movido = true
       setMarquee({
         x: Math.min(x0, ev.clientX) - r.left,
@@ -387,9 +388,9 @@ export default function Timeline({
         h: Math.abs(ev.clientY - y0),
       })
     }
-    const soltar = (ev: globalThis.MouseEvent) => {
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+    const soltar = (ev: globalThis.PointerEvent) => {
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
       setMarquee(null)
       if (!movido) {
         limpiarSeleccion()
@@ -409,8 +410,8 @@ export default function Timeline({
       if (ids.length) marcarBloques(ids)
       else limpiarSeleccion()
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   // altura, dentro del contenido de la pista, de la separación donde nacería el
@@ -429,11 +430,26 @@ export default function Timeline({
   // la misma lógica que el arrastre de un clip, si el cursor apunta a una fila (se
   // ilumina ese nivel) o a una separación (se enciende la guía de pista nueva).
   // así el destino queda claro antes de soltar, en lugar de sombrear toda la zona
+  // margen, en píxeles, alrededor de la pila de pistas de video dentro del cual el
+  // cursor todavía cuenta como apuntando a una separación de arriba o de abajo. más
+  // lejos que eso el cursor está sobre el audio o el texto, y ahí no tiene sentido
+  // ofrecer una pista de video nueva ni encender la guía
+  const MARGEN_PISTAS = 18
+
   function alArrastrarMedioEncima(e: React.DragEvent) {
     if (!e.dataTransfer.types.includes(TIPO_ARRASTRE)) return
     e.preventDefault()
     const stack = filasRef.current
     if (!stack) return
+    // si el cursor se fue lejos de las pistas de video (a la zona de audio o texto),
+    // no se enciende ninguna guía ni resalte: la guía de pista nueva solo vive
+    // pegada a las pistas de video, no paseando por toda la línea de tiempo
+    const rect = stack.getBoundingClientRect()
+    if (e.clientY < rect.top - MARGEN_PISTAS || e.clientY > rect.bottom + MARGEN_PISTAS) {
+      if (insercionPista !== null) setInsercionPista(null)
+      if (pistaResaltada !== null) setPistaResaltada(null)
+      return
+    }
     const { destino, insercion } = resolverDestinoVertical(stack, e.clientY, numPistas)
     if (insercion !== null) {
       if (insercion !== insercionPista) setInsercionPista(insercion)
@@ -458,9 +474,18 @@ export default function Timeline({
   function alSoltar(e: React.DragEvent) {
     e.preventDefault()
     const stack = filasRef.current
-    const v = stack
+    let v = stack
       ? resolverDestinoVertical(stack, e.clientY, numPistas)
       : { destino: 0, insercion: null }
+    // soltado lejos de las pistas de video (sobre audio o texto): no se abre una
+    // pista nueva, el medio cae en la pista de video más baja. si es audio o imagen
+    // su propia lógica ya lo lleva a donde le toca sin mirar esto
+    if (stack) {
+      const rect = stack.getBoundingClientRect()
+      if (e.clientY < rect.top - MARGEN_PISTAS || e.clientY > rect.bottom + MARGEN_PISTAS) {
+        v = { destino: 0, insercion: null }
+      }
+    }
     setInsercionPista(null)
     setPistaResaltada(null)
     const id = e.dataTransfer.getData(TIPO_ARRASTRE)
@@ -615,7 +640,7 @@ export default function Timeline({
             {/* tirador del borde derecho: arrastrándolo se ensancha o estrecha la
                 columna de cabeceras, para que quepan los nombres largos */}
             <div
-              onMouseDown={estirarCabeceras}
+              onPointerDown={estirarCabeceras}
               title="Arrastra para cambiar el ancho"
               className="absolute inset-y-0 right-0 z-50 w-1.5 cursor-ew-resize opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover/cols:opacity-60"
               style={{ background: 'rgb(var(--brand) / 0.8)' }}
@@ -627,13 +652,13 @@ export default function Timeline({
             onDragOver={alArrastrarMedioEncima}
             onDragLeave={alSalirMedio}
             onDrop={alSoltar}
-            onMouseDown={iniciarMarquee}
+            onPointerDown={iniciarMarquee}
             onMouseMove={seguirScrubber}
             onMouseLeave={() => setHoverSeg(null)}
             className="relative shrink-0 rounded-lg"
             style={{ width: anchoContenido }}
           >
-          <div onMouseDown={alPresionarRegla}>
+          <div onPointerDown={alPresionarRegla}>
             <TimeRuler total={total} pxPorSegundo={pxPorSegundo} ancho={anchoContenido} alto={ALTO_REGLA} />
           </div>
 
@@ -663,6 +688,10 @@ export default function Timeline({
                       layout="position"
                       transition={DESLIZA}
                       data-fila-pista={p}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        abrirMenuContextual({ x: e.clientX, y: e.clientY, tipo: 'pista', id: String(p) })
+                      }}
                       className="relative rounded-lg transition-[opacity,box-shadow,background-color] duration-150"
                       style={{
                         height: altosPista[p],
@@ -742,6 +771,10 @@ export default function Timeline({
                     <div
                       key={`texto-${n}`}
                       data-nivel-texto={n}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        abrirMenuContextual({ x: e.clientX, y: e.clientY, tipo: 'carril-texto', id: String(n) })
+                      }}
                       className="relative overflow-hidden rounded-lg"
                       style={{ height: altoFilaTexto, background: 'rgb(var(--border) / 0.05)' }}
                     >
@@ -778,6 +811,10 @@ export default function Timeline({
                     <div
                       key={`audio-${n}`}
                       data-nivel-audio={n}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        abrirMenuContextual({ x: e.clientX, y: e.clientY, tipo: 'carril-audio', id: String(n) })
+                      }}
                       className="group relative overflow-hidden rounded-lg"
                       style={{ height: altoFilaAudio, background: 'rgb(var(--border) / 0.05)' }}
                     >
@@ -915,7 +952,7 @@ export default function Timeline({
                 pista para mover el cabezal. es lo único con eventos activos de
                 esta capa, el resto de la línea azul no intercepta el ratón */}
             <div
-              onMouseDown={arrastrarCabezal}
+              onPointerDown={arrastrarCabezal}
               title="Arrastra para mover el cabezal"
               className="pointer-events-auto absolute -top-0.5 left-1/2 flex h-4 w-4 -translate-x-1/2 cursor-grab items-start justify-center active:cursor-grabbing"
             >

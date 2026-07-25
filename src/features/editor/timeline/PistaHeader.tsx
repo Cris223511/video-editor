@@ -1,4 +1,4 @@
-import { MouseEvent as ReactMouseEvent, ReactNode, useState } from 'react'
+import { PointerEvent as ReactPointerEvent, ReactNode, useState } from 'react'
 import {
   ChevronDown,
   ChevronUp,
@@ -64,6 +64,7 @@ export default function PistaHeader({ indice, alto }: { indice: number; alto: nu
   const alternarBloquearPista = useEditorStore((s) => s.alternarBloquearPista)
   const reordenarPista = useEditorStore((s) => s.reordenarPista)
   const renombrarPista = useEditorStore((s) => s.renombrarPista)
+  const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
   const finGesto = useEditorStore((s) => s.finGesto)
   const [confirmando, setConfirmando] = useState(false)
   // se enciende mientras se arrastra la cabecera para reordenarla, y sirve para
@@ -74,7 +75,7 @@ export default function PistaHeader({ indice, alto }: { indice: number; alto: nu
   // vecina, se permuta con ella y el arrastre sigue desde la nueva posición. es
   // el mismo intercambio que hacen las flechas, pero disparado por el gesto. se
   // ignoran los botones y el tirador de alto para no robarles su función
-  function iniciarReordenar(e: ReactMouseEvent) {
+  function iniciarReordenar(e: ReactPointerEvent) {
     const dianaEl = e.target as HTMLElement
     if (dianaEl.closest('button') || dianaEl.closest('[data-tirador-alto]')) return
     if (useEditorStore.getState().numPistas <= 1) return
@@ -88,7 +89,7 @@ export default function PistaHeader({ indice, alto }: { indice: number; alto: nu
     setArrastrando(true)
     document.body.style.cursor = 'grabbing'
 
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       const dy = ev.clientY - baseY
       const st = useEditorStore.getState()
       // arriba en pantalla es el nivel de índice mayor, así que subir el cursor
@@ -109,27 +110,27 @@ export default function PistaHeader({ indice, alto }: { indice: number; alto: nu
       // el gesto se cierra para que la próxima edición abra un paso de historial
       // nuevo en vez de fundirse con las permutas recién hechas
       finGesto()
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
-  function estirar(e: ReactMouseEvent) {
+  function estirar(e: ReactPointerEvent) {
     e.preventDefault()
     const inicioY = e.clientY
     const original = alto
-    const mover = (ev: globalThis.MouseEvent) =>
+    const mover = (ev: globalThis.PointerEvent) =>
       setAltoPista(indice, original + (ev.clientY - inicioY))
     const soltar = () => {
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
       document.body.style.cursor = ''
     }
     document.body.style.cursor = 'ns-resize'
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   // arriba del todo va el nivel de índice mayor, así que la flecha de subir se
@@ -143,7 +144,12 @@ export default function PistaHeader({ indice, alto }: { indice: number; alto: nu
 
   return (
     <div
-      onMouseDown={iniciarReordenar}
+      onPointerDown={iniciarReordenar}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        abrirMenuContextual({ x: e.clientX, y: e.clientY, tipo: 'pista', id: String(indice) })
+      }}
       className={[
         'group relative flex flex-col justify-center gap-1 rounded-lg px-2 py-1 transition-shadow',
         reordenable ? 'cursor-grab' : '',
@@ -207,7 +213,7 @@ export default function PistaHeader({ indice, alto }: { indice: number; alto: nu
       </div>
 
       <div
-        onMouseDown={estirar}
+        onPointerDown={estirar}
         data-tirador-alto
         title="Arrastra para cambiar el alto"
         className="absolute inset-x-0 -bottom-0.5 h-1.5 cursor-ns-resize opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover:opacity-60"

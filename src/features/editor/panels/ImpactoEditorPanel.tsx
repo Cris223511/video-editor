@@ -45,7 +45,7 @@ export default function ImpactoEditorPanel() {
         </div>
       </div>
 
-      <Campo etiqueta="Color de la bolita">
+      <Campo etiqueta="Color del impacto">
         <ColorCampo valor={im.color} onChange={(v) => actualizarImpacto(im.id, { color: v })} />
       </Campo>
 

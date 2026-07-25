@@ -1,6 +1,8 @@
 import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
+  ArrowDownToLine,
+  ArrowUpToLine,
   BringToFront,
   Copy,
   ClipboardPaste,
@@ -93,11 +95,14 @@ export default function MenuContextual() {
   if (!menu) return null
 
   const st = useEditorStore.getState()
+  // las filas (una pista de video o una fila de audio o texto) no traen un bloque
+  // sino el índice de la fila en el id. tienen su propio juego de opciones
+  const esFila = menu.tipo === 'pista' || menu.tipo === 'carril-audio' || menu.tipo === 'carril-texto'
   const clip = menu.tipo === 'clip' ? clips.find((c) => c.id === menu.id) : undefined
   const capa = menu.tipo === 'capa' ? capas.find((c) => c.id === menu.id) : undefined
   const audio = menu.tipo === 'audio' ? audios.find((a) => a.id === menu.id) : undefined
   const region = menu.tipo === 'region' ? audioRegiones.find((r) => r.id === menu.id) : undefined
-  if (!clip && !capa && !audio && !region) return null
+  if (!esFila && !clip && !capa && !audio && !region) return null
 
   // ejecuta la acción y cierra, que es lo que se espera de un menú de este tipo
   const con = (fn: () => void) => () => {
@@ -107,6 +112,38 @@ export default function MenuContextual() {
   const irAPanel = (h: Herramienta) => con(() => st.setHerramienta(h))
 
   const opciones: Opcion[] = []
+
+  // opciones de una fila entera: insertar otra encima o debajo, y eliminarla con
+  // aviso. no se puede borrar la última que queda
+  if (esFila) {
+    const n = Number(menu.id)
+    if (menu.tipo === 'pista') {
+      opciones.push(
+        { id: 'ins-arriba', etiqueta: 'Insertar pista encima', icono: <ArrowUpToLine size={15} />, onElegir: con(() => st.insertarPistaEn(n + 1)) },
+        { id: 'ins-abajo', etiqueta: 'Insertar pista debajo', icono: <ArrowDownToLine size={15} />, onElegir: con(() => st.insertarPistaEn(n)) },
+        { id: 'dup', etiqueta: 'Duplicar la pista', icono: <CopyPlus size={15} />, separadorAntes: true, onElegir: con(() => st.duplicarPista(n)) },
+        {
+          id: 'del', etiqueta: 'Eliminar la pista', icono: <Trash2 size={15} />, atajo: 'Supr', peligro: true, separadorAntes: true,
+          desactivada: st.numPistas <= 1,
+          onElegir: con(() => { if (window.confirm('Se eliminará esta pista de video con todo lo que contenga. Podrás deshacerlo.')) st.quitarPista(n) }),
+        },
+      )
+    } else {
+      const esAudio = menu.tipo === 'carril-audio'
+      const insertar = esAudio ? st.insertarNivelAudio : st.insertarNivelTexto
+      const quitar = esAudio ? st.quitarNivelAudio : st.quitarNivelTexto
+      const ultima = esAudio ? st.nivelesAudio <= 1 : st.nivelesTexto <= 1
+      opciones.push(
+        { id: 'ins-arriba', etiqueta: 'Insertar fila encima', icono: <ArrowUpToLine size={15} />, onElegir: con(() => insertar(n + 1, '')) },
+        { id: 'ins-abajo', etiqueta: 'Insertar fila debajo', icono: <ArrowDownToLine size={15} />, onElegir: con(() => insertar(n, '')) },
+        {
+          id: 'del', etiqueta: 'Eliminar la fila', icono: <Trash2 size={15} />, atajo: 'Supr', peligro: true, separadorAntes: true,
+          desactivada: ultima,
+          onElegir: con(() => { if (window.confirm('Se eliminará esta fila con todo lo que contenga. Podrás deshacerlo.')) quitar(n) }),
+        },
+      )
+    }
+  }
 
   if (clip) {
     opciones.push(
@@ -161,8 +198,9 @@ export default function MenuContextual() {
     )
   }
 
-  // con varios bloques marcados se ofrece además borrarlos todos de golpe
-  if (st.bloquesSeleccionados.length > 1) {
+  // con varios bloques marcados se ofrece además borrarlos todos de golpe. esto y
+  // el «más opciones» de abajo son cosa de los bloques, no de las filas
+  if (!esFila && st.bloquesSeleccionados.length > 1) {
     const n = st.bloquesSeleccionados.length
     opciones.push({
       id: 'borrar-conjunto',
@@ -178,23 +216,25 @@ export default function MenuContextual() {
     })
   }
 
-  opciones.push({
-    id: 'mas',
-    etiqueta: 'Más opciones',
-    icono: <SlidersHorizontal size={15} />,
-    separadorAntes: true,
-    onElegir: irAPanel(
-      clip
-        ? 'transformar'
-        : capa
-          ? capa.tipo === 'trazo'
-            ? 'dibujar'
-            : capa.tipo === 'imagen'
-              ? 'transformar'
-              : capa.tipo
-          : 'audio',
-    ),
-  })
+  if (!esFila) {
+    opciones.push({
+      id: 'mas',
+      etiqueta: 'Más opciones',
+      icono: <SlidersHorizontal size={15} />,
+      separadorAntes: true,
+      onElegir: irAPanel(
+        clip
+          ? 'transformar'
+          : capa
+            ? capa.tipo === 'trazo'
+              ? 'dibujar'
+              : capa.tipo === 'imagen'
+                ? 'transformar'
+                : capa.tipo
+            : 'audio',
+      ),
+    })
+  }
 
   return createPortal(
     <div

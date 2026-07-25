@@ -242,8 +242,8 @@ interface EstadoEditor {
   marcarBloques: (ids: string[]) => void
   // menú que sale al pulsar con el botón derecho sobre un bloque de la línea de
   // tiempo. guarda dónde se pulsó y sobre qué, y de ahí sale lo que se ofrece
-  menuContextual: { x: number; y: number; tipo: 'clip' | 'capa' | 'audio' | 'region'; id: string } | null
-  abrirMenuContextual: (m: { x: number; y: number; tipo: 'clip' | 'capa' | 'audio' | 'region'; id: string }) => void
+  menuContextual: { x: number; y: number; tipo: 'clip' | 'capa' | 'audio' | 'region' | 'pista' | 'carril-audio' | 'carril-texto'; id: string } | null
+  abrirMenuContextual: (m: { x: number; y: number; tipo: 'clip' | 'capa' | 'audio' | 'region' | 'pista' | 'carril-audio' | 'carril-texto'; id: string }) => void
   cerrarMenuContextual: () => void
   // borra de una vez todos los bloques marcados, sea cual sea su tipo
   quitarBloques: (ids: string[]) => void
@@ -296,6 +296,13 @@ interface EstadoEditor {
   setFundido: (id: string, lado: 'entrada' | 'salida', segundos: number) => void
   agregarNivelTexto: () => void
   agregarNivelAudio: () => void
+  // duplica una pista de video entera con sus clips, figuras e imágenes, en una
+  // pista nueva justo encima
+  duplicarPista: (indice: number) => void
+  // quita una fila del carril de texto o de audio con lo que contenga, y baja las
+  // de encima. no se puede quedar el carril sin ninguna fila
+  quitarNivelTexto: (nivel: number) => void
+  quitarNivelAudio: (nivel: number) => void
   // permuta dos filas del carril de audio: todo lo que vive en una pasa a la otra
   // y viceversa. sirve para arrastrar un nivel entero arriba o abajo y decidir cuál
   // va primero, sin tener que mover sus bloques uno por uno
@@ -663,6 +670,9 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'moverCarril',
   'agregarNivelTexto',
   'agregarNivelAudio',
+  'duplicarPista',
+  'quitarNivelTexto',
+  'quitarNivelAudio',
   'intercambiarNivelAudio',
   'moverCapaNivel',
   'insertarNivelTexto',
@@ -1856,6 +1866,62 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         clipSeleccionado: seguiaVivo ? s.clipSeleccionado : null,
         capaSeleccionada: capaViva ? s.capaSeleccionada : null,
         playhead: Math.min(s.playhead, duracionTotal(clips)),
+      }
+    }),
+
+  // duplica una pista entera: sus clips, figuras e imágenes se copian a una pista
+  // nueva que nace justo encima. todo lo que estaba en ese índice o más arriba sube
+  // un puesto para dejarle sitio, igual que al insertar
+  duplicarPista: (indice) =>
+    set((s) => {
+      if (s.numPistas >= MAX_PISTAS) return {}
+      const destino = indice + 1
+      const clipsCorridos = s.pista.clips.map((c) => (c.pista >= destino ? { ...c, pista: c.pista + 1 } : c))
+      const copiasClips = s.pista.clips
+        .filter((c) => c.pista === indice)
+        .map((c) => ({ ...c, id: crypto.randomUUID(), pista: destino, tono: { ...c.tono }, efectos: c.efectos.map((e) => ({ ...e })) }))
+      const capasCorridas = s.capas.map((c) =>
+        (c.tipo === 'figura' || c.tipo === 'imagen') && (c.nivel ?? 0) >= destino
+          ? { ...c, nivel: (c.nivel ?? 0) + 1 }
+          : c,
+      )
+      const copiasCapas = s.capas
+        .filter((c) => (c.tipo === 'figura' || c.tipo === 'imagen') && (c.nivel ?? 0) === indice)
+        .map((c) => ({ ...c, id: crypto.randomUUID(), nivel: destino }))
+      const altosPista = [...s.altosPista]
+      altosPista.splice(destino, 0, s.altosPista[indice] ?? ALTO_PISTA_BASE)
+      const pistasMeta = [...s.pistasMeta]
+      pistasMeta.splice(destino, 0, { ...metaPista(s.numPistas + 1), nombre: `${s.pistasMeta[indice]?.nombre ?? 'Video'} (copia)` })
+      return {
+        numPistas: s.numPistas + 1,
+        altosPista,
+        pistasMeta,
+        pista: { ...s.pista, clips: [...clipsCorridos, ...copiasClips] },
+        capas: [...capasCorridas, ...copiasCapas],
+      }
+    }),
+
+  quitarNivelTexto: (nivel) =>
+    set((s) => {
+      if (s.nivelesTexto <= 1) return {}
+      // se van las capas de texto de esa fila; las de arriba bajan un puesto. las
+      // figuras e imágenes no cuentan aquí, viven en las pistas de video
+      const esTexto = (t: string) => t !== 'imagen' && t !== 'figura'
+      const capas = s.capas
+        .filter((c) => !(esTexto(c.tipo) && (c.nivel ?? 0) === nivel))
+        .map((c) => (esTexto(c.tipo) && (c.nivel ?? 0) > nivel ? { ...c, nivel: (c.nivel ?? 0) - 1 } : c))
+      return { capas, nivelesTexto: s.nivelesTexto - 1 }
+    }),
+
+  quitarNivelAudio: (nivel) =>
+    set((s) => {
+      if (s.nivelesAudio <= 1) return {}
+      const bajar = <T extends { nivel?: number }>(x: T): T =>
+        (x.nivel ?? 0) > nivel ? { ...x, nivel: (x.nivel ?? 0) - 1 } : x
+      return {
+        nivelesAudio: s.nivelesAudio - 1,
+        audios: s.audios.filter((a) => (a.nivel ?? 0) !== nivel).map(bajar),
+        audioRegiones: s.audioRegiones.filter((r) => (r.nivel ?? 0) !== nivel).map(bajar),
       }
     }),
 

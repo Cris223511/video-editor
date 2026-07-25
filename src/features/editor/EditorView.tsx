@@ -118,10 +118,10 @@ export default function EditorView() {
                   collapsedSize={0}
                   // mismo default y mismo mínimo que el panel de medios de abajo;
                   // al compartir grupo y ancho, sus bordes coinciden siempre. el
-                  // mínimo se subió un poco para que, al estrecharlo del todo, el panel
-                  // de propiedades quede a la par del de medios de abajo y no más angosto
+                  // mínimo se dejó más bajo para poder estrecharlo bastante, y es el
+                  // mismo en los dos para que queden a la par al plegarlos del todo
                   defaultSize={21}
-                  minSize={21}
+                  minSize={15}
                   maxSize={42}
                   onCollapse={() => setVerOpciones(false)}
                   onExpand={() => setVerOpciones(true)}
@@ -132,52 +132,58 @@ export default function EditorView() {
 
                 <Tirador orientacion="vertical" onDobleClic={() => alternar(opciones, verOpciones)} />
 
+                {/* el visor y el panel contextual de la derecha comparten esta
+                    misma casilla: así, al abrir los controles de la derecha, el que
+                    cede espacio es el visor (que es flex-1) y no el panel de la
+                    izquierda, que se queda quieto y alineado con el de medios */}
                 <Panel id="visor" order={2} minSize={30} className={`flex ${suave}`}>
-                  {/* el mismo contenedor cambia de vestido al pasar a pantalla
-                      completa en lugar de montarse otro aparte. así el visor no se
-                      reinicia: el video sigue donde estaba y las capas encima no
-                      parpadean. el primer hijo (el visor en sí) se redondea para que
-                      la imagen no llegue a tocar los bordes de la pantalla */}
-                  <div
-                    className={
-                      visorCompleto
-                        ? 'fixed inset-0 z-[70] flex flex-col overflow-hidden p-6 backdrop-blur-2xl [&>*:first-child]:overflow-hidden [&>*:first-child]:rounded-2xl'
-                        : 'panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl'
-                    }
-                    // el fondo va en el estilo y no en una clase para que no dependa
-                    // del tema: a pantalla completa siempre se quiere oscuro, tanto
-                    // en claro como en oscuro, y así el video destaca de verdad
-                    style={
-                      visorCompleto
-                        ? { animation: 'fundido-in 0.25s ease-out', background: 'rgb(6 10 20 / 0.94)' }
-                        : undefined
-                    }
-                  >
-                    <Preview />
-                    <PlaybackControls
-                      visorCompleto={visorCompleto}
-                      onAlternarCompleto={() => setVisorCompleto((v) => !v)}
-                    />
-                    {/* a pantalla completa solo cierra la equis, nada de clic al
-                        fondo ni escape, que es como se pidió */}
-                    {visorCompleto && (
-                      <button
-                        onClick={() => setVisorCompleto(false)}
-                        aria-label="Cerrar la pantalla completa"
-                        className="absolute right-5 top-5 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/12 text-white backdrop-blur transition-colors hover:bg-white/25"
-                      >
-                        <X size={18} />
-                      </button>
-                    )}
+                  <div className="flex h-full min-w-0 flex-1 gap-1.5">
+                    {/* el mismo contenedor cambia de vestido al pasar a pantalla
+                        completa en lugar de montarse otro aparte. así el visor no se
+                        reinicia: el video sigue donde estaba y las capas encima no
+                        parpadean. el primer hijo (el visor en sí) se redondea para que
+                        la imagen no llegue a tocar los bordes de la pantalla */}
+                    <div
+                      className={
+                        visorCompleto
+                          ? 'fixed inset-0 z-[70] flex flex-col overflow-hidden p-6 backdrop-blur-2xl [&>*:first-child]:overflow-hidden [&>*:first-child]:rounded-2xl'
+                          : 'panel flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl'
+                      }
+                      // el fondo va en el estilo y no en una clase para que no dependa
+                      // del tema: a pantalla completa siempre se quiere oscuro, tanto
+                      // en claro como en oscuro, y así el video destaca de verdad
+                      style={
+                        visorCompleto
+                          ? { animation: 'fundido-in 0.25s ease-out', background: 'rgb(6 10 20 / 0.94)' }
+                          : undefined
+                      }
+                    >
+                      <Preview />
+                      <PlaybackControls
+                        visorCompleto={visorCompleto}
+                        onAlternarCompleto={() => setVisorCompleto((v) => !v)}
+                      />
+                      {/* a pantalla completa solo cierra la equis, nada de clic al
+                          fondo ni escape, que es como se pidió */}
+                      {visorCompleto && (
+                        <button
+                          onClick={() => setVisorCompleto(false)}
+                          aria-label="Cerrar la pantalla completa"
+                          className="absolute right-5 top-5 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/12 text-white backdrop-blur transition-colors hover:bg-white/25"
+                        >
+                          <X size={18} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* panel contextual del elemento elegido, pegado a la derecha
+                        del visor. al abrir sus controles, empuja al visor, no al
+                        panel de la izquierda */}
+                    {!visorCompleto && <PanelClip />}
                   </div>
                 </Panel>
               </PanelGroup>
             </div>
-
-            {/* panel contextual del elemento elegido, pegado a la derecha del
-                visor. reserva su sitio siempre para que seleccionar no empuje la
-                vista de golpe, y sus controles crecen con suavidad al abrirse */}
-            {!visorCompleto && <PanelClip />}
 
           </div>
         </Panel>
@@ -202,7 +208,7 @@ export default function EditorView() {
                   collapsedSize={0}
                   // mismo default y mínimo que el panel de opciones de arriba
                   defaultSize={21}
-                  minSize={21}
+                  minSize={15}
                   maxSize={42}
                   onCollapse={() => setVerMedios(false)}
                   onExpand={() => setVerMedios(true)}

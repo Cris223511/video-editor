@@ -1,4 +1,4 @@
-import { MouseEvent as ReactMouseEvent, useState } from 'react'
+import { PointerEvent as ReactPointerEvent, useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import Icon, { NombreIcono } from '../../../components/ui/Icon'
 import Tooltip from '../../../components/ui/Tooltip'
@@ -37,7 +37,7 @@ export default function CarrilHeader({
   onBajar?: () => void
   // arrastre para cambiar el alto de las filas del carril; el gesto lo maneja quien
   // lo pasa, aquí solo se pinta el tirador en el borde inferior
-  onEstirar?: (e: React.MouseEvent) => void
+  onEstirar?: (e: React.PointerEvent) => void
   // reordenar el carril entero: recibe la dirección (-1 sube, 1 baja) y la resuelve
   // contra el orden vigente, así arrastrar varios pasos seguidos no usa un índice
   // viejo. sin definir, el carril no se reordena
@@ -48,7 +48,7 @@ export default function CarrilHeader({
   // los mismos onSubir/onBajar que las flechas: al pasar de la mitad del alto del
   // carril se salta al hueco contiguo. no arranca sobre un botón, el rótulo
   // editable ni el tirador de alto, para no pisar esos gestos
-  function iniciarReordenar(e: ReactMouseEvent) {
+  function iniciarReordenar(e: ReactPointerEvent) {
     const t = e.target as HTMLElement
     if (t.closest('button') || t.closest('input') || t.closest('[data-tirador-alto]')) return
     if (!onReordenar) return
@@ -57,7 +57,7 @@ export default function CarrilHeader({
     const paso = Math.max(28, alto + 12)
     setArrastrando(true)
     document.body.style.cursor = 'grabbing'
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       const dy = ev.clientY - baseY
       if (dy < -paso / 2) {
         onReordenar(-1)
@@ -70,11 +70,11 @@ export default function CarrilHeader({
     const soltar = () => {
       setArrastrando(false)
       document.body.style.cursor = ''
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   return (
@@ -98,7 +98,7 @@ export default function CarrilHeader({
           «arrastrar» sale solo aquí, en el inicio, y no por toda la cabecera. así no
           se confunde con la zona del nombre ni con los botones de la derecha */}
       <span
-        onMouseDown={iniciarReordenar}
+        onPointerDown={iniciarReordenar}
         title={onReordenar ? 'Arrastra para reordenar la sección' : undefined}
         className={[
           'grid h-6 w-6 shrink-0 place-items-center rounded-md',
@@ -140,7 +140,7 @@ export default function CarrilHeader({
       </span>
       {onEstirar && (
         <div
-          onMouseDown={onEstirar}
+          onPointerDown={onEstirar}
           data-tirador-alto
           title="Arrastra para cambiar el alto"
           className="absolute inset-x-0 bottom-0 z-10 h-1.5 cursor-ns-resize opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover:opacity-60"

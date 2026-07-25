@@ -7,9 +7,11 @@ import { formatearBytes } from '../../../lib/format/bytes'
 
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 text-[13px]">
-      <span className="text-[color:var(--muted)]">{etiqueta}</span>
-      <span className="text-right font-medium">{valor}</span>
+    // con flex-wrap el valor baja bajo la etiqueta cuando el panel es muy angosto,
+    // en vez de cortarse; break-words evita que un valor largo se salga del borde
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-[13px]">
+      <span className="shrink-0 text-[color:var(--muted)]">{etiqueta}</span>
+      <span className="min-w-0 break-words text-right font-medium">{valor}</span>
     </div>
   )
 }
