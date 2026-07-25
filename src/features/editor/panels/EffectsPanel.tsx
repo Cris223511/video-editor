@@ -19,6 +19,11 @@ import {
   TIPO_EFECTO,
 } from '../../../lib/efectos/catalogo'
 
+// dato que viaja al arrastrar una fila para reordenarla. es distinto del que usa el
+// catálogo (TIPO_EFECTO), así que soltar una fila sobre otra reordena, y soltar una
+// muestra del catálogo reemplaza, sin que se confundan
+const TIPO_ORDEN_EFECTO = 'application/x-ve-orden-efecto'
+
 // nombre visible de un efecto ya puesto, para la etiqueta de su fila
 function nombreEfecto(e: EfectoClip): string {
   if (e.tipo === 'nitidez-brillo') return 'Nítido y brilloso'
@@ -38,6 +43,7 @@ export default function EffectsPanel() {
   const actualizarEfecto = useEditorStore((s) => s.actualizarEfecto)
   const quitarEfecto = useEditorStore((s) => s.quitarEfecto)
   const reordenarEfecto = useEditorStore((s) => s.reordenarEfecto)
+  const moverEfectoA = useEditorStore((s) => s.moverEfectoA)
   const reemplazarEfecto = useEditorStore((s) => s.reemplazarEfecto)
   const setTransicionEfecto = useEditorStore((s) => s.setTransicionEfecto)
 
@@ -61,6 +67,13 @@ export default function EffectsPanel() {
   // cuando está encendido, la próxima muestra que se elija entra como efecto nuevo en
   // vez de reemplazar al seleccionado. lo prende el botón «+»
   const [modoAgregar, setModoAgregar] = useState(false)
+  // arrastre de reordenar filas: la que se está moviendo, sobre cuál está el cursor y
+  // de qué lado (antes o después), para pintar la línea celeste de inserción
+  const [arrastreOrden, setArrastreOrden] = useState<{
+    id: string
+    sobre: string
+    lado: 'antes' | 'despues'
+  } | null>(null)
 
   if (!clip) {
     return (
@@ -116,6 +129,21 @@ export default function EffectsPanel() {
 
     reemplazarEfecto(clip.id, objetivo.id, { ...crearEfecto(id), id: objetivo.id })
     setActivoId(objetivo.id)
+  }
+
+  // suelta el reorden por arrastre: se calcula la posición destino entre las demás
+  // filas (todas menos la que se arrastra) según sobre cuál se soltó y de qué lado
+  function soltarOrden() {
+    if (!clip || !arrastreOrden) return
+    const ids = efectos.map((e) => e.id).filter((id) => id !== arrastreOrden.id)
+    let pos = ids.indexOf(arrastreOrden.sobre)
+    if (pos < 0) {
+      setArrastreOrden(null)
+      return
+    }
+    if (arrastreOrden.lado === 'despues') pos += 1
+    moverEfectoA(clip.id, arrastreOrden.id, pos)
+    setArrastreOrden(null)
   }
 
   // reemplazo por arrastre: al soltar una muestra sobre una fila, esa fila cambia su
@@ -184,6 +212,9 @@ export default function EffectsPanel() {
                   ultimo={i === efectos.length - 1}
                   abierto={ajustesDe === e.id}
                   activo={objetivo?.id === e.id}
+                  atenuado={arrastreOrden?.id === e.id}
+                  lineaAntes={arrastreOrden?.sobre === e.id && arrastreOrden.lado === 'antes'}
+                  lineaDespues={arrastreOrden?.sobre === e.id && arrastreOrden.lado === 'despues'}
                   onSeleccionar={() => {
                     setActivoId(e.id)
                     setModoAgregar(false)
@@ -198,6 +229,12 @@ export default function EffectsPanel() {
                   onSubir={() => reordenarEfecto(clip.id, e.id, -1)}
                   onBajar={() => reordenarEfecto(clip.id, e.id, 1)}
                   onSoltarEfecto={(id) => reemplazarPorArrastre(e.id, id)}
+                  onArrancarOrden={() => setArrastreOrden({ id: e.id, sobre: e.id, lado: 'antes' })}
+                  onOrdenSobre={(lado) =>
+                    setArrastreOrden((prev) => (prev ? { ...prev, sobre: e.id, lado } : prev))
+                  }
+                  onSoltarOrden={soltarOrden}
+                  onFinOrden={() => setArrastreOrden(null)}
                 />
               ))}
             </AnimatePresence>
@@ -246,6 +283,9 @@ function FilaEfecto({
   ultimo,
   abierto,
   activo,
+  atenuado,
+  lineaAntes,
+  lineaDespues,
   onSeleccionar,
   onAbrir,
   onCambiar,
@@ -253,12 +293,19 @@ function FilaEfecto({
   onSubir,
   onBajar,
   onSoltarEfecto,
+  onArrancarOrden,
+  onOrdenSobre,
+  onSoltarOrden,
+  onFinOrden,
 }: {
   efecto: EfectoClip
   primero: boolean
   ultimo: boolean
   abierto: boolean
   activo: boolean
+  atenuado: boolean
+  lineaAntes: boolean
+  lineaDespues: boolean
   onSeleccionar: () => void
   onAbrir: () => void
   onCambiar: (cambios: Partial<EfectoClip>) => void
@@ -266,20 +313,40 @@ function FilaEfecto({
   onSubir: () => void
   onBajar: () => void
   onSoltarEfecto: (id: string) => void
+  onArrancarOrden: () => void
+  onOrdenSobre: (lado: 'antes' | 'despues') => void
+  onSoltarOrden: () => void
+  onFinOrden: () => void
 }) {
-  // se enciende mientras se arrastra una muestra sobre esta fila, para avisar de que
-  // al soltar se reemplaza su efecto
+  // se enciende mientras se arrastra una muestra del catálogo sobre esta fila, para
+  // avisar de que al soltar se reemplaza su efecto
   const [arrastreEncima, setArrastreEncima] = useState(false)
+
+  // la línea celeste de inserción, igual que la de la línea de tiempo, arriba o abajo
+  // de la fila según de qué lado caiga el reorden
+  const lineaOrden = (arriba: boolean) => (
+    <span
+      className="pointer-events-none absolute inset-x-1 z-20 h-0.5 rounded-full"
+      style={{
+        top: arriba ? -4 : undefined,
+        bottom: arriba ? undefined : -4,
+        background: '#38bdf8',
+        boxShadow: '0 0 6px rgba(56,189,248,0.85)',
+      }}
+    />
+  )
 
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{ opacity: atenuado ? 0.4 : 1, y: 0 }}
       exit={{ opacity: 0, y: -6 }}
       transition={{ layout: { duration: 0.28, ease: [0.16, 1, 0.3, 1] }, duration: 0.2 }}
       className="relative"
     >
+      {lineaAntes && lineaOrden(true)}
+      {lineaDespues && lineaOrden(false)}
       {/* mandos del efecto, flotando por encima de la fila como una burbuja. se abre
           hacia arriba, que es donde hay sitio, y no empuja al resto de las filas */}
       <AnimatePresence>
@@ -298,8 +365,21 @@ function FilaEfecto({
       </AnimatePresence>
 
       <div
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData(TIPO_ORDEN_EFECTO, efecto.id)
+          e.dataTransfer.effectAllowed = 'move'
+          onArrancarOrden()
+        }}
+        onDragEnd={onFinOrden}
         onDragOver={(e) => {
-          if (e.dataTransfer.types.includes(TIPO_EFECTO)) {
+          // reorden de filas: se mira si el cursor cae en la mitad de arriba o de
+          // abajo de la fila para insertar antes o después
+          if (e.dataTransfer.types.includes(TIPO_ORDEN_EFECTO)) {
+            e.preventDefault()
+            const r = e.currentTarget.getBoundingClientRect()
+            onOrdenSobre(e.clientY < r.top + r.height / 2 ? 'antes' : 'despues')
+          } else if (e.dataTransfer.types.includes(TIPO_EFECTO)) {
             e.preventDefault()
             if (!arrastreEncima) setArrastreEncima(true)
           }
@@ -308,6 +388,12 @@ function FilaEfecto({
           if (!e.currentTarget.contains(e.relatedTarget as Node)) setArrastreEncima(false)
         }}
         onDrop={(e) => {
+          if (e.dataTransfer.getData(TIPO_ORDEN_EFECTO)) {
+            e.preventDefault()
+            e.stopPropagation()
+            onSoltarOrden()
+            return
+          }
           const id = e.dataTransfer.getData(TIPO_EFECTO)
           if (!id) return
           e.preventDefault()

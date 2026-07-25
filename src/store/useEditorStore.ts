@@ -216,6 +216,7 @@ interface EstadoEditor {
   actualizarEfecto: (id: string, efectoId: string, cambios: Partial<EfectoClip>) => void
   quitarEfecto: (id: string, efectoId: string) => void
   reordenarEfecto: (id: string, efectoId: string, dir: -1 | 1) => void
+  moverEfectoA: (id: string, efectoId: string, indice: number) => void
   reemplazarEfecto: (id: string, efectoId: string, nuevo: EfectoClip) => void
   ponerEfectoEncima: (id: string, efecto: EfectoClip) => void
   setTransicion: (id: string, cambios: Partial<Transicion>) => void
@@ -622,6 +623,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'actualizarEfecto',
   'quitarEfecto',
   'reordenarEfecto',
+  'moverEfectoA',
   'reemplazarEfecto',
   'ponerEfectoEncima',
   'setTransicion',
@@ -1517,6 +1519,26 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
           const j = i + dir
           if (i < 0 || j < 0 || j >= efs.length) return c
           ;[efs[i], efs[j]] = [efs[j], efs[i]]
+          return { ...c, efectos: efs }
+        }),
+      },
+    })),
+
+  // mueve un efecto a una posición concreta de la pila. lo usa el arrastre de
+  // reordenar: se saca de donde está y se inserta en el índice destino, corriendo
+  // el resto. el índice ya viene ajustado por quien llama
+  moverEfectoA: (id, efectoId, indice) =>
+    set((s) => ({
+      pista: {
+        ...s.pista,
+        clips: s.pista.clips.map((c) => {
+          if (c.id !== id) return c
+          const efs = [...(c.efectos ?? [])]
+          const desde = efs.findIndex((e) => e.id === efectoId)
+          if (desde < 0) return c
+          const [mov] = efs.splice(desde, 1)
+          const destino = Math.max(0, Math.min(efs.length, indice))
+          efs.splice(destino, 0, mov)
           return { ...c, efectos: efs }
         }),
       },
