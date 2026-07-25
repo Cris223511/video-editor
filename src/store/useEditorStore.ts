@@ -2742,7 +2742,40 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         clips.length === 1
           ? { ...s.pista, clips: clips.map((c) => ({ ...c, encuadre: undefined })) }
           : s.pista
-      return { resolucion: { ancho, alto }, lienzoManual: true, pista }
+
+      // los elementos (figuras, imágenes, censuras, dibujos) no deben cambiar de
+      // tamaño ni deformarse al cambiar la proporción. como el ancho se guarda en
+      // fracción del ancho del lienzo y el alto en fracción del alto, un cambio de
+      // proporción distorsionaría la figura; para evitarlo se reescalan sus medidas
+      // por el factor inverso, de modo que conserven sus píxeles exactos. el grosor y
+      // el tamaño de letra van en píxeles del lienzo y la posición en fracción, así
+      // que se dejan como están (una figura centrada sigue centrada)
+      const fx = s.resolucion.ancho / ancho
+      const fy = s.resolucion.alto / alto
+      const capas =
+        fx === 1 && fy === 1
+          ? s.capas
+          : s.capas.map((c) => {
+              if (c.tipo === 'figura' || c.tipo === 'censura') {
+                return { ...c, anchoRel: c.anchoRel * fx, altoRel: c.altoRel * fy }
+              }
+              if (c.tipo === 'imagen') {
+                return {
+                  ...c,
+                  anchoRel: c.anchoRel * fx,
+                  altoRel: c.altoRel !== undefined ? c.altoRel * fy : c.altoRel,
+                }
+              }
+              if (c.tipo === 'trazo') {
+                return {
+                  ...c,
+                  trazos: c.trazos.map((t) => t.map((p) => ({ x: p.x * fx, y: p.y * fy }))),
+                }
+              }
+              return c
+            })
+
+      return { resolucion: { ancho, alto }, lienzoManual: true, pista, capas }
     }),
 
   setLienzoAuto: () => set((s) => ({ resolucion: { ...s.resolucionAuto }, lienzoManual: false })),
