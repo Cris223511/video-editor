@@ -9,15 +9,15 @@ import { useEditorStore } from '../../../store/useEditorStore'
 import { Campo, Deslizador, Segmentado } from '../../../components/ui/Controls'
 import { useProjectStore } from '../../../store/useProjectStore'
 import { EfectoClip } from '../../../types/timeline'
-import { CATEGORIAS_EFECTO, buscarEfecto, esFiltro } from '../../../lib/efectos/catalogo'
-
-// valores de partida al añadir el desenfoque: intensidad media y barrido
-// horizontal, que es la dirección más habitual en un travelling
-const DESENFOQUE_INICIAL = {
-  tipo: 'desenfoque-movimiento' as const,
-  intensidad: 40,
-  angulo: 0,
-}
+import {
+  CATEGORIAS_EFECTO,
+  buscarEfecto,
+  esFiltro,
+  claveEfecto,
+  claveCatalogo,
+  crearEfecto,
+  TIPO_EFECTO,
+} from '../../../lib/efectos/catalogo'
 
 // nombre visible de un efecto ya puesto, para la etiqueta de su fila
 function nombreEfecto(e: EfectoClip): string {
@@ -26,32 +26,10 @@ function nombreEfecto(e: EfectoClip): string {
   return 'Desenfoque de movimiento'
 }
 
-// identidad de un efecto, para no ponerlo dos veces. el desenfoque y la nitidez son
-// únicos; los filtros se distinguen por cuál es
-function claveEfecto(e: EfectoClip): string {
-  if (e.tipo === 'filtro') return `filtro:${e.filtro}`
-  if (e.tipo === 'desenfoque-movimiento') return 'desenfoque'
-  return 'nitidez-brillo'
-}
-
-// misma identidad pero calculada desde el id de una muestra del catálogo
-function claveCatalogo(id: string): string {
-  if (id === 'nitidez-brillo') return 'nitidez-brillo'
-  if (id === 'desenfoque-movimiento') return 'desenfoque'
-  return `filtro:${id}`
-}
-
-// crea el efecto que corresponde a una muestra del catálogo, con sus valores de
-// arranque. cada tipo guarda sus propios mandos
-function crearEfecto(id: string): EfectoClip {
-  if (id === 'nitidez-brillo') return { id: crypto.randomUUID(), tipo: 'nitidez-brillo', nitidez: 55, brillo: 35 }
-  if (id === 'desenfoque-movimiento') return { id: crypto.randomUUID(), ...DESENFOQUE_INICIAL }
-  return { id: crypto.randomUUID(), tipo: 'filtro', filtro: id, intensidad: 50 }
-}
-
 // panel de efectos del clip. arriba el catálogo para elegir; abajo los efectos ya
-// puestos, en filas apiladas como capas. el orden se puede cambiar y cada efecto se
-// regula, se reemplaza o se quita por su cuenta
+// puestos, en filas apiladas como capas. clicar una muestra reemplaza el efecto que
+// esté seleccionado en vez de sumar otro; para agregar uno nuevo se usa el botón «+»
+// o se arrastra la muestra al clip en la línea de tiempo
 export default function EffectsPanel() {
   const clips = useEditorStore((s) => s.pista.clips)
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
@@ -77,9 +55,12 @@ export default function EffectsPanel() {
   // qué fila tiene abierto su panel de ajustes. solo una a la vez, para no llenar
   // todo de mandos flotantes
   const [ajustesDe, setAjustesDe] = useState<string | null>(null)
-  // fila que está esperando su reemplazo: mientras hay una, el catálogo cambia ese
-  // efecto en lugar de sumar uno nuevo. null cuando no se está reemplazando nada
-  const [reemplazandoId, setReemplazandoId] = useState<string | null>(null)
+  // efecto «seleccionado»: es el que reemplaza un clic en el catálogo. por defecto se
+  // toma el último de la lista
+  const [activoId, setActivoId] = useState<string | null>(null)
+  // cuando está encendido, la próxima muestra que se elija entra como efecto nuevo en
+  // vez de reemplazar al seleccionado. lo prende el botón «+»
+  const [modoAgregar, setModoAgregar] = useState(false)
 
   if (!clip) {
     return (
@@ -91,27 +72,62 @@ export default function EffectsPanel() {
 
   const efectos = clip.efectos ?? []
   const puestos = new Set(efectos.map(claveEfecto))
+  // el efecto que un clic en el catálogo va a reemplazar: el seleccionado, o el
+  // último si el seleccionado ya no existe
+  const objetivo = efectos.find((e) => e.id === activoId) ?? efectos[efectos.length - 1]
+  const objetivoClave = objetivo ? claveEfecto(objetivo) : null
 
-  // al elegir una muestra del catálogo se suma ese efecto como una capa nueva. si ya
-  // estaba puesto no se agrega otra vez: para tener otro se elige una muestra
-  // distinta, y así clicar varias veces la misma no llena la lista de repetidos.
-  // si hay una fila esperando reemplazo, la muestra elegida cambia ese efecto en su
-  // sitio en vez de agregar uno al final
+  // qué hace un clic en una muestra del catálogo, según el estado:
+  // - en modo agregar (o con la lista vacía) crea un efecto nuevo
+  // - si se pulsa el efecto que ya es el seleccionado, lo quita (desmarca)
+  // - si se pulsa uno que ya está en otra fila, se pasa a seleccionar esa
+  // - en el caso normal, reemplaza el efecto seleccionado por el elegido, en su sitio
   function elegir(id: string) {
     if (!clip) return
-    if (reemplazandoId) {
-      const actual = efectos.find((e) => e.id === reemplazandoId)
-      // reemplazar por el mismo o por otro que ya esté en la lista no tiene sentido
-      if (!actual || claveEfecto(actual) === claveCatalogo(id) || puestos.has(claveCatalogo(id))) {
-        setReemplazandoId(null)
+    const clave = claveCatalogo(id)
+
+    if (modoAgregar || efectos.length === 0) {
+      setModoAgregar(false)
+      if (puestos.has(clave)) {
+        const ya = efectos.find((e) => claveEfecto(e) === clave)
+        if (ya) setActivoId(ya.id)
         return
       }
-      reemplazarEfecto(clip.id, reemplazandoId, { ...crearEfecto(id), id: reemplazandoId })
-      setReemplazandoId(null)
+      const nuevo = crearEfecto(id)
+      agregarEfecto(clip.id, nuevo)
+      setActivoId(nuevo.id)
       return
     }
-    if (puestos.has(claveCatalogo(id))) return
-    agregarEfecto(clip.id, crearEfecto(id))
+
+    if (!objetivo) return
+
+    if (claveEfecto(objetivo) === clave) {
+      quitarEfecto(clip.id, objetivo.id)
+      if (ajustesDe === objetivo.id) setAjustesDe(null)
+      setActivoId(null)
+      return
+    }
+
+    if (puestos.has(clave)) {
+      const ya = efectos.find((e) => claveEfecto(e) === clave)
+      if (ya) setActivoId(ya.id)
+      return
+    }
+
+    reemplazarEfecto(clip.id, objetivo.id, { ...crearEfecto(id), id: objetivo.id })
+    setActivoId(objetivo.id)
+  }
+
+  // reemplazo por arrastre: al soltar una muestra sobre una fila, esa fila cambia su
+  // efecto por el arrastrado, sin moverse de sitio y sin crear duplicados
+  function reemplazarPorArrastre(rowId: string, id: string) {
+    if (!clip) return
+    const fila = efectos.find((e) => e.id === rowId)
+    if (!fila) return
+    const clave = claveCatalogo(id)
+    if (claveEfecto(fila) === clave || puestos.has(clave)) return
+    reemplazarEfecto(clip.id, rowId, { ...crearEfecto(id), id: rowId })
+    setActivoId(rowId)
   }
 
   return (
@@ -122,15 +138,36 @@ export default function EffectsPanel() {
         videoUrl={videoUrl}
         tiempo={tiempoFrame}
         puestos={puestos}
-        reemplazando={!!reemplazandoId}
-        onCancelarReemplazo={() => setReemplazandoId(null)}
+        objetivoClave={objetivoClave}
+        modoAgregar={modoAgregar}
+        onCancelarAgregar={() => setModoAgregar(false)}
         onElegir={elegir}
       />
 
-      {/* efectos aplicados, en filas apiladas como capas. el de más abajo es el
-          último que se aplica, sobre el resultado de los de arriba */}
+      {/* efectos aplicados, en filas apiladas como capas. el de más arriba es el
+          nivel 1 */}
       <div className="flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/10">
-        <span className="text-xs font-medium text-[color:var(--muted)]">Efectos aplicados</span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-[color:var(--muted)]">Efectos aplicados</span>
+          {efectos.length > 0 && (
+            <Tooltip texto="Añadir otro efecto" lado="arriba">
+              <button
+                onClick={() => {
+                  setModoAgregar(true)
+                  setAjustesDe(null)
+                }}
+                aria-label="Añadir otro efecto"
+                aria-pressed={modoAgregar}
+                className={[
+                  'interactivo grid h-6 w-6 place-items-center rounded-md transition-colors',
+                  modoAgregar ? 'bg-brand text-white' : 'text-[color:var(--muted)] hover:bg-brand/10 hover:text-brand',
+                ].join(' ')}
+              >
+                <Icon name="mas" size={15} />
+              </button>
+            </Tooltip>
+          )}
+        </div>
         {efectos.length === 0 ? (
           <p className="text-[13px] italic leading-relaxed text-[color:var(--muted)]">
             Todavía no hay efectos. Elige uno del catálogo de arriba y aparecerá aquí como una capa
@@ -146,20 +183,21 @@ export default function EffectsPanel() {
                   primero={i === 0}
                   ultimo={i === efectos.length - 1}
                   abierto={ajustesDe === e.id}
-                  reemplazando={reemplazandoId === e.id}
-                  onAbrir={() => setAjustesDe((prev) => (prev === e.id ? null : e.id))}
-                  onReemplazar={() => {
-                    setReemplazandoId((prev) => (prev === e.id ? null : e.id))
-                    setAjustesDe(null)
+                  activo={objetivo?.id === e.id}
+                  onSeleccionar={() => {
+                    setActivoId(e.id)
+                    setModoAgregar(false)
                   }}
+                  onAbrir={() => setAjustesDe((prev) => (prev === e.id ? null : e.id))}
                   onCambiar={(cambios) => actualizarEfecto(clip.id, e.id, cambios)}
                   onQuitar={() => {
                     quitarEfecto(clip.id, e.id)
                     if (ajustesDe === e.id) setAjustesDe(null)
-                    if (reemplazandoId === e.id) setReemplazandoId(null)
+                    if (activoId === e.id) setActivoId(null)
                   }}
                   onSubir={() => reordenarEfecto(clip.id, e.id, -1)}
                   onBajar={() => reordenarEfecto(clip.id, e.id, 1)}
+                  onSoltarEfecto={(id) => reemplazarPorArrastre(e.id, id)}
                 />
               ))}
             </AnimatePresence>
@@ -198,34 +236,41 @@ export default function EffectsPanel() {
 }
 
 // una fila de la lista de efectos: su nombre, el botón de ajustes que abre sus
-// mandos por encima, el de quitar y las flechas para moverlo de posición. el
-// movimiento entre filas se anima solo con la disposición de framer, con la misma
-// curva que usan los bloques de la línea de tiempo
+// mandos por encima, el de quitar y las flechas para moverlo de posición. clicar el
+// nombre la selecciona (será la que reemplace el catálogo), y soltar una muestra
+// encima cambia su efecto. el movimiento entre filas se anima con la disposición de
+// framer, con la misma curva que usan los bloques de la línea de tiempo
 function FilaEfecto({
   efecto,
   primero,
   ultimo,
   abierto,
-  reemplazando,
+  activo,
+  onSeleccionar,
   onAbrir,
-  onReemplazar,
   onCambiar,
   onQuitar,
   onSubir,
   onBajar,
+  onSoltarEfecto,
 }: {
   efecto: EfectoClip
   primero: boolean
   ultimo: boolean
   abierto: boolean
-  reemplazando: boolean
+  activo: boolean
+  onSeleccionar: () => void
   onAbrir: () => void
-  onReemplazar: () => void
   onCambiar: (cambios: Partial<EfectoClip>) => void
   onQuitar: () => void
   onSubir: () => void
   onBajar: () => void
+  onSoltarEfecto: (id: string) => void
 }) {
+  // se enciende mientras se arrastra una muestra sobre esta fila, para avisar de que
+  // al soltar se reemplaza su efecto
+  const [arrastreEncima, setArrastreEncima] = useState(false)
+
   return (
     <motion.div
       layout
@@ -253,9 +298,26 @@ function FilaEfecto({
       </AnimatePresence>
 
       <div
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes(TIPO_EFECTO)) {
+            e.preventDefault()
+            if (!arrastreEncima) setArrastreEncima(true)
+          }
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) setArrastreEncima(false)
+        }}
+        onDrop={(e) => {
+          const id = e.dataTransfer.getData(TIPO_EFECTO)
+          if (!id) return
+          e.preventDefault()
+          e.stopPropagation()
+          setArrastreEncima(false)
+          onSoltarEfecto(id)
+        }}
         className={[
           'flex items-center gap-2 rounded-xl border p-2.5 transition-colors',
-          reemplazando
+          arrastreEncima || activo
             ? 'border-brand ring-2 ring-brand/40'
             : abierto
               ? 'border-brand'
@@ -283,9 +345,19 @@ function FilaEfecto({
         </div>
 
         <Icon name="efectos" size={15} className="shrink-0 text-brand" />
-        <span className="flex-1 truncate text-sm font-medium">{nombreEfecto(efecto)}</span>
+        {/* el nombre es el que selecciona la fila: al pulsarlo, un clic en el catálogo
+            reemplazará este efecto */}
+        <button
+          onClick={onSeleccionar}
+          className={[
+            'flex-1 truncate text-left text-sm font-medium transition-colors',
+            activo ? 'text-brand' : 'hover:text-brand',
+          ].join(' ')}
+        >
+          {nombreEfecto(efecto)}
+        </button>
 
-        <Tooltip texto="Ajustes del efecto" lado="izquierda">
+        <Tooltip texto="Ajustes del efecto" lado="arriba">
           <button
             onClick={onAbrir}
             aria-label="Ajustes del efecto"
@@ -298,20 +370,7 @@ function FilaEfecto({
             <Icon name="ajustes" size={15} />
           </button>
         </Tooltip>
-        <Tooltip texto={reemplazando ? 'Cancelar el reemplazo' : 'Reemplazar por otro efecto'} lado="izquierda">
-          <button
-            onClick={onReemplazar}
-            aria-label="Reemplazar el efecto"
-            aria-pressed={reemplazando}
-            className={[
-              'interactivo grid h-7 w-7 shrink-0 place-items-center rounded-lg transition-colors',
-              reemplazando ? 'bg-brand text-white' : 'text-[color:var(--muted)] hover:bg-brand/10 hover:text-brand',
-            ].join(' ')}
-          >
-            <Icon name="reemplazar" size={15} />
-          </button>
-        </Tooltip>
-        <Tooltip texto="Quitar el efecto" lado="izquierda">
+        <Tooltip texto="Quitar el efecto" lado="arriba">
           <button
             onClick={onQuitar}
             aria-label="Quitar el efecto"
@@ -381,23 +440,26 @@ function MandosEfecto({
   )
 }
 
-// rejilla del catálogo, repartida en subcategorías. las muestras ya puestas se
-// marcan y no se vuelven a agregar al pulsarlas
+// rejilla del catálogo, repartida en subcategorías. cada muestra se puede clicar
+// (reemplaza o agrega, según el modo) o arrastrar hacia una fila o hacia el clip. la
+// que coincide con el efecto seleccionado se resalta más fuerte
 function Catalogo({
   miniatura,
   videoUrl,
   tiempo,
   puestos,
-  reemplazando,
-  onCancelarReemplazo,
+  objetivoClave,
+  modoAgregar,
+  onCancelarAgregar,
   onElegir,
 }: {
   miniatura?: string
   videoUrl?: string
   tiempo: number
   puestos: Set<string>
-  reemplazando: boolean
-  onCancelarReemplazo: () => void
+  objetivoClave: string | null
+  modoAgregar: boolean
+  onCancelarAgregar: () => void
   onElegir: (id: string) => void
 }) {
   const [categoria, setCategoria] = useState(CATEGORIAS_EFECTO[0].id)
@@ -411,14 +473,13 @@ function Catalogo({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* mientras se reemplaza, el título del catálogo cambia por un aviso claro con
-          su botón de cancelar, para que se note que la próxima muestra sustituye en
-          vez de agregar */}
-      {reemplazando ? (
+      {/* en modo agregar, el título cambia por un aviso claro con su botón de cancelar,
+          para que se note que la próxima muestra entra como efecto nuevo */}
+      {modoAgregar ? (
         <div className="flex items-center justify-between gap-2 rounded-lg bg-brand/10 px-2.5 py-1.5">
-          <span className="text-[11px] font-medium text-brand">Elige el efecto de reemplazo</span>
+          <span className="text-[11px] font-medium text-brand">Elige el efecto a agregar</span>
           <button
-            onClick={onCancelarReemplazo}
+            onClick={onCancelarAgregar}
             className="interactivo text-[11px] font-medium text-[color:var(--muted)] hover:text-brand"
           >
             Cancelar
@@ -444,20 +505,31 @@ function Catalogo({
       </div>
       <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(104px,1fr))]">
         {actual.efectos.map((e) => {
-          const puesto = puestos.has(claveCatalogo(e.id))
+          const clave = claveCatalogo(e.id)
+          const puesto = puestos.has(clave)
+          const esObjetivo = objetivoClave === clave
           return (
             <button
               key={e.id}
+              draggable
+              onDragStart={(ev) => {
+                ev.dataTransfer.setData(TIPO_EFECTO, e.id)
+                ev.dataTransfer.effectAllowed = 'copy'
+              }}
               onClick={() => onElegir(e.id)}
               onMouseEnter={() => setEncima(e.id)}
               onMouseLeave={() => setEncima(null)}
-              title={puesto ? `${e.nombre} (ya aplicado)` : e.nombre}
+              title={puesto ? `${e.nombre} (aplicado)` : e.nombre}
               className="group flex flex-col gap-1 text-left"
             >
               <span
                 className={[
                   'relative block h-16 w-full overflow-hidden rounded-lg border transition-all duration-200',
-                  puesto ? 'border-brand ring-2 ring-brand/40' : 'border-black/10 group-hover:border-brand dark:border-white/10',
+                  esObjetivo
+                    ? 'border-brand ring-2 ring-brand'
+                    : puesto
+                      ? 'border-brand/60 ring-2 ring-brand/25'
+                      : 'border-black/10 group-hover:border-brand dark:border-white/10',
                 ].join(' ')}
                 style={{ ...fondo, filter: e.css(encima === e.id ? 100 : 50) }}
               >

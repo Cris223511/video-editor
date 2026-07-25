@@ -10,6 +10,7 @@ import MedioNoDisponible from '../../../components/ui/MedioNoDisponible'
 import PropiedadesClip from './PropiedadesClip'
 import TransicionBlock from './TransicionBlock'
 import { TIPO_TRANSICION } from '../GaleriaTransiciones'
+import { TIPO_EFECTO, crearEfecto } from '../../../lib/efectos/catalogo'
 import { resolverDestinoVertical } from './destinoVertical'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
 
@@ -44,6 +45,7 @@ export default function ClipBlock({
   const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(clip.id))
   const seleccionar = useEditorStore((s) => s.seleccionar)
   const setTransicion = useEditorStore((s) => s.setTransicion)
+  const ponerEfectoEncima = useEditorStore((s) => s.ponerEfectoEncima)
   const moverClip = useEditorStore((s) => s.moverClip)
   const duplicarClip = useEditorStore((s) => s.duplicarClip)
   const recortarClip = useEditorStore((s) => s.recortarClip)
@@ -69,6 +71,9 @@ export default function ClipBlock({
   // se enciende mientras se arrastra una transición de la galería sobre el clip,
   // para señalar que al soltar se aplicará en su borde de entrada
   const [transicionEncima, setTransicionEncima] = useState(false)
+  // se enciende al arrastrar una muestra de efecto sobre el clip, para avisar de que
+  // al soltar ese efecto queda en nivel 1, por encima de los demás
+  const [efectoEncima, setEfectoEncima] = useState(false)
   // controla la ventana de propiedades del clip, que enseña un resumen de solo
   // lectura de todo lo que se le aplicó (velocidad, color, efectos, transición)
   const [verPropiedades, setVerPropiedades] = useState(false)
@@ -288,6 +293,24 @@ export default function ClipBlock({
     seleccionar(clip.id)
   }
 
+  // se sueltan dos cosas distintas sobre el clip: una transición de la galería o una
+  // muestra de efecto. según el tipo de dato que traiga el arrastre se aplica una u
+  // otra. el efecto entra en nivel 1, encima de todos
+  function alSoltar(e: React.DragEvent) {
+    if (e.dataTransfer.types.includes(TIPO_TRANSICION)) {
+      alSoltarTransicion(e)
+      return
+    }
+    const idEfecto = e.dataTransfer.getData(TIPO_EFECTO)
+    if (idEfecto) {
+      e.preventDefault()
+      e.stopPropagation()
+      setEfectoEncima(false)
+      ponerEfectoEncima(clip.id, crearEfecto(idEfecto))
+      seleccionar(clip.id)
+    }
+  }
+
   return (
     <Tooltip texto={nombre} retardo={2000} lado="arriba">
     <motion.div
@@ -305,12 +328,18 @@ export default function ClipBlock({
         if (e.dataTransfer.types.includes(TIPO_TRANSICION)) {
           e.preventDefault()
           if (!transicionEncima) setTransicionEncima(true)
+        } else if (e.dataTransfer.types.includes(TIPO_EFECTO)) {
+          e.preventDefault()
+          if (!efectoEncima) setEfectoEncima(true)
         }
       }}
       onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) setTransicionEncima(false)
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          setTransicionEncima(false)
+          setEfectoEncima(false)
+        }
       }}
-      onDrop={alSoltarTransicion}
+      onDrop={alSoltar}
       className={[
         'group absolute top-0 flex h-full items-end overflow-hidden rounded-lg border transition-[border-color]',
         bloqueada ? 'cursor-default' : 'cursor-grab',
@@ -372,6 +401,12 @@ export default function ClipBlock({
             }}
           />
         </div>
+      )}
+
+      {/* señal de que se suelta un efecto encima: un aro azul lleno que abarca todo
+          el clip, ya que el efecto se aplica al plano entero, no a un borde */}
+      {efectoEncima && (
+        <div className="pointer-events-none absolute inset-0 z-20 rounded-lg bg-brand/15 ring-2 ring-inset ring-brand" />
       )}
 
       <span className="pointer-events-none relative w-full truncate bg-gradient-to-t from-black/85 to-transparent px-2 pb-0.5 pt-2 text-[10px] font-medium text-white">

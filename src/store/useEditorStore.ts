@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { Track, Clip, AjusteTono, Transicion, PistaMeta, EfectoClip, Encuadre } from '../types/timeline'
+import { claveEfecto } from '../lib/efectos/catalogo'
 import { MediaAsset } from '../types/media'
 import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto, CapaTrazo, KeyframePos } from '../types/layers'
 import { RegionAudio, ClipAudio } from '../types/audio'
@@ -216,6 +217,7 @@ interface EstadoEditor {
   quitarEfecto: (id: string, efectoId: string) => void
   reordenarEfecto: (id: string, efectoId: string, dir: -1 | 1) => void
   reemplazarEfecto: (id: string, efectoId: string, nuevo: EfectoClip) => void
+  ponerEfectoEncima: (id: string, efecto: EfectoClip) => void
   setTransicion: (id: string, cambios: Partial<Transicion>) => void
   // duración de aparición del color y los efectos del clip; 0 la apaga
   setTransicionEfecto: (id: string, duracion: number) => void
@@ -621,6 +623,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'quitarEfecto',
   'reordenarEfecto',
   'reemplazarEfecto',
+  'ponerEfectoEncima',
   'setTransicion',
   'setTransicionEfecto',
   'setTransicionSalida',
@@ -1530,6 +1533,28 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
             ? { ...c, efectos: (c.efectos ?? []).map((e) => (e.id === efectoId ? nuevo : e)) }
             : c,
         ),
+      },
+    })),
+
+  // deja un efecto en el primer lugar de la pila (nivel 1, por encima de todos). se
+  // usa al arrastrar una muestra sobre el clip: si ese efecto ya estaba se sube al
+  // tope conservando sus ajustes, si no estaba entra nuevo como primero, y si ya era
+  // el primero no cambia nada
+  ponerEfectoEncima: (id, efecto) =>
+    set((s) => ({
+      pista: {
+        ...s.pista,
+        clips: s.pista.clips.map((c) => {
+          if (c.id !== id) return c
+          const efs = c.efectos ?? []
+          const clave = claveEfecto(efecto)
+          const existente = efs.find((e) => claveEfecto(e) === clave)
+          if (existente) {
+            if (efs[0]?.id === existente.id) return c
+            return { ...c, efectos: [existente, ...efs.filter((e) => e.id !== existente.id)] }
+          }
+          return { ...c, efectos: [efecto, ...efs] }
+        }),
       },
     })),
 

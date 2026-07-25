@@ -88,6 +88,35 @@ export function buscarEfecto(id: string): EfectoCatalogo | undefined {
   return undefined
 }
 
+// dato que viaja al arrastrar una muestra de efecto: hacia una fila para reemplazar
+// ese efecto, o hacia el clip en la línea de tiempo para dejarlo encima de todos
+export const TIPO_EFECTO = 'application/x-ve-efecto'
+
+// identidad de un efecto ya puesto, para no repetirlo. el desenfoque y la nitidez
+// son únicos; los filtros se distinguen por cuál es
+export function claveEfecto(e: EfectoClip): string {
+  if (e.tipo === 'filtro') return `filtro:${e.filtro}`
+  if (e.tipo === 'desenfoque-movimiento') return 'desenfoque'
+  return 'nitidez-brillo'
+}
+
+// la misma identidad, pero calculada desde el id de una muestra del catálogo
+export function claveCatalogo(id: string): string {
+  if (id === 'nitidez-brillo') return 'nitidez-brillo'
+  if (id === 'desenfoque-movimiento') return 'desenfoque'
+  return `filtro:${id}`
+}
+
+// arma el efecto que corresponde a una muestra del catálogo, con sus valores de
+// arranque. el desenfoque parte con intensidad media y barrido horizontal, que es
+// la dirección más habitual en un travelling
+export function crearEfecto(id: string): EfectoClip {
+  if (id === 'nitidez-brillo') return { id: crypto.randomUUID(), tipo: 'nitidez-brillo', nitidez: 55, brillo: 35 }
+  if (id === 'desenfoque-movimiento')
+    return { id: crypto.randomUUID(), tipo: 'desenfoque-movimiento', intensidad: 40, angulo: 0 }
+  return { id: crypto.randomUUID(), tipo: 'filtro', filtro: id, intensidad: 50 }
+}
+
 export function esFiltro(e: EfectoClip): e is { id: string } & EfectoFiltro {
   return e.tipo === 'filtro'
 }
