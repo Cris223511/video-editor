@@ -27,6 +27,7 @@ const TIPO_ORDEN_EFECTO = 'application/x-ve-orden-efecto'
 // nombre visible de un efecto ya puesto, para la etiqueta de su fila
 function nombreEfecto(e: EfectoClip): string {
   if (e.tipo === 'nitidez-brillo') return 'Nítido y brilloso'
+  if (e.tipo === 'gopro') return 'Cámara de acción'
   if (esFiltro(e)) return buscarEfecto(e.filtro)?.nombre ?? 'Efecto'
   return 'Desenfoque de movimiento'
 }
@@ -489,6 +490,14 @@ function MandosEfecto({
           <Deslizador valor={efecto.brillo} min={0} max={100} onChange={(v) => onCambiar({ brillo: v })} />
         </Campo>
       </>
+    )
+  }
+
+  if (efecto.tipo === 'gopro') {
+    return (
+      <Campo etiqueta={`Curvatura (${Math.round(efecto.curvatura)})`}>
+        <Deslizador valor={efecto.curvatura} min={0} max={100} onChange={(v) => onCambiar({ curvatura: v })} />
+      </Campo>
     )
   }
 

@@ -7,6 +7,7 @@ import { gananciaEn, fundidoEn } from '../audio/ganancia'
 import { usaMatriz, matrizTono, tablasColor, stdDeviationsDesenfoque } from '../color/tono'
 import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../color/mezcla'
 import { paramsNB, nodosFiltroNB, NodoFiltro } from '../efectos/nitidezBrillo'
+import { paramsGoPro, nodosFiltroGoPro } from '../efectos/goPro'
 import { dibujarFotograma, Escena } from './compositor'
 
 export interface DatosExport {
@@ -193,6 +194,18 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
         nodosFiltroNB(p).forEach((n) => filtro.appendChild(construirNodoNB(n)))
         return filtro
       }
+      // filtro de la curvatura de lente. usa la misma receta en datos que el visor y,
+      // como aquel, mide la escala en fracción del elemento (objectBoundingBox), así
+      // el archivo se curva igual que la vista previa
+      const construirFiltroGoPro = (id: string, efectos: typeof clips[number]['efectos']) => {
+        const p = paramsGoPro(efectos ?? [])
+        if (!p) return null
+        const filtro = document.createElementNS(NS, 'filter')
+        filtro.setAttribute('id', id)
+        filtro.setAttribute('primitiveUnits', 'objectBoundingBox')
+        nodosFiltroGoPro(p).forEach((n) => filtro.appendChild(construirNodoNB(n)))
+        return filtro
+      }
 
       // filtros svg de tono (temperatura y tinte) referenciados por el compositor
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
@@ -208,6 +221,8 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
         if (fBlur) defs.appendChild(fBlur)
         const fNB = construirFiltroNB(`nbexp-${c.id}`, c.efectos)
         if (fNB) defs.appendChild(fNB)
+        const fGP = construirFiltroGoPro(`goproexp-${c.id}`, c.efectos)
+        if (fGP) defs.appendChild(fGP)
       })
 
       // rehace las defs de un clip con el tono y los efectos ya mezclados por su
@@ -220,6 +235,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
           defs.querySelector(`#tonoexp-${c.id}`)?.remove()
           defs.querySelector(`#blurexp-${c.id}`)?.remove()
           defs.querySelector(`#nbexp-${c.id}`)?.remove()
+          defs.querySelector(`#goproexp-${c.id}`)?.remove()
           const fTono = construirFiltroTono(`tonoexp-${c.id}`, mezclarTono(c.tono, mix))
           if (fTono) defs.appendChild(fTono)
           const efectosMix = mezclarEfectos(c.efectos ?? [], mix)
@@ -227,6 +243,8 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
           if (fBlur) defs.appendChild(fBlur)
           const fNB = construirFiltroNB(`nbexp-${c.id}`, efectosMix)
           if (fNB) defs.appendChild(fNB)
+          const fGP = construirFiltroGoPro(`goproexp-${c.id}`, efectosMix)
+          if (fGP) defs.appendChild(fGP)
         }
       }
       // las imágenes de capa también corrigen color por el mismo camino que los

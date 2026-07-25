@@ -28,6 +28,7 @@ import {
 import { anterior, posterior, pintarTransicion, progreso, progresoSalida } from '../../lib/transiciones/pintar'
 import { cssEfectos } from '../../lib/efectos/catalogo'
 import { paramsNB, nodosFiltroNB, NodoFiltro } from '../../lib/efectos/nitidezBrillo'
+import { paramsGoPro, nodosFiltroGoPro } from '../../lib/efectos/goPro'
 
 // pinta un nodo del filtro de nitidez y brillo (y sus hijos) como elemento svg.
 // la receta viene en datos desde el helper, la misma que usa la exportación, así
@@ -791,7 +792,9 @@ export default function Preview() {
       const mix = mixEntradaEfecto(c.inicio, c.transicionEfecto, playhead)
       return { clip: c, tono: mezclarTono(c.tono, mix), efectos: mezclarEfectos(c.efectos ?? [], mix) }
     })
-    .filter((x) => usaMatriz(x.tono) || hayEfectoFiltro(x.efectos) || paramsNB(x.efectos))
+    .filter(
+      (x) => usaMatriz(x.tono) || hayEfectoFiltro(x.efectos) || paramsNB(x.efectos) || paramsGoPro(x.efectos),
+    )
 
   const hayContenido = clipsOrdenados.length > 0 || hayCapas
 
@@ -1040,6 +1043,9 @@ export default function Preview() {
                         // la nitidez y el brillo se enganchan al final, en su propio
                         // filtro, para que afilen y hagan resplandecer lo ya corregido
                         if (paramsNB(mezclaEfecto.efectos)) partes.push(`url(#nb-${c.id})`)
+                        // la curvatura de lente va la última: dobla el resultado ya
+                        // corregido y afilado, como haría el cristal de la cámara
+                        if (paramsGoPro(mezclaEfecto.efectos)) partes.push(`url(#gopro-${c.id})`)
                         return partes.join(' ') || undefined
                       })(),
                     }}
@@ -1083,11 +1089,19 @@ export default function Preview() {
                     const tablas = tablasColor(tono)
                     const desenfoques = stdDeviationsDesenfoque(efectos)
                     const nb = paramsNB(efectos)
+                    const gopro = paramsGoPro(efectos)
                     return (
                       <Fragment key={c.id}>
                       {nb && (
                         <filter id={`nb-${c.id}`} colorInterpolationFilters="sRGB">
                           {nodosFiltroNB(nb).map((n, i) => pintarNodoNB(n, i))}
+                        </filter>
+                      )}
+                      {gopro && (
+                        // primitiveUnits en fracción del elemento: la curvatura se ve
+                        // igual en el visor pequeño y en el archivo a resolución completa
+                        <filter id={`gopro-${c.id}`} primitiveUnits="objectBoundingBox">
+                          {nodosFiltroGoPro(gopro).map((n, i) => pintarNodoNB(n, i))}
                         </filter>
                       )}
                       <filter id={`tono-${c.id}`} colorInterpolationFilters="sRGB">

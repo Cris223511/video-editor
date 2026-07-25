@@ -11,6 +11,7 @@ import { estiloEntrada, progresoEntrada, estiloSalida, progresoSalidaCapa, combi
 import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../color/mezcla'
 import { cssEfectos } from '../efectos/catalogo'
 import { paramsNB } from '../efectos/nitidezBrillo'
+import { paramsGoPro } from '../efectos/goPro'
 import { encuadreDe, rectClip } from '../timeline/encuadre'
 import { aplicarTransformCanvas } from '../layers/transform'
 
@@ -651,7 +652,8 @@ export function dibujarFotograma(
       const hayColor = !esTonoNeutro(tonoEf)
       const hayDesenfoque = hayEfectoFiltro(efectos)
       const hayNB = !!paramsNB(efectos)
-      if (hayDesenfoque || hayNB) {
+      const hayGoPro = !!paramsGoPro(efectos)
+      if (hayDesenfoque || hayNB || hayGoPro) {
         // cada filtro svg va en su propia pasada, porque mezclarlo con las funciones
         // nativas en el mismo ctx.filter deja el fotograma en negro. primero el video
         // con su color y sus efectos css, luego, si toca, el desenfoque, y por último
@@ -681,9 +683,24 @@ export function dibujarFotograma(
               fuente = aux2
             }
           }
-          // pasada final al lienzo del clip: con nitidez y brillo se aplica su filtro,
-          // y si no lo hay, se vuelca lo que traiga la fuente tal cual
-          dst.filter = hayNB ? `url(#nbexp-${clip.id})` : 'none'
+          // la nitidez y el brillo van en su propia pasada. si además hay curvatura,
+          // el resultado aterriza en un lienzo aparte para curvarlo después; si no,
+          // se aplica directo al lienzo del clip
+          if (hayNB) {
+            const auxN = fuente === aux ? auxSegundo(ancho, alto) : aux
+            const aN = auxN.getContext('2d')
+            if (aN) {
+              aN.setTransform(1, 0, 0, 1, 0, 0)
+              aN.clearRect(0, 0, ancho, alto)
+              aN.filter = `url(#nbexp-${clip.id})`
+              aN.drawImage(fuente, 0, 0)
+              aN.filter = 'none'
+              fuente = auxN
+            }
+          }
+          // pasada final: la curvatura de lente dobla lo que traiga la fuente. si no
+          // la hay, se vuelca tal cual
+          dst.filter = hayGoPro ? `url(#goproexp-${clip.id})` : 'none'
           dst.drawImage(fuente, 0, 0)
           dst.filter = 'none'
         }

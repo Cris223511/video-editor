@@ -32,6 +32,10 @@ export const CATEGORIAS_EFECTO: CategoriaEfecto[] = [
         css: (i) => `contrast(${1 + p(i) * 0.35}) brightness(${1 + p(i) * 0.16}) saturate(${1 + p(i) * 0.22})`,
       },
       { id: 'desenfoque-movimiento', nombre: 'Desenfoque', css: (i) => `blur(${(p(i) * 3).toFixed(2)}px)` },
+      // la curvatura de lente no se puede imitar con un filtro css, así que la muestra
+      // solo insinúa el aire de cámara de acción con un poco de contraste y color; la
+      // curva de verdad la aplica el visor al elegirlo
+      { id: 'gopro', nombre: 'Cámara de acción', css: (i) => `contrast(${1 + p(i) * 0.25}) saturate(${1 + p(i) * 0.3})` },
     ],
   },
   {
@@ -97,6 +101,7 @@ export const TIPO_EFECTO = 'application/x-ve-efecto'
 export function claveEfecto(e: EfectoClip): string {
   if (e.tipo === 'filtro') return `filtro:${e.filtro}`
   if (e.tipo === 'desenfoque-movimiento') return 'desenfoque'
+  if (e.tipo === 'gopro') return 'gopro'
   return 'nitidez-brillo'
 }
 
@@ -104,6 +109,7 @@ export function claveEfecto(e: EfectoClip): string {
 export function claveCatalogo(id: string): string {
   if (id === 'nitidez-brillo') return 'nitidez-brillo'
   if (id === 'desenfoque-movimiento') return 'desenfoque'
+  if (id === 'gopro') return 'gopro'
   return `filtro:${id}`
 }
 
@@ -114,6 +120,7 @@ export function crearEfecto(id: string): EfectoClip {
   if (id === 'nitidez-brillo') return { id: crypto.randomUUID(), tipo: 'nitidez-brillo', nitidez: 55, brillo: 35 }
   if (id === 'desenfoque-movimiento')
     return { id: crypto.randomUUID(), tipo: 'desenfoque-movimiento', intensidad: 40, angulo: 0 }
+  if (id === 'gopro') return { id: crypto.randomUUID(), tipo: 'gopro', curvatura: 55 }
   return { id: crypto.randomUUID(), tipo: 'filtro', filtro: id, intensidad: 50 }
 }
 

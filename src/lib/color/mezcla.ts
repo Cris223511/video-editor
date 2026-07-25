@@ -45,6 +45,8 @@ export function mezclarEfectos(efectos: EfectoClip[], mix: number): EfectoClip[]
     // la nitidez y el brillo llevan sus dos mandos propios en lugar de una sola
     // intensidad, así que su aparición progresiva escala los dos a la vez
     if (e.tipo === 'nitidez-brillo') return { ...e, nitidez: e.nitidez * m, brillo: e.brillo * m }
+    // la curvatura de lente entra a la par que el color, escalando su único mando
+    if (e.tipo === 'gopro') return { ...e, curvatura: e.curvatura * m }
     return { ...e, intensidad: e.intensidad * m }
   })
 }

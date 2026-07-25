@@ -47,10 +47,20 @@ export interface EfectoNitidezBrillo {
   brillo: number // 0 a 100
 }
 
+// aspecto de cámara de acción: curva la imagen como una lente de ojo de pez, con el
+// centro abombado y los bordes recogidos, para ese aire tipo GoPro. la curvatura va
+// de 0 (plano) a 100 (muy curvado). se resuelve con un filtro svg de desplazamiento,
+// igual que los demás, así que el visor y el archivo exportado salen idénticos
+export interface EfectoGoPro {
+  tipo: 'gopro'
+  curvatura: number // 0 a 100
+}
+
 export type EfectoClip = { id: string } & (
   | EfectoDesenfoque
   | EfectoFiltro
   | EfectoNitidezBrillo
+  | EfectoGoPro
 )
 
 // encuadre del clip dentro del lienzo. x e y son el centro del video en
