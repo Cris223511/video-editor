@@ -2709,7 +2709,19 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       recorteRapido: false,
     })),
 
-  setLienzo: (ancho, alto) => set({ resolucion: { ancho, alto }, lienzoManual: true }),
+  setLienzo: (ancho, alto) =>
+    set((s) => {
+      // cuando hay un solo clip, al cambiar la proporción del lienzo el video se
+      // reacomoda solo para acoplarse al nuevo cuadro, aunque estuviera reencuadrado:
+      // deja de quedar mal encajado, que es incómodo. con varios clips no se toca
+      // nada, porque cada uno pudo colocarse a mano y no queremos deshacer ese trabajo
+      const clips = s.pista.clips
+      const pista =
+        clips.length === 1
+          ? { ...s.pista, clips: clips.map((c) => ({ ...c, encuadre: undefined })) }
+          : s.pista
+      return { resolucion: { ancho, alto }, lienzoManual: true, pista }
+    }),
 
   setLienzoAuto: () => set((s) => ({ resolucion: { ...s.resolucionAuto }, lienzoManual: false })),
 
