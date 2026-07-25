@@ -39,6 +39,11 @@ export interface CapaBase {
   // (desvanecido, crecimiento, deslizamiento o revelado por máscara). sin definir,
   // la capa aparece de golpe salvo que tenga fundidoEntrada, que sigue vigente
   transicion?: Transicion
+  // transición con la que sale la capa, del mismo catálogo. es el espejo de la de
+  // entrada: la técnica se reproduce al revés durante los últimos segundos, de modo
+  // que el elemento se va desvaneciéndose, encogiendo o deslizándose. sin definir, la
+  // capa desaparece de golpe salvo que tenga fundidoSalida
+  transicionSalida?: Transicion
   // fila del carril de texto y figuras en la que se dibuja el bloque. es solo una
   // ayuda visual de la línea de tiempo para separar elementos que se solapan en el
   // tiempo; no cambia qué queda delante de qué (eso lo deciden el orden y los

@@ -8,7 +8,14 @@ import { fundidoEn } from '../../../lib/audio/ganancia'
 import { Ancla, Caja, redimensionar } from '../../../lib/layers/resize'
 import { CajaGuia, Guia, imantar, imantarValor } from '../../../lib/layers/guias'
 import { sufijoTransformCss } from '../../../lib/layers/transform'
-import { estiloEntrada, progresoEntrada, transformEntradaCss } from '../../../lib/transiciones/entrada'
+import {
+  estiloEntrada,
+  progresoEntrada,
+  transformEntradaCss,
+  estiloSalida,
+  progresoSalidaCapa,
+  combinarEntradaSalida,
+} from '../../../lib/transiciones/entrada'
 import { esTonoNeutro, filtroCss, usaMatriz, matrizTono, tablasColor } from '../../../lib/color/tono'
 import Tiradores from './Tiradores'
 import ManijaGiro, { anguloGiro } from './ManijaGiro'
@@ -548,7 +555,13 @@ export default function CapasOverlay() {
         const entrada =
           c.tipo === 'censura'
             ? { opacidad: 1, escala: 1, tx: 0, ty: 0 }
-            : estiloEntrada(c.transicion?.tipo ?? 'ninguna', progresoEntrada(playhead, c.inicio, c.transicion))
+            : combinarEntradaSalida(
+                estiloEntrada(c.transicion?.tipo ?? 'ninguna', progresoEntrada(playhead, c.inicio, c.transicion)),
+                estiloSalida(
+                  c.transicionSalida?.tipo ?? 'ninguna',
+                  progresoSalidaCapa(playhead, c.inicio, c.duracion, c.transicionSalida),
+                ),
+              )
         const entradaCss = transformEntradaCss(entrada, Math.min(rect.w, rect.h))
         const extra = [c.tipo === 'censura' ? '' : sufijoTransformCss(c), entradaCss]
           .filter(Boolean)

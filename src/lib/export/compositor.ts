@@ -7,7 +7,7 @@ import { esTonoNeutro, filtroCss, hayEfectoFiltro } from '../color/tono'
 import { REPETICIONES_BRILLO, desenfoqueBrillo } from '../layers/defaults'
 import { anterior, posterior, pintarTransicion, progreso, progresoSalida } from '../transiciones/pintar'
 import { fundidoEn } from '../audio/ganancia'
-import { estiloEntrada, progresoEntrada } from '../transiciones/entrada'
+import { estiloEntrada, progresoEntrada, estiloSalida, progresoSalidaCapa, combinarEntradaSalida } from '../transiciones/entrada'
 import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../color/mezcla'
 import { cssEfectos } from '../efectos/catalogo'
 import { paramsNB } from '../efectos/nitidezBrillo'
@@ -766,7 +766,13 @@ export function dibujarFotograma(
     // entrada de la capa: la opacidad rebaja el alfa igual que el fundido; la
     // escala y el deslizamiento se aplican como una transformación del lienzo
     // anclada al centro de la capa, para que el archivo salga idéntico al visor
-    const entrada = estiloEntrada(cOrig.transicion?.tipo ?? 'ninguna', progresoEntrada(t, cOrig.inicio, cOrig.transicion))
+    const entrada = combinarEntradaSalida(
+      estiloEntrada(cOrig.transicion?.tipo ?? 'ninguna', progresoEntrada(t, cOrig.inicio, cOrig.transicion)),
+      estiloSalida(
+        cOrig.transicionSalida?.tipo ?? 'ninguna',
+        progresoSalidaCapa(t, cOrig.inicio, cOrig.duracion, cOrig.transicionSalida),
+      ),
+    )
     const c = f >= 1 && entrada.opacidad >= 1
       ? cOrig
       : ({ ...cOrig, opacidad: cOrig.opacidad * f * entrada.opacidad } as typeof cOrig)

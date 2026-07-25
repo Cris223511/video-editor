@@ -96,3 +96,42 @@ export function progresoEntrada(
   if (dentro >= transicion.duracion) return 1
   return dentro / transicion.duracion
 }
+
+// progreso de la salida de una capa, medido desde el final hacia atrás: 0 cuando
+// aún no empieza a irse y 1 cuando ya se fue del todo. fuera de la ventana de salida
+// devuelve 0, para que el resto del tiempo la capa esté entera
+export function progresoSalidaCapa(
+  playhead: number,
+  inicio: number,
+  duracion: number,
+  transicion: { tipo: string; duracion: number } | undefined,
+): number {
+  if (!transicion || transicion.tipo === 'ninguna' || transicion.duracion <= 0) return 0
+  const fin = inicio + duracion
+  const restante = fin - playhead
+  if (restante >= transicion.duracion) return 0
+  if (restante <= 0) return 1
+  return 1 - restante / transicion.duracion
+}
+
+// estilo de la salida de una capa. es el espejo de la entrada: reutiliza la misma
+// coreografía pero recorrida al revés, de modo que la capa parte de su estado pleno
+// y termina desvanecida, encogida o desplazada. q va de 0 (aún entera) a 1 (ya ida)
+export function estiloSalida(tipo: string, q: number): EstiloEntrada {
+  if (q <= 0 || tipo === 'ninguna' || !tipo) return NEUTRO
+  // al recorrer la entrada desde 1 hacia 0 se obtiene el camino inverso, que es
+  // justamente cómo debe verse una salida
+  return estiloEntrada(tipo, 1 - q)
+}
+
+// combina la entrada y la salida en un solo estilo: las opacidades y las escalas se
+// multiplican y los desplazamientos se suman. normalmente solo una de las dos está
+// activa, pero en un elemento muy corto pueden solaparse y así no se pisan
+export function combinarEntradaSalida(a: EstiloEntrada, b: EstiloEntrada): EstiloEntrada {
+  return {
+    opacidad: a.opacidad * b.opacidad,
+    escala: a.escala * b.escala,
+    tx: a.tx + b.tx,
+    ty: a.ty + b.ty,
+  }
+}

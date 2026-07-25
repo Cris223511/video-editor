@@ -36,27 +36,53 @@ function TransicionCapa() {
   if (!capa) return null
 
   const trans = capa.transicion ?? { tipo: 'ninguna', duracion: 0.5 }
+  const salida = capa.transicionSalida ?? { tipo: 'ninguna', duracion: 0.5 }
   return (
-    <div className="flex flex-col gap-3">
-      <span className="text-sm font-medium">Transición de entrada</span>
-      <p className="text-[13px] leading-relaxed text-[color:var(--muted)]">
-        Elige cómo aparece este elemento cuando llega su turno en la línea de tiempo. La duración
-        marca cuánto tarda en asentarse.
-      </p>
-      <GaleriaTransiciones
-        actual={trans.tipo}
-        onElegir={(t) => actualizarCapa(capa.id, { transicion: { tipo: t, duracion: trans.duracion } })}
-      />
-      {trans.tipo !== 'ninguna' && (
-        <Campo etiqueta={`Duración (${trans.duracion.toFixed(1)} s)`}>
-          <Deslizador
-            valor={Math.round(trans.duracion * 10)}
-            min={2}
-            max={20}
-            onChange={(v) => actualizarCapa(capa.id, { transicion: { tipo: trans.tipo, duracion: v / 10 } })}
-          />
-        </Campo>
-      )}
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
+        <span className="text-sm font-medium">Transición de entrada</span>
+        <p className="text-[13px] leading-relaxed text-[color:var(--muted)]">
+          Elige cómo aparece este elemento cuando llega su turno en la línea de tiempo. La duración
+          marca cuánto tarda en asentarse.
+        </p>
+        <GaleriaTransiciones
+          actual={trans.tipo}
+          onElegir={(t) => actualizarCapa(capa.id, { transicion: { tipo: t, duracion: trans.duracion } })}
+        />
+        {trans.tipo !== 'ninguna' && (
+          <Campo etiqueta={`Duración (${trans.duracion.toFixed(1)} s)`}>
+            <Deslizador
+              valor={Math.round(trans.duracion * 10)}
+              min={2}
+              max={20}
+              onChange={(v) => actualizarCapa(capa.id, { transicion: { tipo: trans.tipo, duracion: v / 10 } })}
+            />
+          </Campo>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3 border-t border-black/10 pt-3 dark:border-white/10">
+        <span className="text-sm font-medium">Transición de salida</span>
+        <p className="text-[13px] leading-relaxed text-[color:var(--muted)]">
+          Cómo se va el elemento al final de su tramo. Es la misma técnica, pero al revés: se
+          desvanece, encoge o se desliza para irse. El rato que dura en pantalla lo marca su bloque
+          en la línea de tiempo.
+        </p>
+        <GaleriaTransiciones
+          actual={salida.tipo}
+          onElegir={(t) => actualizarCapa(capa.id, { transicionSalida: { tipo: t, duracion: salida.duracion } })}
+        />
+        {salida.tipo !== 'ninguna' && (
+          <Campo etiqueta={`Duración (${salida.duracion.toFixed(1)} s)`}>
+            <Deslizador
+              valor={Math.round(salida.duracion * 10)}
+              min={2}
+              max={20}
+              onChange={(v) => actualizarCapa(capa.id, { transicionSalida: { tipo: salida.tipo, duracion: v / 10 } })}
+            />
+          </Campo>
+        )}
+      </div>
     </div>
   )
 }
