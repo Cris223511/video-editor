@@ -4,6 +4,53 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.29.0 (2026-07-25)
+
+Esta versión reordena la línea de tiempo alrededor de un modelo más simple, estrena
+los impactos (efectos momentáneos dentro de un clip) y pule varios detalles de la
+edición y de la presentación.
+
+### Línea de tiempo
+
+- Las figuras y las imágenes dejaron de tener carriles propios: ahora viven dentro
+  de las pistas de video, como un bloque más, y se arrastran de una pista a otra con
+  el mismo gesto que los clips. La línea de tiempo queda con tres secciones claras,
+  video, audio y texto.
+- Selección múltiple con un recuadro: se arrastra desde una zona vacía y, al soltar,
+  quedan marcados todos los bloques que toca, sea cual sea su tipo. Con el clic
+  derecho sobre la selección se pueden borrar todos de una vez.
+- La tira de fotogramas de cada clip es más densa y se ancla al tiempo real: al
+  recortar, los fotogramas no se desplazan, así sirven de guía para saber por dónde
+  se está cortando.
+- Se retiró el agarre de reordenar filas de audio, que aparecía al pasar el cursor y
+  confundía.
+
+### Impactos
+
+- Una función nueva: efectos momentáneos que se ponen sobre un clip, como una
+  transición pero dentro del propio plano. Afectan a todo lo que se ve en ese
+  instante, incluidas las imágenes y los textos que tenga delante.
+- Se arrastran desde el panel de la derecha hasta el punto del clip donde se quieren,
+  se ven como una bolita con una rayita que marca su duración, y se mueven o se
+  editan con un clic. Al arrastrarlos sale una guía que marca dónde caerán.
+- Nueve efectos: rebote, acercamiento, sacudida, latido, flash a negro, flash a
+  blanco, destello, parpadeo y flash de color. Cada uno con su color, su duración
+  libre y su fuerza, y con una vista previa animada en la paleta.
+- Se ven igual al editar y al exportar, porque el visor y el archivo final comparten
+  el mismo motor.
+
+### Figuras
+
+- La estrella llena por completo su recuadro, así la caja de selección se ciñe a la
+  forma en lugar de dejar aire alrededor.
+
+### Sitio y textos
+
+- La demostración de censura de la portada cambió su fondo por un paisaje de montañas
+  con cielo, sol y dos cordilleras, en lugar del degradado anterior.
+- Los rótulos del formulario de proyecto quedan limpios: solo el signo de dos puntos
+  y el asterisco de obligatorio, sin las aclaraciones entre paréntesis.
+
 ## 2.0.0 (2026-07-19)
 
 Segunda versión. La anterior permitía importar, editar y exportar; esta convierte la
