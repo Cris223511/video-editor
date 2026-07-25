@@ -5,7 +5,7 @@ import { rectContenido } from '../../../lib/layers/rect'
 import { rectClip, encuadreDe } from '../../../lib/timeline/encuadre'
 import { clipEnTiempo } from '../../../lib/timeline/clips'
 import { Ancla, redimensionar } from '../../../lib/layers/resize'
-import { Guia, imantar } from '../../../lib/layers/guias'
+import { Guia, imantar, imantarValor } from '../../../lib/layers/guias'
 import { hayRecorte } from '../../../lib/layers/recorteMascara'
 import Tiradores from './Tiradores'
 import ManijaGiro, { anguloGiro } from './ManijaGiro'
@@ -128,12 +128,35 @@ export default function ClipOverlay() {
     e.stopPropagation()
     e.preventDefault()
     setMoviendoVisor(true)
+    const este = ancla.includes('e')
+    const oeste = ancla.includes('w')
+    const norte = ancla.startsWith('n')
+    const sur = ancla.startsWith('s')
     const mover = (ev: globalThis.MouseEvent) => {
       const p = normalizar(ev)
+      // el borde que se arrastra se imanta al centro y los bordes del lienzo, y ahí
+      // sale la línea guía, igual que al mover. con Alt no se imanta, para clavar un
+      // tamaño libre
+      const gs: Guia[] = []
+      let px = p.x
+      let py = p.y
+      if (!ev.altKey) {
+        if (este || oeste) {
+          const s = imantarValor(px, [0, 0.5, 1])
+          px = s.v
+          if (s.pos !== null) gs.push({ eje: 'x', pos: s.pos })
+        }
+        if (norte || sur) {
+          const s = imantarValor(py, [0, 0.5, 1])
+          py = s.v
+          if (s.pos !== null) gs.push({ eje: 'y', pos: s.pos })
+        }
+      }
+      setGuias(gs)
       // el video escala uniforme, así que siempre va proporcional; lo que sí cambia
       // con Alt es que crece desde el centro por los dos lados en vez de anclar el
       // borde contrario
-      const n = redimensionar(caja, ancla, p.x, p.y, { proporcional: true, simetrico: ev.altKey }, 0.02)
+      const n = redimensionar(caja, ancla, px, py, { proporcional: true, simetrico: ev.altKey }, 0.02)
       const factor = caja.w > 0 ? n.w / caja.w : 1
       actualizarEncuadre(id, {
         x: n.x - desfase.x * factor,
@@ -142,6 +165,7 @@ export default function ClipOverlay() {
       })
     }
     const soltar = () => {
+      setGuias([])
       setMoviendoVisor(false)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)

@@ -28,6 +28,27 @@ export interface CajaGuia {
 // busca a qué puntos conviene pegar la caja que se está moviendo. compara contra
 // el centro y los bordes del lienzo y contra los de las demás capas visibles.
 // devuelve la posición ya corregida y las guías que hay que pintar
+// imanta una coordenada suelta (0..1) a los objetivos cercanos. se usa al
+// redimensionar: el borde que se arrastra se pega al centro y los bordes del lienzo
+// (o de las capas vecinas) y ahí sale la línea guía, igual que al mover. devuelve la
+// coordenada ya corregida y, si se pegó a algo, la línea donde cayó
+export function imantarValor(
+  v: number,
+  objetivos: number[],
+  iman = IMAN,
+): { v: number; pos: number | null } {
+  let mejor: number | null = null
+  let dist = Infinity
+  for (const o of objetivos) {
+    const d = Math.abs(v - o)
+    if (d <= iman && d < dist) {
+      dist = d
+      mejor = o
+    }
+  }
+  return mejor === null ? { v, pos: null } : { v: mejor, pos: mejor }
+}
+
 export function imantar(
   caja: CajaGuia,
   otras: CajaGuia[],

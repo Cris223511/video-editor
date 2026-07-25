@@ -6,7 +6,7 @@ import { rectContenido } from '../../../lib/layers/rect'
 import { posicionCapa } from '../../../lib/layers/motion'
 import { fundidoEn } from '../../../lib/audio/ganancia'
 import { Ancla, Caja, redimensionar } from '../../../lib/layers/resize'
-import { CajaGuia, Guia, imantar } from '../../../lib/layers/guias'
+import { CajaGuia, Guia, imantar, imantarValor } from '../../../lib/layers/guias'
 import { sufijoTransformCss } from '../../../lib/layers/transform'
 import { estiloEntrada, progresoEntrada, transformEntradaCss } from '../../../lib/transiciones/entrada'
 import { esTonoNeutro, filtroCss, usaMatriz, matrizTono, tablasColor } from '../../../lib/color/tono'
@@ -360,14 +360,42 @@ export default function CapasOverlay() {
     // recolocar su centro aquí pelearía con los keyframes
     const fija = capa.keyframes.length === 0
 
+    // objetivos a los que se pega el borde al agrandar: el centro y los bordes del
+    // lienzo, más los de las capas vecinas. se calculan una vez al empezar el gesto
+    const vecinas = cajasVecinas(capa.id)
+    const objX = [0, 0.5, 1, ...vecinas.flatMap((c) => [c.x - c.w / 2, c.x, c.x + c.w / 2])]
+    const objY = [0, 0.5, 1, ...vecinas.flatMap((c) => [c.y - c.h / 2, c.y, c.y + c.h / 2])]
+    const este = ancla.includes('e')
+    const oeste = ancla.includes('w')
+    const norte = ancla.startsWith('n')
+    const sur = ancla.startsWith('s')
+
     const mover = (ev: globalThis.MouseEvent) => {
       const p = normalizar(ev)
+      // se imanta el borde que se arrastra a las líneas cercanas y ahí sale la guía,
+      // igual que al mover. con Alt no se imanta, para poder clavar un tamaño libre
+      const gs: Guia[] = []
+      let px = p.x
+      let py = p.y
+      if (!ev.altKey) {
+        if (este || oeste) {
+          const s = imantarValor(px, objX)
+          px = s.v
+          if (s.pos !== null) gs.push({ eje: 'x', pos: s.pos })
+        }
+        if (norte || sur) {
+          const s = imantarValor(py, objY)
+          py = s.v
+          if (s.pos !== null) gs.push({ eje: 'y', pos: s.pos })
+        }
+      }
+      setGuias(gs)
       // mismo esquema para cualquier elemento: por defecto (y con Ctrl) se conserva
       // la proporción, con Shift se estira ancho y alto por separado, y con Alt crece
       // desde el centro por todos los lados. el texto es la excepción: escala su
       // tamaño de letra, que es un único valor, así que siempre va proporcional
       const proporcional = capa.tipo === 'texto' ? true : !ev.shiftKey
-      const n = redimensionar(inicial, ancla, p.x, p.y, { proporcional, simetrico: ev.altKey })
+      const n = redimensionar(inicial, ancla, px, py, { proporcional, simetrico: ev.altKey })
       const posicion = fija ? { x: entre(0, 1, n.x), y: entre(0, 1, n.y) } : {}
 
       if (capa.tipo === 'texto') {
@@ -385,6 +413,7 @@ export default function CapasOverlay() {
       })
     }
     const soltar = () => {
+      setGuias([])
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
