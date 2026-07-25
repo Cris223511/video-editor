@@ -36,6 +36,7 @@ import {
   Volume2,
   Wind,
   X,
+  Zap,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
@@ -82,6 +83,7 @@ const iconos = {
   dibujar: Pencil,
   transformar: FlipHorizontal2,
   recortar: Crop,
+  impacto: Zap,
 } as const
 
 export type NombreIcono = keyof typeof iconos

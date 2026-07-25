@@ -92,6 +92,7 @@ export default function ExportDialog() {
         desenfoqueFondo: estado.desenfoqueFondo,
         clips: estado.pista.clips,
         capas: estado.capas,
+        impactos: estado.impactos,
         marco: estado.marco,
         audioRegiones: estado.audioRegiones,
         audios: estado.audios,

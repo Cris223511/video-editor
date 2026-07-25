@@ -1,5 +1,6 @@
 import { Clip, PistaMeta } from '../../types/timeline'
 import { Capa } from '../../types/layers'
+import { Impacto } from '../../types/impacto'
 import { Marco } from '../../types/marco'
 import { RegionAudio, ClipAudio } from '../../types/audio'
 import { clipEnTiempo, duracionProyecto } from '../timeline/clips'
@@ -19,6 +20,7 @@ export interface DatosExport {
   desenfoqueFondo?: number
   clips: Clip[]
   capas: Capa[]
+  impactos: Impacto[]
   marco: Marco
   audioRegiones: RegionAudio[]
   // audios importados sueltos en la pista de sonido, con su propio material
@@ -463,6 +465,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
           desenfoqueFondo: datos.desenfoqueFondo,
           clips,
           capas: datos.capas,
+          impactos: datos.impactos,
           marco: datos.marco,
           ocultas,
         })

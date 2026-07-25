@@ -3,6 +3,9 @@ import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto, CapaTrazo } from 
 import { Marco } from '../../types/marco'
 import { clipEnTiempo } from '../timeline/clips'
 import { posicionCapa } from '../layers/motion'
+import { puntosEstrella } from '../layers/figuras'
+import { estadoImpactosEn } from '../impactos/catalogo'
+import { Impacto } from '../../types/impacto'
 import { esTonoNeutro, filtroCss, hayEfectoFiltro } from '../color/tono'
 import { REPETICIONES_BRILLO, desenfoqueBrillo } from '../layers/defaults'
 import { anterior, posterior, pintarTransicion, progreso, progresoSalida } from '../transiciones/pintar'
@@ -25,6 +28,8 @@ export interface Escena {
   desenfoqueFondo?: number
   clips: Clip[] // ya ordenados por inicio
   capas: Capa[]
+  // impactos: efectos momentáneos que deforman el cuadro entero en su tramo
+  impactos?: Impacto[]
   marco: Marco
   // niveles de video escondidos: al elegir el clip visible se saltan, para que
   // lo exportado coincida con lo que muestra el visor
@@ -66,6 +71,17 @@ function auxRecorte(w: number, h: number): HTMLCanvasElement {
   if (lienzoRecorte.width !== w) lienzoRecorte.width = w
   if (lienzoRecorte.height !== h) lienzoRecorte.height = h
   return lienzoRecorte
+}
+
+// lienzo aparte para el impacto: el cuadro ya compuesto se copia aquí y se vuelve
+// a volcar escalado, desplazado y desenfocado, porque un canvas no se puede
+// transformar sobre sí mismo en una sola pasada
+let lienzoImpacto: HTMLCanvasElement | null = null
+function auxImpacto(w: number, h: number): HTMLCanvasElement {
+  if (!lienzoImpacto) lienzoImpacto = document.createElement('canvas')
+  if (lienzoImpacto.width !== w) lienzoImpacto.width = w
+  if (lienzoImpacto.height !== h) lienzoImpacto.height = h
+  return lienzoImpacto
 }
 
 // gradiente radial del óvalo, de negro sólido a transparente según el difuminado.
@@ -268,19 +284,10 @@ function dibujarFigura(ctx: CanvasRenderingContext2D, c: CapaFigura, ancho: numb
     ctx.closePath()
     trazar()
   } else if (c.forma === 'estrella') {
-    const cx = w / 2
-    const cy = h / 2
-    const R = Math.min(w, h) / 2 - i
-    const r = R * 0.42
+    // misma estrella que el visor: llena su caja para que no deje aire
+    const pts = puntosEstrella(w, h, i)
     ctx.beginPath()
-    for (let k = 0; k < 10; k++) {
-      const ang = ((k * 36 - 90) * Math.PI) / 180
-      const rr = k % 2 === 0 ? R : r
-      const px = cx + rr * Math.cos(ang)
-      const py = cy + rr * Math.sin(ang)
-      if (k === 0) ctx.moveTo(px, py)
-      else ctx.lineTo(px, py)
-    }
+    pts.forEach(([px, py], k) => (k === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)))
     ctx.closePath()
     trazar()
   } else if (c.forma === 'linea') {
@@ -815,4 +822,34 @@ export function dibujarFotograma(
   }
 
   dibujarMarco(ctx, marco, ancho, alto, escala)
+
+  // impactos: deforman el cuadro entero ya compuesto (clip, capas y marco), igual
+  // que en el visor. el geométrico se aplica copiando a un lienzo aparte y
+  // volviéndolo a volcar escalado y desenfocado; el velo se pinta encima
+  const imp = estadoImpactosEn(escena.impactos ?? [], t)
+  if (imp.escala !== 1 || imp.desenfoque > 0 || imp.x !== 0 || imp.y !== 0) {
+    const aux = auxImpacto(ancho, alto)
+    const actx = aux.getContext('2d')
+    if (actx) {
+      actx.clearRect(0, 0, ancho, alto)
+      actx.drawImage(ctx.canvas, 0, 0)
+      ctx.clearRect(0, 0, ancho, alto)
+      ctx.fillStyle = colorFondo
+      ctx.fillRect(0, 0, ancho, alto)
+      ctx.save()
+      ctx.filter = imp.desenfoque > 0 ? `blur(${(imp.desenfoque * alto).toFixed(2)}px)` : 'none'
+      ctx.translate(ancho / 2 + imp.x * alto, alto / 2 + imp.y * alto)
+      ctx.scale(imp.escala, imp.escala)
+      ctx.translate(-ancho / 2, -alto / 2)
+      ctx.drawImage(aux, 0, 0)
+      ctx.restore()
+    }
+  }
+  if (imp.veloOpacidad > 0) {
+    ctx.save()
+    ctx.globalAlpha = imp.veloOpacidad
+    ctx.fillStyle = imp.veloColor
+    ctx.fillRect(0, 0, ancho, alto)
+    ctx.restore()
+  }
 }

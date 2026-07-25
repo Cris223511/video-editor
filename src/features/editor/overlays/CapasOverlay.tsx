@@ -3,6 +3,7 @@ import { useEditorStore } from '../../../store/useEditorStore'
 import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTrazo } from '../../../types/layers'
 import { REPETICIONES_BRILLO, desenfoqueBrillo, hexAOpacidad } from '../../../lib/layers/defaults'
 import { rectContenido } from '../../../lib/layers/rect'
+import { puntosEstrella } from '../../../lib/layers/figuras'
 import { posicionCapa } from '../../../lib/layers/motion'
 import { fundidoEn } from '../../../lib/audio/ganancia'
 import { Ancla, Caja, redimensionar } from '../../../lib/layers/resize'
@@ -42,17 +43,9 @@ function dibujoFigura(c: CapaFigura, w: number, h: number, g: number) {
     case 'triangulo':
       return <polygon points={`${w / 2},${i} ${w - i},${h - i} ${i},${h - i}`} fill={fill} stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />
     case 'estrella': {
-      const cx = w / 2
-      const cy = h / 2
-      const R = Math.min(w, h) / 2 - i
-      const r = R * 0.42
-      const pts: string[] = []
-      for (let k = 0; k < 10; k++) {
-        const ang = ((k * 36 - 90) * Math.PI) / 180
-        const rr = k % 2 === 0 ? R : r
-        pts.push(`${cx + rr * Math.cos(ang)},${cy + rr * Math.sin(ang)}`)
-      }
-      return <polygon points={pts.join(' ')} fill={fill} stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />
+      // la estrella llena su caja para que el recuadro de selección se le ciña
+      const pts = puntosEstrella(w, h, i).map(([x, y]) => `${x},${y}`).join(' ')
+      return <polygon points={pts} fill={fill} stroke={stroke} strokeWidth={sw} strokeLinejoin="round" />
     }
     case 'linea':
       return <line x1={g} y1={h / 2} x2={w - g} y2={h / 2} stroke={c.colorRelleno} strokeWidth={g} strokeLinecap="round" />

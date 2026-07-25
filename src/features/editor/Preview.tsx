@@ -29,6 +29,7 @@ import { anterior, posterior, pintarTransicion, progreso, progresoSalida } from 
 import { cssEfectos } from '../../lib/efectos/catalogo'
 import { paramsNB, nodosFiltroNB, NodoFiltro } from '../../lib/efectos/nitidezBrillo'
 import { paramsGoPro, nodosFiltroGoPro } from '../../lib/efectos/goPro'
+import { estadoImpactosEn } from '../../lib/impactos/catalogo'
 
 // pinta un nodo del filtro de nitidez y brillo (y sus hijos) como elemento svg.
 // la receta viene en datos desde el helper, la misma que usa la exportación, así
@@ -52,6 +53,7 @@ import { TIPO_FIGURA } from './panels/FiguraPanel'
 export default function Preview() {
   const clips = useEditorStore((s) => s.pista.clips)
   const playhead = useEditorStore((s) => s.playhead)
+  const impactos = useEditorStore((s) => s.impactos)
   const reproduciendo = useEditorStore((s) => s.reproduciendo)
   // mientras se edita el recorte de un clip, ese clip se muestra entero (sin
   // aplicar todavía el recorte al video), para poder ver lo que se va a dejar fuera
@@ -803,6 +805,16 @@ export default function Preview() {
   // su fondo se ve en las bandas cuando el video no lo cubre
   const lienzoRect = rectContenido(areaTam.w, areaTam.h, resolucion.ancho / resolucion.alto)
 
+  // efecto combinado de los impactos activos en este instante: deforma el cuadro
+  // entero (clip y lo que tenga delante) y puede echarle un velo. va en tiempo
+  // real, sin suavizado, para que el golpe se sienta seco
+  const imp = estadoImpactosEn(impactos, playhead)
+  const impactoActivo = imp.escala !== 1 || imp.desenfoque > 0 || imp.x !== 0 || imp.y !== 0
+  const impactoTransform = impactoActivo
+    ? `scale(${imp.escala}) translate(${imp.x * lienzoRect.h}px, ${imp.y * lienzoRect.h}px)`
+    : ''
+  const impactoFiltro = imp.desenfoque > 0 ? `blur(${(imp.desenfoque * lienzoRect.h).toFixed(2)}px)` : undefined
+
   return (
     // el fondo oscuro solo tiene sentido cuando hay video: rodear la imagen de
     // negro ayuda a juzgar el color. sin nada que mostrar, ese mismo fondo deja
@@ -880,11 +892,16 @@ export default function Preview() {
               width: lienzoRect.w,
               height: lienzoRect.h,
               background: colorFondo,
+              // el zoom del visor (lupa de la interfaz) y el impacto se apilan en la
+              // misma transformación: primero el impacto sobre el contenido y luego
+              // la lupa por encima
               transform:
-                zoomVisor.z > 1
-                  ? `translate(${zoomVisor.x}px, ${zoomVisor.y}px) scale(${zoomVisor.z})`
-                  : undefined,
-              transition: 'transform 140ms ease-out',
+                `${zoomVisor.z > 1 ? `translate(${zoomVisor.x}px, ${zoomVisor.y}px) scale(${zoomVisor.z})` : ''} ${impactoTransform}`.trim() ||
+                undefined,
+              filter: impactoFiltro,
+              // durante un impacto no hay suavizado: el efecto debe verse cuadro a
+              // cuadro tal cual, no interpolado
+              transition: impactoActivo ? 'none' : 'transform 140ms ease-out',
             }}
             // un clic sobre la imagen elige el clip que hay bajo el cabezal para
             // poder reencuadrarlo; las capas y los tiradores cortan la
@@ -1137,6 +1154,15 @@ export default function Preview() {
             <RecorteOverlay />
             <MarcoOverlay alturaLienzo={lienzoRect.h} />
             <CuentaRegresiva />
+
+            {/* velo del impacto (flash a negro, a blanco o de color) por encima de
+                todo lo que se ve, incluidas las imágenes y textos de delante */}
+            {imp.veloOpacidad > 0 && (
+              <div
+                className="pointer-events-none absolute inset-0 z-40"
+                style={{ background: imp.veloColor, opacity: imp.veloOpacidad }}
+              />
+            )}
 
             {/* elementos de sonido de los audios importados. no se ven; solo
                 suenan, sincronizados con el cabezal por el efecto de arriba */}

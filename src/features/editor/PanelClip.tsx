@@ -15,6 +15,8 @@ import CensuraPanel from './panels/CensuraPanel'
 import DibujarPanel from './panels/DibujarPanel'
 import AudioPanel from './panels/AudioPanel'
 import AudioClipPanel from './panels/AudioClipPanel'
+import ImpactosPanel from './panels/ImpactosPanel'
+import ImpactoEditorPanel from './panels/ImpactoEditorPanel'
 
 // una categoría del panel de la derecha: su icono en el sub-riel y el panel de
 // controles que abre. cada tipo de elemento ofrece las suyas
@@ -31,9 +33,15 @@ const CLIP: Categoria[] = [
   { id: 'transiciones', icono: 'transiciones', etiqueta: 'Transiciones', panel: <Transiciones /> },
   { id: 'tono', icono: 'tono', etiqueta: 'Ajustar colores', panel: <TonePanel /> },
   { id: 'efectos', icono: 'efectos', etiqueta: 'Efectos', panel: <EffectsPanel /> },
+  { id: 'impactos', icono: 'impacto', etiqueta: 'Impactos', panel: <ImpactosPanel /> },
   { id: 'velocidad', icono: 'velocidad', etiqueta: 'Velocidad', panel: <SpeedPanel /> },
   { id: 'recortar', icono: 'recortar', etiqueta: 'Recortar', panel: <RecortarPanel /> },
   { id: 'transformar', icono: 'transformar', etiqueta: 'Transformar', panel: <TransformarPanel /> },
+]
+
+// cuando hay una bolita elegida, el panel de la derecha muestra solo su editor
+const IMPACTO_EDITOR: Categoria[] = [
+  { id: 'impacto-editor', icono: 'impacto', etiqueta: 'Impacto', panel: <ImpactoEditorPanel /> },
 ]
 
 // según el tipo de la capa elegida, sus propias categorías. el estilo del
@@ -70,6 +78,7 @@ export default function PanelClip() {
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const regionSeleccionada = useEditorStore((s) => s.regionSeleccionada)
+  const impactoSeleccionado = useEditorStore((s) => s.impactoSeleccionado)
   const capas = useEditorStore((s) => s.capas)
   const audios = useEditorStore((s) => s.audios)
 
@@ -77,15 +86,17 @@ export default function PanelClip() {
   // la selección de audio comparte campo entre un clip de audio importado o
   // separado y una franja de ganancia; se distinguen mirando en qué lista está
   const esClipAudio = regionSeleccionada && audios.some((a) => a.id === regionSeleccionada)
-  const categorias: Categoria[] = clipSeleccionado
-    ? CLIP
-    : capa
-      ? categoriasCapa(capa.tipo)
-      : esClipAudio
-        ? [{ id: 'audio', icono: 'audio', etiqueta: 'Audio', panel: <AudioClipPanel /> }]
-        : regionSeleccionada
-          ? [{ id: 'audio', icono: 'audio', etiqueta: 'Audio', panel: <AudioPanel /> }]
-          : []
+  const categorias: Categoria[] = impactoSeleccionado
+    ? IMPACTO_EDITOR
+    : clipSeleccionado
+      ? CLIP
+      : capa
+        ? categoriasCapa(capa.tipo)
+        : esClipAudio
+          ? [{ id: 'audio', icono: 'audio', etiqueta: 'Audio', panel: <AudioClipPanel /> }]
+          : regionSeleccionada
+            ? [{ id: 'audio', icono: 'audio', etiqueta: 'Audio', panel: <AudioPanel /> }]
+            : []
 
   const hayAlgo = categorias.length > 0
   // la categoría abierta vive en el store para que los overlays del visor (el
@@ -94,13 +105,19 @@ export default function PanelClip() {
   const activa = useEditorStore((s) => s.categoriaClip)
   const setActiva = useEditorStore((s) => s.setCategoriaClip)
   useEffect(() => {
+    // elegir una bolita sí abre su editor de una vez: el usuario hizo clic en ella
+    // justo para editarla, así que no tiene sentido obligarlo a pulsar otra vez
+    if (impactoSeleccionado) {
+      setActiva('impacto-editor')
+      return
+    }
     // al cambiar de selección no se abre ninguna categoría sola: solo se limpia la
     // que quede señalando algo que ya no existe. el usuario pulsa el icono que
     // quiera para desplegar sus controles, no se despliega automáticamente
     if (!hayAlgo || (activa && !categorias.some((c) => c.id === activa))) setActiva(null)
     // solo interesa reaccionar a qué categorías hay, no a la propia elección
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clipSeleccionado, capaSeleccionada, regionSeleccionada, capa?.tipo])
+  }, [clipSeleccionado, capaSeleccionada, regionSeleccionada, impactoSeleccionado, capa?.tipo])
 
   const abierta = categorias.find((c) => c.id === activa)
 
