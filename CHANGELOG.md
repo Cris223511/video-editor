@@ -4,6 +4,43 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.30.0 (2026-07-25)
+
+Esta versión hace el editor manejable con el dedo, pule la disposición de los
+paneles y suma un menú de fila, además de varios detalles de los impactos.
+
+### Táctil
+
+- Todos los arrastres del editor funcionan ahora con el dedo, no solo con el ratón:
+  mover clips, textos, figuras, imágenes y audios en la línea de tiempo, moverlos y
+  redimensionarlos en el visor, arrastrar el cabezal, reordenar filas y estirar los
+  paneles. Por dentro los gestos pasaron a eventos de puntero, que valen igual para
+  ratón y para dedo, y las zonas que se agarran ya no desplazan la página al tocarlas.
+
+### Paneles
+
+- Al abrir los controles de la derecha, el que cede espacio es el visor y no el
+  panel de la izquierda, que se queda quieto y alineado con el de medios.
+- Los paneles de la izquierda se pueden estrechar más, y su ficha de proyecto ya no
+  corta el texto cuando el panel queda angosto: los valores se acomodan debajo de su
+  etiqueta en lugar de recortarse.
+
+### Línea de tiempo
+
+- Clic derecho sobre una fila para insertar otra encima o debajo, duplicar la pista
+  de video o eliminarla con aviso. Funciona en las pistas de video y en las filas de
+  audio y de texto, y no deja borrar la última fila que quede.
+- La guía de «nueva pista» al arrastrar un medio solo aparece pegada a las pistas de
+  video, no paseando por la zona de audio y texto.
+
+### Impactos
+
+- Cada efecto de la paleta se muestra con una vista previa animada que lo reproduce
+  en bucle y en cascada, para verlo antes de usarlo.
+- La duración se pone libre, con el valor que se quiera, y un doble clic la
+  restablece. Al arrastrar un impacto por la línea de tiempo aparece una guía que
+  marca dónde va a caer.
+
 ## 2.29.0 (2026-07-25)
 
 Esta versión reordena la línea de tiempo alrededor de un modelo más simple, estrena
