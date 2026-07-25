@@ -117,9 +117,11 @@ export default function EditorView() {
                   collapsible
                   collapsedSize={0}
                   // mismo default y mismo mínimo que el panel de medios de abajo;
-                  // al compartir grupo y ancho, sus bordes coinciden siempre
+                  // al compartir grupo y ancho, sus bordes coinciden siempre. el
+                  // mínimo se subió un poco para que, al estrecharlo del todo, el panel
+                  // de propiedades quede a la par del de medios de abajo y no más angosto
                   defaultSize={21}
-                  minSize={18}
+                  minSize={21}
                   maxSize={42}
                   onCollapse={() => setVerOpciones(false)}
                   onExpand={() => setVerOpciones(true)}
@@ -200,7 +202,7 @@ export default function EditorView() {
                   collapsedSize={0}
                   // mismo default y mínimo que el panel de opciones de arriba
                   defaultSize={21}
-                  minSize={18}
+                  minSize={21}
                   maxSize={42}
                   onCollapse={() => setVerMedios(false)}
                   onExpand={() => setVerMedios(true)}
