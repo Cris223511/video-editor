@@ -672,7 +672,6 @@ function ModalNombre({
         <span className="ml-0.5 font-semibold" style={{ color: 'rgb(var(--alerta))' }} title="Obligatorio">
           *
         </span>
-        <span className="ml-1 font-normal">(obligatorio)</span>
       </label>
       <input
         ref={campo}
@@ -698,7 +697,7 @@ function ModalNombre({
       {conNota && (
         <>
           <label className="mb-2 mt-5 block text-[13px] font-medium text-[color:var(--muted)]">
-            Descripción: <span className="font-normal">(opcional)</span>
+            Descripción:
           </label>
           <textarea
             value={texto}

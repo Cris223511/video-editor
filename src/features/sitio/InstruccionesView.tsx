@@ -221,18 +221,17 @@ export default function InstruccionesView() {
           Cómo funciona el <Subrayado>editor</Subrayado>
         </Titulo>
 
-        <p className="mt-5 max-w-3xl text-entrada text-[color:var(--muted)]">
-          Aquí tienes cada herramienta del editor explicada con calma, para que sepas qué esperar
-          antes de tocarla. No necesitas una cuenta ni descargar ningún programa. Abre{' '}
+        <p className="mt-5 max-w-5xl text-entrada text-[color:var(--muted)]">
+          Esta guía repasa cada herramienta del editor y para qué sirve, así sabes qué esperar antes
+          de usarla. Abre{' '}
           <Link to={RUTAS.medios} className="text-brand hover:underline">
             el editor
           </Link>
-          , arrastra un video y ponte a trabajar. Y cuando quieras seguir con un montaje que dejaste
-          a medias, lo encuentras guardado en{' '}
+          , arrastra un video y empieza; lo que dejes a medias queda en{' '}
           <Link to={RUTAS.proyectos} className="text-brand hover:underline">
             mis proyectos
-          </Link>
-          .
+          </Link>{' '}
+          para retomarlo cuando quieras.
         </p>
 
         <Lista titulo="Montar la línea de tiempo" pasos={MONTAJE} />

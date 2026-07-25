@@ -49,6 +49,52 @@ const AZUL = 'linear-gradient(120deg, rgb(var(--accent-boton)), rgb(var(--accent
 const PANEL = 'rgb(var(--border) / 0.09)'
 const PISTA = 'rgb(var(--border) / 0.12)'
 
+// el fondo de la escena de censura es un paisaje de montañas. los dos perfiles
+// de cordillera se guardan como listas de vértices y se comparten entre la
+// silueta que se dibuja en svg y el muestreo del mosaico, así el pixelado tapa
+// exactamente el paisaje que hay detrás y no unos colores inventados
+const CIMA_LEJOS = [
+  { x: 0, y: 0.54 },
+  { x: 0.18, y: 0.45 },
+  { x: 0.34, y: 0.56 },
+  { x: 0.52, y: 0.43 },
+  { x: 0.7, y: 0.54 },
+  { x: 0.86, y: 0.47 },
+  { x: 1, y: 0.55 },
+]
+const CIMA_CERCA = [
+  { x: 0, y: 0.73 },
+  { x: 0.16, y: 0.61 },
+  { x: 0.32, y: 0.75 },
+  { x: 0.5, y: 0.58 },
+  { x: 0.66, y: 0.72 },
+  { x: 0.84, y: 0.62 },
+  { x: 1, y: 0.74 },
+]
+const CIELO_TOP = [32, 62, 112]
+const CIELO_BASE = [96, 150, 206]
+const MONTE_LEJOS = [74, 106, 158]
+const MONTE_CERCA = [28, 48, 82]
+const SOL_POS = { x: 0.72, y: 0.3 }
+
+// alto del perfil en la posición horizontal u (0 a 1), interpolando entre los
+// vértices. debajo de esa altura (v mayor) empieza la montaña
+function alturaRidge(u: number, ridge: { x: number; y: number }[]) {
+  for (let i = 0; i < ridge.length - 1; i++) {
+    const a = ridge[i]
+    const b = ridge[i + 1]
+    if (u >= a.x && u <= b.x) return a.y + (b.y - a.y) * ((u - a.x) / (b.x - a.x || 1))
+  }
+  return ridge[ridge.length - 1].y
+}
+
+// convierte un perfil en la ruta de un polígono cerrado hasta el borde inferior,
+// en coordenadas de 0 a 100 para un viewBox cómodo
+function siluetaPath(ridge: { x: number; y: number }[]) {
+  const cima = ridge.map((p) => `L${(p.x * 100).toFixed(1)},${(p.y * 100).toFixed(1)}`).join(' ')
+  return `M0,100 ${cima} L100,100 Z`
+}
+
 // interpolación suave de ida y vuelta, la que usan varias escenas para moverse
 // sin que se note el salto al cerrar el bucle
 function vaiven(t: number, periodo = ACCION) {
@@ -408,44 +454,38 @@ function EscenaCensura({ t }: { t: number }) {
   const VH = 58
 
   // color del fondo en un punto, en coordenadas propias del video (0 a 1). es la
-  // misma composición que se pinta detrás: el degradado y las dos siluetas. de
-  // aquí sale el mosaico, así que el pixelado tapa lo que hay de verdad en lugar
-  // de inventarse unos colores que no pegaban con la escena
+  // misma composición que se pinta detrás: cielo, sol y las dos cordilleras. de
+  // aquí sale el mosaico, así que el pixelado tapa el paisaje de verdad en lugar
+  // de inventarse unos colores que no pegan con la escena
   const colorFondo = (u: number, v: number) => {
-    const f = Math.min(1, Math.max(0, 0.26 * u + 0.74 * v))
-    let r = 29 + (47 - 29) * f
-    let g = 53 + (107 - 53) * f
-    let b = 87 + (214 - 87) * f
-    // siluetas del fondo, como dos medios óvalos apoyados abajo
-    const oval = (cx: number, cy: number, rx: number, ry: number, fuerza: number) => {
-      const d = ((u - cx) / rx) ** 2 + ((v - cy) / ry) ** 2
-      if (d < 1) {
-        const k = fuerza * (1 - d * 0.35)
-        r += (6 - r) * k
-        g += (12 - g) * k
-        b += (24 - b) * k
-      }
+    // cielo: degradado vertical del azul hondo de arriba al azul claro del horizonte
+    let r = CIELO_TOP[0] + (CIELO_BASE[0] - CIELO_TOP[0]) * v
+    let g = CIELO_TOP[1] + (CIELO_BASE[1] - CIELO_TOP[1]) * v
+    let b = CIELO_TOP[2] + (CIELO_BASE[2] - CIELO_TOP[2]) * v
+    // el sol y su halo cálido, que se funde con el cielo. la v va algo comprimida
+    // para que el resplandor no quede aplastado en una franja
+    const dSol = Math.hypot(u - SOL_POS.x, (v - SOL_POS.y) * 1.2)
+    if (dSol < 0.24) {
+      const k = (1 - dSol / 0.24) ** 2
+      r += (255 - r) * k * 0.92
+      g += (243 - g) * k * 0.92
+      b += (206 - b) * k * 0.92
     }
-    oval(0.25, 1, 0.15, 0.45, 0.3)
-    oval(0.73, 1, 0.19, 0.6, 0.22)
-    // franjas verticales y unos puntos de luz: sin algo de detalle, un fondo casi
-    // liso hace que el pixelado y el desenfoque no se distingan de un color plano
-    const franja = Math.sin(u * Math.PI * 9)
-    r += franja * 9
-    g += franja * 11
-    b += franja * 14
-    const luz = (cx: number, cy: number, rad: number, fuerza: number) => {
-      const d = Math.hypot(u - cx, (v - cy) * 1.6)
-      if (d < rad) {
-        const k = fuerza * (1 - d / rad)
-        r += (235 - r) * k
-        g += (245 - g) * k
-        b += (255 - b) * k
-      }
+    // cordillera lejana, más clara por la bruma; tapa el cielo donde asoma
+    if (v >= alturaRidge(u, CIMA_LEJOS)) {
+      r = MONTE_LEJOS[0]
+      g = MONTE_LEJOS[1]
+      b = MONTE_LEJOS[2]
     }
-    luz(0.17, 0.3, 0.12, 0.5)
-    luz(0.52, 0.62, 0.1, 0.38)
-    luz(0.86, 0.24, 0.11, 0.42)
+    // cordillera cercana, la silueta oscura de delante, con un leve oscurecido
+    // hacia la base que le da algo de volumen a la ladera
+    const baseCerca = alturaRidge(u, CIMA_CERCA)
+    if (v >= baseCerca) {
+      const s = 1 - Math.min(1, (v - baseCerca) * 0.8) * 0.3
+      r = MONTE_CERCA[0] * s
+      g = MONTE_CERCA[1] * s
+      b = MONTE_CERCA[2] * s
+    }
     return `rgb(${Math.round(Math.min(255, Math.max(0, r)))} ${Math.round(Math.min(255, Math.max(0, g)))} ${Math.round(Math.min(255, Math.max(0, b)))})`
   }
 
@@ -507,45 +547,29 @@ function EscenaCensura({ t }: { t: number }) {
 
       <span
         className="absolute inset-x-[3%] top-[20%] h-[58%] overflow-hidden rounded-lg"
-        style={{ background: 'linear-gradient(165deg, #1d3557, #2f6bd6)' }}
+        style={{ background: `linear-gradient(180deg, rgb(${CIELO_TOP.join(' ')}), rgb(${CIELO_BASE.join(' ')}))` }}
       >
-        {/* dos siluetas de fondo para que el plano no sea un color plano. las
-            mismas que replica colorFondo para muestrear */}
+        {/* el sol y su resplandor, detrás de las montañas */}
         <span
-          className="absolute bottom-0 left-[10%] h-[45%] w-[30%] rounded-t-full"
-          style={{ background: 'rgb(6 12 24 / 0.3)' }}
-        />
-        <span
-          className="absolute bottom-0 right-[8%] h-[60%] w-[38%] rounded-t-full"
-          style={{ background: 'rgb(6 12 24 / 0.22)' }}
-        />
-        {/* franjas y luces, lo que da textura al plano para que se note lo que
-            hace cada modo de censura */}
-        <span
-          className="absolute inset-0"
+          className="absolute rounded-full"
           style={{
-            backgroundImage:
-              'repeating-linear-gradient(90deg, rgb(255 255 255 / 0.05) 0 4%, transparent 4% 11%)',
+            left: `${SOL_POS.x * 100}%`,
+            top: `${SOL_POS.y * 100}%`,
+            width: '30%',
+            height: '48%',
+            transform: 'translate(-50%, -50%)',
+            background:
+              'radial-gradient(circle, rgb(255 243 206) 0%, rgb(255 236 190 / 0.55) 34%, transparent 68%)',
           }}
         />
-        {[
-          { x: 17, y: 30, s: 24 },
-          { x: 52, y: 62, s: 20 },
-          { x: 86, y: 24, s: 22 },
-        ].map((l) => (
-          <span
-            key={`${l.x}-${l.y}`}
-            className="absolute rounded-full"
-            style={{
-              left: `${l.x}%`,
-              top: `${l.y}%`,
-              width: `${l.s}%`,
-              height: `${l.s * 1.6}%`,
-              transform: 'translate(-50%, -50%)',
-              background: 'radial-gradient(circle, rgb(235 245 255 / 0.5) 0%, transparent 70%)',
-            }}
-          />
-        ))}
+        {/* las dos cordilleras, calcadas de los mismos perfiles que muestrea el
+            mosaico de la censura para que el pixelado tape justo lo que se ve.
+            preserveAspectRatio none deja que el svg se estire a la caja igual que
+            el muestreo trata u y v por separado */}
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
+          <path d={siluetaPath(CIMA_LEJOS)} fill={`rgb(${MONTE_LEJOS.join(' ')})`} />
+          <path d={siluetaPath(CIMA_CERCA)} fill={`rgb(${MONTE_CERCA.join(' ')})`} />
+        </svg>
       </span>
 
       {/* puntos del recorrido que ya quedó grabado */}
