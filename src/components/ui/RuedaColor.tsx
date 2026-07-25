@@ -1,16 +1,14 @@
-import { MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react'
+import { MouseEvent as ReactMouseEvent, useRef, useState } from 'react'
 import { PuntoRueda } from '../../lib/color/ruedas'
 
-// cuánto avanza el tirador respecto a lo que se mueve el ratón. por debajo de 1
-// el control se vuelve más lento que el cursor, que es justo lo que hace falta
-// para afinar un color sin pasarse
-const SENSIBILIDAD = 0.55
+// en el modo fino (con Shift) el tirador avanza mucho menos de lo que se mueve el
+// cursor, para clavar un color sin pasarse
 const SENSIBILIDAD_FINA = 0.14
 
-// rueda de corrección de color de una zona tonal. al presionar se captura el
-// puntero: el cursor desaparece y deja de chocar contra los bordes de la
-// pantalla, así que se puede seguir afinando todo lo que haga falta. con Shift
-// el movimiento se vuelve mucho más lento, y con doble clic la rueda vuelve al
+// rueda de corrección de color de una zona tonal. el tirador va justo bajo el
+// cursor, medido desde el centro de la rueda: así arranca donde se hace clic (en
+// el centro, si se pulsa el centro) y lo sigue sin pegar saltos. con Shift el
+// movimiento se afina desde donde se pulsa, y con doble clic la rueda vuelve al
 // centro
 export default function RuedaColor({
   etiqueta,
@@ -24,38 +22,30 @@ export default function RuedaColor({
   diametro?: number
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [capturado, setCapturado] = useState(false)
+  const [arrastrando, setArrastrando] = useState(false)
   // el valor vive en una referencia durante el arrastre porque los eventos de
   // movimiento llegan más rápido de lo que react vuelve a pintar
   const actual = useRef(valor)
   actual.current = valor
 
-  useEffect(() => {
-    if (!capturado) return
-    const radio = diametro / 2
+  function agarrar(e: ReactMouseEvent) {
+    e.preventDefault()
+    const el = ref.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const radio = rect.width / 2
+    const cx = rect.left + radio
+    const cy = rect.top + radio
+    setArrastrando(true)
 
-    // la captura del puntero se pide recién cuando el gesto es un arrastre de
-    // verdad, no en el primer clic. si se pidiera al pulsar, el segundo clic de un
-    // doble clic caía con el puntero ya bloqueado y no se registraba, así que la
-    // rueda nunca volvía al centro. con este umbral, un clic o un doble clic sin
-    // desplazamiento no llegan a bloquear nada
-    let bloqueado = false
-    let acumX = 0
-    let acumY = 0
+    // referencia del modo fino: se guarda dónde estaba el cursor y el valor al
+    // pulsar Shift, para afinar desde ahí sin saltos al entrar o salir del modo
+    let fino: { x: number; y: number; base: PuntoRueda } | null = null
 
-    const mover = (ev: globalThis.MouseEvent) => {
-      if (!bloqueado) {
-        acumX += ev.movementX
-        acumY += ev.movementY
-        if (Math.hypot(acumX, acumY) < 4) return
-        bloqueado = true
-        const p = ref.current?.requestPointerLock() as unknown as Promise<void> | undefined
-        if (p && typeof p.catch === 'function') p.catch(() => {})
-      }
-      const paso = ev.shiftKey ? SENSIBILIDAD_FINA : SENSIBILIDAD
-      let x = actual.current.x + (ev.movementX / radio) * paso
-      let y = actual.current.y + (ev.movementY / radio) * paso
-      // el tirador no sale del círculo: pasado el borde se queda en él
+    const aplicar = (px: number, py: number) => {
+      let x = px
+      let y = py
+      // el tirador no sale del círculo: pasado el borde se queda pegado a él
       const dist = Math.hypot(x, y)
       if (dist > 1) {
         x /= dist
@@ -66,31 +56,27 @@ export default function RuedaColor({
       onChange(nuevo)
     }
 
-    const soltar = () => {
-      setCapturado(false)
-      if (document.pointerLockElement) document.exitPointerLock()
-    }
-    // si el navegador suelta la captura por su cuenta (Esc, cambio de pestaña)
-    // hay que enterarse para no quedarse arrastrando a ciegas
-    const alCambiarCaptura = () => {
-      if (!document.pointerLockElement) setCapturado(false)
+    const mover = (ev: globalThis.MouseEvent) => {
+      if (ev.shiftKey) {
+        if (!fino) fino = { x: ev.clientX, y: ev.clientY, base: actual.current }
+        aplicar(
+          fino.base.x + ((ev.clientX - fino.x) / radio) * SENSIBILIDAD_FINA,
+          fino.base.y + ((ev.clientY - fino.y) / radio) * SENSIBILIDAD_FINA,
+        )
+        return
+      }
+      fino = null
+      // posición del cursor respecto al centro de la rueda, normalizada al radio
+      aplicar((ev.clientX - cx) / radio, (ev.clientY - cy) / radio)
     }
 
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
-    document.addEventListener('pointerlockchange', alCambiarCaptura)
-    return () => {
+    const soltar = () => {
+      setArrastrando(false)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
-      document.removeEventListener('pointerlockchange', alCambiarCaptura)
     }
-  }, [capturado, diametro, onChange])
-
-  function agarrar(e: ReactMouseEvent) {
-    e.preventDefault()
-    // solo se marca el gesto como activo; la captura del puntero se pide después,
-    // cuando el cursor se mueve de verdad, para no romper el doble clic
-    setCapturado(true)
+    window.addEventListener('mousemove', mover)
+    window.addEventListener('mouseup', soltar)
   }
 
   const centrada = Math.abs(valor.x) < 0.001 && Math.abs(valor.y) < 0.001
@@ -104,7 +90,7 @@ export default function RuedaColor({
         title="Arrastra para corregir. Shift afina el movimiento y el doble clic la devuelve al centro"
         className={[
           'relative rounded-full transition-shadow duration-200',
-          capturado ? 'cursor-none shadow-[0_0_0_2px_rgb(var(--brand))]' : 'cursor-grab',
+          arrastrando ? 'cursor-grabbing shadow-[0_0_0_2px_rgb(var(--brand))]' : 'cursor-grab',
         ].join(' ')}
         style={{
           width: diametro,
