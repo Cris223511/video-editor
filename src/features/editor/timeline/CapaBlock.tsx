@@ -83,20 +83,28 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     // fila del carril de texto cayó y reubicar la capa en ese nivel
     let ultimoX = e.clientX
     let ultimoY = e.clientY
+    const startY = e.clientY
+    // cuánto hay que mover en vertical para que el gesto cuente como cambio de nivel;
+    // por debajo de esto es solo horizontal y no sale la etiqueta que sigue al cursor
+    const UMBRAL_VERT = 14
 
     const mover = (ev: globalThis.MouseEvent) => {
-      // la etiqueta sigue al cursor durante todo el gesto, así se ve en qué punto
-      // de la línea de tiempo va a caer lo que se lleva en la mano
-      useEditorStore.getState().setArrastreVivo({ etiqueta:
-          capa.tipo === 'texto'
-            ? capa.texto || 'Texto'
-            : capa.tipo === 'imagen'
-              ? 'Imagen'
-              : capa.tipo === 'censura'
-                ? 'Censura'
-                : capa.tipo === 'trazo'
-                  ? 'Dibujo'
-                  : 'Figura', x: ev.clientX, y: ev.clientY })
+      // la etiqueta que sigue al cursor solo asoma en un gesto vertical (cambiar de
+      // fila o abrir una nueva); moviendo a los lados estorbaba
+      if (Math.abs(ev.clientY - startY) > UMBRAL_VERT) {
+        useEditorStore.getState().setArrastreVivo({ etiqueta:
+            capa.tipo === 'texto'
+              ? capa.texto || 'Texto'
+              : capa.tipo === 'imagen'
+                ? 'Imagen'
+                : capa.tipo === 'censura'
+                  ? 'Censura'
+                  : capa.tipo === 'trazo'
+                    ? 'Dibujo'
+                    : 'Figura', x: ev.clientX, y: ev.clientY })
+      } else {
+        useEditorStore.getState().setArrastreVivo(null)
+      }
 
       ultimoX = ev.clientX
       ultimoY = ev.clientY

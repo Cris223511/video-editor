@@ -123,6 +123,12 @@ export default function ClipBlock({
     if (bloqueada) return
     setInteractuando(true)
     const startX = e.clientX
+    const startY = e.clientY
+    // cuánto hay que subir o bajar el cursor para que el gesto se tome como vertical
+    // (cambiar de nivel o abrir uno nuevo). por debajo de esto el arrastre es solo
+    // horizontal y no se toca la pista ni sale la guía de nivel, que era lo que
+    // aparecía sin querer al mover un clip a los lados
+    const UMBRAL_VERT = 14
     const inicioOriginal = clip.inicio
     const umbral = UMBRAL_IMAN_PX / pxPorSegundo
     // bordes de partida del propio clip: se excluyen del imantado para que no se
@@ -150,9 +156,14 @@ export default function ClipBlock({
     }
 
     const mover = (ev: globalThis.MouseEvent) => {
-      // la etiqueta sigue al cursor durante todo el gesto, así se ve en qué punto
-      // de la línea de tiempo va a caer lo que se lleva en la mano
-      useEditorStore.getState().setArrastreVivo({ etiqueta: nombre, x: ev.clientX, y: ev.clientY })
+      // la etiqueta que sigue al cursor solo aparece cuando el gesto es vertical (se
+      // está cambiando de nivel o abriendo uno nuevo). moviendo el bloque a los lados
+      // no viene a cuento y estorbaba
+      if (Math.abs(ev.clientY - startY) > UMBRAL_VERT) {
+        useEditorStore.getState().setArrastreVivo({ etiqueta: nombre, x: ev.clientX, y: ev.clientY })
+      } else {
+        useEditorStore.getState().setArrastreVivo(null)
+      }
 
       // el primer desplazamiento de verdad es el que decide si el gesto era un
       // arrastre o un simple clic con alt
@@ -171,7 +182,10 @@ export default function ClipBlock({
         moverBloques(grupo, inicioOriginal + dxg - clip.inicio)
         return
       }
-      const v = decidirVertical(ev.clientY)
+      // solo se resuelve el destino vertical si el cursor subió o bajó de verdad. en
+      // un arrastre horizontal el clip se queda en su nivel y no asoma la guía de
+      // pista, aunque el cursor roce la separación entre filas
+      const v = Math.abs(ev.clientY - startY) > UMBRAL_VERT ? decidirVertical(ev.clientY) : undefined
       if (v) {
         if (v.insercion !== null) {
           // apuntando a una separación: se pinta la guía y el clip se queda donde
@@ -190,6 +204,10 @@ export default function ClipBlock({
             moverClipAPista(idGesto, v.destino)
           }
         }
+      } else if (insercionActual !== null) {
+        // el gesto volvió a ser horizontal: se apaga la guía de pista
+        insercionActual = null
+        setInsercionPista(null)
       }
 
       const dx = (ev.clientX - startX) / pxPorSegundo

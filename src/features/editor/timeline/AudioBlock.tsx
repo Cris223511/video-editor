@@ -213,11 +213,17 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     // carril de audio sobre la que quede
     let ultimoX = e.clientX
     let ultimoY = e.clientY
+    const startY = e.clientY
+    const UMBRAL_VERT = 14
 
     const mover = (ev: globalThis.MouseEvent) => {
-      // la etiqueta sigue al cursor durante todo el gesto, así se ve en qué punto
-      // de la línea de tiempo va a caer lo que se lleva en la mano
-      useEditorStore.getState().setArrastreVivo({ etiqueta: 'Audio', x: ev.clientX, y: ev.clientY })
+      // la etiqueta que sigue al cursor solo asoma en un gesto vertical (cambiar de
+      // nivel o abrir uno nuevo); moviendo a los lados estorbaba
+      if (Math.abs(ev.clientY - startY) > UMBRAL_VERT) {
+        useEditorStore.getState().setArrastreVivo({ etiqueta: 'Audio', x: ev.clientX, y: ev.clientY })
+      } else {
+        useEditorStore.getState().setArrastreVivo(null)
+      }
 
       ultimoX = ev.clientX
       ultimoY = ev.clientY
