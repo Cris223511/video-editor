@@ -49,6 +49,29 @@ export interface Pintor {
   (clip: Clip, alfa: number): void
 }
 
+// dibuja un clip con un filtro css (desenfoque, brillo...) y, si hace falta, un
+// leve acercamiento para que el desenfoque no deje asomar el borde transparente
+// del lienzo. lo comparten las transiciones de la familia de desenfoque
+function conFiltro(
+  ctx: CanvasRenderingContext2D,
+  ancho: number,
+  alto: number,
+  clip: Clip,
+  pintar: Pintor,
+  filtro: string,
+  zoom: number,
+) {
+  ctx.save()
+  ctx.filter = filtro
+  if (zoom !== 1) {
+    ctx.translate(ancho / 2, alto / 2)
+    ctx.scale(zoom, zoom)
+    ctx.translate(-ancho / 2, -alto / 2)
+  }
+  pintar(clip, 1)
+  ctx.restore()
+}
+
 // ejecuta la transición de entrada de un clip sobre el lienzo. toda la
 // coreografía vive aquí y no repartida entre el visor y el compositor, que es
 // lo que garantiza que lo exportado coincida con lo que se vio al editar
@@ -156,6 +179,90 @@ export function pintarTransicion(
         // el que entra se funde además de crecer, o el salto se nota demasiado
         pintar(entrante, p)
         ctx.restore()
+      }
+      return
+    }
+
+    // familia de desenfoque: corte seco a la mitad. en la primera mitad se ve el
+    // plano que sale acumulando el efecto hasta el tope; en la segunda, el que entra
+    // lo va soltando. el cambio de plano ocurre justo en el punto de máximo efecto,
+    // así el corte queda escondido detrás del desenfoque
+    case 'desenfoque': {
+      const maxB = Math.min(ancho, alto) * 0.06
+      if (p < 0.5) {
+        const k = p / 0.5
+        if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, `blur(${(maxB * k).toFixed(2)}px)`, 1 + 0.06 * k)
+      } else {
+        const k = 1 - (p - 0.5) / 0.5
+        if (entrante) conFiltro(ctx, ancho, alto, entrante, pintar, `blur(${(maxB * k).toFixed(2)}px)`, 1 + 0.06 * k)
+      }
+      return
+    }
+
+    case 'resplandor': {
+      const maxB = Math.min(ancho, alto) * 0.05
+      const filtro = (k: number) => `blur(${(maxB * k).toFixed(2)}px) brightness(${(1 + 0.9 * k).toFixed(3)})`
+      if (p < 0.5) {
+        const k = p / 0.5
+        if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, filtro(k), 1 + 0.05 * k)
+      } else {
+        const k = 1 - (p - 0.5) / 0.5
+        if (entrante) conFiltro(ctx, ancho, alto, entrante, pintar, filtro(k), 1 + 0.05 * k)
+      }
+      return
+    }
+
+    case 'flash': {
+      if (p < 0.5) {
+        if (saliente) pintar(saliente, 1)
+      } else if (entrante) {
+        pintar(entrante, 1)
+      }
+      // el velo blanco sube hacia el corte y cae después: pico agudo justo en la
+      // mitad, que es donde cambia el plano
+      const velo = Math.max(0, 1 - Math.abs(p - 0.5) / 0.5)
+      if (velo > 0) {
+        ctx.save()
+        ctx.globalAlpha = Math.min(1, velo * 1.6)
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(0, 0, ancho, alto)
+        ctx.restore()
+      }
+      return
+    }
+
+    case 'zoom-desenfoque': {
+      const maxB = Math.min(ancho, alto) * 0.045
+      if (p < 0.5) {
+        const k = p / 0.5
+        if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, `blur(${(maxB * k).toFixed(2)}px)`, 1 + 0.55 * k)
+      } else {
+        const k = 1 - (p - 0.5) / 0.5
+        if (entrante) conFiltro(ctx, ancho, alto, entrante, pintar, `blur(${(maxB * k).toFixed(2)}px)`, 1 + 0.55 * k)
+      }
+      return
+    }
+
+    case 'barrido-movimiento': {
+      const maxB = Math.min(ancho, alto) * 0.05
+      const dir = t.direccion ?? 'izq'
+      const dx = dir === 'izq' ? -ancho : dir === 'der' ? ancho : 0
+      const dy = dir === 'arr' ? -alto : dir === 'aba' ? alto : 0
+      // se agranda para que el barrido no descubra los bordes del lienzo al correrse
+      const pintarLado = (clip: Clip, k: number, signo: number) => {
+        ctx.save()
+        ctx.filter = `blur(${(maxB * k).toFixed(2)}px)`
+        ctx.translate(ancho / 2, alto / 2)
+        ctx.scale(1.2, 1.2)
+        ctx.translate(-ancho / 2, -alto / 2)
+        ctx.translate(signo * dx * 0.16 * k, signo * dy * 0.16 * k)
+        pintar(clip, 1)
+        ctx.restore()
+      }
+      if (p < 0.5) {
+        if (saliente) pintarLado(saliente, p / 0.5, 1)
+      } else if (entrante) {
+        pintarLado(entrante, 1 - (p - 0.5) / 0.5, -1)
       }
       return
     }

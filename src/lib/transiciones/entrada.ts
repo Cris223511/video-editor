@@ -48,12 +48,22 @@ export function estiloEntrada(tipo: string, p: number): EstiloEntrada {
     case 'negro':
     case 'blanco':
     case 'mascara':
+    // las de desenfoque y destello nacieron para mezclar dos planos de video; sobre
+    // un elemento suelto no hay un segundo plano al que desenfocar, así que entran
+    // con un desvanecido, que es su equivalente más honesto
+    case 'desenfoque':
+    case 'resplandor':
+    case 'flash':
       return { opacidad: f, escala: 1, tx: 0, ty: 0 }
+    case 'zoom-desenfoque':
+      // el golpe de zoom sí tiene sentido en una capa: entra creciendo un poco
+      return { opacidad: f, escala: 1.3 - 0.3 * f, tx: 0, ty: 0 }
     case 'escala': {
       // acercar entra creciendo desde pequeño; alejar entra encogiendo desde grande
       const desde = t.direccion === 'izq' ? 1.4 : 0.6
       return { opacidad: f, escala: desde + (1 - desde) * f, tx: 0, ty: 0 }
     }
+    case 'barrido-movimiento':
     case 'desplazamiento': {
       const tx = t.direccion === 'der' ? -despl : t.direccion === 'izq' ? despl : 0
       const ty = t.direccion === 'arr' ? despl : t.direccion === 'aba' ? -despl : 0

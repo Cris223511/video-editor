@@ -8,6 +8,7 @@ export type Grupo =
   | 'barridos'
   | 'formas'
   | 'movimiento'
+  | 'desenfoques'
 
 // cómo se dibuja la transición. la distinción importa porque cada familia
 // necesita una técnica distinta en el lienzo
@@ -19,6 +20,13 @@ export type Tecnica =
   | 'mascara' // el plano nuevo se revela recortado por una forma
   | 'desplazamiento' // el plano nuevo empuja o se desliza sobre el anterior
   | 'escala' // el plano nuevo crece o el anterior se aleja
+  // las de abajo trabajan por corte seco a mitad de camino: el plano que sale
+  // acumula el efecto hasta el tope, corta, y el que entra lo va soltando
+  | 'desenfoque' // se desenfoca hasta el tope y el siguiente se va enfocando
+  | 'resplandor' // desenfoque que además se ilumina en el cambio
+  | 'flash' // un golpe de luz blanca en el corte
+  | 'zoom-desenfoque' // acercón brusco con desenfoque, tipo golpe de cámara
+  | 'barrido-movimiento' // latigazo lateral desenfocado de un plano al otro
 
 // forma del recorte para las transiciones de máscara. el progreso va de 0 a 1
 export type Forma =
@@ -228,6 +236,59 @@ export const CATALOGO: Transicion[] = [
     direccion: 'izq',
     descripcion: 'El plano anterior se aleja y deja ver el siguiente.',
   },
+
+  {
+    id: 'desenfoque',
+    nombre: 'Desenfoque',
+    grupo: 'desenfoques',
+    tecnica: 'desenfoque',
+    descripcion: 'El plano que sale se desenfoca hasta el tope, corta, y el que entra se va enfocando.',
+  },
+  {
+    id: 'destello',
+    nombre: 'Destello suave',
+    grupo: 'desenfoques',
+    tecnica: 'resplandor',
+    descripcion: 'Un desenfoque que además se ilumina al pasar de un plano al otro.',
+  },
+  {
+    id: 'flash',
+    nombre: 'Flash de luz',
+    grupo: 'desenfoques',
+    tecnica: 'flash',
+    descripcion: 'Un golpe de luz blanca justo en el corte entre los dos planos.',
+  },
+  {
+    id: 'golpe-zoom',
+    nombre: 'Golpe de zoom',
+    grupo: 'desenfoques',
+    tecnica: 'zoom-desenfoque',
+    descripcion: 'El plano se acerca de golpe con desenfoque y el siguiente se asienta.',
+  },
+  {
+    id: 'whip-izq',
+    nombre: 'Latigazo a la izquierda',
+    grupo: 'desenfoques',
+    tecnica: 'barrido-movimiento',
+    direccion: 'izq',
+    descripcion: 'Un barrido lateral desenfocado que arrastra de un plano al otro.',
+  },
+  {
+    id: 'whip-der',
+    nombre: 'Latigazo a la derecha',
+    grupo: 'desenfoques',
+    tecnica: 'barrido-movimiento',
+    direccion: 'der',
+    descripcion: 'Igual que el anterior, pero hacia el otro lado.',
+  },
+  {
+    id: 'whip-arr',
+    nombre: 'Latigazo hacia arriba',
+    grupo: 'desenfoques',
+    tecnica: 'barrido-movimiento',
+    direccion: 'arr',
+    descripcion: 'Un barrido vertical desenfocado que empuja hacia arriba.',
+  },
 ]
 
 export const NOMBRES_GRUPO: Record<Grupo, string> = {
@@ -236,6 +297,7 @@ export const NOMBRES_GRUPO: Record<Grupo, string> = {
   barridos: 'Barridos',
   formas: 'Formas y aperturas',
   movimiento: 'Zooms y empujes',
+  desenfoques: 'Desenfoque y destellos',
 }
 
 export const POR_ID = new Map(CATALOGO.map((t) => [t.id, t]))
