@@ -38,40 +38,64 @@ export const POSICION: Record<Ancla, { left: string; top: string }> = {
   se: { left: '100%', top: '100%' },
 }
 
-// calcula la caja resultante al arrastrar un agarre hasta el punto (px, py).
-// el borde opuesto al que se agarra no se mueve, así que el elemento crece solo
-// hacia el lado que se estira. con `proporcional` activo (tecla Shift) se
-// conserva la relación entre ancho y alto, igual que en cualquier editor
+// modificadores del redimensionado, iguales para cualquier elemento:
+// - proporcional: conserva la relación ancho/alto (lo normal, y también con Ctrl).
+//   se apaga con Shift, que deja estirar ancho y alto por separado.
+// - simetrico: con Alt, el centro queda fijo y los dos bordes opuestos se mueven en
+//   espejo, así el elemento crece por todos los lados a la vez
+export interface OpcionesResize {
+  proporcional: boolean
+  simetrico: boolean
+}
+
+// calcula la caja resultante al arrastrar un agarre hasta el punto (px, py). sin
+// Alt, el borde opuesto al que se agarra no se mueve y el elemento crece solo hacia
+// el lado que se estira; con Alt, el que no se mueve es el centro. la proporción se
+// conserva salvo que se pida lo contrario
 export function redimensionar(
   caja: Caja,
   ancla: Ancla,
   px: number,
   py: number,
-  proporcional: boolean,
+  opts: OpcionesResize,
   min = 0.03,
 ): Caja {
-  let x0 = caja.x - caja.w / 2
-  let x1 = caja.x + caja.w / 2
-  let y0 = caja.y - caja.h / 2
-  let y1 = caja.y + caja.h / 2
-  const relacion = caja.h > 0 ? caja.w / caja.h : 1
-
   const este = ancla.includes('e')
   const oeste = ancla.includes('w')
   const norte = ancla.startsWith('n')
   const sur = ancla.startsWith('s')
+  const horizontal = este || oeste
+  const vertical = norte || sur
+  const relacion = caja.h > 0 ? caja.w / caja.h : 1
 
-  if (este) x1 = px
-  if (oeste) x0 = px
-  if (sur) y1 = py
-  if (norte) y0 = py
+  let w = caja.w
+  let h = caja.h
+  // bordes anclados de partida, para recolocar el centro al final cuando no es
+  // simétrico. el borde contrario al que se agarra es el que no se mueve
+  const x0Fijo = caja.x - caja.w / 2
+  const x1Fijo = caja.x + caja.w / 2
+  const y0Fijo = caja.y - caja.h / 2
+  const y1Fijo = caja.y + caja.h / 2
 
-  let w = Math.max(min, x1 - x0)
-  let h = Math.max(min, y1 - y0)
+  if (opts.simetrico) {
+    // el tamaño sale del doble de la distancia del cursor al centro en el eje que
+    // se estira; el centro no se toca
+    if (horizontal) w = Math.max(min, Math.abs(px - caja.x) * 2)
+    if (vertical) h = Math.max(min, Math.abs(py - caja.y) * 2)
+  } else {
+    let x0 = x0Fijo
+    let x1 = x1Fijo
+    let y0 = y0Fijo
+    let y1 = y1Fijo
+    if (este) x1 = px
+    if (oeste) x0 = px
+    if (sur) y1 = py
+    if (norte) y0 = py
+    w = Math.max(min, x1 - x0)
+    h = Math.max(min, y1 - y0)
+  }
 
-  if (proporcional) {
-    const horizontal = este || oeste
-    const vertical = norte || sur
+  if (opts.proporcional) {
     if (horizontal && vertical) {
       // en las esquinas manda el eje que más se movió, para que el elemento siga
       // al cursor sin dar tirones
@@ -86,14 +110,16 @@ export function redimensionar(
     h = Math.max(min, h)
   }
 
-  // el centro se recoloca para que el borde anclado siga donde estaba. cuando el
-  // agarre es de un lado, el otro eje se queda como está
+  // el centro: si es simétrico se queda donde estaba; si no, se recoloca para que
+  // el borde anclado (el contrario al agarre) siga en su sitio
   let x = caja.x
   let y = caja.y
-  if (este) x = x0 + w / 2
-  else if (oeste) x = x1 - w / 2
-  if (sur) y = y0 + h / 2
-  else if (norte) y = y1 - h / 2
+  if (!opts.simetrico) {
+    if (este) x = x0Fijo + w / 2
+    else if (oeste) x = x1Fijo - w / 2
+    if (sur) y = y0Fijo + h / 2
+    else if (norte) y = y1Fijo - h / 2
+  }
 
   return { x, y, w, h }
 }

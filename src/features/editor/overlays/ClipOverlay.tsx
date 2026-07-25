@@ -130,7 +130,10 @@ export default function ClipOverlay() {
     setMoviendoVisor(true)
     const mover = (ev: globalThis.MouseEvent) => {
       const p = normalizar(ev)
-      const n = redimensionar(caja, ancla, p.x, p.y, true, 0.02)
+      // el video escala uniforme, así que siempre va proporcional; lo que sí cambia
+      // con Alt es que crece desde el centro por los dos lados en vez de anclar el
+      // borde contrario
+      const n = redimensionar(caja, ancla, p.x, p.y, { proporcional: true, simetrico: ev.altKey }, 0.02)
       const factor = caja.w > 0 ? n.w / caja.w : 1
       actualizarEncuadre(id, {
         x: n.x - desfase.x * factor,

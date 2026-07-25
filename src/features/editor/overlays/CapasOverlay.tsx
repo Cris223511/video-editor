@@ -362,13 +362,12 @@ export default function CapasOverlay() {
 
     const mover = (ev: globalThis.MouseEvent) => {
       const p = normalizar(ev)
-      // el texto siempre guarda proporción. la imagen va al revés que el resto:
-      // por defecto mantiene su relación (se estira ancho y alto a la vez) y solo
-      // con shift se deforma libre, que es lo pedido para no aplastar una foto sin
-      // querer. figuras y demás siguen libres salvo que se pulse shift
-      const forzarProporcion =
-        capa.tipo === 'texto' || (capa.tipo === 'imagen' ? !ev.shiftKey : ev.shiftKey)
-      const n = redimensionar(inicial, ancla, p.x, p.y, forzarProporcion)
+      // mismo esquema para cualquier elemento: por defecto (y con Ctrl) se conserva
+      // la proporción, con Shift se estira ancho y alto por separado, y con Alt crece
+      // desde el centro por todos los lados. el texto es la excepción: escala su
+      // tamaño de letra, que es un único valor, así que siempre va proporcional
+      const proporcional = capa.tipo === 'texto' ? true : !ev.shiftKey
+      const n = redimensionar(inicial, ancla, p.x, p.y, { proporcional, simetrico: ev.altKey })
       const posicion = fija ? { x: entre(0, 1, n.x), y: entre(0, 1, n.y) } : {}
 
       if (capa.tipo === 'texto') {
