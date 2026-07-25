@@ -1,4 +1,4 @@
-import { MouseEvent as ReactMouseEvent } from 'react'
+import { PointerEvent as ReactPointerEvent } from 'react'
 import { Impacto } from '../../../types/impacto'
 import { Clip } from '../../../types/timeline'
 import { useEditorStore } from '../../../store/useEditorStore'
@@ -26,7 +26,7 @@ export default function ImpactoDot({ impacto, clip, pxPorSegundo }: Props) {
   const izquierda = (impacto.t - clip.inicio) * pxPorSegundo
   const anchoLinea = Math.max(2, impacto.duracion * pxPorSegundo)
 
-  function iniciarMover(e: ReactMouseEvent) {
+  function iniciarMover(e: ReactPointerEvent) {
     if (e.button !== 0) return
     // no dejar que el gesto arranque el arrastre del clip de debajo
     e.stopPropagation()
@@ -34,7 +34,7 @@ export default function ImpactoDot({ impacto, clip, pxPorSegundo }: Props) {
     const startX = e.clientX
     const tOriginal = impacto.t
     let movido = false
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       const dx = (ev.clientX - startX) / pxPorSegundo
       if (!movido && Math.abs(ev.clientX - startX) < 3) return
       movido = true
@@ -47,29 +47,29 @@ export default function ImpactoDot({ impacto, clip, pxPorSegundo }: Props) {
       // un clic seco, sin arrastrar, solo selecciona para abrir su editor
       if (!movido) seleccionarImpacto(impacto.id)
       setGuiaImantado(null)
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
-  function iniciarDuracion(e: ReactMouseEvent) {
+  function iniciarDuracion(e: ReactPointerEvent) {
     if (e.button !== 0) return
     e.stopPropagation()
     e.preventDefault()
     seleccionarImpacto(impacto.id)
     const startX = e.clientX
     const durOriginal = impacto.duracion
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       recortarImpacto(impacto.id, durOriginal + (ev.clientX - startX) / pxPorSegundo)
     }
     const soltar = () => {
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   return (
@@ -82,7 +82,7 @@ export default function ImpactoDot({ impacto, clip, pxPorSegundo }: Props) {
           background: impacto.color,
           opacity: seleccionado ? 0.95 : 0.6,
         }}
-        onMouseDown={iniciarDuracion}
+        onPointerDown={iniciarDuracion}
         title="Arrastra para cambiar cuánto dura"
       />
       {/* la bolita */}
@@ -96,7 +96,7 @@ export default function ImpactoDot({ impacto, clip, pxPorSegundo }: Props) {
           outline: seleccionado ? '2px solid #fff' : 'none',
           outlineOffset: 1,
         }}
-        onMouseDown={iniciarMover}
+        onPointerDown={iniciarMover}
         title="Arrastra para moverla · clic para editarla"
       />
     </span>

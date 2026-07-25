@@ -23,6 +23,24 @@
   -webkit-user-select: text;
 }
 
+/* los elementos que se arrastran con el dedo (bloques de la línea de tiempo,
+   capas del visor, tiradores y manijas) desactivan los gestos táctiles del
+   navegador sobre ellos: así arrastrar con el dedo mueve el elemento en vez de
+   desplazar la página o hacer zoom. el arrastre en sí lo llevan eventos de
+   puntero, que valen igual para ratón y para dedo. las zonas vacías conservan su
+   desplazamiento normal, porque la regla solo pisa lo que de verdad se agarra */
+[data-bloque-id],
+[data-arrastrable],
+.editor-noselect [class*='cursor-grab'],
+.editor-noselect [class*='cursor-move'],
+.editor-noselect [class*='cursor-crosshair'],
+.editor-noselect [class*='cursor-ew-resize'],
+.editor-noselect [class*='cursor-ns-resize'],
+.editor-noselect [class*='cursor-nwse'],
+.editor-noselect [class*='cursor-nesw'] {
+  touch-action: none;
+}
+
 /* tokens de color del tema, tomados del azul del logo. toda la interfaz se
    apoya en ellos para que el salto entre claro y oscuro salga uniforme sin
    duplicar estilos. el claro es el modo por defecto */

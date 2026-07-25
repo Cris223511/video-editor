@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { MouseEvent as ReactMouseEvent, useState } from 'react'
+import { PointerEvent as ReactPointerEvent, useState } from 'react'
 import { Capa } from '../../../types/layers'
 import Tooltip from '../../../components/ui/Tooltip'
 import Icon from '../../../components/ui/Icon'
@@ -58,7 +58,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     seleccionarCapa(capa.id)
   }
 
-  function iniciarMover(e: ReactMouseEvent) {
+  function iniciarMover(e: ReactPointerEvent) {
     // solo el botón izquierdo arrastra. el derecho abre el menú, y si de paso
     // arrancaba un gesto de movimiento el bloque se iba con el cursor
     if (e.button !== 0) return
@@ -102,7 +102,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     // por debajo de esto es solo horizontal y no sale la etiqueta que sigue al cursor
     const UMBRAL_VERT = 14
 
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       // la etiqueta que sigue al cursor solo asoma en un gesto vertical (cambiar de
       // fila o abrir una nueva); moviendo a los lados estorbaba
       if (Math.abs(ev.clientY - startY) > UMBRAL_VERT) {
@@ -174,8 +174,8 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       if (esDePistaVideo) {
         if (insercionActual !== null) insertarPistaEn(insercionActual, idGesto)
         setInsercionPista(null)
-        window.removeEventListener('mousemove', mover)
-        window.removeEventListener('mouseup', soltar)
+        window.removeEventListener('pointermove', mover)
+        window.removeEventListener('pointerup', soltar)
         return
       }
       // el resto (texto, dibujo, censura) se mueve por las filas del carril de
@@ -192,14 +192,14 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
         const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelTexto')
         if (destino !== null) moverCapaNivel(idGesto, destino)
       }
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
-  function iniciarRecorte(e: ReactMouseEvent, lado: 'inicio' | 'fin') {
+  function iniciarRecorte(e: ReactPointerEvent, lado: 'inicio' | 'fin') {
     e.stopPropagation()
     e.preventDefault()
     seleccionarCapa(capa.id)
@@ -213,7 +213,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     // el borde de otro elemento se pega a él y sale la guía. el desplazamiento se
     // aplica en incrementos hacia el borde ya imantado, para no descuadrarse
     let ultimoBorde = lado === 'inicio' ? inicioBase : finBase
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       const bordeBruto = (lado === 'inicio' ? inicioBase : finBase) + (ev.clientX - startX) / pxPorSegundo
       const enganche = imantarBorde(bordeBruto, puntos, umbral, propios)
       const bordeFinal = enganche ? enganche.punto : bordeBruto
@@ -227,11 +227,11 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     const soltar = () => {
       setGuiaImantado(null)
       setInteractuando(false)
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   const etiqueta =
@@ -258,7 +258,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={capa.nivel ?? 0}
       data-bloque-id={capa.id}
-      onMouseDown={iniciarMover}
+      onPointerDown={iniciarMover}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes(TIPO_TRANSICION)) {
           e.preventDefault()
@@ -347,14 +347,14 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       )}
 
       <div
-        onMouseDown={(e) => iniciarRecorte(e, 'inicio')}
+        onPointerDown={(e) => iniciarRecorte(e, 'inicio')}
         className={[
           'absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-amber-400/80 transition-opacity',
           seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
         ].join(' ')}
       />
       <div
-        onMouseDown={(e) => iniciarRecorte(e, 'fin')}
+        onPointerDown={(e) => iniciarRecorte(e, 'fin')}
         className={[
           'absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-amber-400/80 transition-opacity',
           seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',

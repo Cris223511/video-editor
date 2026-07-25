@@ -1,4 +1,4 @@
-import { CSSProperties, MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react'
+import { CSSProperties, PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTrazo } from '../../../types/layers'
 import { REPETICIONES_BRILLO, desenfoqueBrillo, hexAOpacidad } from '../../../lib/layers/defaults'
@@ -140,7 +140,7 @@ export default function CapasOverlay() {
   const rect = rectContenido(tam.w, tam.h, aspecto)
   const escala = rect.h > 0 ? rect.h / resolucion.alto : 0
 
-  function normalizar(ev: globalThis.MouseEvent) {
+  function normalizar(ev: globalThis.PointerEvent) {
     const root = rootRef.current
     if (!root) return { x: 0.5, y: 0.5 }
     const r = root.getBoundingClientRect()
@@ -150,7 +150,7 @@ export default function CapasOverlay() {
 
   // arrastre unificado: grabando escribe el recorrido; con recorrido ya hecho
   // desplaza todo; y sin recorrido mueve la posición fija
-  function iniciarArrastre(e: ReactMouseEvent, capa: Capa) {
+  function iniciarArrastre(e: ReactPointerEvent, capa: Capa) {
     e.stopPropagation()
     // con shift la capa solo se suma o se quita del conjunto para alinear varias,
     // sin arrastrar; sin shift se elige esta y empieza el movimiento normal
@@ -167,7 +167,7 @@ export default function CapasOverlay() {
     // cursor; conservando este desfase, el elemento se desliza desde donde estaba
     const agarre = propia ? { x: ultima.x - propia.x, y: ultima.y - propia.y } : { x: 0, y: 0 }
 
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       const p = normalizar(ev)
       const st = useEditorStore.getState()
       if (st.grabandoMovimiento) {
@@ -193,21 +193,21 @@ export default function CapasOverlay() {
       ultima = p
     }
     const soltar = () => {
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
       setGuias([])
       // soltar el cursor durante una toma la pausa, sin cerrarla: el cabezal se
       // detiene y uno decide si sigue grabando, mueve o cambia el elemento, o guarda
       const st = useEditorStore.getState()
       if (st.grabandoMovimiento && st.grabacionActiva) st.pausarGrabacion()
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   // dibujo de máscara con pincel: cada trazo se guarda relativo al centro de la
   // capa para que se mueva con ella
-  function iniciarPincel(e: ReactMouseEvent, capa: CapaCensura) {
+  function iniciarPincel(e: ReactPointerEvent, capa: CapaCensura) {
     e.stopPropagation()
     seleccionarCapa(capa.id)
     if (!useEditorStore.getState().dibujandoMascara) {
@@ -216,26 +216,26 @@ export default function CapasOverlay() {
     }
     const centro = posicionCapa(capa, useEditorStore.getState().playhead)
     const puntos: { x: number; y: number }[] = []
-    const agregar = (ev: globalThis.MouseEvent) => {
+    const agregar = (ev: globalThis.PointerEvent) => {
       const p = normalizar(ev)
       puntos.push({ x: p.x - centro.x, y: p.y - centro.y })
     }
     agregar(e.nativeEvent)
-    const mover = (ev: globalThis.MouseEvent) => agregar(ev)
+    const mover = (ev: globalThis.PointerEvent) => agregar(ev)
     const soltar = () => {
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
       if (puntos.length) anadirTrazo(capa.id, puntos)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   // lápiz libre: la superficie de dibujo captura un trazo a mano alzada y lo
   // guarda en la capa de dibujo activa. si la seleccionada no es un dibujo, se
   // crea una nueva al vuelo. el gesto se abre y se cierra a mano para que crear la
   // capa y añadirle el trazo cuenten como un solo paso de deshacer
-  function iniciarDibujo(e: ReactMouseEvent) {
+  function iniciarDibujo(e: ReactPointerEvent) {
     e.stopPropagation()
     const st = useEditorStore.getState()
     const actual = st.capas.find((c) => c.id === st.capaSeleccionada && c.tipo === 'trazo')
@@ -246,7 +246,7 @@ export default function CapasOverlay() {
     const capa = useEditorStore.getState().capas.find((c) => c.id === id) as CapaTrazo
     const centro = posicionCapa(capa, useEditorStore.getState().playhead)
     const puntos: { x: number; y: number }[] = []
-    const agregar = (ev: globalThis.MouseEvent) => {
+    const agregar = (ev: globalThis.PointerEvent) => {
       const p = normalizar(ev)
       puntos.push({ x: p.x - centro.x, y: p.y - centro.y })
       // se copia el array para que react vea un valor nuevo y repinte: así el
@@ -254,39 +254,39 @@ export default function CapasOverlay() {
       setTrazoVivo({ id, puntos: [...puntos] })
     }
     agregar(e.nativeEvent)
-    const mover = (ev: globalThis.MouseEvent) => agregar(ev)
+    const mover = (ev: globalThis.PointerEvent) => agregar(ev)
     const soltar = () => {
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
       if (puntos.length) anadirTrazoDibujo(id, puntos)
       // el trazo ya vive en la capa, así que la copia en vivo sobra
       setTrazoVivo(null)
       finGesto()
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   // borrador: mientras se arrastra va quitando lo que el círculo toca. el radio se
   // pasa a unidades del lienzo, que es en las que viven las capas, y todo el gesto
   // cuenta como un solo paso de deshacer
-  function iniciarBorrado(e: ReactMouseEvent) {
+  function iniciarBorrado(e: ReactPointerEvent) {
     e.stopPropagation()
     abrirGesto()
     const radio = borradorGrosor / 2 / Math.max(1, rect.w)
-    const borrar = (ev: globalThis.MouseEvent) => {
+    const borrar = (ev: globalThis.PointerEvent) => {
       const p = normalizar(ev)
       borrarEn(p.x, p.y, radio)
     }
     borrar(e.nativeEvent)
-    const mover = (ev: globalThis.MouseEvent) => borrar(ev)
+    const mover = (ev: globalThis.PointerEvent) => borrar(ev)
     const soltar = () => {
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
       finGesto()
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   // alto que ocupa una imagen en unidades del lienzo. la caja abarca la imagen
@@ -347,7 +347,7 @@ export default function CapasOverlay() {
   // redimensionado común a todo lo que va sobre el lienzo. el borde contrario al
   // agarre no se mueve, y Shift conserva la proporción. el texto escala siempre
   // proporcional, porque deformarlo lo dejaría ilegible
-  function iniciarRedimension(e: ReactMouseEvent, capa: Capa, ancla: Ancla) {
+  function iniciarRedimension(e: ReactPointerEvent, capa: Capa, ancla: Ancla) {
     e.stopPropagation()
     e.preventDefault()
     seleccionarCapa(capa.id)
@@ -370,7 +370,7 @@ export default function CapasOverlay() {
     const norte = ancla.startsWith('n')
     const sur = ancla.startsWith('s')
 
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       const p = normalizar(ev)
       // se imanta el borde que se arrastra a las líneas cercanas y ahí sale la guía,
       // igual que al mover. con Alt no se imanta, para poder clavar un tamaño libre
@@ -414,11 +414,11 @@ export default function CapasOverlay() {
     }
     const soltar = () => {
       setGuias([])
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   // giro por la manija: se toma el centro del elemento en pantalla y se sigue el
@@ -427,39 +427,39 @@ export default function CapasOverlay() {
   // redimensiona un dibujo escalando sus puntos desde el centro de su caja. el
   // factor sale de cuánto se acerca o aleja el cursor de ese centro respecto al
   // fotograma anterior, así el arrastre se siente proporcional y sin saltos
-  function iniciarEscalaTrazo(e: ReactMouseEvent, id: string, centro: { x: number; y: number }) {
+  function iniciarEscalaTrazo(e: ReactPointerEvent, id: string, centro: { x: number; y: number }) {
     e.stopPropagation()
     e.preventDefault()
     abrirGesto()
-    const dist = (ev: globalThis.MouseEvent) => {
+    const dist = (ev: globalThis.PointerEvent) => {
       const root = rootRef.current
       if (!root) return 1
       const r = root.getBoundingClientRect()
       return Math.hypot(ev.clientX - r.left - centro.x, ev.clientY - r.top - centro.y)
     }
     let ultimo = 0
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       const d = dist(ev)
       if (ultimo > 4 && d > 4) escalarTrazo(id, d / ultimo)
       ultimo = d
     }
     const soltar = () => {
       finGesto()
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
     // se toma la distancia de partida en el primer movimiento para no dar un salto
     ultimo = 0
-    const arranque = (ev: globalThis.MouseEvent) => {
+    const arranque = (ev: globalThis.PointerEvent) => {
       ultimo = dist(ev)
-      window.removeEventListener('mousemove', arranque)
-      window.addEventListener('mousemove', mover)
+      window.removeEventListener('pointermove', arranque)
+      window.addEventListener('pointermove', mover)
     }
-    window.addEventListener('mousemove', arranque)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', arranque)
+    window.addEventListener('pointerup', soltar)
   }
 
-  function iniciarGiro(e: ReactMouseEvent, capa: Capa) {
+  function iniciarGiro(e: ReactPointerEvent, capa: Capa) {
     e.stopPropagation()
     e.preventDefault()
     seleccionarCapa(capa.id)
@@ -468,15 +468,15 @@ export default function CapasOverlay() {
     const cr = cajaEl.getBoundingClientRect()
     const cx = cr.left + cr.width / 2
     const cy = cr.top + cr.height / 2
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       actualizarCapa(capa.id, { rotacion: anguloGiro(cx, cy, ev) })
     }
     const soltar = () => {
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   // el fundido de la capa se resuelve aquí, rebajando su opacidad, en lugar de
@@ -569,7 +569,7 @@ export default function CapasOverlay() {
           return (
             <div
               key={c.id}
-              onMouseDown={(e) => iniciarPincel(e, c)}
+              onPointerDown={(e) => iniciarPincel(e, c)}
               className="pointer-events-auto absolute inset-0"
               style={{ cursor: dibujandoMascara ? 'crosshair' : 'move' }}
             />
@@ -581,7 +581,7 @@ export default function CapasOverlay() {
             <div
               key={c.id}
               data-capa-id={c.id}
-              onMouseDown={(e) => iniciarArrastre(e, c)}
+              onPointerDown={(e) => iniciarArrastre(e, c)}
               className="pointer-events-auto absolute cursor-move"
               style={{
                 left: centroX,
@@ -611,7 +611,7 @@ export default function CapasOverlay() {
             <div
               key={c.id}
               data-capa-id={c.id}
-              onMouseDown={(e) => iniciarArrastre(e, c)}
+              onPointerDown={(e) => iniciarArrastre(e, c)}
               className={[
                 'pointer-events-auto absolute cursor-move',
                 seleccion ? 'outline outline-2 outline-brand' : '',
@@ -763,7 +763,7 @@ export default function CapasOverlay() {
                         r={Math.max(g, 14) / 2}
                         fill="transparent"
                         className="pointer-events-auto cursor-move"
-                        onMouseDown={(e) => iniciarArrastre(e, c)}
+                        onPointerDown={(e) => iniciarArrastre(e, c)}
                       />
                     ) : (
                       <polyline
@@ -776,7 +776,7 @@ export default function CapasOverlay() {
                         strokeLinejoin="round"
                         style={{ pointerEvents: 'stroke' }}
                         className="pointer-events-auto cursor-move"
-                        onMouseDown={(e) => iniciarArrastre(e, c)}
+                        onPointerDown={(e) => iniciarArrastre(e, c)}
                       />
                     ),
                   )}
@@ -820,7 +820,7 @@ export default function CapasOverlay() {
             <div
               key={c.id}
               data-capa-id={c.id}
-              onMouseDown={(e) => iniciarArrastre(e, c)}
+              onPointerDown={(e) => iniciarArrastre(e, c)}
               className={[
                 'pointer-events-auto absolute cursor-move',
                 seleccion ? 'outline outline-2 outline-brand' : '',
@@ -906,7 +906,7 @@ export default function CapasOverlay() {
               seleccionarCapa(c.id)
               setEditando(c.id)
             }}
-            onMouseDown={(e) => {
+            onPointerDown={(e) => {
               if (enEdicion) {
                 // durante la edición el clic coloca el cursor, no mueve la capa
                 e.stopPropagation()
@@ -992,7 +992,7 @@ export default function CapasOverlay() {
           para que pintar no mueva las capas de debajo */}
       {dibujando && (
         <div
-          onMouseDown={iniciarDibujo}
+          onPointerDown={iniciarDibujo}
           className="pointer-events-auto absolute z-20"
           style={{ left: rect.ox, top: rect.oy, width: rect.w, height: rect.h, cursor: 'crosshair' }}
         />
@@ -1003,7 +1003,7 @@ export default function CapasOverlay() {
           para saber qué se va a llevar antes de pulsar */}
       {herramienta === 'borrador' && (
         <div
-          onMouseDown={iniciarBorrado}
+          onPointerDown={iniciarBorrado}
           className="pointer-events-auto absolute z-20"
           style={{
             left: rect.ox,

@@ -1,4 +1,4 @@
-import { MouseEvent as ReactMouseEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
 import { rectContenido } from '../../../lib/layers/rect'
@@ -56,7 +56,7 @@ export default function ClipOverlay() {
   const activo = clipEnTiempo(ordenados, playhead, ocultas)
 
   // el cursor, llevado a fracción del lienzo (0 a 1 dentro del área útil)
-  function normalizar(ev: globalThis.MouseEvent) {
+  function normalizar(ev: globalThis.PointerEvent) {
     const root = rootRef.current
     if (!root) return { x: 0.5, y: 0.5 }
     const r = root.getBoundingClientRect()
@@ -70,7 +70,7 @@ export default function ClipOverlay() {
   // línea guía; con Alt se desactiva por si hay que colocarlo justo al lado sin que
   // salte
   function iniciarArrastre(
-    e: ReactMouseEvent,
+    e: ReactPointerEvent,
     id: string,
     base: { x: number; y: number },
     tamCaja: { w: number; h: number },
@@ -83,7 +83,7 @@ export default function ClipOverlay() {
     e.stopPropagation()
     setMoviendoVisor(true)
     const inicio = normalizar(e.nativeEvent)
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       const p = normalizar(ev)
       const bruto = { x: base.x + (p.x - inicio.x), y: base.y + (p.y - inicio.y) }
       if (ev.altKey) {
@@ -103,18 +103,18 @@ export default function ClipOverlay() {
     const soltar = () => {
       setGuias([])
       setMoviendoVisor(false)
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   // redimensionar por un tirador. el video escala uniforme, así que el factor de
   // crecimiento de la caja se traslada tal cual a la escala del encuadre, y el
   // nuevo centro sale de dejar quieto el borde contrario al que se agarra
   function iniciarRedimension(
-    e: ReactMouseEvent,
+    e: ReactPointerEvent,
     id: string,
     ancla: Ancla,
     caja: { x: number; y: number; w: number; h: number },
@@ -132,7 +132,7 @@ export default function ClipOverlay() {
     const oeste = ancla.includes('w')
     const norte = ancla.startsWith('n')
     const sur = ancla.startsWith('s')
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       const p = normalizar(ev)
       // el borde que se arrastra se imanta al centro y los bordes del lienzo, y ahí
       // sale la línea guía, igual que al mover. con Alt no se imanta, para clavar un
@@ -167,16 +167,16 @@ export default function ClipOverlay() {
     const soltar = () => {
       setGuias([])
       setMoviendoVisor(false)
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   // giro del video por la manija: el mismo cálculo que las capas, guardando el
   // ángulo en el encuadre del clip
-  function iniciarGiroClip(e: ReactMouseEvent, id: string) {
+  function iniciarGiroClip(e: ReactPointerEvent, id: string) {
     e.stopPropagation()
     e.preventDefault()
     const cajaEl = (e.currentTarget as HTMLElement).parentElement
@@ -185,16 +185,16 @@ export default function ClipOverlay() {
     const cx = cr.left + cr.width / 2
     const cy = cr.top + cr.height / 2
     setMoviendoVisor(true)
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       actualizarEncuadre(id, { rotacion: anguloGiro(cx, cy, ev) })
     }
     const soltar = () => {
       setMoviendoVisor(false)
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   // la caja solo aparece cuando el clip bajo el cabezal es el que está elegido
@@ -248,7 +248,7 @@ export default function ClipOverlay() {
         />
       ))}
       <div
-        onMouseDown={(e) =>
+        onPointerDown={(e) =>
           iniciarArrastre(e, activo.id, { x: enc.x, y: enc.y }, { w: cajaRecorte.w, h: cajaRecorte.h }, desfaseRecorte)
         }
         onDoubleClick={(e) => {

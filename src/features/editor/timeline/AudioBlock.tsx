@@ -1,4 +1,4 @@
-import { MouseEvent as ReactMouseEvent, useEffect, useState } from 'react'
+import { PointerEvent as ReactPointerEvent, useEffect, useState } from 'react'
 import { RegionAudio } from '../../../types/audio'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
@@ -182,7 +182,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
   // reposo se anima su posición para que se deslice al acomodarse en vez de saltar
   const [interactuando, setInteractuando] = useState(false)
 
-  function iniciarMover(e: ReactMouseEvent) {
+  function iniciarMover(e: ReactPointerEvent) {
     // solo el botón izquierdo arrastra. el derecho abre el menú, y si de paso
     // arrancaba un gesto de movimiento el bloque se iba con el cursor
     if (e.button !== 0) return
@@ -216,7 +216,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     const startY = e.clientY
     const UMBRAL_VERT = 14
 
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       // la etiqueta que sigue al cursor solo asoma en un gesto vertical (cambiar de
       // nivel o abrir uno nuevo); moviendo a los lados estorbaba
       if (Math.abs(ev.clientY - startY) > UMBRAL_VERT) {
@@ -263,14 +263,14 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
         const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelAudio')
         if (destino !== null) moverAudioNivel(idGesto, destino)
       }
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
-  function iniciarRecorte(e: ReactMouseEvent, lado: 'inicio' | 'fin') {
+  function iniciarRecorte(e: ReactPointerEvent, lado: 'inicio' | 'fin') {
     e.stopPropagation()
     e.preventDefault()
     seleccionarRegion(region.id)
@@ -283,7 +283,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     // el borde de la franja también se imanta al cabezal, al cero y a los bordes
     // de los demás, con su guía; se aplica en incrementos hacia el borde enganchado
     let ultimoBorde = lado === 'inicio' ? inicioBase : finBase
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       const bordeBruto = (lado === 'inicio' ? inicioBase : finBase) + (ev.clientX - startX) / pxPorSegundo
       const enganche = imantarBorde(bordeBruto, puntos, umbral, propios)
       const bordeFinal = enganche ? enganche.punto : bordeBruto
@@ -294,11 +294,11 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     const soltar = () => {
       setGuiaImantado(null)
       setInteractuando(false)
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   const ancho = Math.max(region.duracion * pxPorSegundo, 8)
@@ -312,7 +312,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
   return (
     <div
       data-bloque-id={region.id}
-      onMouseDown={iniciarMover}
+      onPointerDown={iniciarMover}
       // el botón derecho abre el menú de este bloque en el punto donde se pulsó
       onContextMenu={(e) => {
         e.preventDefault()
@@ -349,14 +349,14 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
       </span>
 
       <div
-        onMouseDown={(e) => iniciarRecorte(e, 'inicio')}
+        onPointerDown={(e) => iniciarRecorte(e, 'inicio')}
         className={[
           'absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-emerald-400/80 transition-opacity',
           seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
         ].join(' ')}
       />
       <div
-        onMouseDown={(e) => iniciarRecorte(e, 'fin')}
+        onPointerDown={(e) => iniciarRecorte(e, 'fin')}
         className={[
           'absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-emerald-400/80 transition-opacity',
           seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',

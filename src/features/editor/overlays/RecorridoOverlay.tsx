@@ -1,4 +1,4 @@
-import { MouseEvent as ReactMouseEvent } from 'react'
+import { PointerEvent as ReactPointerEvent } from 'react'
 import { Capa, KeyframePos } from '../../../types/layers'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { trazarRecorrido } from '../../../lib/layers/motion'
@@ -42,7 +42,7 @@ export default function RecorridoOverlay({
 }: {
   capa: Capa
   rect: Rect
-  normalizar: (ev: globalThis.MouseEvent) => { x: number; y: number }
+  normalizar: (ev: globalThis.PointerEvent) => { x: number; y: number }
 }) {
   const moverKeyframe = useEditorStore((s) => s.moverKeyframe)
   const quitarKeyframe = useEditorStore((s) => s.quitarKeyframe)
@@ -62,7 +62,7 @@ export default function RecorridoOverlay({
   // con el pincel activo, pulsar sobre la línea mete un nodo nuevo por donde se
   // pulsa. el instante se saca proyectando el clic sobre el tramo más cercano entre
   // dos nodos, así el punto se cuela en el sitio del recorrido que le toca
-  function insertarEnClic(e: ReactMouseEvent) {
+  function insertarEnClic(e: ReactPointerEvent) {
     e.stopPropagation()
     e.preventDefault()
     const p = normalizar(e.nativeEvent)
@@ -87,7 +87,7 @@ export default function RecorridoOverlay({
     insertarKeyframe(capa.id, a.t + (b.t - a.t) * mejor.f, p.x, p.y)
   }
 
-  function agarrar(e: ReactMouseEvent, indice: number) {
+  function agarrar(e: ReactPointerEvent, indice: number) {
     e.stopPropagation()
     e.preventDefault()
     // con el pincel, pulsar un nodo lo borra en vez de arrastrarlo
@@ -95,38 +95,38 @@ export default function RecorridoOverlay({
       quitarKeyframe(capa.id, indice)
       return
     }
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       const p = normalizar(ev)
       moverKeyframe(capa.id, indice, p.x, p.y)
     }
     const soltar = () => {
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   // arrastre de un tirador: la punta suelta define un desplazamiento respecto al
   // nodo, y ese desplazamiento (ya en unidades normalizadas 0..1) dividido por tau
   // es la pendiente. lado indica si es el tirador de entrada o el de salida; el de
   // entrada apunta al revés, por eso se invierte el signo antes de guardar
-  function agarrarTirador(e: ReactMouseEvent, indice: number, lado: 1 | -1) {
+  function agarrarTirador(e: ReactPointerEvent, indice: number, lado: 1 | -1) {
     e.stopPropagation()
     e.preventDefault()
     const nodo = k[indice]
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       const p = normalizar(ev)
       const hx = (lado * (p.x - nodo.x)) / TAU
       const hy = (lado * (p.y - nodo.y)) / TAU
       setTiradorNodo(capa.id, indice, hx, hy)
     }
     const soltar = () => {
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   const aPantalla = (p: { x: number; y: number }) => ({
@@ -177,7 +177,7 @@ export default function RecorridoOverlay({
           strokeWidth={18}
           className="pointer-events-auto cursor-crosshair"
           style={{ pointerEvents: 'stroke' }}
-          onMouseDown={insertarEnClic}
+          onPointerDown={insertarEnClic}
         />
       )}
 
@@ -207,7 +207,7 @@ export default function RecorridoOverlay({
                 stroke={color}
                 strokeWidth={1.5}
                 className="pointer-events-auto cursor-move"
-                onMouseDown={(e) => agarrarTirador(e, i, 1)}
+                onPointerDown={(e) => agarrarTirador(e, i, 1)}
               >
                 <title>{`Curvatura del punto ${i + 1}`}</title>
               </circle>
@@ -220,7 +220,7 @@ export default function RecorridoOverlay({
                 stroke={color}
                 strokeWidth={1.5}
                 className="pointer-events-auto cursor-move"
-                onMouseDown={(e) => agarrarTirador(e, i, -1)}
+                onPointerDown={(e) => agarrarTirador(e, i, -1)}
               >
                 <title>{`Curvatura del punto ${i + 1}`}</title>
               </circle>
@@ -244,7 +244,7 @@ export default function RecorridoOverlay({
               stroke={color}
               strokeWidth={actual ? 3 : 2}
               className="pointer-events-auto cursor-grab"
-              onMouseDown={(e) => agarrar(e, i)}
+              onPointerDown={(e) => agarrar(e, i)}
               onDoubleClick={(e) => {
                 e.stopPropagation()
                 quitarKeyframe(capa.id, i)

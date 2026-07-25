@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { MouseEvent as ReactMouseEvent, useEffect, useState } from 'react'
+import { PointerEvent as ReactPointerEvent, useEffect, useState } from 'react'
 import { Info, Volume2, VolumeX } from 'lucide-react'
 import { Clip } from '../../../types/timeline'
 import { useEditorStore } from '../../../store/useEditorStore'
@@ -106,7 +106,7 @@ export default function ClipBlock({
 
   const ancho = Math.max(clip.duracion * pxPorSegundo, 8)
 
-  function iniciarMover(e: ReactMouseEvent) {
+  function iniciarMover(e: ReactPointerEvent) {
     // solo el botón izquierdo arrastra. el derecho abre el menú, y si de paso
     // arrancaba un gesto de movimiento el bloque se iba con el cursor
     if (e.button !== 0) return
@@ -167,7 +167,7 @@ export default function ClipBlock({
       return resolverDestinoVertical(stack, clientY, useEditorStore.getState().numPistas)
     }
 
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       // la etiqueta que sigue al cursor solo aparece cuando el gesto es vertical (se
       // está cambiando de nivel o abriendo uno nuevo). moviendo el bloque a los lados
       // no viene a cuento y estorbaba
@@ -243,14 +243,14 @@ export default function ClipBlock({
       setGuiaImantado(null)
       setInteractuando(false)
       finGesto()
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
-  function iniciarRecorte(e: ReactMouseEvent, lado: 'inicio' | 'fin') {
+  function iniciarRecorte(e: ReactPointerEvent, lado: 'inicio' | 'fin') {
     e.stopPropagation()
     e.preventDefault()
     seleccionar(clip.id)
@@ -274,7 +274,7 @@ export default function ClipBlock({
     const propios = [base.inicio, base.inicio + base.duracion]
     setInteractuando(true)
     setEstirandoVelocidad(e.altKey)
-    const mover = (ev: globalThis.MouseEvent) => {
+    const mover = (ev: globalThis.PointerEvent) => {
       const delta = (ev.clientX - inicioX) / pxPorSegundo
       // con alt el gesto deja de recortar y pasa a repartir el mismo trozo de
       // video en más o menos tiempo, que es tal cual cambiar la velocidad
@@ -304,11 +304,11 @@ export default function ClipBlock({
       setEstirandoVelocidad(false)
       setGuiaImantado(null)
       setInteractuando(false)
-      window.removeEventListener('mousemove', mover)
-      window.removeEventListener('mouseup', soltar)
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
     }
-    window.addEventListener('mousemove', mover)
-    window.addEventListener('mouseup', soltar)
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
   }
 
   // al soltar una transición arrastrada desde la galería, se aplica como
@@ -361,7 +361,7 @@ export default function ClipBlock({
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={clip.pista}
       data-bloque-id={clip.id}
-      onMouseDown={iniciarMover}
+      onPointerDown={iniciarMover}
       // el botón derecho abre el menú de este bloque en el punto donde se pulsó
       onContextMenu={(e) => {
         e.preventDefault()
@@ -389,7 +389,7 @@ export default function ClipBlock({
       }}
       onDrop={alSoltar}
       className={[
-        'group absolute top-0 flex h-full items-end overflow-hidden rounded-lg border transition-[border-color]',
+        'group absolute top-0 flex h-full touch-none items-end overflow-hidden rounded-lg border transition-[border-color]',
         bloqueada ? 'cursor-default' : 'cursor-grab',
         seleccionado
           ? 'border-brand'
@@ -498,7 +498,7 @@ export default function ClipBlock({
         <button
           type="button"
           aria-label="Ver propiedades del clip"
-          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation()
             setVerPropiedades(true)
@@ -520,7 +520,7 @@ export default function ClipBlock({
           type="button"
           aria-label={clip.silenciado ? 'Quitar el silencio del clip' : 'Silenciar el clip'}
           disabled={clip.mudo}
-          onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation()
             alternarSilencioClip(clip.id)
@@ -553,7 +553,7 @@ export default function ClipBlock({
       {!bloqueada && (
         <>
           <div
-            onMouseDown={(e) => iniciarRecorte(e, 'inicio')}
+            onPointerDown={(e) => iniciarRecorte(e, 'inicio')}
             title="Recortar por el inicio (con Alt cambia la velocidad)"
             className={[
               'absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-brand/80 transition-opacity',
@@ -561,7 +561,7 @@ export default function ClipBlock({
             ].join(' ')}
           />
           <div
-            onMouseDown={(e) => iniciarRecorte(e, 'fin')}
+            onPointerDown={(e) => iniciarRecorte(e, 'fin')}
             title="Recortar por el final (con Alt cambia la velocidad)"
             className={[
               'absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-brand/80 transition-opacity',
