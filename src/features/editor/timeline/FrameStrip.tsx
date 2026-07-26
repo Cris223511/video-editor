@@ -2,15 +2,15 @@ import { Tira } from '../../../lib/media/fotogramas'
 
 // dibuja la tira de fotogramas dentro de un clip, alineada al tiempo real.
 //
-// la rejilla de fotogramas se ancla al tiempo ABSOLUTO de la línea de tiempo, no
-// al borde del clip. así, al recortar por la izquierda, cada fotograma se queda en
-// el mismo sitio en pantalla (el clip se hace más corto pero lo que se ve no se
-// desplaza), y sirve de guía para saber en qué fotograma se está cortando. cada
-// hueco calcula qué instante del video fuente le toca (según el recorte de entrada
-// y la velocidad) y elige el fotograma más cercano.
+// la rejilla se ancla al contenido del propio clip (a su recorte de entrada), no a
+// la posición del clip en la línea de tiempo. así, mover el clip de sitio no desplaza
+// las miniaturas dentro de él: se ven idénticas antes y después de moverlo. y como al
+// recortar por la izquierda el recorte de entrada avanza junto con el inicio, las
+// miniaturas siguen quedándose en el mismo punto en pantalla al recortar, que era la
+// razón de anclar la rejilla. cada hueco calcula qué instante del video fuente le
+// toca (según el recorte de entrada y la velocidad) y elige el fotograma más cercano.
 export default function FrameStrip({
   tira,
-  inicio,
   ancho,
   alto,
   recorteInicio,
@@ -18,9 +18,6 @@ export default function FrameStrip({
   pxPorSegundo,
 }: {
   tira: Tira
-  // segundo de la línea de tiempo donde arranca el clip. sitúa la rejilla en
-  // coordenadas absolutas para que recortar no desplace lo que se ve
-  inicio: number
   ancho: number
   alto: number
   recorteInicio: number
@@ -35,12 +32,14 @@ export default function FrameStrip({
   // (algo menos que el alto de la fila) y el fotograma se recorta a ese ancho con
   // object-cover: entran muchos más y la tira se lee como una película de verdad
   const anchoFoto = Math.max(28, Math.round(alto * 0.62))
-  // píxel absoluto del borde izquierdo del clip, y desfase dentro de la rejilla
-  // global de fotogramas. el primer hueco arranca un poco antes del borde (en el
-  // trozo negativo que el overflow recorta) para que las divisiones caigan siempre
-  // en los mismos puntos absolutos aunque el clip cambie de largo o de sitio
-  const izqAbs = inicio * pxPorSegundo
-  const desfase = ((izqAbs % anchoFoto) + anchoFoto) % anchoFoto
+  // posición del recorte de entrada expresada en píxeles de la línea de tiempo, y
+  // desfase dentro de la rejilla de fotogramas. faseando por la fuente (no por el
+  // inicio del clip) la tira no se mueve al arrastrar el clip de sitio, pero sigue
+  // acompañando al recorte, donde inicio y recorte avanzan a la par. el primer hueco
+  // arranca un poco antes del borde (en el trozo negativo que el overflow recorta)
+  // para que las divisiones caigan siempre en los mismos puntos del contenido
+  const fuentePx = (recorteInicio / velocidad) * pxPorSegundo
+  const desfase = ((fuentePx % anchoFoto) + anchoFoto) % anchoFoto
   const primeraLocal = -desfase
   const cuantos = Math.ceil((ancho - primeraLocal) / anchoFoto)
 

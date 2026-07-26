@@ -434,7 +434,6 @@ export default function ClipBlock({
         >
           <FrameStrip
             tira={tira}
-            inicio={clip.inicio}
             ancho={ancho}
             alto={altoPista}
             recorteInicio={clip.recorteInicio}

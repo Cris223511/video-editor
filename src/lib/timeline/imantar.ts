@@ -13,10 +13,18 @@ export const UMBRAL_IMAN_PX = 8
 // para descartar los bordes propios del bloque que se mueve, que no deben atraerlo
 const EPSILON = 0.0005
 
-// quita de la lista de anclajes los instantes que coinciden con los bordes del
-// propio bloque, para que no se imante contra sí mismo ni dibuje una guía fantasma
+// quita de la lista de anclajes los bordes del propio bloque, para que no se imante
+// contra sí mismo ni dibuje una guía fantasma. se retira UNA sola aparición por cada
+// borde propio, no todas las que coincidan en ese instante. así, si el bloque arranca
+// pegado a otro (comparten un borde), al sacar el borde propio no se lleva por delante
+// el del vecino, que sigue siendo un anclaje válido al que imantarse
 function sinPropios(puntos: number[], propios: number[]): number[] {
-  return puntos.filter((p) => !propios.some((q) => Math.abs(p - q) < EPSILON))
+  const restantes = [...puntos]
+  for (const q of propios) {
+    const i = restantes.findIndex((p) => Math.abs(p - q) < EPSILON)
+    if (i >= 0) restantes.splice(i, 1)
+  }
+  return restantes
 }
 
 // busca el anclaje más cercano a alguno de los bordes indicados. devuelve el
