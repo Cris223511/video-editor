@@ -9,14 +9,17 @@ import PanelClip from './PanelClip'
 import OptionsPanel from './OptionsPanel'
 import Timeline from './timeline/Timeline'
 import MenuContextual from './MenuContextual'
+import ConfirmacionGlobal from './ConfirmacionGlobal'
 import ExportDialog from './ExportDialog'
 import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
 import Loader from '../../components/ui/Loader'
+import { useParams } from 'react-router-dom'
 import { useAtajos } from './useAtajos'
 import { useAutoguardado } from './useAutoguardado'
-import { useRestaurarSesion } from './useRestaurarSesion'
 import { useProjectStore } from '../../store/useProjectStore'
+import { abrirSesion, hayProyectoEnMemoria, marcarProyectoEnMemoria } from '../../lib/proyecto/sesion'
+import NoEncontrada from '../sitio/NoEncontrada'
 
 // disposición al estilo de un editor de escritorio: opciones a la izquierda,
 // visor al centro, y abajo los medios junto a la línea de tiempo. el reparto lo
@@ -61,11 +64,49 @@ export default function EditorView() {
     else raiz.classList.remove('ve-visor-completo')
     return () => raiz.classList.remove('ve-visor-completo')
   }, [visorCompleto])
-  // al entrar al editor, si no se está trabajando en nada y hay una sesión
-  // guardada, se recarga. eso es lo que evita que un refresco deje el editor en
-  // blanco con el trabajo aparentemente perdido. la guarda de vacío impide pisar
-  // un proyecto recién abierto desde la lista, que ya trae sus medios
-  useRestaurarSesion()
+  // el editor trabaja sobre el proyecto cuyo token viene en la dirección. si ese
+  // token existe en este equipo se abre; si no (por ejemplo alguien llega con un
+  // token de otra máquina), se muestra la vista de página no encontrada. un proyecto
+  // ya vivo en memoria (recién abierto o creado) no se recarga, para no perder cambios
+  // sin guardar al ir y volver dentro de la app
+  const { id: tokenProyecto } = useParams()
+  const [estadoProyecto, setEstadoProyecto] = useState<'cargando' | 'ok' | 'noExiste'>(() =>
+    tokenProyecto && hayProyectoEnMemoria() && useProjectStore.getState().idProyecto === tokenProyecto
+      ? 'ok'
+      : 'cargando',
+  )
+  useEffect(() => {
+    if (!tokenProyecto) return
+    if (hayProyectoEnMemoria() && useProjectStore.getState().idProyecto === tokenProyecto) {
+      setEstadoProyecto('ok')
+      return
+    }
+    let vivo = true
+    setEstadoProyecto('cargando')
+    abrirSesion(tokenProyecto)
+      .then((ok) => {
+        if (!vivo) return
+        if (ok) {
+          setEstadoProyecto('ok')
+          return
+        }
+        // no está guardado. si su token coincide con el de la sesión activa de este
+        // equipo, es un proyecto nuevo todavía sin guardar y se muestra vacío. si no,
+        // el token no pertenece a este equipo y no hay nada que abrir
+        if (useProjectStore.getState().idProyecto === tokenProyecto) {
+          marcarProyectoEnMemoria()
+          setEstadoProyecto('ok')
+        } else {
+          setEstadoProyecto('noExiste')
+        }
+      })
+      .catch(() => {
+        if (vivo) setEstadoProyecto('noExiste')
+      })
+    return () => {
+      vivo = false
+    }
+  }, [tokenProyecto])
 
   // el plegado se pide al propio panel en lugar de sacarlo del árbol. antes se
   // dejaba de dibujar y react-resizable-panels perdía la correspondencia entre
@@ -82,6 +123,13 @@ export default function EditorView() {
   }
 
   const suave = plegando ? 'transition-[flex-grow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]' : ''
+
+  // un token que no corresponde a ningún proyecto de este equipo cae en la vista de
+  // página no encontrada, tal como pasaría con cualquier dirección inexistente
+  if (estadoProyecto === 'noExiste') return <NoEncontrada />
+  // mientras se lee el proyecto del almacén se muestra el cargador, para no dejar ver
+  // el editor a medio montar en un refresco
+  if (estadoProyecto === 'cargando') return <Loader texto="Abriendo tu proyecto..." />
 
   return (
     // el editor no deja seleccionar texto al arrastrar por sus paneles ni por el
@@ -239,6 +287,7 @@ export default function EditorView() {
       {/* menú del botón derecho; vive arriba del todo para poder salir por encima
           de cualquier panel sin que lo recorte ninguno */}
       <MenuContextual />
+      <ConfirmacionGlobal />
     </div>
   )
 }

@@ -33,7 +33,8 @@ export default function TopBar() {
   // el aviso se muestra tanto si el guardado lo pidió el botón como si lo lanzó
   // el guardado automático por debajo
   const enGuardado = guardando || guardandoAuto
-  const enEditor = pathname === RUTAS.editor
+  // el editor vive en /editor/<token>: se reconoce por su prefijo
+  const enEditor = pathname.startsWith(RUTAS.editor + '/')
   // los botones de historial se apagan cuando no queda nada por deshacer o
   // rehacer, para que se vea de un vistazo si hay pasos disponibles
   const deshacer = useEditorStore((s) => s.deshacer)

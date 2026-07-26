@@ -29,7 +29,12 @@ export default function FrameStrip({
 }) {
   if (!tira.imagenes.length || ancho <= 0) return null
 
-  const anchoFoto = Math.max(24, Math.round(alto * tira.aspecto))
+  // el ancho de cada hueco de la tira. antes cada fotograma se veía entero (alto
+  // por la proporción del video, unos 114 px en 16:9), y por eso salían pocos y muy
+  // anchos, que es lo que se leía como estirado. ahora los huecos son más angostos
+  // (algo menos que el alto de la fila) y el fotograma se recorta a ese ancho con
+  // object-cover: entran muchos más y la tira se lee como una película de verdad
+  const anchoFoto = Math.max(28, Math.round(alto * 0.62))
   // píxel absoluto del borde izquierdo del clip, y desfase dentro de la rejilla
   // global de fotogramas. el primer hueco arranca un poco antes del borde (en el
   // trozo negativo que el overflow recorta) para que las divisiones caigan siempre

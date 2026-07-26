@@ -14,6 +14,10 @@ import { MediaAsset } from '../../types/media'
 
 // tipo de dato que viaja al arrastrar un medio hacia la línea de tiempo
 export const TIPO_ARRASTRE = 'application/x-video-editor-asset'
+// tipo extra que viaja en el arrastre solo para delatar la clase del medio durante
+// el dragover, donde el navegador no deja leer el id. así la línea de tiempo sabe
+// si sombrear las pistas de video o el carril de audio antes de soltar
+export const tipoClaseArrastre = (clase: string) => `application/x-ve-clase-${clase}`
 
 // panel de medios, abajo a la izquierda y junto a la línea de tiempo. los
 // medios se arrastran desde aquí hasta la pista, y se importan más soltando
@@ -77,6 +81,9 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
                   draggable
                   onDragStart={(e) => {
                     e.dataTransfer.setData(TIPO_ARRASTRE, m.id)
+                    // la clase va en su propio tipo (sin valor) para poder leerla en
+                    // el dragover, donde getData del id no está disponible
+                    e.dataTransfer.setData(tipoClaseArrastre(m.clase), '')
                     e.dataTransfer.effectAllowed = 'copy'
                   }}
                   // solo en los videos, al posar el cursor se reproduce la vista

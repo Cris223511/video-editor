@@ -194,6 +194,19 @@ export default function ClipBlock({
         moverBloques(grupo, inicioOriginal + dxg - clip.inicio)
         return
       }
+      // primero se mueve en el tiempo (horizontal) y luego se resuelve el nivel. así
+      // la comprobación de si la pista destino está libre mira el instante NUEVO del
+      // clip, no el viejo: arrastrar un clip en diagonal hasta un hueco de otra pista
+      // funciona al momento aunque su posición de partida solapara al de arriba
+      const dx = (ev.clientX - startX) / pxPorSegundo
+      const bruto = Math.max(0, inicioOriginal + dx)
+      // imantado: si el inicio o el fin del clip caen cerca de un anclaje, se
+      // pegan a él para que sea fácil unir clips sin huecos ni solapes. cuando
+      // engancha, se enciende la línea guía en ese instante
+      const { inicio, guia } = imantarMover(bruto, clip.duracion, puntos, umbral, propios)
+      setGuiaImantado(guia)
+      moverClip(idGesto, inicio)
+
       // solo se resuelve el destino vertical si el cursor subió o bajó de verdad. en
       // un arrastre horizontal el clip se queda en su nivel y no asoma la guía de
       // pista, aunque el cursor roce la separación entre filas
@@ -212,8 +225,11 @@ export default function ClipBlock({
             setInsercionPista(null)
           }
           if (v.destino !== null && v.destino !== pistaActual) {
-            pistaActual = v.destino
+            // moverClipAPista solo cambia de pista si el destino está libre en el
+            // tramo del clip; si lo consiguió, se recuerda la nueva pista
             moverClipAPista(idGesto, v.destino)
+            const real = useEditorStore.getState().pista.clips.find((c) => c.id === idGesto)
+            if (real) pistaActual = real.pista
           }
         }
       } else if (insercionActual !== null) {
@@ -221,15 +237,6 @@ export default function ClipBlock({
         insercionActual = null
         setInsercionPista(null)
       }
-
-      const dx = (ev.clientX - startX) / pxPorSegundo
-      const bruto = Math.max(0, inicioOriginal + dx)
-      // imantado: si el inicio o el fin del clip caen cerca de un anclaje, se
-      // pegan a él para que sea fácil unir clips sin huecos ni solapes. cuando
-      // engancha, se enciende la línea guía en ese instante
-      const { inicio, guia } = imantarMover(bruto, clip.duracion, puntos, umbral, propios)
-      setGuiaImantado(guia)
-      moverClip(idGesto, inicio)
     }
     const soltar = () => {
       useEditorStore.getState().setArrastreVivo(null)
@@ -242,6 +249,8 @@ export default function ClipBlock({
       // al soltar, la guía desaparece: el clip ya quedó encajado en su sitio
       setGuiaImantado(null)
       setInteractuando(false)
+      // si mover el clip dejó su antigua pista sin nada, esa fila se poda sola
+      if (movido) useEditorStore.getState().podarPistasVacias()
       finGesto()
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)

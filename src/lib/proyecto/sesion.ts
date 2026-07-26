@@ -11,6 +11,18 @@ import {
   VERSION_FORMATO,
 } from './formato'
 
+// bandera de sesión viva: dice si en esta carga de la página ya hay un proyecto
+// montado en memoria (recién abierto o recién creado). el editor la usa para no
+// recargar desde el almacén un proyecto que ya está vivo, y así no perder cambios sin
+// guardar al ir y volver dentro de la app. arranca en false en cada carga de página
+let proyectoEnMemoria = false
+export function marcarProyectoEnMemoria(): void {
+  proyectoEnMemoria = true
+}
+export function hayProyectoEnMemoria(): boolean {
+  return proyectoEnMemoria
+}
+
 // arma la portada del proyecto para la lista. con línea de tiempo montada, se
 // toma el fotograma que se ve justo en la mitad del montaje: se busca qué clip
 // cae en ese instante y se captura el frame de su medio en el segundo que le
@@ -104,6 +116,8 @@ export async function guardarSesion(id: string, creado: number): Promise<void> {
 export async function abrirSesion(id: string): Promise<boolean> {
   const p = await leerProyecto(id)
   if (!p) return false
+  // el proyecto queda montado en memoria: a partir de aquí es la sesión viva
+  marcarProyectoEnMemoria()
 
   // se anota cuándo se abrió, que es el dato que la lista enseña para reconocer
   // un proyecto. no se toca 'modificado', porque abrir no es editar
@@ -213,6 +227,9 @@ function regenerarMiniaturas(medios: MediaAsset[]): void {
 export function nuevoProyecto(): void {
   // limpiar libera las direcciones temporales de los medios y vacía la lista
   useProjectStore.getState().limpiar()
+  // un proyecto nuevo también es sesión viva: el editor lo mostrará (vacío) sin
+  // intentar leerlo del almacén, donde todavía no existe hasta el primer guardado
+  marcarProyectoEnMemoria()
   const id = crypto.randomUUID()
   useProjectStore.setState({
     idProyecto: id,

@@ -5,7 +5,11 @@
 // blanco
 export const RUTAS = {
   portada: '/',
+  // el editor vive bajo un token por proyecto (/editor/<id>): cada montaje tiene su
+  // propia dirección, guardable y recargable. 'editor' a secas es solo el prefijo,
+  // que sirve para reconocer la sección; para navegar a un proyecto se usa editorProyecto
   editor: '/editor',
+  editorProyecto: (id: string) => `/editor/${id}`,
   medios: '/medios',
   proyectos: '/proyectos',
   proyecto: (id: string) => `/proyectos/${id}`,

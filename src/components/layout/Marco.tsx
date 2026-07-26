@@ -9,22 +9,6 @@ import HaloCursor from '../sitio/HaloCursor'
 import { RUTAS } from '../../rutasDef'
 import { useScrollSuave } from '../../lib/scroll/useScrollSuave'
 
-// las vistas de sitio llevan pie; el editor no, porque ahí cada píxel de alto
-// cuenta para la línea de tiempo
-const CON_PIE = [
-  RUTAS.portada,
-  RUTAS.instrucciones,
-  RUTAS.terminos,
-  RUTAS.privacidad,
-  RUTAS.proyectos,
-  RUTAS.medios,
-]
-
-// solo el espacio de trabajo lleva la barra del editor, con el título del
-// proyecto, guardar y exportar. la pantalla de traer medios todavía no tiene
-// nada de eso, así que le corresponde la barra de navegación como al resto
-const CON_BARRA_EDITOR = [RUTAS.editor]
-
 // armazón común a todas las rutas: barra arriba, la vista en medio y el pie
 // cuando corresponde
 export default function Marco() {
@@ -40,9 +24,13 @@ export default function Marco() {
     window.scrollTo({ top: 0 })
   }, [pathname])
 
-  const conPie =
-    CON_PIE.includes(pathname as (typeof CON_PIE)[number]) || pathname.startsWith('/proyectos')
-  const enEditor = CON_BARRA_EDITOR.includes(pathname as (typeof CON_BARRA_EDITOR)[number])
+  // el editor vive en /editor/<token>, así que se reconoce por prefijo, no por
+  // igualdad exacta con la ruta base
+  const enEditor = pathname.startsWith(RUTAS.editor + '/')
+  // el pie va en todas las vistas del sitio; solo el editor se queda sin él, porque
+  // ahí cada píxel de alto cuenta para la línea de tiempo. así la página de dirección
+  // no encontrada también lo lleva, como una vista más del sitio
+  const conPie = !enEditor
 
   // el desplazamiento con inercia solo en el sitio: dentro del editor la rueda
   // sirve para acercar la línea de tiempo y debe responder al instante

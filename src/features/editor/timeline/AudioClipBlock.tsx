@@ -119,8 +119,29 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
       // nivel o abrir uno nuevo); moviendo a los lados estorbaba
       if (Math.abs(ev.clientY - startY) > UMBRAL_VERT) {
         useEditorStore.getState().setArrastreVivo({ etiqueta: asset?.nombre ?? 'Audio', x: ev.clientX, y: ev.clientY })
+        // guía celeste de fila nueva mientras el gesto es vertical, igual que la de
+        // los clips: se enciende al apuntar a una separación o al fondo del carril
+        const junta = separacionBajoCursor(ev.clientX, ev.clientY, 'nivelAudio')
+        const debajo = porDebajoDelUltimo(ev.clientX, ev.clientY, 'nivelAudio')
+        const st = useEditorStore.getState()
+        if (junta !== null || debajo) {
+          // apuntando a una separación o al fondo: se promete fila nueva con la línea
+          // y no se sombrea ninguna fila existente
+          st.setInsercionAudio(junta !== null ? junta : 0)
+          st.setFilaAudioResaltada(null)
+        } else {
+          // encima de una fila que ya existe: se ilumina esa fila para avisar dónde
+          // caerá el bloque, tal como hace la pista de video con el clip. aunque la
+          // fila tenga otro audio en ese tramo sigue siendo destino válido, porque al
+          // soltar el bloque se encaja solo al hueco libre más cercano de esa fila
+          st.setInsercionAudio(null)
+          st.setFilaAudioResaltada(nivelBajoCursor(ev.clientX, ev.clientY, 'nivelAudio'))
+        }
       } else {
-        useEditorStore.getState().setArrastreVivo(null)
+        const st = useEditorStore.getState()
+        st.setArrastreVivo(null)
+        st.setInsercionAudio(null)
+        st.setFilaAudioResaltada(null)
       }
 
       ultimoX = ev.clientX
@@ -146,6 +167,8 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
     }
     const soltar = () => {
       useEditorStore.getState().setArrastreVivo(null)
+      useEditorStore.getState().setInsercionAudio(null)
+      useEditorStore.getState().setFilaAudioResaltada(null)
       // alt y clic seco: el bloque entra o sale del conjunto
       if (!movido && conAlt) alternarBloque(audio.id)
       setGuiaImantado(null)
@@ -161,6 +184,9 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
         const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelAudio')
         if (destino !== null) moverAudioNivel(idGesto, destino)
       }
+      // si mover el bloque dejó su fila de origen sin nada, esa fila se cierra sola,
+      // igual que las pistas de video con los clips
+      if (movido) useEditorStore.getState().podarNivelesAudioVacios()
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)
     }
@@ -236,7 +262,14 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
       }}
     >
       <Lineas alturas={onda} color="rgba(56, 189, 248, 0.7)" />
-      <span className="pointer-events-none relative truncate rounded bg-black/35 px-1 text-[10px] font-medium text-white">
+      {/* el nombre solo asoma al pasar el cursor o con el audio elegido: fijo todo
+          el tiempo tapaba la onda y molestaba */}
+      <span
+        className={[
+          'pointer-events-none relative truncate rounded bg-black/35 px-1 text-[10px] font-medium text-white transition-opacity duration-150',
+          seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+        ].join(' ')}
+      >
         {asset?.nombre ?? 'audio'}
       </span>
       <div

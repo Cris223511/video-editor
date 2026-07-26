@@ -27,8 +27,9 @@ export default function ImportView() {
     await procesar(files)
     const despues = useProjectStore.getState().medios.length
     if (despues > antes) {
-      // el editor recoge el testigo del cargador y lo apaga al tener el video listo
-      navegar(RUTAS.editor)
+      // el editor recoge el testigo del cargador y lo apaga al tener el video listo.
+      // se entra a la dirección del proyecto actual, que es su token
+      navegar(RUTAS.editorProyecto(useProjectStore.getState().idProyecto))
     } else {
       // no entró nada (todo falló la validación): se apaga y se queda en esta vista
       useProjectStore.setState({ preparando: false })

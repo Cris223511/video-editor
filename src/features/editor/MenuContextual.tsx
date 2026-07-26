@@ -113,11 +113,21 @@ export default function MenuContextual() {
 
   const opciones: Opcion[] = []
 
-  // opciones de una fila entera: insertar otra encima o debajo, y eliminarla con
-  // aviso. no se puede borrar la última que queda
+  // eliminar una fila: si está vacía se borra directo (da facilidad); si tiene algo,
+  // se pide confirmación con el modal bonito de la app, no con el aviso del navegador
+  const eliminarFila = (vacia: boolean, mensaje: string, accion: () => void) => {
+    if (vacia) accion()
+    else st.pedirConfirmacion({ titulo: 'Eliminar', mensaje, aceptar: 'Eliminar', onAceptar: accion })
+  }
+
+  // opciones de una fila entera: insertar otra encima o debajo, y eliminarla. no se
+  // puede borrar la última que queda
   if (esFila) {
     const n = Number(menu.id)
     if (menu.tipo === 'pista') {
+      const vacia =
+        !clips.some((c) => c.pista === n) &&
+        !capas.some((c) => (c.tipo === 'figura' || c.tipo === 'imagen') && (c.nivel ?? 0) === n)
       opciones.push(
         { id: 'ins-arriba', etiqueta: 'Insertar pista encima', icono: <ArrowUpToLine size={15} />, onElegir: con(() => st.insertarPistaEn(n + 1)) },
         { id: 'ins-abajo', etiqueta: 'Insertar pista debajo', icono: <ArrowDownToLine size={15} />, onElegir: con(() => st.insertarPistaEn(n)) },
@@ -125,7 +135,9 @@ export default function MenuContextual() {
         {
           id: 'del', etiqueta: 'Eliminar la pista', icono: <Trash2 size={15} />, atajo: 'Supr', peligro: true, separadorAntes: true,
           desactivada: st.numPistas <= 1,
-          onElegir: con(() => { if (window.confirm('Se eliminará esta pista de video con todo lo que contenga. Podrás deshacerlo.')) st.quitarPista(n) }),
+          onElegir: con(() =>
+            eliminarFila(vacia, 'Se eliminará esta pista de video con todo lo que contenga. Podrás deshacerlo.', () => st.quitarPista(n)),
+          ),
         },
       )
     } else {
@@ -133,13 +145,18 @@ export default function MenuContextual() {
       const insertar = esAudio ? st.insertarNivelAudio : st.insertarNivelTexto
       const quitar = esAudio ? st.quitarNivelAudio : st.quitarNivelTexto
       const ultima = esAudio ? st.nivelesAudio <= 1 : st.nivelesTexto <= 1
+      const vacia = esAudio
+        ? !audios.some((a) => (a.nivel ?? 0) === n) && !audioRegiones.some((r) => (r.nivel ?? 0) === n)
+        : !capas.some((c) => c.tipo !== 'imagen' && c.tipo !== 'figura' && (c.nivel ?? 0) === n)
       opciones.push(
         { id: 'ins-arriba', etiqueta: 'Insertar fila encima', icono: <ArrowUpToLine size={15} />, onElegir: con(() => insertar(n + 1, '')) },
         { id: 'ins-abajo', etiqueta: 'Insertar fila debajo', icono: <ArrowDownToLine size={15} />, onElegir: con(() => insertar(n, '')) },
         {
           id: 'del', etiqueta: 'Eliminar la fila', icono: <Trash2 size={15} />, atajo: 'Supr', peligro: true, separadorAntes: true,
           desactivada: ultima,
-          onElegir: con(() => { if (window.confirm('Se eliminará esta fila con todo lo que contenga. Podrás deshacerlo.')) quitar(n) }),
+          onElegir: con(() =>
+            eliminarFila(vacia, 'Se eliminará esta fila con todo lo que contenga. Podrás deshacerlo.', () => quitar(n)),
+          ),
         },
       )
     }
@@ -208,11 +225,14 @@ export default function MenuContextual() {
       icono: <Trash2 size={15} />,
       peligro: true,
       separadorAntes: true,
-      onElegir: con(() => {
-        if (window.confirm(`¿Borrar estos ${n} elementos de la línea de tiempo?`)) {
-          st.quitarBloques(st.bloquesSeleccionados)
-        }
-      }),
+      onElegir: con(() =>
+        st.pedirConfirmacion({
+          titulo: 'Eliminar',
+          mensaje: `Se eliminarán estos ${n} elementos de la línea de tiempo. Podrás deshacerlo.`,
+          aceptar: 'Eliminar',
+          onAceptar: () => st.quitarBloques(st.bloquesSeleccionados),
+        }),
+      ),
     })
   }
 

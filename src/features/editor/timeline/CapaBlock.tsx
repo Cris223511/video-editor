@@ -156,6 +156,28 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
         insercionActual = null
         setInsercionPista(null)
       }
+      // texto, dibujo y censura: guía ámbar de fila nueva en el carril de texto, la
+      // misma idea que la de los clips pero sobre las filas de texto
+      if (!esDePistaVideo) {
+        if (Math.abs(ev.clientY - startY) > UMBRAL_VERT) {
+          const junta = separacionBajoCursor(ev.clientX, ev.clientY, 'nivelTexto')
+          const debajo = porDebajoDelUltimo(ev.clientX, ev.clientY, 'nivelTexto')
+          const st = useEditorStore.getState()
+          if (junta !== null || debajo) {
+            st.setInsercionTexto(junta !== null ? junta : 0)
+            st.setFilaTextoResaltada(null)
+          } else {
+            // encima de una fila de texto existente se ilumina esa fila, igual que la
+            // pista de video hace con el clip
+            st.setInsercionTexto(null)
+            st.setFilaTextoResaltada(nivelBajoCursor(ev.clientX, ev.clientY, 'nivelTexto'))
+          }
+        } else {
+          const st = useEditorStore.getState()
+          st.setInsercionTexto(null)
+          st.setFilaTextoResaltada(null)
+        }
+      }
       const dx = (ev.clientX - startX) / pxPorSegundo
       const bruto = Math.max(0, inicioOriginal + dx)
       const { inicio, guia } = imantarMover(bruto, capa.duracion, puntos, umbral, propios)
@@ -164,6 +186,8 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     }
     const soltar = () => {
       useEditorStore.getState().setArrastreVivo(null)
+      useEditorStore.getState().setInsercionTexto(null)
+      useEditorStore.getState().setFilaTextoResaltada(null)
       // alt y clic seco: el bloque entra o sale del conjunto
       if (!movido && conAlt) alternarBloque(capa.id)
       setGuiaImantado(null)
@@ -174,6 +198,8 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       if (esDePistaVideo) {
         if (insercionActual !== null) insertarPistaEn(insercionActual, idGesto)
         setInsercionPista(null)
+        // si la figura o imagen dejó su pista de video sin nada, esa fila se poda
+        if (movido) useEditorStore.getState().podarPistasVacias()
         window.removeEventListener('pointermove', mover)
         window.removeEventListener('pointerup', soltar)
         return
@@ -192,6 +218,8 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
         const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelTexto')
         if (destino !== null) moverCapaNivel(idGesto, destino)
       }
+      // si el bloque dejó vacía su fila de texto de origen, se cierra sola
+      if (movido) useEditorStore.getState().podarNivelesTextoVacios()
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)
     }

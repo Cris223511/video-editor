@@ -24,7 +24,7 @@ import Selector from '../../components/ui/Selector'
 import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
 import { useToast } from '../../components/ui/ToastProvider'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { RUTAS } from '../../rutasDef'
 import { borrarProyecto, espacio, guardarProyecto, leerProyecto, listarProyectos } from '../../lib/proyecto/almacen'
@@ -55,8 +55,6 @@ function fechaLarga(ms: number): string {
 // duplican y se borran. nada de esto sale del navegador
 export default function ProyectosView() {
   const navegar = useNavigate()
-  // si la dirección trae un identificador, ese proyecto se abre solo al entrar
-  const { id: idEnRuta } = useParams()
   // crear uno nuevo estrena un proyecto en blanco antes de ir a importar: así no
   // se cuela nada del que estaba abierto (era el error de ver medios ajenos)
   const irAImportar = () => {
@@ -97,11 +95,6 @@ export default function ProyectosView() {
   }, [])
 
   // abrir por dirección: compartir el enlace de un proyecto lo deja listo para
-  // seguir trabajando sin pasar por la lista
-  useEffect(() => {
-    if (idEnRuta) abrir(idEnRuta)
-  }, [idEnRuta])
-
   async function abrir(id: string) {
     try {
       const ok = await abrirSesion(id)
@@ -110,7 +103,7 @@ export default function ProyectosView() {
         refrescar()
         return
       }
-      navegar(RUTAS.editor)
+      navegar(RUTAS.editorProyecto(id))
     } catch {
       mostrar('error', 'No se pudo abrir el proyecto.')
     }
@@ -161,7 +154,13 @@ export default function ProyectosView() {
     const f = files?.[0]
     if (!f) return
     try {
-      await guardarProyecto(await desempaquetar(f))
+      const p = await desempaquetar(f)
+      // el archivo trae su token original. si en este equipo ya hay un proyecto con
+      // ese mismo token (por ejemplo se importa dos veces, o se trae de vuelta uno que
+      // ya estaba aquí), entra como copia con token nuevo para no pisar el existente
+      const choca = await leerProyecto(p.id)
+      const aGuardar = choca ? { ...p, id: crypto.randomUUID() } : p
+      await guardarProyecto(aGuardar)
       mostrar('success', 'Proyecto importado.')
       refrescar()
     } catch (e) {

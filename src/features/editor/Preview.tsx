@@ -78,6 +78,9 @@ export default function Preview() {
   const audios = useEditorStore((s) => s.audios)
   const capasTodas = useEditorStore((s) => s.capas)
   const volumenGlobal = useEditorStore((s) => s.volumenGlobal)
+  // volumen de monitorización: multiplica lo que suena en el visor sin tocar el
+  // proyecto ni la exportación
+  const volumenPreview = useEditorStore((s) => s.volumenPreview)
   const pistasMeta = useEditorStore((s) => s.pistasMeta)
   const medios = useProjectStore((s) => s.medios)
 
@@ -151,11 +154,11 @@ export default function Preview() {
   const audioCtxRef = useRef<AudioContext | null>(null)
   const gananciaRef = useRef<GainNode | null>(null)
   const cableadosRef = useRef<Set<string>>(new Set())
-  const audioRef = useRef({ regiones: audioRegiones, general: volumenGlobal })
+  const audioRef = useRef({ regiones: audioRegiones, general: volumenGlobal, preview: volumenPreview })
 
   useEffect(() => {
-    audioRef.current = { regiones: audioRegiones, general: volumenGlobal }
-  }, [audioRegiones, volumenGlobal])
+    audioRef.current = { regiones: audioRegiones, general: volumenGlobal, preview: volumenPreview }
+  }, [audioRegiones, volumenGlobal, volumenPreview])
 
   function asegurarGrafo(): GainNode | null {
     if (!audioCtxRef.current) {
@@ -189,10 +192,23 @@ export default function Preview() {
   useEffect(() => {
     const el = areaRef.current
     if (!el) return
-    const observar = new ResizeObserver(() => setAreaTam({ w: el.clientWidth, h: el.clientHeight }))
+    const medir = () => setAreaTam({ w: el.clientWidth, h: el.clientHeight })
+    const observar = new ResizeObserver(medir)
     observar.observe(el)
-    setAreaTam({ w: el.clientWidth, h: el.clientHeight })
-    return () => observar.disconnect()
+    medir()
+    // el zoom del navegador (Ctrl +/-) no siempre dispara el ResizeObserver de forma
+    // fiable, y el visor se quedaba con el tamaño viejo y descolocado. escuchar el
+    // resize de la ventana, que sí salta con el zoom, y remedir además en el
+    // siguiente cuadro asegura que el lienzo se reacomode a su tamaño real
+    const alRedimensionar = () => {
+      medir()
+      requestAnimationFrame(medir)
+    }
+    window.addEventListener('resize', alRedimensionar)
+    return () => {
+      observar.disconnect()
+      window.removeEventListener('resize', alRedimensionar)
+    }
   }, [clips.length, hayCapas])
 
   const clipsOrdenados = useMemo(() => [...clips].sort((a, b) => a.inicio - b.inicio), [clips])
@@ -274,6 +290,7 @@ export default function Preview() {
           1,
           a.volumen *
             volumenGlobal *
+            volumenPreview *
             fundidoEn(playhead, a.inicio, a.duracion, a.fundidoEntrada, a.fundidoSalida),
         ),
       )
@@ -296,7 +313,7 @@ export default function Preview() {
         if (!el.paused) el.pause()
       }
     })
-  }, [playhead, reproduciendo, audios, volumenGlobal])
+  }, [playhead, reproduciendo, audios, volumenGlobal, volumenPreview])
 
   // durante la reproducción avanza el clip activo y salta al siguiente al
   // terminar; el cabezal se calcula desde el tiempo real del video
@@ -417,6 +434,7 @@ export default function Preview() {
         nodo.gain.value = metas[act.pista]?.silenciada || act.mudo || act.silenciado
           ? 0
           : gananciaEn(audioRef.current.regiones, audioRef.current.general, ph) *
+            audioRef.current.preview *
             (act.volumen ?? 1) *
             fundidoEn(ph, act.inicio, act.duracion, act.fundidoEntrada, act.fundidoSalida)
       }

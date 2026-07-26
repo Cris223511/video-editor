@@ -171,13 +171,20 @@ interface EstadoEditor {
   desenfoqueFondo: number
   marco: Marco
   volumenGlobal: number
+  // volumen de monitorización de la vista previa, de 0 a 1. es solo para escuchar el
+  // montaje mientras se edita: no se guarda en el proyecto ni entra en la exportación,
+  // por eso vive aparte del volumen general. arranca al máximo en cada sesión
+  volumenPreview: number
   audioRegiones: RegionAudio[]
 
   // trae un medio a la línea de tiempo. sin destino aterriza al final de la pista
   // base, como siempre; con destino se puede pedir un nivel concreto (pista) o
   // abrir uno nuevo en una separación (insertarEn), que es lo que necesita el
   // arrastre desde el panel para soltar justo donde la guía prometió
-  agregarDesdeAsset: (asset: MediaAsset, destino?: { pista?: number; insertarEn?: number }) => void
+  agregarDesdeAsset: (
+    asset: MediaAsset,
+    destino?: { pista?: number; insertarEn?: number; audioNivel?: number; insertarAudioEn?: number },
+  ) => void
   quitarClip: (id: string) => void
   // separa el audio de un clip de video: lo deja mudo y añade el clip de audio ya
   // decodificado, vinculado a él. el decodificado va fuera del store, en el panel
@@ -245,6 +252,12 @@ interface EstadoEditor {
   menuContextual: { x: number; y: number; tipo: 'clip' | 'capa' | 'audio' | 'region' | 'pista' | 'carril-audio' | 'carril-texto'; id: string } | null
   abrirMenuContextual: (m: { x: number; y: number; tipo: 'clip' | 'capa' | 'audio' | 'region' | 'pista' | 'carril-audio' | 'carril-texto'; id: string }) => void
   cerrarMenuContextual: () => void
+  // ventana de confirmación global: cualquier sitio pide un aviso con su texto y su
+  // acción, y se pinta con el mismo modal bonito de siempre en vez del feo del
+  // navegador. es de vista, no entra al historial
+  confirmacion: { titulo: string; mensaje: string; aceptar?: string; onAceptar: () => void } | null
+  pedirConfirmacion: (c: { titulo: string; mensaje: string; aceptar?: string; onAceptar: () => void }) => void
+  cerrarConfirmacion: () => void
   // borra de una vez todos los bloques marcados, sea cual sea su tipo
   quitarBloques: (ids: string[]) => void
 
@@ -299,6 +312,15 @@ interface EstadoEditor {
   // duplica una pista de video entera con sus clips, figuras e imágenes, en una
   // pista nueva justo encima
   duplicarPista: (indice: number) => void
+  // quita las pistas de video que quedaron vacías (sin clips ni figuras ni
+  // imágenes), conservando siempre al menos una. se llama al soltar un clip tras
+  // moverlo, para que una fila que quedó sin nada desaparezca sola
+  podarPistasVacias: () => void
+  // la misma idea que podarPistasVacias pero para los carriles de audio y de texto:
+  // al soltar un bloque tras moverlo, la fila que dejó sin nada se cierra sola. se
+  // conserva siempre al menos una fila en cada carril
+  podarNivelesAudioVacios: () => void
+  podarNivelesTextoVacios: () => void
   // quita una fila del carril de texto o de audio con lo que contenga, y baja las
   // de encima. no se puede quedar el carril sin ninguna fila
   quitarNivelTexto: (nivel: number) => void
@@ -321,6 +343,21 @@ interface EstadoEditor {
   // entre dos niveles: guarda el índice donde nacería la pista nueva, o null si
   // ahora mismo no se está apuntando a ninguna separación
   insercionPista: number | null
+  // lo mismo pero para los carriles de audio y de texto: la fila nueva que nacería
+  // al soltar un bloque de audio o de texto sobre una separación. cada uno lleva la
+  // suya para poder dibujar su guía celeste, igual que la de las pistas de video
+  insercionAudio: number | null
+  insercionTexto: number | null
+  setInsercionAudio: (nivel: number | null) => void
+  setInsercionTexto: (nivel: number | null) => void
+  // fila de audio o de texto que queda iluminada cuando el cursor pasa por encima
+  // de una fila existente al mover un bloque. es el aviso de "aquí cae", el mismo
+  // gesto que hace la pista de video con el clip. va aparte de la guía de fila
+  // nueva: o se pinta la separación con la línea, o se sombrea la fila entera
+  filaAudioResaltada: number | null
+  filaTextoResaltada: number | null
+  setFilaAudioResaltada: (nivel: number | null) => void
+  setFilaTextoResaltada: (nivel: number | null) => void
   // lo que se está arrastrando ahora mismo por la línea de tiempo, para dibujar la
   // etiqueta que acompaña al cursor. null cuando no hay ningún gesto en marcha
   arrastreVivo: { etiqueta: string; x: number; y: number } | null
@@ -483,6 +520,7 @@ interface EstadoEditor {
   limpiarDibujo: (id: string) => void
 
   setVolumenGlobal: (v: number) => void
+  setVolumenPreview: (v: number) => void
   agregarRegionAudio: () => void
   actualizarRegionAudio: (id: string, cambios: Partial<RegionAudio>) => void
   quitarRegionAudio: (id: string) => void
@@ -671,6 +709,9 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'agregarNivelTexto',
   'agregarNivelAudio',
   'duplicarPista',
+  'podarPistasVacias',
+  'podarNivelesAudioVacios',
+  'podarNivelesTextoVacios',
   'quitarNivelTexto',
   'quitarNivelAudio',
   'intercambiarNivelAudio',
@@ -763,13 +804,132 @@ const ALTO_FILA_DEF: Record<'audio' | 'texto', number> = {
 // capas que de verdad viven en ese carril (texto, censura y dibujo): las figuras
 // y las imágenes se fueron a las pistas de video. se usa al crear un texto para
 // que se reparta por niveles en vez de amontonarse
-function nivelLibreTexto(capas: { tipo: string; nivel?: number }[]): number {
-  const enCarrilTexto = (t: string) => t !== 'imagen' && t !== 'figura'
-  const ocupados = new Set(capas.filter((c) => enCarrilTexto(c.tipo)).map((c) => c.nivel ?? 0))
-  let destino = 0
-  while (destino < MAX_NIVELES - 1 && ocupados.has(destino)) destino++
-  return destino
+// dice si el tramo [ini, ini+dur) pisa a alguno de los otros bloques de la lista
+// (que ya vienen filtrados a la misma fila). con esto se impide que dos clips o dos
+// audios queden uno encima de otro en un mismo nivel; los overlays (texto, figuras,
+// imágenes, dibujos) sí pueden solaparse y no pasan por aquí
+function pisaAlguno(otros: { inicio: number; duracion: number }[], ini: number, dur: number): boolean {
+  return otros.some((o) => ini < o.inicio + o.duracion && ini + dur > o.inicio)
 }
+
+// recoloca un inicio para que su tramo no pise a los vecinos de su fila: si cae
+// encima de uno, se pega a su borde por el lado desde el que llega, de modo que los
+// bloques quedan juntos pero nunca superpuestos. si el hueco no da, devuelve null
+function inicioSinSolape(
+  otros: { inicio: number; duracion: number }[],
+  deseado: number,
+  dur: number,
+  inicioActual: number,
+): number | null {
+  let ini = Math.max(0, deseado)
+  if (!pisaAlguno(otros, ini, dur)) return ini
+  const haciaDerecha = deseado >= inicioActual
+  const vecino = otros.find((o) => ini < o.inicio + o.duracion && ini + dur > o.inicio)
+  if (vecino) ini = Math.max(0, haciaDerecha ? vecino.inicio - dur : vecino.inicio + vecino.duracion)
+  return pisaAlguno(otros, ini, dur) ? null : ini
+}
+
+// busca el sitio libre más cercano a `deseado` donde un tramo de `dur` no pise a
+// ninguno de `otros`. si el punto deseado ya está despejado se queda ahí; si no,
+// prueba pegarse al borde de cada vecino (justo antes o justo después) y se queda
+// con el hueco más próximo. como el carril no termina por la derecha siempre hay uno
+// tras el último bloque, así que subir un bloque que asomaba por debajo de otro lo
+// encaja al lado en lugar de dejarlo trabado
+function huecoMasCercano(otros: { inicio: number; duracion: number }[], deseado: number, dur: number): number {
+  const d = Math.max(0, deseado)
+  if (!pisaAlguno(otros, d, dur)) return d
+  const candidatos = [0]
+  for (const o of otros) {
+    candidatos.push(o.inicio + o.duracion)
+    candidatos.push(o.inicio - dur)
+  }
+  let mejor = d
+  let mejorDist = Infinity
+  for (const c of candidatos) {
+    const x = Math.max(0, c)
+    if (!pisaAlguno(otros, x, dur)) {
+      const dist = Math.abs(x - deseado)
+      if (dist < mejorDist) {
+        mejorDist = dist
+        mejor = x
+      }
+    }
+  }
+  return mejor
+}
+
+// poda pura de las pistas de video sin contenido: recibe las listas y sus metadatos
+// y devuelve los campos ya recolocados, o null si no sobra ninguna fila. la comparten
+// la acción de podar y las de borrar, para que quitar el último bloque de una fila la
+// cierre igual que sacarlo de ella arrastrando
+function calcularPodaVideo(
+  clips: Clip[],
+  capas: Capa[],
+  numPistas: number,
+  altosPista: number[],
+  pistasMeta: PistaMeta[],
+): { numPistas: number; altosPista: number[]; pistasMeta: PistaMeta[]; clips: Clip[]; capas: Capa[] } | null {
+  if (numPistas <= 1) return null
+  const ocupadas = new Set<number>()
+  clips.forEach((c) => ocupadas.add(c.pista))
+  capas.forEach((c) => {
+    if (c.tipo === 'figura' || c.tipo === 'imagen') ocupadas.add(c.nivel ?? 0)
+  })
+  const conservar = Array.from({ length: numPistas }, (_, i) => i).filter((i) => ocupadas.has(i))
+  if (conservar.length === numPistas) return null
+  if (conservar.length === 0) conservar.push(0)
+  const mapa = new Map<number, number>()
+  conservar.forEach((viejo, nuevo) => mapa.set(viejo, nuevo))
+  return {
+    numPistas: conservar.length,
+    altosPista: conservar.map((i) => altosPista[i]),
+    pistasMeta: conservar.map((i) => pistasMeta[i]),
+    clips: clips.map((c) => ({ ...c, pista: mapa.get(c.pista) ?? 0 })),
+    capas: capas.map((c) =>
+      c.tipo === 'figura' || c.tipo === 'imagen' ? { ...c, nivel: mapa.get(c.nivel ?? 0) ?? 0 } : c,
+    ),
+  }
+}
+
+// poda pura de las filas de audio vacías (audios importados y franjas de ganancia)
+function calcularPodaAudio(
+  audios: ClipAudio[],
+  audioRegiones: RegionAudio[],
+  nivelesAudio: number,
+): { nivelesAudio: number; audios: ClipAudio[]; audioRegiones: RegionAudio[] } | null {
+  if (nivelesAudio <= 1) return null
+  const ocupados = new Set<number>()
+  audios.forEach((a) => ocupados.add(a.nivel ?? 0))
+  audioRegiones.forEach((r) => ocupados.add(r.nivel ?? 0))
+  const conservar = Array.from({ length: nivelesAudio }, (_, i) => i).filter((i) => ocupados.has(i))
+  if (conservar.length === nivelesAudio) return null
+  if (conservar.length === 0) conservar.push(0)
+  const mapa = new Map<number, number>()
+  conservar.forEach((viejo, nuevo) => mapa.set(viejo, nuevo))
+  const recolocar = <T extends { nivel?: number }>(x: T): T => ({ ...x, nivel: mapa.get(x.nivel ?? 0) ?? 0 })
+  return { nivelesAudio: conservar.length, audios: audios.map(recolocar), audioRegiones: audioRegiones.map(recolocar) }
+}
+
+// poda pura de las filas de texto vacías (solo cuentan texto, dibujo y censura; las
+// figuras e imágenes viven en las pistas de video)
+function calcularPodaTexto(capas: Capa[], nivelesTexto: number): { nivelesTexto: number; capas: Capa[] } | null {
+  if (nivelesTexto <= 1) return null
+  const esTexto = (t: string) => t !== 'imagen' && t !== 'figura'
+  const ocupados = new Set<number>()
+  capas.forEach((c) => {
+    if (esTexto(c.tipo)) ocupados.add(c.nivel ?? 0)
+  })
+  const conservar = Array.from({ length: nivelesTexto }, (_, i) => i).filter((i) => ocupados.has(i))
+  if (conservar.length === nivelesTexto) return null
+  if (conservar.length === 0) conservar.push(0)
+  const mapa = new Map<number, number>()
+  conservar.forEach((viejo, nuevo) => mapa.set(viejo, nuevo))
+  return {
+    nivelesTexto: conservar.length,
+    capas: capas.map((c) => (esTexto(c.tipo) ? { ...c, nivel: mapa.get(c.nivel ?? 0) ?? 0 } : c)),
+  }
+}
+
 const ANCHO_CABECERAS_MIN = 120
 const ANCHO_CABECERAS_MAX = 360
 const ALTO_PISTA_MIN = 40
@@ -880,6 +1040,11 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   borradorFiltro: 'todo',
   borradorGrosor: 24,
   menuContextual: null,
+  confirmacion: null,
+  insercionAudio: null,
+  insercionTexto: null,
+  filaAudioResaltada: null,
+  filaTextoResaltada: null,
   regionSeleccionada: null,
   impactos: [],
   impactoSeleccionado: null,
@@ -896,6 +1061,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   desenfoqueFondo: 45,
   marco: { tipo: 'ninguno', color: '#ffffff', grosor: 30, radio: 40 },
   volumenGlobal: 1,
+  volumenPreview: 1,
   audioRegiones: [],
   audios: [],
   grabandoMovimiento: false,
@@ -1015,20 +1181,44 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   agregarDesdeAsset: (asset, destino) =>
     set((s) => {
-      // un audio importado va a la pista de sonido como un clip propio, pegado al
-      // final de lo que ya haya ahí, con su duración completa y a volumen normal
+      // un audio importado va a la pista de sonido como un clip propio. cae en la
+      // fila que diga el destino (o se abre una nueva si se soltó en una separación),
+      // pegado al final de lo que ya haya en esa fila para no solaparse con otro audio
       if (asset.clase === 'audio') {
-        const inicio = s.audios.reduce((t, a) => Math.max(t, a.inicio + a.duracion), 0)
+        let audios = s.audios
+        let audioRegiones = s.audioRegiones
+        let nivel = destino?.audioNivel ?? 0
+        let nivelesAudio = s.nivelesAudio
+        if (destino?.insertarAudioEn != null && s.nivelesAudio < MAX_NIVELES) {
+          const corte = Math.max(0, Math.min(s.nivelesAudio, destino.insertarAudioEn))
+          const subir = <T extends { nivel?: number }>(x: T): T =>
+            (x.nivel ?? 0) >= corte ? { ...x, nivel: (x.nivel ?? 0) + 1 } : x
+          audios = audios.map(subir)
+          audioRegiones = audioRegiones.map(subir)
+          nivel = corte
+          nivelesAudio = s.nivelesAudio + 1
+        }
+        const inicio = audios
+          .filter((a) => (a.nivel ?? 0) === nivel)
+          .reduce((t, a) => Math.max(t, a.inicio + a.duracion), 0)
         const audio: ClipAudio = {
           id: crypto.randomUUID(),
           assetId: asset.id,
           inicio,
+          nivel,
           duracion: asset.duracion,
           recorteInicio: 0,
           duracionFuente: asset.duracion,
           volumen: 1,
         }
-        return { audios: [...s.audios, audio], regionSeleccionada: null, clipSeleccionado: null, capaSeleccionada: null }
+        return {
+          audios: [...audios, audio],
+          audioRegiones,
+          nivelesAudio,
+          regionSeleccionada: null,
+          clipSeleccionado: null,
+          capaSeleccionada: null,
+        }
       }
 
       // por defecto los tres arrays de niveles se quedan como están; solo cambian
@@ -1204,6 +1394,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   abrirMenuContextual: (m) => set({ menuContextual: m }),
   cerrarMenuContextual: () => set({ menuContextual: null }),
 
+  pedirConfirmacion: (c) => set({ confirmacion: c }),
+  cerrarConfirmacion: () => set({ confirmacion: null }),
+
   moverBloques: (ids, delta) =>
     set((s) => {
       const dentro = new Set(ids)
@@ -1232,13 +1425,44 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       // un id puede ser de cualquiera de los cuatro tipos, así que se barre cada
       // lista. borrar un video se lleva además el audio que se le separó
       const clipsFuera = s.pista.clips.filter((c) => fuera.has(c.id)).map((c) => c.id)
+      let clips = s.pista.clips.filter((c) => !fuera.has(c.id))
+      let capas = s.capas.filter((c) => !fuera.has(c.id))
+      let audios = s.audios.filter(
+        (a) => !fuera.has(a.id) && !(a.vinculadoA && clipsFuera.includes(a.vinculadoA)),
+      )
+      let audioRegiones = s.audioRegiones.filter((r) => !fuera.has(r.id))
+      let { numPistas, altosPista, pistasMeta, nivelesAudio, nivelesTexto } = s
+      // cada carril cierra las filas que el borrado dejó vacías. la poda de video se
+      // aplica antes que la de texto porque ambas tocan las capas
+      const pv = calcularPodaVideo(clips, capas, numPistas, altosPista, pistasMeta)
+      if (pv) {
+        clips = pv.clips
+        capas = pv.capas
+        numPistas = pv.numPistas
+        altosPista = pv.altosPista
+        pistasMeta = pv.pistasMeta
+      }
+      const pa = calcularPodaAudio(audios, audioRegiones, nivelesAudio)
+      if (pa) {
+        audios = pa.audios
+        audioRegiones = pa.audioRegiones
+        nivelesAudio = pa.nivelesAudio
+      }
+      const pt = calcularPodaTexto(capas, nivelesTexto)
+      if (pt) {
+        capas = pt.capas
+        nivelesTexto = pt.nivelesTexto
+      }
       return {
-        pista: { ...s.pista, clips: s.pista.clips.filter((c) => !fuera.has(c.id)) },
-        capas: s.capas.filter((c) => !fuera.has(c.id)),
-        audios: s.audios.filter(
-          (a) => !fuera.has(a.id) && !(a.vinculadoA && clipsFuera.includes(a.vinculadoA)),
-        ),
-        audioRegiones: s.audioRegiones.filter((r) => !fuera.has(r.id)),
+        pista: { ...s.pista, clips },
+        capas,
+        audios,
+        audioRegiones,
+        numPistas,
+        altosPista,
+        pistasMeta,
+        nivelesAudio,
+        nivelesTexto,
         bloquesSeleccionados: [],
         clipSeleccionado: null,
         capaSeleccionada: null,
@@ -1250,13 +1474,26 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   quitarClip: (id) =>
     set((s) => {
       const clips = s.pista.clips.filter((c) => c.id !== id)
-      return {
-        pista: { ...s.pista, clips },
+      const base = {
         // borrar el video se lleva también el audio que se había separado de él
         audios: s.audios.filter((a) => a.vinculadoA !== id),
         clipSeleccionado: s.clipSeleccionado === id ? null : s.clipSeleccionado,
         playhead: Math.min(s.playhead, duracionTotal(clips)),
       }
+      // si al quitar el clip su pista se queda sin nada, esa fila se cierra sola, lo
+      // mismo que al sacar el clip arrastrando
+      const poda = calcularPodaVideo(clips, s.capas, s.numPistas, s.altosPista, s.pistasMeta)
+      if (poda) {
+        return {
+          ...base,
+          numPistas: poda.numPistas,
+          altosPista: poda.altosPista,
+          pistasMeta: poda.pistasMeta,
+          pista: { ...s.pista, clips: poda.clips },
+          capas: poda.capas,
+        }
+      }
+      return { ...base, pista: { ...s.pista, clips } }
     }),
 
   // separa el audio del video: marca el clip como mudo (su sonido ya no viene del
@@ -1358,8 +1595,13 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   moverClip: (id, nuevoInicio) =>
     set((s) => {
       const clip = s.pista.clips.find((c) => c.id === id)
-      const inicio = Math.max(0, nuevoInicio)
-      const delta = clip ? inicio - clip.inicio : 0
+      if (!clip) return {}
+      // los clips no se solapan en una misma pista: el inicio se topa con el vecino
+      const otros = s.pista.clips.filter((c) => c.id !== id && c.pista === clip.pista)
+      const ajustado = inicioSinSolape(otros, Math.max(0, nuevoInicio), clip.duracion, clip.inicio)
+      if (ajustado === null) return {}
+      const inicio = ajustado
+      const delta = inicio - clip.inicio
       return {
         pista: {
           ...s.pista,
@@ -1762,19 +2004,31 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       capasSeleccionadas: id ? [] : s.capasSeleccionadas,
       regionSeleccionada: id ? null : s.regionSeleccionada,
       impactoSeleccionado: id ? null : s.impactoSeleccionado,
+      // un clic normal sobre un clip solo lo selecciona: si se venía del modo recorte
+      // (abierto con el menú, la tecla C o el doble clic) se sale de él, para que
+      // volver a pulsar el clip no lo reabra. entrar al recorte es siempre un gesto
+      // explícito, así que apagarlo aquí no estorba: el menú vuelve a encenderlo justo
+      // después de llamar a seleccionar. mismo criterio que ya usaba Escape
+      herramienta: s.herramienta === 'recortar' ? 'proyecto' : s.herramienta,
+      categoriaClip: s.categoriaClip === 'recortar' ? null : s.categoriaClip,
+      recorteRapido: false,
     })),
 
   limpiarSeleccion: () =>
-    set({
+    set((s) => ({
       clipSeleccionado: null,
       capaSeleccionada: null,
       capasSeleccionadas: [],
       regionSeleccionada: null,
       impactoSeleccionado: null,
       bloquesSeleccionados: [],
-      // soltar la selección cierra también el recorte rápido del visor
+      // soltar la selección cierra también el modo recorte del visor (rápido, por
+      // herramienta o por categoría), para que no quede colgado y se reabra al volver
+      // a pulsar un clip
       recorteRapido: false,
-    }),
+      herramienta: s.herramienta === 'recortar' ? 'proyecto' : s.herramienta,
+      categoriaClip: s.categoriaClip === 'recortar' ? null : s.categoriaClip,
+    })),
 
   // el nivel nuevo aparece encima de los demás, vacío y con el alto estándar y
   // sus metadatos en reposo
@@ -1825,6 +2079,10 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     }),
 
   setInsercionPista: (indice) => set({ insercionPista: indice }),
+  setInsercionAudio: (nivel) => set({ insercionAudio: nivel }),
+  setInsercionTexto: (nivel) => set({ insercionTexto: nivel }),
+  setFilaAudioResaltada: (nivel) => set({ filaAudioResaltada: nivel }),
+  setFilaTextoResaltada: (nivel) => set({ filaTextoResaltada: nivel }),
 
   setArrastreVivo: (a) => set({ arrastreVivo: a }),
   setGuiaImantado: (segundo) => set({ guiaImantado: segundo }),
@@ -1925,6 +2183,23 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       }
     }),
 
+  podarPistasVacias: () =>
+    set((s) => {
+      const poda = calcularPodaVideo(s.pista.clips, s.capas, s.numPistas, s.altosPista, s.pistasMeta)
+      if (!poda) return {}
+      return {
+        numPistas: poda.numPistas,
+        altosPista: poda.altosPista,
+        pistasMeta: poda.pistasMeta,
+        pista: { ...s.pista, clips: poda.clips },
+        capas: poda.capas,
+      }
+    }),
+
+  podarNivelesAudioVacios: () => set((s) => calcularPodaAudio(s.audios, s.audioRegiones, s.nivelesAudio) ?? {}),
+
+  podarNivelesTextoVacios: () => set((s) => calcularPodaTexto(s.capas, s.nivelesTexto) ?? {}),
+
   alternarSilencioPista: (indice) =>
     set((s) => ({
       pistasMeta: s.pistasMeta.map((m, i) => (i === indice ? { ...m, silenciada: !m.silenciada } : m)),
@@ -2007,12 +2282,26 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   moverClipAPista: (id, pista) =>
     set((s) => {
+      const clip = s.pista.clips.find((c) => c.id === id)
+      if (!clip) return {}
       const destino = Math.min(s.numPistas - 1, Math.max(0, pista))
+      if (destino === clip.pista) return {}
+      // dos clips no se solapan en un mismo nivel. si la pista destino está ocupada en
+      // el tramo del clip, en vez de trabarse se desliza al hueco libre más cercano de
+      // esa pista, de modo que arrastrar hacia arriba un clip que asomaba por debajo de
+      // otro lo encaja a su lado al momento
+      const otros = s.pista.clips.filter((c) => c.id !== id && c.pista === destino)
+      const inicio = huecoMasCercano(otros, clip.inicio, clip.duracion)
+      const delta = inicio - clip.inicio
       return {
         pista: {
           ...s.pista,
-          clips: s.pista.clips.map((c) => (c.id === id ? { ...c, pista: destino } : c)),
+          clips: s.pista.clips.map((c) => (c.id === id ? { ...c, pista: destino, inicio } : c)),
         },
+        // el audio separado de este clip lo sigue si el encaje cambió su inicio
+        audios: delta
+          ? s.audios.map((a) => (a.vinculadoA === id ? { ...a, inicio: Math.max(0, a.inicio + delta) } : a))
+          : s.audios,
       }
     }),
 
@@ -2147,9 +2436,20 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   moverAudioNivel: (id, nivel) =>
     set((s) => {
       const destino = Math.max(0, Math.min(MAX_NIVELES - 1, nivel))
+      // un audio importado no se solapa con otro en su fila; las franjas de ganancia
+      // sí pueden. igual que los clips, si la fila destino está ocupada en el tramo del
+      // audio este se encaja al hueco libre más cercano en vez de trabarse
+      const audio = s.audios.find((a) => a.id === id)
+      let audios = s.audios
+      if (audio && destino !== (audio.nivel ?? 0)) {
+        const otros = s.audios.filter((a) => a.id !== id && (a.nivel ?? 0) === destino)
+        const inicio = huecoMasCercano(otros, audio.inicio, audio.duracion)
+        audios = s.audios.map((a) => (a.id === id ? { ...a, nivel: destino, inicio } : a))
+      } else {
+        audios = s.audios.map((a) => (a.id === id ? { ...a, nivel: destino } : a))
+      }
       // el carril de audio comparte filas entre audios importados y regiones de
-      // ganancia, así que se busca el id en ambas listas y se reubica donde toque
-      const audios = s.audios.map((a) => (a.id === id ? { ...a, nivel: destino } : a))
+      // ganancia, así que la región (que sí puede solapar) solo cambia de fila
       const audioRegiones = s.audioRegiones.map((r) => (r.id === id ? { ...r, nivel: destino } : r))
       const nivelesAudio = Math.max(s.nivelesAudio, Math.min(MAX_NIVELES, destino + 1))
       return { audios, audioRegiones, nivelesAudio }
@@ -2157,19 +2457,18 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   agregarTexto: () =>
     set((s) => {
-      // igual que al separar un audio: la capa nueva busca la primera fila libre
-      // del carril de texto y figuras en vez de amontonarse en la de abajo, así los
-      // elementos se reparten por niveles y no se pisan. si todas están ocupadas se
-      // abre una nueva hasta el tope
-      const destino = nivelLibreTexto(s.capas)
-      const capa = { ...crearCapaTexto(s.playhead, s.resolucion.alto), nivel: destino }
+      // los textos se apilan en la misma fila del carril (la de abajo) uno al lado del
+      // otro en el tiempo, porque como overlays sí pueden convivir en un mismo nivel.
+      // añadir otro texto no debe abrir una fila nueva: nace en la fila 0, en el
+      // cabezal, junto a los que ya haya
+      const capa = { ...crearCapaTexto(s.playhead, s.resolucion.alto), nivel: 0 }
       return {
         capas: [...s.capas, capa],
         capaSeleccionada: capa.id,
         capasSeleccionadas: [capa.id],
         clipSeleccionado: null,
         herramienta: 'texto',
-        nivelesTexto: Math.max(s.nivelesTexto, destino + 1),
+        nivelesTexto: Math.max(s.nivelesTexto, 1),
       }
     }),
 
@@ -2242,10 +2541,27 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     })),
 
   quitarCapa: (id) =>
-    set((s) => ({
-      capas: s.capas.filter((c) => c.id !== id),
-      capaSeleccionada: s.capaSeleccionada === id ? null : s.capaSeleccionada,
-    })),
+    set((s) => {
+      const capas = s.capas.filter((c) => c.id !== id)
+      const base = { capaSeleccionada: s.capaSeleccionada === id ? null : s.capaSeleccionada }
+      // una capa de texto, dibujo o censura puede dejar vacía su fila de texto; una
+      // figura o imagen, su pista de video. se comprueban ambos carriles
+      const pt = calcularPodaTexto(capas, s.nivelesTexto)
+      const pv = calcularPodaVideo(s.pista.clips, pt ? pt.capas : capas, s.numPistas, s.altosPista, s.pistasMeta)
+      if (pv) {
+        return {
+          ...base,
+          nivelesTexto: pt ? pt.nivelesTexto : s.nivelesTexto,
+          capas: pv.capas,
+          numPistas: pv.numPistas,
+          altosPista: pv.altosPista,
+          pistasMeta: pv.pistasMeta,
+          pista: { ...s.pista, clips: pv.clips },
+        }
+      }
+      if (pt) return { ...base, capas: pt.capas, nivelesTexto: pt.nivelesTexto }
+      return { ...base, capas }
+    }),
 
   duplicarCapa: (id) => {
     const s = get()
@@ -2742,6 +3058,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     })),
 
   setVolumenGlobal: (v) => set({ volumenGlobal: Math.max(0, Math.min(2, v)) }),
+  // el de la vista previa va de 0 a 1 (0 a 100 %): es un mando para escuchar, no
+  // multiplica el sonido más allá del original
+  setVolumenPreview: (v) => set({ volumenPreview: Math.max(0, Math.min(1, v)) }),
 
   agregarRegionAudio: () =>
     set((s) => {
@@ -2766,10 +3085,12 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     })),
 
   quitarRegionAudio: (id) =>
-    set((s) => ({
-      audioRegiones: s.audioRegiones.filter((r) => r.id !== id),
-      regionSeleccionada: s.regionSeleccionada === id ? null : s.regionSeleccionada,
-    })),
+    set((s) => {
+      const audioRegiones = s.audioRegiones.filter((r) => r.id !== id)
+      const base = { regionSeleccionada: s.regionSeleccionada === id ? null : s.regionSeleccionada }
+      const pa = calcularPodaAudio(s.audios, audioRegiones, s.nivelesAudio)
+      return pa ? { ...base, ...pa } : { ...base, audioRegiones }
+    }),
 
   duplicarRegionAudio: (id) => {
     const s = get()
@@ -2815,9 +3136,15 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     })),
 
   moverAudio: (id, nuevoInicio) =>
-    set((s) => ({
-      audios: s.audios.map((a) => (a.id === id ? { ...a, inicio: Math.max(0, nuevoInicio) } : a)),
-    })),
+    set((s) => {
+      const audio = s.audios.find((a) => a.id === id)
+      if (!audio) return {}
+      // los audios tampoco se solapan entre sí en una misma fila
+      const otros = s.audios.filter((a) => a.id !== id && (a.nivel ?? 0) === (audio.nivel ?? 0))
+      const ajustado = inicioSinSolape(otros, Math.max(0, nuevoInicio), audio.duracion, audio.inicio)
+      if (ajustado === null) return {}
+      return { audios: s.audios.map((a) => (a.id === id ? { ...a, inicio: ajustado } : a)) }
+    }),
 
   // recortar un audio por sus bordes. el borde de inicio mueve además el punto de
   // entrada en la fuente, y ninguno de los dos puede pasar de lo que dura el
@@ -2848,10 +3175,12 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     })),
 
   quitarAudio: (id) =>
-    set((s) => ({
-      audios: s.audios.filter((a) => a.id !== id),
-      regionSeleccionada: s.regionSeleccionada === id ? null : s.regionSeleccionada,
-    })),
+    set((s) => {
+      const audios = s.audios.filter((a) => a.id !== id)
+      const base = { regionSeleccionada: s.regionSeleccionada === id ? null : s.regionSeleccionada }
+      const pa = calcularPodaAudio(audios, s.audioRegiones, s.nivelesAudio)
+      return pa ? { ...base, ...pa } : { ...base, audios }
+    }),
 
   setVolumenAudio: (id, volumen) =>
     set((s) => ({

@@ -206,7 +206,13 @@ export function useAtajos() {
           }
           if (st.clipSeleccionado) st.quitarClip(st.clipSeleccionado)
           else if (st.capaSeleccionada) st.quitarCapa(st.capaSeleccionada)
-          else if (st.regionSeleccionada) st.quitarRegionAudio(st.regionSeleccionada)
+          else if (st.regionSeleccionada) {
+            // regionSeleccionada guarda tanto un audio importado como una franja de
+            // ganancia, así que se mira en qué lista vive para borrar de la correcta.
+            // antes siempre se llamaba a quitarRegionAudio y un audio no se borraba
+            if (st.audios.some((a) => a.id === st.regionSeleccionada)) st.quitarAudio(st.regionSeleccionada)
+            else st.quitarRegionAudio(st.regionSeleccionada)
+          }
           return
 
         case 'ArrowLeft':

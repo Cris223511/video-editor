@@ -5,7 +5,8 @@ import Tooltip from '../../../components/ui/Tooltip'
 import BarraGlobales from '../BarraGlobales'
 import { OndaAudio } from './AudioBlock'
 import FantasmaArrastre from './FantasmaArrastre'
-import { TIPO_ARRASTRE } from '../MediaLibrary'
+import { TIPO_ARRASTRE, tipoClaseArrastre } from '../MediaLibrary'
+import { nivelBajoCursor, separacionBajoCursor, porDebajoDelUltimo } from './nivelCursor'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
 import { duracionProyecto } from '../../../lib/timeline/clips'
@@ -119,6 +120,15 @@ export default function Timeline({
   // null, ahí se dibuja la guía celeste que promete crear una pista al soltar
   const insercionPista = useEditorStore((s) => s.insercionPista)
   const setInsercionPista = useEditorStore((s) => s.setInsercionPista)
+  const insercionAudio = useEditorStore((s) => s.insercionAudio)
+  const setInsercionAudio = useEditorStore((s) => s.setInsercionAudio)
+  const insercionTexto = useEditorStore((s) => s.insercionTexto)
+  const setInsercionTexto = useEditorStore((s) => s.setInsercionTexto)
+  // filas que quedan iluminadas cuando el cursor pasa por encima de una fila ya
+  // existente al mover un bloque de audio o de texto, el mismo aviso que da la
+  // pista de video con el clip. las setean los propios bloques durante el arrastre
+  const filaAudioResaltada = useEditorStore((s) => s.filaAudioResaltada)
+  const filaTextoResaltada = useEditorStore((s) => s.filaTextoResaltada)
   // instante donde pintar la línea guía del imantado mientras se mueve o recorta
   // un bloque; null cuando ningún borde está enganchado a un anclaje
   const guiaImantado = useEditorStore((s) => s.guiaImantado)
@@ -135,6 +145,11 @@ export default function Timeline({
   // contenedor de las filas de video; su distancia al borde del contenido sitúa
   // la guía de inserción a la altura exacta de cada separación entre niveles
   const filasRef = useRef<HTMLDivElement>(null)
+  // contenedor de las filas de audio; sirve para situar la guía de inserción de
+  // audio cuando se arrastra un audio desde el panel de medios
+  const filasAudioRef = useRef<HTMLDivElement>(null)
+  // fila de audio resaltada mientras se arrastra un audio desde el panel de medios
+  const [audioResaltado, setAudioResaltado] = useState<number | null>(null)
   // ancho visible del contenedor con desplazamiento. se mide en vivo para que la
   // regla y las filas cubran todo el ancho disponible aunque el proyecto sea
   // corto o esté vacío, y no se corten a media pista
@@ -278,7 +293,13 @@ export default function Timeline({
   useEffect(() => {
     const limpiar = () => {
       setPistaResaltada(null)
-      if (useEditorStore.getState().insercionPista !== null) setInsercionPista(null)
+      setAudioResaltado(null)
+      const st = useEditorStore.getState()
+      if (st.insercionPista !== null) setInsercionPista(null)
+      if (st.insercionAudio !== null) setInsercionAudio(null)
+      if (st.insercionTexto !== null) setInsercionTexto(null)
+      if (st.filaAudioResaltada !== null) st.setFilaAudioResaltada(null)
+      if (st.filaTextoResaltada !== null) st.setFilaTextoResaltada(null)
     }
     window.addEventListener('dragend', limpiar)
     window.addEventListener('drop', limpiar)
@@ -426,6 +447,26 @@ export default function Timeline({
     return base + arriba + altosPista[k] + HUECO_PISTA / 2
   }
 
+  // altura de la guía de inserción de audio, relativa al contenedor de sus filas.
+  // el nivel 0 (que llega al arrastrar por debajo del carril) cae al pie de todo; el
+  // resto se sitúa en el hueco encima de la fila de ese nivel. las filas se dibujan
+  // del nivel mayor al menor, igual que en video
+  function yInsercionAudio(k: number): number {
+    const paso = altoFilaAudio + GAP_FILAS
+    if (k <= 0) return nivelesAudio * paso - GAP_FILAS / 2
+    // separacionBajoCursor devuelve el nivel de arriba de la juntura (el mayor de
+    // los dos). ese nivel se dibuja en la fila de índice nivelesAudio-1-k, y la
+    // línea va en su borde inferior, o sea una fila más abajo de su borde superior
+    return (nivelesAudio - k) * paso - GAP_FILAS / 2
+  }
+
+  // lo mismo para el carril de texto
+  function yInsercionTexto(k: number): number {
+    const paso = altoFilaTexto + GAP_FILAS
+    if (k <= 0) return nivelesTexto * paso - GAP_FILAS / 2
+    return (nivelesTexto - k) * paso - GAP_FILAS / 2
+  }
+
   // mientras se pasea un medio por encima de la línea de tiempo se resuelve, con
   // la misma lógica que el arrastre de un clip, si el cursor apunta a una fila (se
   // ilumina ese nivel) o a una separación (se enciende la guía de pista nueva).
@@ -436,11 +477,40 @@ export default function Timeline({
   // ofrecer una pista de video nueva ni encender la guía
   const MARGEN_PISTAS = 18
 
+  // apaga cualquier resalte o guía del arrastre de medios, de video y de audio
+  function apagarSenales() {
+    if (insercionPista !== null) setInsercionPista(null)
+    if (pistaResaltada !== null) setPistaResaltada(null)
+    if (audioResaltado !== null) setAudioResaltado(null)
+    if (insercionAudio !== null) setInsercionAudio(null)
+  }
+
   function alArrastrarMedioEncima(e: React.DragEvent) {
     if (!e.dataTransfer.types.includes(TIPO_ARRASTRE)) return
     e.preventDefault()
+    // un audio se sombrea y se inserta sobre el carril de audio, no sobre las pistas
+    // de video. la clase viaja en su propio tipo, que sí se puede leer en el dragover
+    if (e.dataTransfer.types.includes(tipoClaseArrastre('audio'))) {
+      if (pistaResaltada !== null) setPistaResaltada(null)
+      if (insercionPista !== null) setInsercionPista(null)
+      const junta = separacionBajoCursor(e.clientX, e.clientY, 'nivelAudio')
+      if (junta !== null || porDebajoDelUltimo(e.clientX, e.clientY, 'nivelAudio')) {
+        const ins = junta ?? 0
+        if (ins !== insercionAudio) setInsercionAudio(ins)
+        if (audioResaltado !== null) setAudioResaltado(null)
+      } else {
+        const n = nivelBajoCursor(e.clientX, e.clientY, 'nivelAudio')
+        if (insercionAudio !== null) setInsercionAudio(null)
+        if (n !== null && n !== audioResaltado) setAudioResaltado(n)
+        else if (n === null && audioResaltado !== null) setAudioResaltado(null)
+      }
+      return
+    }
+    // el resto (video e imagen) van a las pistas de video
     const stack = filasRef.current
     if (!stack) return
+    if (audioResaltado !== null) setAudioResaltado(null)
+    if (insercionAudio !== null) setInsercionAudio(null)
     // si el cursor se fue lejos de las pistas de video (a la zona de audio o texto),
     // no se enciende ninguna guía ni resalte: la guía de pista nueva solo vive
     // pegada a las pistas de video, no paseando por toda la línea de tiempo
@@ -465,32 +535,42 @@ export default function Timeline({
   // cruzar por encima de un clip o una fila hija (que también disparan dragleave)
   function alSalirMedio(e: React.DragEvent) {
     if (e.currentTarget.contains(e.relatedTarget as Node)) return
-    setInsercionPista(null)
-    setPistaResaltada(null)
+    apagarSenales()
   }
 
   // al soltar el medio aterriza donde la señal prometía: en la fila bajo el cursor
-  // o, si se apuntaba a una separación, en una pista nueva abierta ahí mismo
+  // o, si se apuntaba a una separación, en una fila o pista nueva abierta ahí mismo
   function alSoltar(e: React.DragEvent) {
     e.preventDefault()
+    const id = e.dataTransfer.getData(TIPO_ARRASTRE)
+    const asset = id ? medios.find((m) => m.id === id) : undefined
+
+    // los audios se resuelven contra el carril de audio, igual que en el arrastre
+    if (asset?.clase === 'audio') {
+      const junta = separacionBajoCursor(e.clientX, e.clientY, 'nivelAudio')
+      const debajo = porDebajoDelUltimo(e.clientX, e.clientY, 'nivelAudio')
+      apagarSenales()
+      if (junta !== null || debajo) agregarDesdeAsset(asset, { insertarAudioEn: junta ?? 0 })
+      else {
+        const n = nivelBajoCursor(e.clientX, e.clientY, 'nivelAudio')
+        agregarDesdeAsset(asset, { audioNivel: n ?? 0 })
+      }
+      return
+    }
+
     const stack = filasRef.current
     let v = stack
       ? resolverDestinoVertical(stack, e.clientY, numPistas)
       : { destino: 0, insercion: null }
     // soltado lejos de las pistas de video (sobre audio o texto): no se abre una
-    // pista nueva, el medio cae en la pista de video más baja. si es audio o imagen
-    // su propia lógica ya lo lleva a donde le toca sin mirar esto
+    // pista nueva, el medio cae en la pista de video más baja
     if (stack) {
       const rect = stack.getBoundingClientRect()
       if (e.clientY < rect.top - MARGEN_PISTAS || e.clientY > rect.bottom + MARGEN_PISTAS) {
         v = { destino: 0, insercion: null }
       }
     }
-    setInsercionPista(null)
-    setPistaResaltada(null)
-    const id = e.dataTransfer.getData(TIPO_ARRASTRE)
-    if (!id) return
-    const asset = medios.find((m) => m.id === id)
+    apagarSenales()
     if (!asset) return
     if (v.insercion !== null) agregarDesdeAsset(asset, { insertarEn: v.insercion })
     else agregarDesdeAsset(asset, { pista: v.destino ?? 0 })
@@ -761,12 +841,15 @@ export default function Timeline({
                   saber a qué fila mudarse. la fila más alta encabeza la pila. las
                   figuras y las imágenes ya no viven aquí: se fueron a las pistas de
                   video */}
-              <div className="flex flex-col" style={{ gap: GAP_FILAS }}>
+              <div className="relative flex flex-col" style={{ gap: GAP_FILAS }}>
                 {Array.from({ length: nivelesTexto }, (_, i) => nivelesTexto - 1 - i).map((n) => {
                   const propias = capas.filter(
                     (c) => c.tipo !== 'imagen' && c.tipo !== 'figura' && (c.nivel ?? 0) === n,
                   )
                   const filaVacia = propias.length === 0
+                  // se ilumina en ámbar mientras un bloque de texto se arrastra por
+                  // encima, como aviso de dónde va a caer
+                  const resaltada = filaTextoResaltada === n
                   return (
                     <div
                       key={`texto-${n}`}
@@ -775,8 +858,12 @@ export default function Timeline({
                         e.preventDefault()
                         abrirMenuContextual({ x: e.clientX, y: e.clientY, tipo: 'carril-texto', id: String(n) })
                       }}
-                      className="relative overflow-hidden rounded-lg"
-                      style={{ height: altoFilaTexto, background: 'rgb(var(--border) / 0.05)' }}
+                      className="relative overflow-hidden rounded-lg transition-[background-color,box-shadow] duration-150"
+                      style={{
+                        height: altoFilaTexto,
+                        background: resaltada ? 'rgb(245 158 11 / 0.16)' : 'rgb(var(--border) / 0.05)',
+                        boxShadow: resaltada ? 'inset 0 0 0 1px rgb(245 158 11 / 0.4)' : undefined,
+                      }}
                     >
                       {filaVacia && (
                         <div className="pointer-events-none flex h-full items-center gap-2 px-3 text-[11px] text-[color:var(--muted)]">
@@ -790,6 +877,25 @@ export default function Timeline({
                     </div>
                   )
                 })}
+                {/* guía de inserción de una fila de texto nueva, en ámbar como el
+                    carril, al mover un texto, dibujo o censura sobre una separación */}
+                {insercionTexto !== null && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 z-30 flex items-center"
+                    style={{ top: yInsercionTexto(insercionTexto) }}
+                  >
+                    <span
+                      className="h-0.5 w-full animate-pulse rounded-full"
+                      style={{ background: '#f59e0b', boxShadow: '0 0 8px rgba(245,158,11,0.9)' }}
+                    />
+                    <span
+                      className="absolute left-2 -translate-y-px rounded px-1.5 py-0.5 text-[10px] font-medium text-white"
+                      style={{ background: '#f59e0b' }}
+                    >
+                      Nueva fila aquí
+                    </span>
+                  </div>
+                )}
               </div>
                 </>
               )}
@@ -799,7 +905,7 @@ export default function Timeline({
                   cuando el carril entero está vacío, enseña el rótulo y una onda muy
                   tenue de fondo para que no se vea plano. cada fila lleva su
                   data-nivel-audio para recibir el bloque que se suelte encima */}
-              <div className="flex flex-col" style={{ gap: GAP_FILAS }}>
+              <div ref={filasAudioRef} className="relative flex flex-col" style={{ gap: GAP_FILAS }}>
                 {Array.from({ length: nivelesAudio }, (_, i) => nivelesAudio - 1 - i).map((n) => {
                   const regionesFila = audioRegiones.filter((r) => (r.nivel ?? 0) === n)
                   const audiosFila = audios.filter((a) => (a.nivel ?? 0) === n)
@@ -807,6 +913,10 @@ export default function Timeline({
                   // cada fila añadida se ve igual que la primera y no queda una banda
                   // muerta sin nada que la explique
                   const filaVacia = regionesFila.length === 0 && audiosFila.length === 0
+                  // esta fila recibiría el audio que se arrastra ahora mismo, ya sea
+                  // uno traído del panel (audioResaltado, local) o un bloque que se
+                  // está moviendo por encima de ella (filaAudioResaltada, del store)
+                  const resaltada = audioResaltado === n || filaAudioResaltada === n
                   return (
                     <div
                       key={`audio-${n}`}
@@ -815,8 +925,12 @@ export default function Timeline({
                         e.preventDefault()
                         abrirMenuContextual({ x: e.clientX, y: e.clientY, tipo: 'carril-audio', id: String(n) })
                       }}
-                      className="group relative overflow-hidden rounded-lg"
-                      style={{ height: altoFilaAudio, background: 'rgb(var(--border) / 0.05)' }}
+                      className="group relative overflow-hidden rounded-lg transition-[background-color,box-shadow] duration-150"
+                      style={{
+                        height: altoFilaAudio,
+                        background: resaltada ? 'rgb(16 185 129 / 0.16)' : 'rgb(var(--border) / 0.05)',
+                        boxShadow: resaltada ? 'inset 0 0 0 1px rgb(16 185 129 / 0.4)' : undefined,
+                      }}
                     >
                       {filaVacia ? (
                         <>
@@ -859,6 +973,26 @@ export default function Timeline({
                     </div>
                   )
                 })}
+                {/* guía de inserción de una fila de audio nueva, en verde como el
+                    carril, al arrastrar un audio desde el panel sobre una separación
+                    o por debajo del carril */}
+                {insercionAudio !== null && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 z-30 flex items-center"
+                    style={{ top: yInsercionAudio(insercionAudio) }}
+                  >
+                    <span
+                      className="h-0.5 w-full animate-pulse rounded-full"
+                      style={{ background: '#10b981', boxShadow: '0 0 8px rgba(16,185,129,0.9)' }}
+                    />
+                    <span
+                      className="absolute left-2 -translate-y-px rounded px-1.5 py-0.5 text-[10px] font-medium text-white"
+                      style={{ background: '#10b981' }}
+                    >
+                      Nueva fila aquí
+                    </span>
+                  </div>
+                )}
               </div>
                 </>
               )}

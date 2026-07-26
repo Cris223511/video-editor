@@ -221,8 +221,22 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
       // nivel o abrir uno nuevo); moviendo a los lados estorbaba
       if (Math.abs(ev.clientY - startY) > UMBRAL_VERT) {
         useEditorStore.getState().setArrastreVivo({ etiqueta: 'Audio', x: ev.clientX, y: ev.clientY })
+        const junta = separacionBajoCursor(ev.clientX, ev.clientY, 'nivelAudio')
+        const debajo = porDebajoDelUltimo(ev.clientX, ev.clientY, 'nivelAudio')
+        const st = useEditorStore.getState()
+        if (junta !== null || debajo) {
+          st.setInsercionAudio(junta !== null ? junta : 0)
+          st.setFilaAudioResaltada(null)
+        } else {
+          // sobre una fila ya existente se ilumina esa fila, como el clip con su pista
+          st.setInsercionAudio(null)
+          st.setFilaAudioResaltada(nivelBajoCursor(ev.clientX, ev.clientY, 'nivelAudio'))
+        }
       } else {
-        useEditorStore.getState().setArrastreVivo(null)
+        const st = useEditorStore.getState()
+        st.setArrastreVivo(null)
+        st.setInsercionAudio(null)
+        st.setFilaAudioResaltada(null)
       }
 
       ultimoX = ev.clientX
@@ -248,6 +262,8 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     }
     const soltar = () => {
       useEditorStore.getState().setArrastreVivo(null)
+      useEditorStore.getState().setInsercionAudio(null)
+      useEditorStore.getState().setFilaAudioResaltada(null)
       // alt y clic seco: el bloque entra o sale del conjunto
       if (!movido && conAlt) alternarBloque(region.id)
       setGuiaImantado(null)
@@ -263,6 +279,8 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
         const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelAudio')
         if (destino !== null) moverAudioNivel(idGesto, destino)
       }
+      // si el movimiento dejó vacía la fila de origen, se cierra sola
+      if (movido) useEditorStore.getState().podarNivelesAudioVacios()
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)
     }

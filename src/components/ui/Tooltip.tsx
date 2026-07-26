@@ -33,8 +33,12 @@ export function TooltipProvider({ children }: { children: ReactNode }) {
   return (
     // sin espera: el tooltip sale en cuanto el cursor entra. tener que dejar el
     // ratón quieto un momento para saber qué hace un botón entorpece más de lo
-    // que ayuda, sobre todo en una barra llena de iconos
-    <Tip.Provider delayDuration={0} skipDelayDuration={0}>
+    // que ayuda, sobre todo en una barra llena de iconos.
+    // disableHoverableContent: la burbuja se cierra en cuanto el cursor sale del
+    // botón, sin quedarse abierta mientras el ratón va hacia ella o pasa por encima.
+    // por defecto radix la mantiene viva sobre su propia zona, que es justo lo que
+    // molestaba: al acercar el cursor no desaparecía
+    <Tip.Provider delayDuration={0} skipDelayDuration={0} disableHoverableContent>
       {children}
     </Tip.Provider>
   )
@@ -70,7 +74,7 @@ export default function Tooltip({
   }, [])
 
   return (
-    <Tip.Root open={abierto} onOpenChange={setAbierto} delayDuration={retardo}>
+    <Tip.Root open={abierto} onOpenChange={setAbierto} delayDuration={retardo} disableHoverableContent>
       <Tip.Trigger asChild>{children}</Tip.Trigger>
       <Tip.Portal>
         <Tip.Content
@@ -85,6 +89,12 @@ export default function Tooltip({
             color: 'var(--text)',
             border: '1px solid rgb(var(--border) / 0.16)',
             boxShadow: '0 8px 24px rgb(6 12 24 / 0.18)',
+            // una burbuja de ayuda es solo informativa: no debe atrapar el cursor ni
+            // dejarse seleccionar. sin esto, al mover el ratón hacia ella se quedaba
+            // por encima y estorbaba. los popovers de configuración no usan este
+            // componente, así que su interacción no se ve afectada
+            pointerEvents: 'none',
+            userSelect: 'none',
           }}
         >
           {/* hasta dos líneas antes de recortar: un texto largo en una sola línea
