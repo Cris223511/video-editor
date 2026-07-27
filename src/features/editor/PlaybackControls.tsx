@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { Maximize2, Minimize2, RotateCcw, RotateCw, Volume2, Volume1, VolumeX } from 'lucide-react'
 import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
-import { Deslizador } from '../../components/ui/Controls'
 import { useEditorStore } from '../../store/useEditorStore'
 import { duracionProyecto } from '../../lib/timeline/clips'
 import { formatearDuracion } from '../../lib/format/duracion'
@@ -45,23 +44,33 @@ function ControlVolumen({ oscuro = false }: { oscuro?: boolean }) {
       </Tooltip>
       {abierto && (
         <div
-          className="absolute bottom-full left-1/2 z-[70] mb-2 flex w-60 -translate-x-1/2 flex-col gap-2.5 rounded-xl px-3.5 py-3 shadow-xl"
+          className="absolute bottom-full left-1/2 z-[70] mb-2 flex -translate-x-1/2 flex-col items-center gap-2 rounded-xl px-3 py-3 shadow-xl"
           style={{
             background: 'rgb(var(--surface))',
             border: '1px solid rgb(var(--border) / 0.16)',
             boxShadow: '0 10px 28px rgb(6 12 24 / 0.24)',
           }}
         >
-          {/* mismo formato que el volumen general del panel de audio: una etiqueta con
-              el porcentaje y, debajo, el deslizador estilizado de la app */}
-          <span className="text-xs font-medium text-[color:var(--muted)]">Volumen de la vista previa ({pct}%)</span>
-          <Deslizador valor={pct} min={0} max={100} onChange={(v) => setVolumen(v / 100)} />
-          <button
-            onClick={() => setVolumen(volumen === 0 ? 1 : 0)}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-black/10 py-2 text-sm font-medium transition-colors hover:border-brand hover:text-brand dark:border-white/10"
-          >
-            <Icon name="audio" size={16} /> {volumen === 0 ? 'Quitar silencio' : 'Silenciar'}
-          </button>
+          <span className="text-[11px] font-semibold tabular-nums text-[color:var(--text)]">{pct}</span>
+          {/* deslizador de pie (girado un cuarto de vuelta) con el mismo estilo que el
+              Deslizador de la app: track redondeado con relleno de color de acento hasta
+              el valor y el pulgar en color de marca, en vez del control nativo del navegador */}
+          <div className="relative h-28 w-6">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={pct}
+              onChange={(e) => setVolumen(Number(e.target.value) / 100)}
+              aria-label="Volumen de la vista previa"
+              className="absolute left-1/2 top-1/2 h-1.5 cursor-pointer appearance-none rounded-full accent-brand"
+              style={{
+                width: 112,
+                transform: 'translate(-50%, -50%) rotate(-90deg)',
+                background: `linear-gradient(to right, rgb(var(--accent)) ${pct}%, rgb(var(--border) / 0.18) ${pct}%)`,
+              }}
+            />
+          </div>
         </div>
       )}
     </div>
