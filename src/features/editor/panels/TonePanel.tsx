@@ -50,6 +50,11 @@ export default function TonePanel() {
   const resetTono = useEditorStore((s) => s.resetTono)
   const actualizarCapa = useEditorStore((s) => s.actualizarCapa)
   const medios = useProjectStore((s) => s.medios)
+  // canal de curva que se está editando. las cuatro curvas ya no se apilan: se elige
+  // una con las pestañas y se muestra solo esa. vive aquí arriba, con el resto de los
+  // hooks, porque más abajo hay un return temprano cuando no hay nada seleccionado y
+  // un hook después de ese return rompería las reglas de los hooks al deseleccionar
+  const [curvaActiva, setCurvaActiva] = useState<keyof Curvas>('maestra')
 
   const clip = clips.find((c) => c.id === clipSeleccionado)
   const capaImagen = capas.find((c) => c.id === capaSeleccionada && c.tipo === 'imagen') as
@@ -83,10 +88,6 @@ export default function TonePanel() {
 
   const ruedas = tono.ruedas ?? RUEDAS_NEUTRAS
   const curvas = tono.curvas ?? CURVAS_NEUTRAS
-  // canal de curva que se está editando. las cuatro curvas ya no se apilan: se
-  // elige una con las pestañas y se muestra solo esa, que en un panel estrecho es
-  // mucho más cómodo que verlas todas a la vez
-  const [curvaActiva, setCurvaActiva] = useState<keyof Curvas>('maestra')
   const canalActivo = CANALES.find((c) => c.campo === curvaActiva) ?? CANALES[0]
 
   function cambiarRueda(zona: keyof Ruedas, p: PuntoRueda) {
