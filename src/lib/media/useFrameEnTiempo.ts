@@ -18,11 +18,13 @@ export function useFrameEnTiempo(url: string | undefined, segundo: number): stri
       return
     }
     let vivo = true
+    // respiro corto: en reproducción coalesce los fotogramas seguidos, pero al abrir
+    // el panel en pausa el frame correcto aparece casi al instante
     const t = window.setTimeout(() => {
       frameDeVideo(url, segundo).then((f) => {
         if (vivo && f) setFrame(f)
       })
-    }, 120)
+    }, 40)
     return () => {
       vivo = false
       window.clearTimeout(t)

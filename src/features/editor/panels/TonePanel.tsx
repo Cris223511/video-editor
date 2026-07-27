@@ -135,11 +135,12 @@ export default function TonePanel() {
     })
   }
 
-  // fondo de las muestras: para un video, el fotograma que se ve ahora en el visor (y
-  // mientras se captura, la miniatura del medio como respaldo), de modo que al pasar
-  // el cursor la reproducción continúe desde ese mismo frame sin dar un salto. para
-  // una imagen, la propia imagen
-  const miniatura = videoUrl ? frameActual ?? medioClip?.miniatura : clip ? medioClip?.miniatura : capaImagen?.src
+  // fondo de las muestras: para un video, el fotograma que se ve ahora en el visor, de
+  // modo que al pasar el cursor la reproducción continúe desde ese mismo frame sin dar
+  // un salto. mientras se captura no se enseña ninguna miniatura vieja (marcado con
+  // cargando, que pinta un fondo neutro). para una imagen, la propia imagen
+  const miniatura = videoUrl ? frameActual : clip ? medioClip?.miniatura : capaImagen?.src
+  const cargandoFrame = !!videoUrl && !frameActual
 
   return (
     <div className="flex flex-col gap-4">
@@ -149,7 +150,7 @@ export default function TonePanel() {
         </div>
         {/* un preset solo rellena los ajustes de abajo, así que después se puede
             seguir afinando a mano sin perder nada */}
-        <PresetsColor tono={tono} miniatura={miniatura} videoUrl={videoUrl} tiempo={tiempoFrame} onAplicar={(t) => aplicar(t)} />
+        <PresetsColor tono={tono} miniatura={miniatura} videoUrl={videoUrl} tiempo={tiempoFrame} cargando={cargandoFrame} onAplicar={(t) => aplicar(t)} />
       </div>
 
       <div>

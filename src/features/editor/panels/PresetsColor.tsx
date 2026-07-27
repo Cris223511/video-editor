@@ -30,6 +30,7 @@ export default function PresetsColor({
   miniatura,
   videoUrl,
   tiempo = 0,
+  cargando = false,
   onAplicar,
 }: {
   tono: AjusteTono
@@ -39,6 +40,9 @@ export default function PresetsColor({
   // segundo del archivo que se está viendo en el visor, para que la muestra arranque
   // desde ese mismo frame y no desde el principio
   tiempo?: number
+  // mientras se captura el fotograma del visor, para pintar un fondo neutro en vez de
+  // enseñar una miniatura vieja o el degradado de muestra, que despistaban
+  cargando?: boolean
   onAplicar: (t: AjusteTono) => void
 }) {
   const [categoria, setCategoria] = useState(CATEGORIAS_PRESET[0].id)
@@ -47,10 +51,12 @@ export default function PresetsColor({
 
   const fondo = miniatura
     ? { backgroundImage: `url(${miniatura})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : {
-        backgroundImage:
-          'linear-gradient(135deg, #2b5cff 0%, #46c1ff 22%, #7ee787 45%, #ffd166 68%, #ff6b6b 88%, #8a2be2 100%)',
-      }
+    : cargando
+      ? { backgroundColor: 'rgb(var(--border) / 0.18)' }
+      : {
+          backgroundImage:
+            'linear-gradient(135deg, #2b5cff 0%, #46c1ff 22%, #7ee787 45%, #ffd166 68%, #ff6b6b 88%, #8a2be2 100%)',
+        }
 
   return (
     <div className="flex flex-col gap-3">

@@ -62,7 +62,10 @@ export default function EffectsPanel() {
   // el hover continúe desde ahí sin dar un salto. mientras se captura, la miniatura
   // del medio sirve de respaldo
   const frameActual = useFrameEnTiempo(videoUrl, tiempoFrame)
-  const miniatura = videoUrl ? frameActual ?? medioClip?.miniatura : medioClip?.miniatura
+  // para un video, el fotograma del visor; mientras se captura no se enseña miniatura
+  // vieja (cargandoFrame pinta un fondo neutro). para lo que no es video, su miniatura
+  const miniatura = videoUrl ? frameActual : medioClip?.miniatura
+  const cargandoFrame = !!videoUrl && !frameActual
 
   // qué fila tiene abierto su panel de ajustes. solo una a la vez, para no llenar
   // todo de mandos flotantes
@@ -171,6 +174,7 @@ export default function EffectsPanel() {
         miniatura={miniatura}
         videoUrl={videoUrl}
         tiempo={tiempoFrame}
+        cargando={cargandoFrame}
         puestos={puestos}
         objetivoClave={objetivoClave}
         modoAgregar={modoAgregar}
@@ -547,6 +551,7 @@ function Catalogo({
   miniatura,
   videoUrl,
   tiempo,
+  cargando = false,
   puestos,
   objetivoClave,
   modoAgregar,
@@ -556,6 +561,9 @@ function Catalogo({
   miniatura?: string
   videoUrl?: string
   tiempo: number
+  // mientras se captura el fotograma del visor, para pintar un fondo neutro en vez de
+  // una miniatura vieja o el degradado de muestra
+  cargando?: boolean
   puestos: Set<string>
   objetivoClave: string | null
   modoAgregar: boolean
@@ -567,9 +575,11 @@ function Catalogo({
   const actual = CATEGORIAS_EFECTO.find((c) => c.id === categoria) ?? CATEGORIAS_EFECTO[0]
   const fondo = miniatura
     ? { backgroundImage: `url(${miniatura})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : {
-        backgroundImage: 'linear-gradient(135deg, #3b82f6 0%, #22d3ee 35%, #a3e635 65%, #fbbf24 100%)',
-      }
+    : cargando
+      ? { backgroundColor: 'rgb(var(--border) / 0.18)' }
+      : {
+          backgroundImage: 'linear-gradient(135deg, #3b82f6 0%, #22d3ee 35%, #a3e635 65%, #fbbf24 100%)',
+        }
 
   return (
     <div className="flex flex-col gap-3">
