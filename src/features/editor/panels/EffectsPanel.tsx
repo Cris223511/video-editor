@@ -8,6 +8,7 @@ import MuestraVideo from '../../../components/ui/MuestraVideo'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { Campo, Deslizador, Segmentado } from '../../../components/ui/Controls'
 import { useProjectStore } from '../../../store/useProjectStore'
+import { useFrameEnTiempo } from '../../../lib/media/useFrameEnTiempo'
 import { EfectoClip } from '../../../types/timeline'
 import {
   CATEGORIAS_EFECTO,
@@ -51,13 +52,17 @@ export default function EffectsPanel() {
   const medios = useProjectStore((s) => s.medios)
   const clip = clips.find((c) => c.id === clipSeleccionado)
   const medioClip = clip ? medios.find((m) => m.id === clip.assetId) : undefined
-  const miniatura = medioClip?.miniatura
   // el video del clip, para reproducir la muestra al pasar el cursor. solo si el
   // medio es de video; una imagen no tiene qué reproducir
   const videoUrl = medioClip?.clase === 'video' ? medioClip.url : undefined
   // segundo del archivo que se está viendo en el visor, para que las muestras
   // arranquen en ese mismo frame y no desde el principio
   const tiempoFrame = clip ? Math.max(0, clip.recorteInicio + (playhead - clip.inicio) * clip.velocidad) : 0
+  // fotograma actual del visor, para que la muestra estática enseñe ese mismo frame y
+  // el hover continúe desde ahí sin dar un salto. mientras se captura, la miniatura
+  // del medio sirve de respaldo
+  const frameActual = useFrameEnTiempo(videoUrl, tiempoFrame)
+  const miniatura = videoUrl ? frameActual ?? medioClip?.miniatura : medioClip?.miniatura
 
   // qué fila tiene abierto su panel de ajustes. solo una a la vez, para no llenar
   // todo de mandos flotantes

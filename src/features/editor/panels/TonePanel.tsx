@@ -10,6 +10,7 @@ import RuedaColor from '../../../components/ui/RuedaColor'
 import EditorCurva from '../../../components/ui/EditorCurva'
 import PresetsColor from './PresetsColor'
 import { useProjectStore } from '../../../store/useProjectStore'
+import { useFrameEnTiempo } from '../../../lib/media/useFrameEnTiempo'
 import { PuntoRueda, RUEDAS_NEUTRAS, Ruedas } from '../../../lib/color/ruedas'
 import { Curvas, CURVAS_NEUTRAS, PuntoCurva } from '../../../lib/color/curvas'
 
@@ -64,6 +65,16 @@ export default function TonePanel() {
   // el tono con el que se trabaja sale del clip o de la imagen, lo que esté
   // elegido. una imagen sin tocar aún no guarda tono, así que se parte del neutro
   const tono: AjusteTono | null = clip ? clip.tono : capaImagen ? capaImagen.tono ?? tonoNeutro : null
+
+  // el medio del clip, su video y el segundo del archivo que se ve ahora en el visor
+  // (contando su punto de entrada y su velocidad). se calculan aquí arriba, antes del
+  // return de abajo, porque el hook que captura el fotograma no puede ir tras un
+  // return condicional. ese fotograma es el fondo de las muestras, para que la
+  // reproducción del hover continúe desde el mismo frame que se está viendo
+  const medioClip = clip ? medios.find((m) => m.id === clip.assetId) : undefined
+  const videoUrl = medioClip?.clase === 'video' ? medioClip.url : undefined
+  const tiempoFrame = clip ? Math.max(0, clip.recorteInicio + (playhead - clip.inicio) * clip.velocidad) : 0
+  const frameActual = useFrameEnTiempo(videoUrl, tiempoFrame)
 
   if (!tono) {
     return (
@@ -124,15 +135,11 @@ export default function TonePanel() {
     })
   }
 
-  // miniatura del material elegido, para que las muestras se vean sobre el propio
-  // video en lugar de sobre un ejemplo cualquiera
-  const medioClip = clip ? medios.find((m) => m.id === clip.assetId) : undefined
-  const miniatura = clip ? medioClip?.miniatura : capaImagen?.src
-  // el video del clip, para reproducir cada muestra de color al pasar el cursor
-  const videoUrl = medioClip?.clase === 'video' ? medioClip.url : undefined
-  // segundo del archivo que se ve ahora en el visor: el frame del clip bajo el
-  // cabezal, contando su punto de entrada y su velocidad. las muestras arrancan ahí
-  const tiempoFrame = clip ? Math.max(0, clip.recorteInicio + (playhead - clip.inicio) * clip.velocidad) : 0
+  // fondo de las muestras: para un video, el fotograma que se ve ahora en el visor (y
+  // mientras se captura, la miniatura del medio como respaldo), de modo que al pasar
+  // el cursor la reproducción continúe desde ese mismo frame sin dar un salto. para
+  // una imagen, la propia imagen
+  const miniatura = videoUrl ? frameActual ?? medioClip?.miniatura : clip ? medioClip?.miniatura : capaImagen?.src
 
   return (
     <div className="flex flex-col gap-4">
