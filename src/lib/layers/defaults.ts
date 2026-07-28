@@ -62,9 +62,15 @@ export function crearCapaImagen(
   }
 }
 
-// crea una capa de censura centrada, circular y pixelada por defecto, sin
-// movimiento (fija). el usuario luego elige forma, efecto, tamaño y recorrido
-export function crearCapaCensura(inicio: number): CapaCensura {
+// crea una capa de censura centrada, rectangular y pixelada por defecto, sin
+// movimiento (fija). nace como un cuadrado más bien pequeño porque casi siempre se
+// tapa una cara o una matrícula, y agrandar es más cómodo que achicar. el aspecto del
+// lienzo (ancho/alto) sirve para que salga cuadrada en pantalla y no estirada: como el
+// ancho y el alto del lienzo no miden lo mismo, el alto en fracción se corrige con esa
+// proporción para que los dos lados acaben iguales en píxeles. el usuario luego elige
+// forma, efecto, tamaño y recorrido
+export function crearCapaCensura(inicio: number, aspecto = 1): CapaCensura {
+  const lado = 0.18
   return {
     id: crypto.randomUUID(),
     tipo: 'censura',
@@ -74,11 +80,11 @@ export function crearCapaCensura(inicio: number): CapaCensura {
     y: 0.5,
     opacidad: 100,
     keyframes: [],
-    forma: 'circulo',
+    forma: 'rectangulo',
     efecto: 'pixelar',
     intensidad: 20,
-    anchoRel: 0.25,
-    altoRel: 0.25,
+    anchoRel: lado,
+    altoRel: lado * aspecto,
     trazos: [],
     grosorPincel: 0.06,
   }

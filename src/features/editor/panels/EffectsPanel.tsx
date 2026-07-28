@@ -629,7 +629,6 @@ function Catalogo({
               onClick={() => onElegir(e.id)}
               onMouseEnter={() => setEncima(e.id)}
               onMouseLeave={() => setEncima(null)}
-              title={puesto ? `${e.nombre} (aplicado)` : e.nombre}
               className="group flex flex-col gap-1 text-left"
             >
               <span

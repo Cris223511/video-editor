@@ -299,6 +299,13 @@ export const CATALOGO: Transicion[] = [
   },
 ]
 
+// nombre legible de una transición a partir de su id. sirve para no mostrarle nunca
+// al usuario el identificador crudo ('puertas-h'), sino su nombre de catálogo. si el
+// id no existe (dato viejo o roto), se devuelve tal cual para no quedar en blanco
+export function nombreTransicion(id: string): string {
+  return CATALOGO.find((t) => t.id === id)?.nombre ?? id
+}
+
 export const NOMBRES_GRUPO: Record<Grupo, string> = {
   'sin-transicion': 'Sin transición',
   atenuaciones: 'Atenuaciones',

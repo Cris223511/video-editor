@@ -70,7 +70,6 @@ function RejillaFormas({
               e.dataTransfer.setData(TIPO_FIGURA, f.valor)
               e.dataTransfer.effectAllowed = 'copy'
             }}
-            title={`${f.etiqueta} · haz clic o arrástrala al visor`}
             className={[
               // dos por fila y bajas: la forma y su nombre van en horizontal, así la
               // celda ocupa poco alto en vez del cuadrado grande de antes
@@ -129,7 +128,7 @@ export default function FiguraPanel() {
                 <ColorCampo valor={capa.colorRelleno} onChange={(v) => editar('colorRelleno', v)} />
               </Campo>
               <Campo etiqueta={`Grosor (${capa.grosorBorde})`}>
-                <Deslizador valor={capa.grosorBorde} min={1} max={60} onChange={(v) => editar('grosorBorde', v)} />
+                <Deslizador valor={capa.grosorBorde} min={0} max={60} onChange={(v) => editar('grosorBorde', v)} />
               </Campo>
             </>
           ) : (
@@ -146,7 +145,7 @@ export default function FiguraPanel() {
                   <>
                     <ColorCampo valor={capa.colorBorde} onChange={(v) => editar('colorBorde', v)} />
                     <Campo etiqueta={`Grosor del borde (${capa.grosorBorde})`}>
-                      <Deslizador valor={capa.grosorBorde} min={1} max={60} onChange={(v) => editar('grosorBorde', v)} />
+                      <Deslizador valor={capa.grosorBorde} min={0} max={60} onChange={(v) => editar('grosorBorde', v)} />
                     </Campo>
                   </>
                 )}

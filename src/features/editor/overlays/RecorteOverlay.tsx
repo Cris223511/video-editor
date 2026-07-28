@@ -184,6 +184,12 @@ export default function RecorteOverlay() {
     const root = rootRef.current
     if (!root) return
     const rr = root.getBoundingClientRect()
+    // el cursor llega en píxeles visuales; la caja está en píxeles de layout. con el
+    // navegador a un zoom distinto de 100% esos dos espacios no coinciden y el recorte
+    // se descuadraba respecto al cursor. la escala tam/rr (que es 1/zoom) lleva el
+    // cursor al mismo espacio que la caja
+    const escX = rr.width > 0 ? tam.w / rr.width : 1
+    const escY = rr.height > 0 ? tam.h / rr.height : 1
     const mover = (ev: globalThis.MouseEvent) => {
       // una forma redonda se redimensiona a la vez por ancho y alto para mantenerse
       // redonda: el radio sale de la distancia del cursor al centro, y queda un
@@ -192,13 +198,13 @@ export default function RecorteOverlay() {
       if (esRedondo && !ev.altKey) {
         const cxpx = caja.x + ((rec.izq + (1 - rec.der)) / 2) * caja.w
         const cypx = caja.y + ((rec.arr + (1 - rec.aba)) / 2) * caja.h
-        const dxp = Math.abs(ev.clientX - rr.left - cxpx)
-        const dyp = Math.abs(ev.clientY - rr.top - cypx)
+        const dxp = Math.abs((ev.clientX - rr.left) * escX - cxpx)
+        const dyp = Math.abs((ev.clientY - rr.top) * escY - cypx)
         aplicarRecorte(recorteCircular(Math.max(dxp, dyp)))
         return
       }
-      const fx = (ev.clientX - rr.left - caja.x) / caja.w
-      const fy = (ev.clientY - rr.top - caja.y) / caja.h
+      const fx = ((ev.clientX - rr.left) * escX - caja.x) / caja.w
+      const fy = ((ev.clientY - rr.top) * escY - caja.y) / caja.h
       const cambios: Partial<typeof CERO> = {}
       for (const lado of lados) {
         if (lado === 'izq') cambios.izq = fx
@@ -234,6 +240,11 @@ export default function RecorteOverlay() {
     e.preventDefault()
     const root = rootRef.current
     if (!root) return
+    const rr = root.getBoundingClientRect()
+    // misma corrección de zoom que al redimensionar: el desplazamiento del cursor va en
+    // píxeles visuales y la caja en píxeles de layout
+    const escX = rr.width > 0 ? tam.w / rr.width : 1
+    const escY = rr.height > 0 ? tam.h / rr.height : 1
     const inicioX = e.clientX
     const inicioY = e.clientY
     const base = { ...rec }
@@ -241,8 +252,8 @@ export default function RecorteOverlay() {
     // el recorte se pega al centro y sale la guía
     const IMAN = 0.02
     const mover = (ev: globalThis.MouseEvent) => {
-      const dx = (ev.clientX - inicioX) / caja.w
-      const dy = (ev.clientY - inicioY) / caja.h
+      const dx = ((ev.clientX - inicioX) * escX) / caja.w
+      const dy = ((ev.clientY - inicioY) * escY) / caja.h
       // el desplazamiento se recorta al hueco que queda a cada lado, así el ancho
       // y el alto del recorte se mantienen exactos mientras se arrastra
       let mx = Math.max(-base.izq, Math.min(base.der, dx))

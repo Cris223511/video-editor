@@ -29,7 +29,6 @@ export default function ImpactoEditorPanel() {
               <button
                 key={def.tipo}
                 onClick={() => actualizarImpacto(im.id, { tipo: def.tipo })}
-                title={def.descripcion}
                 className={[
                   'rounded-lg px-2.5 py-2 text-left text-[11px] font-semibold transition-all duration-150',
                   activo

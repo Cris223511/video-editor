@@ -7,16 +7,31 @@ import { duracionProyecto } from '../../lib/timeline/clips'
 import { formatearDuracion } from '../../lib/format/duracion'
 
 // mando de volumen del visor. es solo de escucha: sube o baja lo que suena en la
-// vista previa sin tocar el proyecto ni la exportación. al pulsarlo asoma un panel
-// con el mismo deslizador y el mismo estilo que el volumen general del panel de audio
+// vista previa sin tocar el proyecto ni la exportación. al pasar el cursor por encima
+// asoma un panel con el mismo deslizador y el mismo estilo que el volumen general del
+// panel de audio
 function ControlVolumen({ oscuro = false }: { oscuro?: boolean }) {
   const volumen = useEditorStore((s) => s.volumenPreview)
   const setVolumen = useEditorStore((s) => s.setVolumenPreview)
   const [abierto, setAbierto] = useState(false)
   const cajaRef = useRef<HTMLDivElement | null>(null)
+  // temporizador de cierre: al salir el cursor no se cierra en el acto, se espera un
+  // instante. así hay tiempo de cruzar el hueco entre la bocina y el deslizador sin
+  // que el panel desaparezca a mitad de camino
+  const cierre = useRef<number>()
   const pct = Math.round(volumen * 100)
 
-  // el popover se cierra al pulsar fuera de él o de su botón, como cualquier menú
+  const abrir = () => {
+    window.clearTimeout(cierre.current)
+    setAbierto(true)
+  }
+  const cerrarConRetraso = () => {
+    window.clearTimeout(cierre.current)
+    cierre.current = window.setTimeout(() => setAbierto(false), 160)
+  }
+
+  // el popover también se cierra al pulsar fuera de él o de su botón, por si el mando
+  // se abrió con un toque en pantalla táctil, donde no hay cursor que se aleje
   useEffect(() => {
     if (!abierto) return
     const fuera = (e: PointerEvent) => {
@@ -26,13 +41,16 @@ function ControlVolumen({ oscuro = false }: { oscuro?: boolean }) {
     return () => window.removeEventListener('pointerdown', fuera)
   }, [abierto])
 
+  // al desmontar no debe quedar un cierre pendiente tocando un estado que ya no existe
+  useEffect(() => () => window.clearTimeout(cierre.current), [])
+
   const Bocina = volumen === 0 ? VolumeX : volumen < 0.5 ? Volume1 : Volume2
   const colorBoton = oscuro
     ? 'text-white/80 hover:text-white'
     : 'text-[color:var(--muted)] hover:text-[color:var(--text)]'
 
   return (
-    <div ref={cajaRef} className="relative">
+    <div ref={cajaRef} className="relative" onMouseEnter={abrir} onMouseLeave={cerrarConRetraso}>
       <Tooltip texto="Volumen de la vista previa" lado="arriba">
         <button
           onClick={() => setAbierto((v) => !v)}
@@ -44,11 +62,12 @@ function ControlVolumen({ oscuro = false }: { oscuro?: boolean }) {
       </Tooltip>
       {abierto && (
         <div
-          className="absolute bottom-full left-1/2 z-[70] mb-2 flex -translate-x-1/2 flex-col items-center gap-2 rounded-xl px-3 py-3 shadow-xl"
+          className="absolute bottom-full left-1/2 z-[70] flex -translate-x-1/2 flex-col items-center gap-2 rounded-xl px-3 pb-3 pt-3 shadow-xl before:absolute before:left-0 before:top-full before:h-2 before:w-full before:content-['']"
           style={{
             background: 'rgb(var(--surface))',
             border: '1px solid rgb(var(--border) / 0.16)',
             boxShadow: '0 10px 28px rgb(6 12 24 / 0.24)',
+            marginBottom: 8,
           }}
         >
           <span className="text-[11px] font-semibold tabular-nums text-[color:var(--text)]">{pct}</span>

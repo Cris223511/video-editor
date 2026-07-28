@@ -233,7 +233,7 @@ export default function LienzoPanel() {
 
           {fondo === 'desenfoque' && (
             <Campo etiqueta={`Desenfoque (${desenfoqueFondo})`}>
-              <Deslizador valor={desenfoqueFondo} min={1} max={100} onChange={setDesenfoqueFondo} />
+              <Deslizador valor={desenfoqueFondo} min={0} max={100} onChange={setDesenfoqueFondo} />
             </Campo>
           )}
 

@@ -48,6 +48,7 @@ export default function ClipBlock({
   const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(clip.id))
   const seleccionar = useEditorStore((s) => s.seleccionar)
   const setTransicion = useEditorStore((s) => s.setTransicion)
+  const setTransicionSalida = useEditorStore((s) => s.setTransicionSalida)
   const ponerEfectoEncima = useEditorStore((s) => s.ponerEfectoEncima)
   const agregarImpacto = useEditorStore((s) => s.agregarImpacto)
   // los impactos que caen dentro del tramo de este clip: se dibujan encima como
@@ -56,7 +57,8 @@ export default function ClipBlock({
     s.impactos.filter((im) => im.t >= clip.inicio && im.t < clip.inicio + clip.duracion),
   )
   const moverClip = useEditorStore((s) => s.moverClip)
-  const duplicarClip = useEditorStore((s) => s.duplicarClip)
+  const duplicarClipEn = useEditorStore((s) => s.duplicarClipEn)
+  const setFantasmaDup = useEditorStore((s) => s.setFantasmaDup)
   const recortarClip = useEditorStore((s) => s.recortarClip)
   const estirarVelocidad = useEditorStore((s) => s.estirarVelocidad)
   const moverClipAPista = useEditorStore((s) => s.moverClipAPista)
@@ -77,9 +79,11 @@ export default function ClipBlock({
   // se vuelve a encender para que, al cerrar un hueco, el clip se deslice hasta
   // su nuevo sitio en vez de saltar de golpe
   const [interactuando, setInteractuando] = useState(false)
-  // se enciende mientras se arrastra una transición de la galería sobre el clip,
-  // para señalar que al soltar se aplicará en su borde de entrada
-  const [transicionEncima, setTransicionEncima] = useState(false)
+  // lado del clip donde caería la transición que se arrastra desde la galería, según
+  // la mitad del clip sobre la que está el cursor: la izquierda es la entrada y la
+  // derecha la salida. null cuando no hay ninguna transición encima. así se puede poner
+  // una transición al principio o al final del plano, no solo al principio
+  const [ladoTrans, setLadoTrans] = useState<'entrada' | 'salida' | null>(null)
   // se enciende al arrastrar una muestra de efecto sobre el clip, para avisar de que
   // al soltar ese efecto queda en nivel 1, por encima de los demás
   const [efectoEncima, setEfectoEncima] = useState(false)
@@ -182,10 +186,31 @@ export default function ClipBlock({
       if (!movido) {
         if (Math.abs(ev.clientX - startX) < 3) return
         movido = true
-        if (conAlt) {
-          const nuevo = duplicarClip(clip.id)
-          if (nuevo) idGesto = nuevo
-        }
+      }
+      // con Alt el original no se toca: se rastrea dónde caería una copia y se pinta su
+      // silueta fantasma siguiendo al cursor. la copia no nace hasta soltar, y solo si
+      // el sitio está libre; si se suelta sobre otro clip o fuera de las pistas, no pasa
+      // nada. así el clip duplicado sigue el cursor y hay que sacarlo del original para
+      // colocarlo, en vez de plantarse de golpe a la derecha
+      if (conAlt) {
+        const dx = (ev.clientX - startX) / pxPorSegundo
+        const bruto = Math.max(0, inicioOriginal + dx)
+        // se imanta contra todos los clips, incluido el propio original, porque la copia
+        // tampoco puede pisarlo
+        const { inicio, guia } = imantarMover(bruto, clip.duracion, puntos, umbral, [])
+        setGuiaImantado(guia)
+        let pistaDest = clip.pista
+        const v = Math.abs(ev.clientY - startY) > UMBRAL_VERT ? decidirVertical(ev.clientY) : undefined
+        if (v && v.destino !== null) pistaDest = v.destino
+        const st2 = useEditorStore.getState()
+        const enPista = st2.pista.clips.filter((c) => c.pista === pistaDest)
+        const choca = enPista.some(
+          (c) => c.inicio < inicio + clip.duracion - 0.001 && c.inicio + c.duracion > inicio + 0.001,
+        )
+        const valido = !choca && pistaDest >= 0 && pistaDest < st2.numPistas
+        setFantasmaDup({ inicio, pista: pistaDest, duracion: clip.duracion, valido })
+        useEditorStore.getState().setArrastreVivo({ etiqueta: nombre, x: ev.clientX, y: ev.clientY })
+        return
       }
       // con varios bloques marcados el arrastre los lleva a todos a la vez, así que
       // no hay imantado ni cambio de pista: solo el desplazamiento compartido
@@ -242,6 +267,19 @@ export default function ClipBlock({
       useEditorStore.getState().setArrastreVivo(null)
       // alt y clic seco, sin llegar a arrastrar: el clip entra o sale del conjunto
       if (!movido && conAlt) alternarBloque(clip.id)
+      // alt con arrastre: la copia recién nace ahora, en el sitio del fantasma, y solo
+      // si ese hueco estaba libre. si no, el gesto se cancela y no se crea nada
+      if (conAlt && movido) {
+        const f = useEditorStore.getState().fantasmaDup
+        if (f && f.valido) duplicarClipEn(clip.id, f.inicio, f.pista)
+        setFantasmaDup(null)
+        setGuiaImantado(null)
+        setInteractuando(false)
+        finGesto()
+        window.removeEventListener('pointermove', mover)
+        window.removeEventListener('pointerup', soltar)
+        return
+      }
       // si el gesto acabó sobre una separación, se abre allí el nivel nuevo y el
       // clip aterriza dentro; comparte el mismo paso de historial que el arrastre
       if (insercionActual !== null) insertarPistaEn(insercionActual, idGesto)
@@ -320,15 +358,25 @@ export default function ClipBlock({
     window.addEventListener('pointerup', soltar)
   }
 
-  // al soltar una transición arrastrada desde la galería, se aplica como
-  // transición de entrada de este clip, que es su unión con el clip anterior
+  // qué mitad del clip apunta el cursor: la izquierda es la entrada y la derecha la
+  // salida. sirve para decidir dónde cae la transición y qué borde se resalta
+  function ladoDe(e: React.DragEvent): 'entrada' | 'salida' {
+    const rect = e.currentTarget.getBoundingClientRect()
+    return e.clientX - rect.left < rect.width / 2 ? 'entrada' : 'salida'
+  }
+
+  // al soltar una transición arrastrada desde la galería, se aplica en el borde sobre
+  // el que se soltó: en la mitad izquierda como transición de entrada (su unión con el
+  // clip anterior) y en la derecha como transición de salida
   function alSoltarTransicion(e: React.DragEvent) {
     const tipo = e.dataTransfer.getData(TIPO_TRANSICION)
     if (!tipo) return
     e.preventDefault()
     e.stopPropagation()
-    setTransicionEncima(false)
-    setTransicion(clip.id, { tipo })
+    const lado = ladoDe(e)
+    setLadoTrans(null)
+    if (lado === 'salida') setTransicionSalida(clip.id, { tipo })
+    else setTransicion(clip.id, { tipo })
     seleccionar(clip.id)
   }
 
@@ -380,7 +428,8 @@ export default function ClipBlock({
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes(TIPO_TRANSICION)) {
           e.preventDefault()
-          if (!transicionEncima) setTransicionEncima(true)
+          const lado = ladoDe(e)
+          if (lado !== ladoTrans) setLadoTrans(lado)
         } else if (e.dataTransfer.types.includes(TIPO_EFECTO)) {
           e.preventDefault()
           if (!efectoEncima) setEfectoEncima(true)
@@ -391,7 +440,7 @@ export default function ClipBlock({
       }}
       onDragLeave={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-          setTransicionEncima(false)
+          setLadoTrans(null)
           setEfectoEncima(false)
           setImpactoEncima(false)
         }
@@ -456,15 +505,19 @@ export default function ClipBlock({
         <div className="pointer-events-none absolute inset-0 z-20 rounded-lg ring-2 ring-inset ring-sky-400" />
       )}
 
-      {/* señal de que se está soltando una transición encima: un aro azul y una
-          franja en el borde de entrada, que es donde va a colocarse */}
-      {transicionEncima && (
+      {/* señal de que se está soltando una transición encima: un aro azul y una franja
+          en el borde donde va a caer, el de entrada si el cursor está en la mitad
+          izquierda o el de salida si está en la derecha. así se ve de antemano si la
+          transición abrirá el plano o lo cerrará */}
+      {ladoTrans && (
         <div className="pointer-events-none absolute inset-0 z-20 rounded-lg ring-2 ring-inset ring-brand">
           <div
-            className="absolute left-0 top-0 h-full w-8"
+            className={`absolute top-0 h-full w-8 ${ladoTrans === 'salida' ? 'right-0' : 'left-0'}`}
             style={{
               background:
-                'linear-gradient(105deg, rgb(24 97 255 / 0.75) 0%, rgb(24 97 255 / 0.25) 60%, transparent 100%)',
+                ladoTrans === 'salida'
+                  ? 'linear-gradient(255deg, rgb(24 97 255 / 0.75) 0%, rgb(24 97 255 / 0.25) 60%, transparent 100%)'
+                  : 'linear-gradient(105deg, rgb(24 97 255 / 0.75) 0%, rgb(24 97 255 / 0.25) 60%, transparent 100%)',
             }}
           />
         </div>

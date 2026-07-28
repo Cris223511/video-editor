@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { Info } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Info, Plus } from 'lucide-react'
 import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
 import Confirmar from '../../components/ui/Confirmar'
@@ -36,6 +37,15 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
   // medio pendiente de confirmar antes de quitarlo. mientras no sea nulo, la
   // ventana de aviso queda abierta preguntando por él
   const [porQuitar, setPorQuitar] = useState<MediaAsset | null>(null)
+  // entrada de archivos oculta, disparada por el botón "+" de la cabecera para
+  // elegir por el explorador. arrastrar sobre el panel es la otra vía
+  const inputRef = useRef<HTMLInputElement>(null)
+  // dragenter y dragleave se disparan también al pasar por los hijos, así que se
+  // cuentan las entradas y salidas para no apagar el aviso a mitad del panel
+  const arrastreRef = useRef(0)
+  // solo interesa el arrastre de archivos del explorador, no el de un medio que se
+  // saca del propio panel hacia la línea de tiempo (ese lleva otro tipo de dato)
+  const esArchivos = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files')
 
   // quita de verdad el medio una vez confirmado: primero se llevan sus usos de la
   // línea de tiempo (clips, audios y capas de imagen) y luego se borra el asset
@@ -49,12 +59,30 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
 
   const soltarArchivos = (e: React.DragEvent) => {
     e.preventDefault()
+    arrastreRef.current = 0
     setEncima(false)
     if (e.dataTransfer.files?.length) procesar(e.dataTransfer.files)
   }
 
   return (
-    <aside ref={ref} className="panel relative flex-1 overflow-hidden rounded-xl">
+    <aside
+      ref={ref}
+      onDragEnter={(e) => {
+        if (!esArchivos(e)) return
+        arrastreRef.current += 1
+        setEncima(true)
+      }}
+      onDragOver={(e) => {
+        if (esArchivos(e)) e.preventDefault()
+      }}
+      onDragLeave={(e) => {
+        if (!esArchivos(e)) return
+        arrastreRef.current = Math.max(0, arrastreRef.current - 1)
+        if (arrastreRef.current === 0) setEncima(false)
+      }}
+      onDrop={soltarArchivos}
+      className="panel relative flex-1 overflow-hidden rounded-xl"
+    >
       {/* bloque en absoluto con ancho controlado para que, al plegar o desplegar,
           las miniaturas y textos no se estiren: solo se descubren o se recortan */}
       <div className="absolute inset-y-0 left-0 flex flex-col" style={{ width: estiloAncho }}>
@@ -70,6 +98,18 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
         >
           {medios.length} {medios.length === 1 ? 'medio' : 'medios'}
         </span>
+        {/* elegir archivos por el explorador, sin ocupar sitio con un cartel; el
+            arrastre sobre el panel es la otra forma de traerlos */}
+        <Tooltip texto="Agregar medios">
+          <button
+            onClick={() => inputRef.current?.click()}
+            aria-label="Agregar medios"
+            disabled={ocupado}
+            className="grid h-6 w-6 place-items-center rounded-md text-[color:var(--muted)] transition-colors hover:bg-brand/10 hover:text-brand disabled:opacity-50"
+          >
+            <Plus size={15} />
+          </button>
+        </Tooltip>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-2.5">
@@ -186,64 +226,58 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
           </ul>
         )}
 
-        {/* con videos ya cargados, el cartel grande sobra y solo mete ruido. se
-            deja un botón discreto para añadir más, que sigue aceptando archivos
-            soltados encima. sin ninguno todavía, se muestra la zona amplia que
-            invita a empezar */}
-        <label
-          onDragOver={(e) => {
-            e.preventDefault()
-            setEncima(true)
-          }}
-          onDragLeave={() => setEncima(false)}
-          onDrop={soltarArchivos}
-          className={
-            medios.length
-              ? [
-                  'flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed py-2 text-center transition-all duration-200',
-                  encima
-                    ? 'border-brand bg-brand/10'
-                    : 'border-[rgb(var(--border)/0.22)] text-[color:var(--muted)] hover:border-brand/60 hover:text-brand',
-                  ocupado ? 'pointer-events-none opacity-60' : '',
-                ].join(' ')
-              : [
-                  'flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-3 py-10 text-center transition-all duration-200',
-                  encima
-                    ? 'scale-[1.02] border-brand bg-brand/10'
-                    : 'border-[rgb(var(--border)/0.22)] hover:border-brand/60 hover:bg-brand/5',
-                  ocupado ? 'pointer-events-none opacity-60' : '',
-                ].join(' ')
-          }
-        >
-          <Icon
-            name={medios.length ? 'mas' : 'subir'}
-            size={medios.length ? 15 : 22}
-            className={encima ? 'text-brand' : 'text-[color:var(--muted)]'}
-          />
-          {medios.length ? (
-            <span className="text-[13px] font-medium">
-              {encima ? 'Suelta para importar' : 'Agregar más'}
+        {/* sin ningún medio todavía, una zona amplia invita a traerlos. con medios ya
+            cargados no hace falta cartel: se arrastra sobre el panel o se usa el "+"
+            de la cabecera */}
+        {medios.length === 0 && (
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={ocupado}
+            className="flex w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-[rgb(var(--border)/0.22)] px-3 py-10 text-center transition-all duration-200 hover:border-brand/60 hover:bg-brand/5 disabled:pointer-events-none disabled:opacity-60"
+          >
+            <Icon name="subir" size={22} className="text-[color:var(--muted)]" />
+            <span className="text-[13px] font-medium leading-tight text-[color:var(--muted)]">
+              Arrastra videos, audio o imágenes
             </span>
-          ) : (
-            <>
-              <span className="text-[13px] font-medium leading-tight text-[color:var(--muted)]">
-                {encima ? 'Suelta para importar' : 'Arrastra videos, audio o imágenes'}
-              </span>
-              <span className="text-[10px] text-[color:var(--muted)]">
-                o haz clic para elegirlos
-              </span>
-            </>
-          )}
-          <input
-            type="file"
-            accept={ACEPTA_MEDIOS}
-            multiple
-            hidden
-            onChange={(e) => e.target.files && procesar(e.target.files)}
-          />
-        </label>
+            <span className="text-[10px] text-[color:var(--muted)]">o haz clic para elegirlos</span>
+          </button>
+        )}
       </div>
       </div>
+
+      {/* entrada de archivos oculta, compartida por el botón "+" de la cabecera y la
+          zona vacía */}
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ACEPTA_MEDIOS}
+        multiple
+        hidden
+        onChange={(e) => {
+          if (e.target.files) procesar(e.target.files)
+          e.target.value = ''
+        }}
+      />
+
+      {/* aviso que cubre todo el panel al arrastrar archivos encima, traslúcido y con
+          desenfoque, al estilo de la pantalla de importar. entra y sale con un fundido
+          y un leve acercamiento para que no aparezca de golpe */}
+      <AnimatePresence>
+        {encima && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand"
+            style={{ background: 'rgb(var(--surface) / 0.55)', backdropFilter: 'blur(6px)' }}
+          >
+            <Icon name="subir" size={26} className="text-brand" />
+            <span className="text-sm font-semibold text-brand">Suelta los archivos aquí</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <FichaMedio medio={detalle} onCerrar={() => setDetalle(null)} />
 

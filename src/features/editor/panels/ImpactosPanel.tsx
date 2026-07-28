@@ -1,20 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { IMPACTOS, TIPO_IMPACTO, COLOR_IMPACTO_DEF, estadoImpacto } from '../../../lib/impactos/catalogo'
 import { TipoImpacto } from '../../../types/impacto'
 
-// duración de un pase de la vista previa y del descanso entre pases, en ms. cada
-// efecto arranca su pase con un desfase según su posición, para que la paleta se
-// vea viva y en cascada en vez de latir todas a la vez
+// duración de un pase de la vista previa y del ciclo completo (pase más el descanso
+// antes de repetir), en ms. la animación solo corre mientras el cursor está sobre la
+// tarjeta; en cuanto se va, la escena vuelve a su reposo
 const PASE = 750
 const CICLO = 2400
-const DESFASE = 300
 
-// escena mínima que se deforma para previsualizar un efecto: un cielo con su sol,
-// una loma y una barra, lo justo para que se lea el zoom, la sacudida o el flash.
-// recibe el reloj global en ms y su propio índice para calcular su avance
-function MuestraImpacto({ tipo, ms, indice }: { tipo: TipoImpacto; ms: number; indice: number }) {
-  const local = (ms + indice * DESFASE) % CICLO
-  const p = local < PASE ? local / PASE : 2 // fuera de rango => en reposo
+// avance que deja la escena quieta. estadoImpacto trata cualquier valor fuera de 0..1
+// como reposo, así que con esto la muestra se ve tal cual sin deformarse
+const REPOSO = 2
+
+// escena mínima que se deforma para previsualizar un efecto: un cielo con su sol, una
+// loma y una barra, lo justo para que se lea el zoom, la sacudida o el flash. `p` es el
+// avance del pase, de 0 a 1, o REPOSO cuando no hay nada que animar
+function MuestraImpacto({ tipo, p }: { tipo: TipoImpacto; p: number }) {
   const e = estadoImpacto(tipo, p, 80, COLOR_IMPACTO_DEF)
   return (
     <span className="relative block h-11 w-[72px] shrink-0 overflow-hidden rounded-md" style={{ background: '#0b1424' }}>
@@ -43,26 +44,63 @@ function MuestraImpacto({ tipo, ms, indice }: { tipo: TipoImpacto; ms: number; i
   )
 }
 
-// paleta de impactos: cada uno es una bolita con su vista previa que se arrastra
-// hasta un clip. no se agrega con un clic a propósito, porque hace falta apuntar a
-// un punto del clip; el arrastre es lo que decide dónde cae
-export default function ImpactosPanel() {
-  // un solo bucle de dibujo lleva el reloj en milisegundos; cada vista previa saca
-  // de ahí su propio avance con un desfase, así corren en cascada y no todas en
-  // sincronía. es continuo, no depende del cursor
-  const [ms, setMs] = useState(0)
-  useEffect(() => {
-    let raf = 0
+// una fila de la paleta: la muestra del efecto y su descripción. la vista previa se
+// mueve únicamente al pasar el cursor por encima; su propio bucle arranca con el hover
+// y se detiene al salir, dejando la escena en reposo, para que solo baile la que se
+// está mirando y no todas de fondo
+function TarjetaImpacto({ im }: { im: (typeof IMPACTOS)[number] }) {
+  const [p, setP] = useState(REPOSO)
+  const raf = useRef(0)
+
+  const activar = () => {
+    cancelAnimationFrame(raf.current)
     let inicio = 0
     const paso = (ts: number) => {
       if (!inicio) inicio = ts
-      setMs(ts - inicio)
-      raf = requestAnimationFrame(paso)
+      const local = (ts - inicio) % CICLO
+      setP(local < PASE ? local / PASE : REPOSO)
+      raf.current = requestAnimationFrame(paso)
     }
-    raf = requestAnimationFrame(paso)
-    return () => cancelAnimationFrame(raf)
-  }, [])
+    raf.current = requestAnimationFrame(paso)
+  }
 
+  const desactivar = () => {
+    cancelAnimationFrame(raf.current)
+    setP(REPOSO)
+  }
+
+  // si la tarjeta se desmonta a mitad de un pase, el bucle no debe seguir vivo
+  useEffect(() => () => cancelAnimationFrame(raf.current), [])
+
+  return (
+    <div
+      draggable
+      onDragStart={(ev) => {
+        ev.dataTransfer.setData(TIPO_IMPACTO, im.tipo)
+        ev.dataTransfer.effectAllowed = 'copy'
+      }}
+      onMouseEnter={activar}
+      onMouseLeave={desactivar}
+      className="group flex cursor-grab items-center gap-3 rounded-xl p-2 pr-3 ring-1 ring-black/10 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:ring-brand/50 active:translate-y-0 active:cursor-grabbing dark:ring-white/10"
+      style={{ background: 'rgb(var(--border) / 0.05)' }}
+    >
+      <MuestraImpacto tipo={im.tipo} p={p} />
+      <span className="min-w-0">
+        <span className="block text-[12px] font-semibold leading-tight text-[color:var(--text)]">
+          {im.nombre}
+        </span>
+        <span className="block text-[10.5px] leading-tight text-[color:var(--muted)]">
+          {im.descripcion}
+        </span>
+      </span>
+    </div>
+  )
+}
+
+// paleta de impactos: cada uno es una tarjeta con su vista previa que se arrastra hasta
+// un clip. no se agrega con un clic a propósito, porque hace falta apuntar a un punto
+// del clip; el arrastre es lo que decide dónde cae
+export default function ImpactosPanel() {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-[12px] leading-relaxed text-[color:var(--muted)]">
@@ -71,28 +109,8 @@ export default function ImpactosPanel() {
       </p>
 
       <div className="grid grid-cols-1 gap-2.5">
-        {IMPACTOS.map((im, i) => (
-          <div
-            key={im.tipo}
-            draggable
-            onDragStart={(ev) => {
-              ev.dataTransfer.setData(TIPO_IMPACTO, im.tipo)
-              ev.dataTransfer.effectAllowed = 'copy'
-            }}
-            title={`${im.nombre} · arrástralo a un clip`}
-            className="group flex cursor-grab items-center gap-3 rounded-xl p-2 pr-3 ring-1 ring-black/10 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:ring-brand/50 active:translate-y-0 active:cursor-grabbing dark:ring-white/10"
-            style={{ background: 'rgb(var(--border) / 0.05)' }}
-          >
-            <MuestraImpacto tipo={im.tipo} ms={ms} indice={i} />
-            <span className="min-w-0">
-              <span className="block text-[12px] font-semibold leading-tight text-[color:var(--text)]">
-                {im.nombre}
-              </span>
-              <span className="block text-[10.5px] leading-tight text-[color:var(--muted)]">
-                {im.descripcion}
-              </span>
-            </span>
-          </div>
+        {IMPACTOS.map((im) => (
+          <TarjetaImpacto key={im.tipo} im={im} />
         ))}
       </div>
     </div>

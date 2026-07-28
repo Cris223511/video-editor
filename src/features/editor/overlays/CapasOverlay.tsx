@@ -7,7 +7,7 @@ import { puntosEstrella } from '../../../lib/layers/figuras'
 import { posicionCapa } from '../../../lib/layers/motion'
 import { fundidoEn } from '../../../lib/audio/ganancia'
 import { Ancla, Caja, redimensionar } from '../../../lib/layers/resize'
-import { CajaGuia, Guia, imantar, imantarValor } from '../../../lib/layers/guias'
+import { CajaGuia, Guia, imantar, imantarValor, imanesPorEje } from '../../../lib/layers/guias'
 import { sufijoTransformCss } from '../../../lib/layers/transform'
 import {
   estiloEntrada,
@@ -99,6 +99,11 @@ export default function CapasOverlay() {
   const [tam, setTam] = useState({ w: 0, h: 0 })
   // líneas de alineación que se muestran solo mientras dura el arrastre
   const [guias, setGuias] = useState<Guia[]>([])
+  // mientras dura un gesto (mover, redimensionar, girar con la manija) el transform
+  // debe seguir al cursor sin retraso, así que en esos momentos se apaga la animación.
+  // fuera de un gesto, girar con los botones o voltear sí se suaviza con una transición
+  const [gestoActivo, setGestoActivo] = useState(false)
+  const reproduciendo = useEditorStore((s) => s.reproduciendo)
   // id de la capa de texto que se está editando en el sitio, tras un doble clic
   const [editando, setEditando] = useState<string | null>(null)
   // trazo que se está pintando ahora mismo con el pincel. se guarda aparte del
@@ -185,7 +190,8 @@ export default function CapasOverlay() {
           moverCapaLienzo(capa.id, cx, cy)
           setGuias([])
         } else {
-          const r = imantar({ x: cx, y: cy, w: propia.w, h: propia.h }, vecinas)
+          const iman = imanesPorEje(rect)
+          const r = imantar({ x: cx, y: cy, w: propia.w, h: propia.h }, vecinas, iman.x, iman.y)
           moverCapaLienzo(capa.id, r.x, r.y)
           setGuias(r.guias)
         }
@@ -378,23 +384,27 @@ export default function CapasOverlay() {
       let px = p.x
       let py = p.y
       if (!ev.altKey) {
+        // enganche por eje para que la guía de arriba/abajo se pegue con la misma
+        // holgura en pantalla que las laterales, sin importar la forma del lienzo
+        const iman = imanesPorEje(rect)
         if (este || oeste) {
-          const s = imantarValor(px, objX)
+          const s = imantarValor(px, objX, iman.x)
           px = s.v
           if (s.pos !== null) gs.push({ eje: 'x', pos: s.pos })
         }
         if (norte || sur) {
-          const s = imantarValor(py, objY)
+          const s = imantarValor(py, objY, iman.y)
           py = s.v
           if (s.pos !== null) gs.push({ eje: 'y', pos: s.pos })
         }
       }
       setGuias(gs)
-      // mismo esquema para cualquier elemento: por defecto (y con Ctrl) se conserva
-      // la proporción, con Shift se estira ancho y alto por separado, y con Alt crece
-      // desde el centro por todos los lados. el texto es la excepción: escala su
-      // tamaño de letra, que es un único valor, así que siempre va proporcional
-      const proporcional = capa.tipo === 'texto' ? true : !ev.shiftKey
+      // por defecto cada lado se estira libre, moviendo solo el borde que se arrastra;
+      // con Shift se conserva la proporción, cambiando alto y ancho a la vez. es al
+      // revés que en los clips de video, que siempre van proporcionales. con Alt, aparte,
+      // crece desde el centro por los dos lados. el texto es la excepción: escala su
+      // tamaño de letra, un único valor, así que va proporcional pase lo que pase
+      const proporcional = capa.tipo === 'texto' ? true : ev.shiftKey
       const n = redimensionar(inicial, ancla, px, py, { proporcional, simetrico: ev.altKey })
       const posicion = fija ? { x: entre(0, 1, n.x), y: entre(0, 1, n.y) } : {}
 
@@ -465,6 +475,10 @@ export default function CapasOverlay() {
     seleccionarCapa(capa.id)
     const cajaEl = (e.currentTarget as HTMLElement).parentElement
     if (!cajaEl) return
+    // girar con la manija sigue al cursor en vivo, así que la animación estorba: se
+    // apaga mientras dura el gesto y vuelve al soltar, para que un giro por botón sí
+    // se suavice
+    setGestoActivo(true)
     const cr = cajaEl.getBoundingClientRect()
     const cx = cr.left + cr.width / 2
     const cy = cr.top + cr.height / 2
@@ -472,6 +486,7 @@ export default function CapasOverlay() {
       actualizarCapa(capa.id, { rotacion: anguloGiro(cx, cy, ev) })
     }
     const soltar = () => {
+      setGestoActivo(false)
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)
     }
@@ -495,6 +510,14 @@ export default function CapasOverlay() {
   const imagenesColor = capas.filter(
     (c): c is CapaImagen => c.tipo === 'imagen' && !!c.tono && usaMatriz(c.tono),
   )
+
+  // suavizado del giro y el volteo: como la posición se mueve por left/top y no por
+  // transform, animar el transform solo afecta a rotar y voltear, justo lo que se
+  // quiere ver fluido. se apaga durante un gesto en vivo (la manija de giro) y durante
+  // la reproducción, donde las transiciones de entrada ya animan el transform por su
+  // cuenta y una segunda animación las frenaría
+  const transicionGiro =
+    gestoActivo || reproduciendo ? undefined : 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)'
 
   return (
     <div ref={rootRef} className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -622,6 +645,7 @@ export default function CapasOverlay() {
                 width: ancho,
                 height: alto,
                 transform: `translate(-50%, -50%) ${extra}`.trim(),
+                transition: transicionGiro,
                 opacity: opa,
               }}
             >
@@ -686,7 +710,7 @@ export default function CapasOverlay() {
                 width={rect.w}
                 height={rect.h}
                 className={movible ? 'overflow-visible' : 'pointer-events-none overflow-visible'}
-                style={{ transform: extra || undefined, transformOrigin: origen }}
+                style={{ transform: extra || undefined, transformOrigin: origen, transition: transicionGiro }}
               >
                 {/* contorno de selección del dibujo: un recuadro azul que abarca lo
                     trazado, para que al elegirlo se vea igual que una imagen */}
@@ -831,6 +855,7 @@ export default function CapasOverlay() {
                 width: ancho,
                 height: alto,
                 transform: `translate(-50%, -50%) ${extra}`.trim(),
+                transition: transicionGiro,
                 opacity: opa,
               }}
             >
@@ -871,6 +896,7 @@ export default function CapasOverlay() {
           left: centroX,
           top: centroY,
           transform: `translate(-50%, -50%) ${extra}`.trim(),
+          transition: transicionGiro,
           fontFamily: `'${c.fuente}', sans-serif`,
           fontSize: c.tamano * escala,
           fontWeight: c.negrita ? 700 : 400,

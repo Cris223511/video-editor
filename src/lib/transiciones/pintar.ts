@@ -42,6 +42,66 @@ export function anterior(clip: Clip, clips: Clip[]): Clip | null {
   return mismos.length ? mismos[mismos.length - 1] : null
 }
 
+// técnicas cuyo efecto (velo de color, desenfoque u opacidad) se puede aplicar sobre
+// TODA la composición a la vez, no solo sobre el video. las geométricas (barridos,
+// puertas, empujes) no entran aquí porque recortan o mueven el fotograma y necesitan
+// el canvas con los dos planos
+export function esTransicionGlobal(tecnica: string): boolean {
+  return (
+    tecnica === 'negro' ||
+    tecnica === 'blanco' ||
+    tecnica === 'desenfoque' ||
+    tecnica === 'resplandor' ||
+    tecnica === 'zoom-desenfoque' ||
+    tecnica === 'flash' ||
+    tecnica === 'flash-camara'
+  )
+}
+
+// efecto de una transición de un solo plano (un clip que abre o cierra contra el fondo)
+// que se aplica a toda la composición: un velo de color con su opacidad, un desenfoque
+// en píxeles y una opacidad general del contenido. así el fundido o el difuminado tapa
+// también las capas (censura, texto, figuras), en vez de dejarlas flotando por encima.
+// `p` es el avance (0 al empezar la transición, 1 al terminarla) y `ladoMenor` el lado
+// corto del lienzo en píxeles, para medir el desenfoque
+export interface EfectoGlobalTrans {
+  veloColor: string
+  veloOpacidad: number
+  blur: number
+  opacidad: number
+}
+export function efectoGlobalTrans(
+  tecnica: string,
+  p: number,
+  esEntrada: boolean,
+  ladoMenor: number,
+): EfectoGlobalTrans {
+  const base: EfectoGlobalTrans = { veloColor: '#000', veloOpacidad: 0, blur: 0, opacidad: 1 }
+  // el efecto es máximo en el extremo (recién abre o a punto de cerrar) y nulo cuando el
+  // plano se ve limpio; al abrir arranca fuerte y afloja, al cerrar es al revés
+  const k = esEntrada ? 1 - p : p
+  switch (tecnica) {
+    case 'opacidad':
+      return { ...base, opacidad: esEntrada ? p : 1 - p }
+    case 'negro':
+      return { ...base, veloColor: '#000', veloOpacidad: k }
+    case 'blanco':
+      return { ...base, veloColor: '#fff', veloOpacidad: k }
+    case 'desenfoque':
+      return { ...base, blur: ladoMenor * 0.06 * k }
+    case 'resplandor':
+      return { ...base, blur: ladoMenor * 0.05 * k }
+    case 'zoom-desenfoque':
+      return { ...base, blur: ladoMenor * 0.045 * k }
+    case 'flash':
+      return { ...base, veloColor: '#fff', veloOpacidad: Math.min(1, k * 1.6) }
+    case 'flash-camara':
+      return { ...base, veloColor: '#fff', veloOpacidad: Math.min(1, Math.pow(k, 0.55) * 1.9), blur: ladoMenor * 0.03 * k }
+    default:
+      return base
+  }
+}
+
 export interface Pintor {
   // dibuja un clip cubriendo el lienzo, con su tono ya aplicado. el llamante lo
   // aporta porque el visor y la exportación obtienen el fotograma de sitios
@@ -98,6 +158,22 @@ export function pintarTransicion(
     return
   }
 
+  // una transición no siempre está entre dos planos: también sirve para abrir o cerrar
+  // un solo clip contra el fondo. cuando falta uno de los dos lados, las técnicas que
+  // normalmente cortan a la mitad (negro, desenfoque, flash...) se reinterpretan como un
+  // fundido continuo desde su estado extremo, para que el clip empiece del todo negro (o
+  // desenfocado, etc.) y llegue a su imagen normal, o al revés al cerrar. sin esto, media
+  // transición se quedaba en el fondo del lienzo y el efecto no se veía
+  const soloUno = !saliente !== !entrante
+  const unico = entrante ?? saliente
+  // el plano que existe es el que entra cuando no hay saliente; si el que falta es el
+  // entrante, entonces el único es el que se está yendo (una salida contra el fondo)
+  const esEntrada = !!entrante && !saliente
+  // avance del efecto para un solo plano: máximo en el extremo (recién abre o a punto de
+  // cerrar) y cero cuando el plano se ve limpio. así una entrada arranca al tope y afloja,
+  // y una salida parte de limpio y llega al tope
+  const kUno = esEntrada ? 1 - p : p
+
   switch (t.tecnica) {
     case 'opacidad': {
       if (saliente) pintar(saliente, 1)
@@ -107,14 +183,21 @@ export function pintarTransicion(
 
     case 'negro':
     case 'blanco': {
-      // en la primera mitad se ve el plano que sale, en la segunda el que entra,
-      // y el velo de color cubre el paso entre ambos
-      if (p < 0.5 && saliente) pintar(saliente, 1)
-      else if (entrante) pintar(entrante, 1)
-      if (op.velo > 0) {
+      const color = t.tecnica === 'negro' ? '#000' : '#fff'
+      // un solo clip: se ve siempre, con un velo de color que va de opaco a nada al
+      // abrir (arranca del todo cubierto) y de nada a opaco al cerrar
+      const velo = soloUno ? kUno : op.velo
+      if (soloUno) {
+        if (unico) pintar(unico, 1)
+      } else {
+        // dos planos: en la primera mitad el que sale, en la segunda el que entra
+        if (p < 0.5 && saliente) pintar(saliente, 1)
+        else if (entrante) pintar(entrante, 1)
+      }
+      if (velo > 0) {
         ctx.save()
-        ctx.globalAlpha = op.velo
-        ctx.fillStyle = t.tecnica === 'negro' ? '#000' : '#fff'
+        ctx.globalAlpha = velo
+        ctx.fillStyle = color
         ctx.fillRect(0, 0, ancho, alto)
         ctx.restore()
       }
@@ -189,6 +272,10 @@ export function pintarTransicion(
     // así el corte queda escondido detrás del desenfoque
     case 'desenfoque': {
       const maxB = Math.min(ancho, alto) * 0.06
+      if (soloUno) {
+        if (unico) conFiltro(ctx, ancho, alto, unico, pintar, `blur(${(maxB * kUno).toFixed(2)}px)`, 1 + 0.06 * kUno)
+        return
+      }
       if (p < 0.5) {
         const k = p / 0.5
         if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, `blur(${(maxB * k).toFixed(2)}px)`, 1 + 0.06 * k)
@@ -202,6 +289,10 @@ export function pintarTransicion(
     case 'resplandor': {
       const maxB = Math.min(ancho, alto) * 0.05
       const filtro = (k: number) => `blur(${(maxB * k).toFixed(2)}px) brightness(${(1 + 0.9 * k).toFixed(3)})`
+      if (soloUno) {
+        if (unico) conFiltro(ctx, ancho, alto, unico, pintar, filtro(kUno), 1 + 0.05 * kUno)
+        return
+      }
       if (p < 0.5) {
         const k = p / 0.5
         if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, filtro(k), 1 + 0.05 * k)
@@ -213,6 +304,19 @@ export function pintarTransicion(
     }
 
     case 'flash': {
+      if (soloUno) {
+        if (unico) pintar(unico, 1)
+        // fogonazo blanco que arranca fuerte y se apaga al abrir, o al revés al cerrar
+        const veloU = Math.min(1, kUno * 1.6)
+        if (veloU > 0) {
+          ctx.save()
+          ctx.globalAlpha = veloU
+          ctx.fillStyle = '#fff'
+          ctx.fillRect(0, 0, ancho, alto)
+          ctx.restore()
+        }
+        return
+      }
       if (p < 0.5) {
         if (saliente) pintar(saliente, 1)
       } else if (entrante) {
@@ -235,12 +339,25 @@ export function pintarTransicion(
       // como tomar una foto con flash: un leve desenfoque de movimiento a cada lado y
       // un fogonazo blanco muy agudo justo en el corte, más brusco que el flash normal
       const maxB = Math.min(ancho, alto) * 0.03
+      const filtroFc = (k: number) => `blur(${(maxB * k).toFixed(2)}px) brightness(${(1 + 0.25 * k).toFixed(3)})`
+      if (soloUno) {
+        if (unico) conFiltro(ctx, ancho, alto, unico, pintar, filtroFc(kUno), 1 + 0.03 * kUno)
+        const veloU = Math.min(1, Math.pow(kUno, 0.55) * 1.9)
+        if (veloU > 0) {
+          ctx.save()
+          ctx.globalAlpha = veloU
+          ctx.fillStyle = '#fff'
+          ctx.fillRect(0, 0, ancho, alto)
+          ctx.restore()
+        }
+        return
+      }
       if (p < 0.5) {
         const k = p / 0.5
-        if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, `blur(${(maxB * k).toFixed(2)}px) brightness(${(1 + 0.25 * k).toFixed(3)})`, 1 + 0.03 * k)
+        if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, filtroFc(k), 1 + 0.03 * k)
       } else {
         const k = 1 - (p - 0.5) / 0.5
-        if (entrante) conFiltro(ctx, ancho, alto, entrante, pintar, `blur(${(maxB * k).toFixed(2)}px) brightness(${(1 + 0.25 * k).toFixed(3)})`, 1 + 0.03 * k)
+        if (entrante) conFiltro(ctx, ancho, alto, entrante, pintar, filtroFc(k), 1 + 0.03 * k)
       }
       // el fogonazo: pico agudo y saturado justo en la mitad
       const velo = Math.max(0, 1 - Math.abs(p - 0.5) / 0.32)
@@ -256,6 +373,10 @@ export function pintarTransicion(
 
     case 'zoom-desenfoque': {
       const maxB = Math.min(ancho, alto) * 0.045
+      if (soloUno) {
+        if (unico) conFiltro(ctx, ancho, alto, unico, pintar, `blur(${(maxB * kUno).toFixed(2)}px)`, 1 + 0.55 * kUno)
+        return
+      }
       if (p < 0.5) {
         const k = p / 0.5
         if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, `blur(${(maxB * k).toFixed(2)}px)`, 1 + 0.55 * k)
@@ -281,6 +402,12 @@ export function pintarTransicion(
         ctx.translate(signo * dx * 0.16 * k, signo * dy * 0.16 * k)
         pintar(clip, 1)
         ctx.restore()
+      }
+      if (soloUno) {
+        // un solo plano se desliza desde su lado (entrada) o hacia él (salida) mientras
+        // se enfoca, sin el corte a mitad de camino
+        if (unico) pintarLado(unico, kUno, esEntrada ? -1 : 1)
+        return
       }
       if (p < 0.5) {
         if (saliente) pintarLado(saliente, p / 0.5, 1)

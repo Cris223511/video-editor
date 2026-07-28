@@ -91,7 +91,6 @@ export default function PresetsColor({
               onClick={() => onAplicar(p.tono)}
               onMouseEnter={() => setEncima(p.id)}
               onMouseLeave={() => setEncima(null)}
-              title={p.nombre}
               className="group flex flex-col gap-1 text-left"
             >
               <span

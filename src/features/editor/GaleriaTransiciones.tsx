@@ -218,7 +218,6 @@ export default function GaleriaTransiciones({
                     e.dataTransfer.setData(TIPO_TRANSICION, t.id)
                     e.dataTransfer.effectAllowed = 'copy'
                   }}
-                  title={`${t.descripcion} · arrástrala sobre un clip para aplicarla`}
                   className={[
                     'group/muestra flex cursor-grab flex-col gap-1.5 rounded-xl p-1.5 text-left transition-all duration-200 active:cursor-grabbing',
                     elegida

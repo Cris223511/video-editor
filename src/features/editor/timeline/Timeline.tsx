@@ -80,6 +80,7 @@ export default function Timeline({
   mediosVisibles?: boolean
 }) {
   const clips = useEditorStore((s) => s.pista.clips)
+  const fantasmaDup = useEditorStore((s) => s.fantasmaDup)
   const agregarDesdeAsset = useEditorStore((s) => s.agregarDesdeAsset)
   // nivel resaltado mientras se arrastra un medio desde el panel: se ilumina solo
   // esa fila para señalar dónde caería el video. si el cursor está sobre una
@@ -103,6 +104,7 @@ export default function Timeline({
   const ordenCarriles = useEditorStore((s) => s.ordenCarriles)
   const moverCarril = useEditorStore((s) => s.moverCarril)
   const playhead = useEditorStore((s) => s.playhead)
+  const reproduciendo = useEditorStore((s) => s.reproduciendo)
   const pxPorSegundo = useEditorStore((s) => s.pxPorSegundo)
   const irA = useEditorStore((s) => s.irA)
   const pausar = useEditorStore((s) => s.pausar)
@@ -227,6 +229,21 @@ export default function Timeline({
     audios.forEach((a) => p.push(a.inicio, a.inicio + a.duracion))
     return p
   }, [clips, capas, audioRegiones, audios, playhead])
+
+  // durante la reproducción la línea de tiempo sigue al cabezal: cuando este se sale
+  // de la vista (avanzando por la derecha, o al reiniciarse al inicio tras llegar al
+  // final) se reencuadra el desplazamiento para que quede visible, sin arrastrarse en
+  // continuo. así, al acabar y volver a dar play, el scroll también vuelve al arranque
+  useEffect(() => {
+    if (!reproduciendo) return
+    const cont = scrollRef.current
+    if (!cont) return
+    const x = playhead * pxPorSegundo
+    const margen = 48
+    if (x < cont.scrollLeft + margen || x > cont.scrollLeft + cont.clientWidth - margen) {
+      cont.scrollLeft = Math.max(0, x - cont.clientWidth * 0.35)
+    }
+  }, [playhead, reproduciendo, pxPorSegundo])
 
   const puedeDividir = clips.some(
     (c) => playhead > c.inicio + MIN && playhead < c.inicio + c.duracion - MIN,
@@ -823,6 +840,22 @@ export default function Timeline({
                           />
                         )
                       })}
+                      {/* silueta de la copia mientras se arrastra un clip con Alt: verde
+                          donde cabe, roja donde pisaría otro clip. no es un clip real
+                          hasta soltar en un hueco válido */}
+                      {fantasmaDup && fantasmaDup.pista === p && (
+                        <div
+                          className="pointer-events-none absolute top-0 z-30 h-full rounded-md border-2 border-dashed"
+                          style={{
+                            left: fantasmaDup.inicio * pxPorSegundo,
+                            width: Math.max(fantasmaDup.duracion * pxPorSegundo, 8),
+                            borderColor: fantasmaDup.valido ? '#22c55e' : '#ef4444',
+                            background: fantasmaDup.valido
+                              ? 'rgb(34 197 94 / 0.18)'
+                              : 'rgb(239 68 68 / 0.14)',
+                          }}
+                        />
+                      )}
                       {/* figuras e imágenes de esta pista, encima de los clips */}
                       {capasFila.map((c) => (
                         <CapaBlock key={c.id} capa={c} pxPorSegundo={pxPorSegundo} puntos={puntos} />

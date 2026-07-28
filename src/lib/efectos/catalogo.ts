@@ -31,7 +31,13 @@ export const CATEGORIAS_EFECTO: CategoriaEfecto[] = [
         nombre: 'Nítido y brilloso',
         css: (i) => `contrast(${1 + p(i) * 0.35}) brightness(${1 + p(i) * 0.16}) saturate(${1 + p(i) * 0.22})`,
       },
-      { id: 'desenfoque-movimiento', nombre: 'Desenfoque', css: (i) => `blur(${(p(i) * 3).toFixed(2)}px)` },
+      // desenfoque de foco: el cuadro entero se pone borroso como una foto fuera de
+      // foco, sin dirección. es un blur css a secas, así que va por la cadena de filtros
+      // normal y la intensidad manda cuánto se difumina, desde nada hasta bastante
+      { id: 'desenfoque-foco', nombre: 'Desenfoque', css: (i) => `blur(${(p(i) * 16).toFixed(2)}px)` },
+      // desenfoque de movimiento: el borroso direccional, tipo barrido de cámara. es
+      // otro efecto, con su propio ángulo, y por eso lo pinta un filtro svg aparte
+      { id: 'desenfoque-movimiento', nombre: 'Desenfoque de movimiento', css: (i) => `blur(${(p(i) * 3).toFixed(2)}px)` },
       // la curvatura de lente no se puede imitar con un filtro css, así que la muestra
       // solo insinúa el aire de cámara de acción con un poco de contraste y color; la
       // curva de verdad la aplica el visor al elegirlo

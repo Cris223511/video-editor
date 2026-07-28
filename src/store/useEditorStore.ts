@@ -362,6 +362,14 @@ interface EstadoEditor {
   // etiqueta que acompaña al cursor. null cuando no hay ningún gesto en marcha
   arrastreVivo: { etiqueta: string; x: number; y: number } | null
   setArrastreVivo: (a: { etiqueta: string; x: number; y: number } | null) => void
+  // silueta fantasma de la copia mientras se arrastra un clip con Alt: dónde caería
+  // (pista y segundo), cuánto mide y si el sitio está libre. la copia no se crea hasta
+  // soltar en un hueco válido, así que hasta entonces esto es solo una vista previa
+  fantasmaDup: { inicio: number; pista: number; duracion: number; valido: boolean } | null
+  setFantasmaDup: (f: { inicio: number; pista: number; duracion: number; valido: boolean } | null) => void
+  // crea una copia del clip en un sitio concreto (segundo y pista) solo si el tramo
+  // está libre; devuelve el id de la copia o null si ahí no cabía
+  duplicarClipEn: (id: string, inicio: number, pista: number) => string | null
   setInsercionPista: (indice: number | null) => void
   // instante (en segundos) donde se dibuja la línea guía del imantado mientras se
   // mueve o recorta un bloque. queda en null cuando no hay ningún enganche activo
@@ -812,6 +820,49 @@ function pisaAlguno(otros: { inicio: number; duracion: number }[], ini: number, 
   return otros.some((o) => ini < o.inicio + o.duracion && ini + dur > o.inicio)
 }
 
+// duración mínima que le queda a una transición (o cero si no tiene ninguna puesta)
+const DURACION_MINIMA_TRANS = 0.1
+function tieneTransicion(c: {
+  transicion?: { tipo: string } | null
+  transicionSalida?: { tipo: string } | null
+}): boolean {
+  return (
+    (!!c.transicion && c.transicion.tipo !== 'ninguna') ||
+    (!!c.transicionSalida && c.transicionSalida.tipo !== 'ninguna')
+  )
+}
+
+// la duración mínima a la que puede encoger un clip o capa: la normal, salvo que
+// tenga transiciones, en cuyo caso debe quedar sitio para que la de entrada y la de
+// salida quepan sin pisarse (cada una como mínimo un cachito, y nunca más de la mitad)
+function duracionMinimaCon(
+  c: { transicion?: { tipo: string } | null; transicionSalida?: { tipo: string } | null },
+  minBase: number,
+): number {
+  return tieneTransicion(c) ? Math.max(minBase, 2 * DURACION_MINIMA_TRANS) : minBase
+}
+
+// achica las transiciones de entrada y salida para que quepan en la duración actual:
+// cada una como mucho la mitad, así el inicio y el fin nunca se solapan en el medio.
+// se usa al recortar, cuando el elemento queda más corto que su transición
+function limitarTransiciones<
+  T extends {
+    duracion: number
+    transicion?: { tipo: string; duracion: number } | null
+    transicionSalida?: { tipo: string; duracion: number } | null
+  },
+>(c: T): T {
+  const max = c.duracion / 2
+  let out = c
+  if (c.transicion && c.transicion.tipo !== 'ninguna' && c.transicion.duracion > max) {
+    out = { ...out, transicion: { ...c.transicion, duracion: Math.max(DURACION_MINIMA_TRANS, max) } }
+  }
+  if (c.transicionSalida && c.transicionSalida.tipo !== 'ninguna' && c.transicionSalida.duracion > max) {
+    out = { ...out, transicionSalida: { ...c.transicionSalida, duracion: Math.max(DURACION_MINIMA_TRANS, max) } }
+  }
+  return out
+}
+
 // recoloca un inicio para que su tramo no pise a los vecinos de su fila: si cae
 // encima de uno, se pega a su borde por el lado desde el que llega, de modo que los
 // bloques quedan juntos pero nunca superpuestos. si el hueco no da, devuelve null
@@ -1068,6 +1119,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   dibujandoMascara: false,
   insercionPista: null,
   arrastreVivo: null,
+  fantasmaDup: null,
   guiaImantado: null,
   portapapeles: null,
 
@@ -1650,20 +1702,23 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         // es el desplazamiento total del cursor desde ese arranque, no un paso
         const b = base ?? c
         const v = b.velocidad
+        // si el clip tiene transiciones, no se le deja encoger tanto como para que la de
+        // entrada y la de salida se pisen: se reserva sitio para las dos
+        const minDur = duracionMinimaCon(c, DURACION_MINIMA)
         if (lado === 'inicio') {
           // delta va en segundos de la pista; el punto de entrada en la fuente
           // avanza a razón de la velocidad. el borde derecho queda fijo
           const dMin = -b.recorteInicio / v
-          const dMax = b.duracion - DURACION_MINIMA
+          const dMax = b.duracion - minDur
           const d = Math.max(dMin, Math.min(delta, dMax))
           const inicio = b.inicio + d
           if (inicio >= 0) {
-            return {
+            return limitarTransiciones({
               ...c,
               inicio,
               duracion: b.duracion - d,
               recorteInicio: b.recorteInicio + d * v,
-            }
+            })
           }
           // el borde izquierdo llegó al arranque de la pista. en lugar de dejar
           // que el clip se salga por la izquierda, se clava en cero y lo que
@@ -1676,18 +1731,18 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
           const duracionTope = b.duracion - dTope
           // cuánto puede crecer por la derecha sin pasarse del final del material
           const margen = Math.max(0, (b.duracionFuente - entrada) / v - duracionTope)
-          return {
+          return limitarTransiciones({
             ...c,
             inicio: 0,
             duracion: duracionTope + Math.min(sobra, margen),
             recorteInicio: entrada,
-          }
+          })
         }
         // borde derecho: no puede pasar del final del video fuente
-        const dMin = DURACION_MINIMA - b.duracion
+        const dMin = minDur - b.duracion
         const dMax = (b.duracionFuente - b.recorteInicio) / v - b.duracion
         const d = Math.max(dMin, Math.min(delta, dMax))
-        return { ...c, duracion: b.duracion + d }
+        return limitarTransiciones({ ...c, duracion: b.duracion + d })
       })
       return { pista: { ...s.pista, clips }, playhead: Math.min(s.playhead, duracionTotal(clips)) }
     }),
@@ -1720,19 +1775,19 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
             corrimiento = -b.inicio
             duracionNueva = b.duracion - corrimiento
           }
-          return {
+          return limitarTransiciones({
             ...c,
             inicio: b.inicio + corrimiento,
             duracion: duracionNueva,
             velocidad: consumidoFuente / duracionNueva,
-          }
+          })
         }
         // borde derecho: el inicio no se mueve, solo se estira o encoge el final
         let duracionNueva = b.duracion + delta
         const durMin = consumidoFuente / 4
         const durMax = consumidoFuente / 0.25
         duracionNueva = Math.max(durMin, Math.min(duracionNueva, durMax))
-        return { ...c, duracion: duracionNueva, velocidad: consumidoFuente / duracionNueva }
+        return limitarTransiciones({ ...c, duracion: duracionNueva, velocidad: consumidoFuente / duracionNueva })
       })
       return { pista: { ...s.pista, clips }, playhead: Math.min(s.playhead, duracionTotal(clips)) }
     }),
@@ -1745,7 +1800,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         // se conserva el mismo trozo de fuente y se recalcula lo que ocupa en la
         // pista, igual que al cambiar la velocidad en un editor de escritorio
         const consumidoFuente = c.duracion * c.velocidad
-        return { ...c, velocidad: v, duracion: consumidoFuente / v }
+        return limitarTransiciones({ ...c, velocidad: v, duracion: consumidoFuente / v })
       })
       return { pista: { ...s.pista, clips }, playhead: Math.min(s.playhead, duracionTotal(clips)) }
     }),
@@ -2085,6 +2140,34 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   setFilaTextoResaltada: (nivel) => set({ filaTextoResaltada: nivel }),
 
   setArrastreVivo: (a) => set({ arrastreVivo: a }),
+  setFantasmaDup: (f) => set({ fantasmaDup: f }),
+
+  duplicarClipEn: (id, inicio, pista) => {
+    const s = get()
+    const orig = s.pista.clips.find((c) => c.id === id)
+    if (!orig) return null
+    // el destino tiene que ser una pista real y su tramo estar despejado; si no, no se
+    // duplica nada y el gesto se cancela sin más
+    if (pista < 0 || pista >= s.numPistas) return null
+    const ini = Math.max(0, inicio)
+    const otros = s.pista.clips.filter((c) => c.pista === pista)
+    if (pisaAlguno(otros, ini, orig.duracion)) return null
+    // la copia lleva su tono y efectos sin referencias compartidas, y cada efecto
+    // estrena id para que los dos clips se editen por separado
+    const copia = structuredClone(orig)
+    copia.id = crypto.randomUUID()
+    copia.efectos = copia.efectos.map((e) => ({ ...e, id: crypto.randomUUID() }))
+    copia.inicio = ini
+    copia.pista = pista
+    set({
+      pista: { ...s.pista, clips: [...s.pista.clips, copia] },
+      clipSeleccionado: copia.id,
+      capaSeleccionada: null,
+      regionSeleccionada: null,
+      fantasmaDup: null,
+    })
+    return copia.id
+  },
   setGuiaImantado: (segundo) => set({ guiaImantado: segundo }),
 
   moviendoVisor: false,
@@ -2498,7 +2581,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   agregarCensura: () =>
     set((s) => {
-      const capa = crearCapaCensura(s.playhead)
+      const capa = crearCapaCensura(s.playhead, s.resolucion.ancho / s.resolucion.alto)
       return {
         capas: [...s.capas, capa],
         capaSeleccionada: capa.id,
@@ -2743,12 +2826,15 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     set((s) => ({
       capas: s.capas.map((c) => {
         if (c.id !== id) return c
+        // con transiciones, la capa no encoge tanto como para que la de entrada y la de
+        // salida se pisen; y lo que quede de transición se achica para caber
+        const minDur = duracionMinimaCon(c, DURACION_MINIMA_CAPA)
         if (lado === 'inicio') {
           const fin = c.inicio + c.duracion
-          const nuevoInicio = Math.max(0, Math.min(c.inicio + delta, fin - DURACION_MINIMA_CAPA))
-          return { ...c, inicio: nuevoInicio, duracion: fin - nuevoInicio }
+          const nuevoInicio = Math.max(0, Math.min(c.inicio + delta, fin - minDur))
+          return limitarTransiciones({ ...c, inicio: nuevoInicio, duracion: fin - nuevoInicio })
         }
-        return { ...c, duracion: Math.max(DURACION_MINIMA_CAPA, c.duracion + delta) }
+        return limitarTransiciones({ ...c, duracion: Math.max(minDur, c.duracion + delta) })
       }),
     })),
 
@@ -3322,7 +3408,11 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       // ningún video (solo un texto o un dibujo) también se puede reproducir
       const total = duracionProyecto(s.pista.clips, s.capas, s.audios, s.audioRegiones)
       if (total === 0) return {}
-      const playhead = s.playhead >= total ? 0 : s.playhead
+      // si el cabezal está en el final (o a un pelo de él), se reinicia al inicio para
+      // volver a reproducir el montaje entero. la reproducción real no siempre deja el
+      // cabezal clavado en el total exacto: por el redondeo de los tiempos del video
+      // se queda unas centésimas antes, y sin este margen darle play no reiniciaba
+      const playhead = s.playhead >= total - 0.08 ? 0 : s.playhead
       return { reproduciendo: true, playhead }
     }),
 

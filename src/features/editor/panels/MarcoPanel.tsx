@@ -39,7 +39,6 @@ export default function MarcoPanel() {
               <button
                 key={t.tipo}
                 onClick={() => setMarco({ tipo: t.tipo })}
-                title={t.etiqueta}
                 className="group flex flex-col gap-1 text-left"
               >
                 <span
@@ -91,7 +90,7 @@ export default function MarcoPanel() {
             <Campo etiqueta={`Grosor (${marco.grosor})`}>
               <Deslizador
                 valor={marco.grosor}
-                min={2}
+                min={0}
                 max={150}
                 onChange={(v) => setMarco({ grosor: v })}
               />

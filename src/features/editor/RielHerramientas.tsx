@@ -56,6 +56,10 @@ function ConTooltip({ activo, texto, children }: { activo: boolean; texto: strin
 export default function RielHerramientas({ onElegir }: { onElegir?: () => void }) {
   const herramienta = useEditorStore((s) => s.herramienta)
   const setHerramienta = useEditorStore((s) => s.setHerramienta)
+  // si la herramienta activa es de edición de un elemento (transformar, tono, etc.),
+  // no pertenece al riel y el panel izquierdo cae a Proyecto; el resaltado sigue esa
+  // misma regla para que no quede el riel sin marcar nada mientras se ve Proyecto
+  const herramientaVista = herramientas.some((h) => h.id === herramienta) ? herramienta : 'proyecto'
 
   // el estado arranca de lo que se guardó la última vez; si no hay nada, plegado
   const [expandido, setExpandido] = useState(() => {
@@ -111,7 +115,7 @@ export default function RielHerramientas({ onElegir }: { onElegir?: () => void }
                 // para que el nombre siga al dibujo
                 'flex h-9 w-full shrink-0 items-center overflow-hidden rounded-lg transition-colors duration-200',
                 expandido ? 'justify-start' : 'justify-center',
-                herramienta === h.id
+                herramientaVista === h.id
                   ? 'bg-brand text-white shadow-sm'
                   : 'text-[color:var(--muted)] hover:bg-brand/10 hover:text-brand',
               ].join(' ')}

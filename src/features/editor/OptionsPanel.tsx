@@ -162,7 +162,13 @@ export default function OptionsPanel({
     borrador: <BorradorPanel />,
   }
 
-  const actual = herramientas.find((h) => h.id === herramienta)
+  // el panel izquierdo es solo para lo del proyecto y para crear elementos nuevos.
+  // la edición de un elemento (transformar, tono, recortar, etc.) vive en el panel
+  // contextual de la derecha, así que si la herramienta activa es una de esas (no está
+  // en el riel), aquí se cae a Proyecto en lugar de duplicar el panel de la derecha sin
+  // título. era justo lo que pasaba al elegir una imagen: salía "Transformar" repetido
+  const herramientaVista = herramientas.some((h) => h.id === herramienta) ? herramienta : 'proyecto'
+  const actual = herramientas.find((h) => h.id === herramientaVista)
 
   return (
     <aside ref={ref} className="panel relative w-full overflow-hidden rounded-xl">
@@ -192,7 +198,7 @@ export default function OptionsPanel({
         </div>
         {/* barra de desplazamiento fina, no la gruesa general: en un panel estrecho
             la ancha se veía tosca */}
-        <div className="scroll-modal min-h-0 flex-1 overflow-y-auto p-3">{paneles[herramienta]}</div>
+        <div className="scroll-modal min-h-0 flex-1 overflow-y-auto p-3">{paneles[herramientaVista]}</div>
       </div>
     </aside>
   )

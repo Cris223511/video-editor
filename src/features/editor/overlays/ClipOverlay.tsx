@@ -5,7 +5,7 @@ import { rectContenido } from '../../../lib/layers/rect'
 import { rectClip, encuadreDe } from '../../../lib/timeline/encuadre'
 import { clipEnTiempo } from '../../../lib/timeline/clips'
 import { Ancla, redimensionar } from '../../../lib/layers/resize'
-import { Guia, imantar, imantarValor } from '../../../lib/layers/guias'
+import { Guia, imantar, imantarValor, imanesPorEje } from '../../../lib/layers/guias'
 import { hayRecorte } from '../../../lib/layers/recorteMascara'
 import Tiradores from './Tiradores'
 import ManijaGiro, { anguloGiro } from './ManijaGiro'
@@ -96,7 +96,8 @@ export default function ClipOverlay() {
       // salir las guías laterales. se lleva el centro al del recorte, se imanta y se
       // devuelve al centro del video restando el mismo desfase
       const centroRec = { x: bruto.x + desfase.x, y: bruto.y + desfase.y }
-      const r = imantar({ x: centroRec.x, y: centroRec.y, w: tamCaja.w, h: tamCaja.h }, [])
+      const iman = imanesPorEje(rect)
+      const r = imantar({ x: centroRec.x, y: centroRec.y, w: tamCaja.w, h: tamCaja.h }, [], iman.x, iman.y)
       setGuias(r.guias)
       actualizarEncuadre(id, { x: r.x - desfase.x, y: r.y - desfase.y })
     }
@@ -141,13 +142,18 @@ export default function ClipOverlay() {
       let px = p.x
       let py = p.y
       if (!ev.altKey) {
+        // el enganche va por eje: en un lienzo apaisado el alto del área es menor, y
+        // con un mismo umbral en fracción la guía de arriba/abajo se pegaba muchísimo
+        // más difícil que las laterales. con imanesPorEje ambas piden la misma holgura
+        // en píxeles de pantalla, así que arriba y abajo se enganchan tan fácil como los lados
+        const iman = imanesPorEje(rect)
         if (este || oeste) {
-          const s = imantarValor(px, [0, 0.5, 1])
+          const s = imantarValor(px, [0, 0.5, 1], iman.x)
           px = s.v
           if (s.pos !== null) gs.push({ eje: 'x', pos: s.pos })
         }
         if (norte || sur) {
-          const s = imantarValor(py, [0, 0.5, 1])
+          const s = imantarValor(py, [0, 0.5, 1], iman.y)
           py = s.v
           if (s.pos !== null) gs.push({ eje: 'y', pos: s.pos })
         }

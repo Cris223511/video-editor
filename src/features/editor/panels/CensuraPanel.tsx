@@ -76,7 +76,7 @@ export default function CensuraPanel({ ocultarAgregar = false }: { ocultarAgrega
             <Campo etiqueta={`Intensidad (${capa.intensidad})`}>
               <Deslizador
                 valor={capa.intensidad}
-                min={2}
+                min={0}
                 max={80}
                 onChange={(v) => editar('intensidad', v)}
               />

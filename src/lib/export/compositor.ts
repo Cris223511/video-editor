@@ -1,4 +1,4 @@
-import { Clip } from '../../types/timeline'
+import { Clip, Encuadre } from '../../types/timeline'
 import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto, CapaTrazo } from '../../types/layers'
 import { Marco } from '../../types/marco'
 import { clipEnTiempo } from '../timeline/clips'
@@ -8,14 +8,15 @@ import { estadoImpactosEn } from '../impactos/catalogo'
 import { Impacto } from '../../types/impacto'
 import { esTonoNeutro, filtroCss, hayEfectoFiltro } from '../color/tono'
 import { REPETICIONES_BRILLO, desenfoqueBrillo } from '../layers/defaults'
-import { anterior, posterior, pintarTransicion, progreso, progresoSalida } from '../transiciones/pintar'
+import { anterior, posterior, pintarTransicion, progreso, progresoSalida, esTransicionGlobal, efectoGlobalTrans } from '../transiciones/pintar'
+import { buscarTransicion } from '../transiciones/catalogo'
 import { fundidoEn } from '../audio/ganancia'
 import { estiloEntrada, progresoEntrada, estiloSalida, progresoSalidaCapa, combinarEntradaSalida } from '../transiciones/entrada'
 import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../color/mezcla'
 import { cssEfectos } from '../efectos/catalogo'
 import { paramsNB } from '../efectos/nitidezBrillo'
 import { paramsGoPro } from '../efectos/goPro'
-import { encuadreDe, rectClip } from '../timeline/encuadre'
+import { encuadreDe, rectClip, ENCUADRE_NEUTRO } from '../timeline/encuadre'
 import { aplicarTransformCanvas } from '../layers/transform'
 
 export interface Escena {
@@ -368,6 +369,7 @@ function dibujarCensura(
   video: HTMLVideoElement | null,
   off: HTMLCanvasElement,
   colorFondo: string,
+  enc: Encuadre,
 ) {
   const pos = posicionCapa(c, t)
   let dx = 0
@@ -421,12 +423,15 @@ function dibujarCensura(
     return
   }
 
-  // la imagen del video ocupa el lienzo con object-contain; se calcula su rect
-  const escala = Math.min(ancho / video.videoWidth, alto / video.videoHeight)
-  const dw = video.videoWidth * escala
-  const dh = video.videoHeight * escala
-  const ox = (ancho - dw) / 2
-  const oy = (alto - dh) / 2
+  // rectángulo real del video dentro del lienzo, con su encaje "contener" y el
+  // encuadre del clip (posición y escala). la censura muestrea a partir de aquí para
+  // tapar justo lo que se ve debajo, en su sitio y tamaño, sin ampliarlo. es el mismo
+  // cálculo que usa el visor, así que lo censurado coincide con lo que se editó
+  const vr = rectClip(video.videoWidth, video.videoHeight, ancho, alto, enc)
+  const dw = vr.dw
+  const dh = vr.dh
+  const ox = vr.dx
+  const oy = vr.dy
   const escX = video.videoWidth / dw
   const escY = video.videoHeight / dh
 
@@ -561,12 +566,37 @@ export function dibujarFotograma(
 
   const activo = clipEnTiempo(clips, t, escena.ocultas)
 
+  // velo y desenfoque de una transición que abre o cierra un clip aislado: se guardan
+  // aquí para aplicarlos al final, sobre TODA la escena ya compuesta (clip, capas y
+  // marco), igual que en el visor, en vez de dejarlos solo sobre el video
+  let veloTransOp = 0
+  let veloTransCol = '#000'
+  let blurTransG = 0
+
   // el clip visible y, si está en plena transición de entrada, el que estaba
   // antes en su misma pista. la coreografía la lleva el motor compartido, así
   // que lo que se exporta es idéntico a lo que se vio al editar
   if (activo) {
     const p = progreso(activo, t)
     const saliente = p < 1 ? anterior(activo, clips) : null
+    // ¿la transición del clip abre o cierra contra el fondo, con una técnica que se
+    // pinta encima de todo? entonces el clip se pinta normal y el velo/desenfoque se
+    // aplican al final, sobre las capas
+    const qG = progresoSalida(activo, t)
+    const tecEntG = buscarTransicion(activo.transicion.tipo).tecnica
+    const tecSalG =
+      activo.transicionSalida && activo.transicionSalida.tipo !== 'ninguna'
+        ? buscarTransicion(activo.transicionSalida.tipo).tecnica
+        : 'corte'
+    const ladoM = Math.min(ancho, alto)
+    const entG = !anterior(activo, clips) && p < 1 && esTransicionGlobal(tecEntG) ? efectoGlobalTrans(tecEntG, p, true, ladoM) : null
+    const salG = !posterior(activo, clips) && qG < 1 && esTransicionGlobal(tecSalG) ? efectoGlobalTrans(tecSalG, qG, false, ladoM) : null
+    const globalAisladaTrans = !!(entG || salG)
+    const vE = entG?.veloOpacidad ?? 0
+    const vS = salG?.veloOpacidad ?? 0
+    veloTransOp = Math.max(vE, vS)
+    veloTransCol = vE >= vS ? entG?.veloColor ?? '#000' : salG?.veloColor ?? '#000'
+    blurTransG = (entG?.blur ?? 0) + (salG?.blur ?? 0)
 
     const pintar = (clip: Clip, alfa: number) => {
       const video = videoDe(clip.id)
@@ -765,7 +795,10 @@ export function dibujarFotograma(
     // misma decisión que en el visor: la salida manda sobre la entrada mientras
     // dura, para que el archivo exportado coincida con lo que se vio al montar
     const q = progresoSalida(activo, t)
-    if (q < 1 && activo.transicionSalida) {
+    if (globalAisladaTrans) {
+      // el clip se pinta normal; su velo y desenfoque se aplican al final, sobre todo
+      pintar(activo, 1)
+    } else if (q < 1 && activo.transicionSalida) {
       pintarTransicion(ctx, ancho, alto, posterior(activo, clips), activo, q, pintar, activo.transicionSalida.tipo)
     } else {
       pintarTransicion(ctx, ancho, alto, activo, saliente, p, pintar)
@@ -778,7 +811,7 @@ export function dibujarFotograma(
   for (const c of capas) {
     if (c.tipo !== 'censura') continue
     if (t < c.inicio || t >= c.inicio + c.duracion) continue
-    dibujarCensura(ctx, c, ancho, alto, t, activoVideo, off, colorFondo)
+    dibujarCensura(ctx, c, ancho, alto, t, activoVideo, off, colorFondo, activo ? encuadreDe(activo) : ENCUADRE_NEUTRO)
   }
 
   // luego texto, imagen y figuras en orden. el fundido de la capa se aplica
@@ -849,6 +882,33 @@ export function dibujarFotograma(
     ctx.save()
     ctx.globalAlpha = imp.veloOpacidad
     ctx.fillStyle = imp.veloColor
+    ctx.fillRect(0, 0, ancho, alto)
+    ctx.restore()
+  }
+
+  // desenfoque de una transición que difumina toda la escena ya compuesta: se copia el
+  // cuadro a un lienzo aparte y se vuelve a volcar borroso, igual que el impacto, para
+  // que el difuminado alcance también las capas, no solo el video
+  if (blurTransG > 0) {
+    const aux = auxImpacto(ancho, alto)
+    const actx = aux.getContext('2d')
+    if (actx) {
+      actx.clearRect(0, 0, ancho, alto)
+      actx.drawImage(ctx.canvas, 0, 0)
+      ctx.clearRect(0, 0, ancho, alto)
+      ctx.fillStyle = colorFondo
+      ctx.fillRect(0, 0, ancho, alto)
+      ctx.save()
+      ctx.filter = `blur(${blurTransG.toFixed(2)}px)`
+      ctx.drawImage(aux, 0, 0)
+      ctx.restore()
+    }
+  }
+  // velo de la transición (fundido a negro o a blanco, flash) por encima de todo
+  if (veloTransOp > 0) {
+    ctx.save()
+    ctx.globalAlpha = veloTransOp
+    ctx.fillStyle = veloTransCol
     ctx.fillRect(0, 0, ancho, alto)
     ctx.restore()
   }

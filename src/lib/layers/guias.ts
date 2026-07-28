@@ -52,7 +52,13 @@ export function imantarValor(
 export function imantar(
   caja: CajaGuia,
   otras: CajaGuia[],
-  iman = IMAN,
+  // el enganche puede ir por eje: como el lienzo casi nunca es cuadrado, una misma
+  // distancia en fracción vale muchos más píxeles en el eje largo que en el corto, y
+  // la guía del eje corto (normalmente arriba/abajo en un lienzo apaisado) se volvía
+  // casi imposible de pegar. dándole a cada eje su propio umbral, ambas líneas se
+  // enganchan con la misma facilidad en pantalla
+  imanX = IMAN,
+  imanY = imanX,
 ): { x: number; y: number; guias: Guia[] } {
   // el lienzo aporta sus bordes y su centro, que es la alineación más pedida
   const objetivosX = [0, 0.5, 1]
@@ -72,7 +78,7 @@ export function imantar(
   for (const propio of referencias(caja.x, caja.w)) {
     for (const destino of objetivosX) {
       const dist = Math.abs(propio - destino)
-      if (dist <= iman && (!mejorX || dist < mejorX.dist))
+      if (dist <= imanX && (!mejorX || dist < mejorX.dist))
         mejorX = { ajuste: destino - propio, pos: destino, dist }
     }
   }
@@ -85,7 +91,7 @@ export function imantar(
   for (const propio of referencias(caja.y, caja.h)) {
     for (const destino of objetivosY) {
       const dist = Math.abs(propio - destino)
-      if (dist <= iman && (!mejorY || dist < mejorY.dist))
+      if (dist <= imanY && (!mejorY || dist < mejorY.dist))
         mejorY = { ajuste: destino - propio, pos: destino, dist }
     }
   }
@@ -95,4 +101,15 @@ export function imantar(
   }
 
   return { x, y, guias }
+}
+
+// umbral de enganche por eje que da la misma holgura en píxeles de pantalla a lo alto
+// y a lo ancho. `rc` es el área de contenido en píxeles (del propio visor), y `px` los
+// píxeles de holgura deseados. así la guía se pega igual de fácil en un lienzo apaisado
+// que en uno vertical, y a cualquier zoom del navegador
+export function imanesPorEje(rc: { w: number; h: number }, px = 9): { x: number; y: number } {
+  return {
+    x: rc.w > 0 ? px / rc.w : IMAN,
+    y: rc.h > 0 ? px / rc.h : IMAN,
+  }
 }

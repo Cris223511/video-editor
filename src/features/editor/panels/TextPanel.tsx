@@ -246,7 +246,7 @@ export default function TextPanel({ ocultarAgregar = false }: { ocultarAgregar?:
                 <Campo etiqueta={`Grosor (${capa.grosorContorno} px)`}>
                   <Deslizador
                     valor={capa.grosorContorno}
-                    min={1}
+                    min={0}
                     max={20}
                     onChange={(v) => editar('grosorContorno', v)}
                   />

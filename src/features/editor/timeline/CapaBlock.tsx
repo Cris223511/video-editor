@@ -46,15 +46,29 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   // arrastrar una transición de la galería y soltarla aquí se la pone a este
   // elemento, igual que a un clip de video. el audio es la excepción y no llega
   // por este bloque, así que cualquier capa la acepta
-  const [transEncima, setTransEncima] = useState(false)
+  // lado donde caería la transición según la mitad del bloque bajo el cursor: izquierda
+  // es la entrada del elemento y derecha su salida. null cuando no hay ninguna encima
+  const [ladoTrans, setLadoTrans] = useState<'entrada' | 'salida' | null>(null)
+  function ladoDe(e: React.DragEvent): 'entrada' | 'salida' {
+    const rect = e.currentTarget.getBoundingClientRect()
+    return e.clientX - rect.left < rect.width / 2 ? 'entrada' : 'salida'
+  }
   function alSoltarTransicion(e: React.DragEvent) {
     const tipo = e.dataTransfer.getData(TIPO_TRANSICION)
     if (!tipo) return
     e.preventDefault()
     e.stopPropagation()
-    setTransEncima(false)
-    const dur = capa.transicion?.duracion ?? 0.5
-    actualizarCapa(capa.id, { transicion: { tipo, duracion: dur } })
+    const lado = ladoDe(e)
+    setLadoTrans(null)
+    // según el borde sobre el que se soltó, la transición entra por el principio o
+    // sale por el final del elemento; cada una guarda su duración por separado
+    if (lado === 'salida') {
+      const dur = capa.transicionSalida?.duracion ?? 0.5
+      actualizarCapa(capa.id, { transicionSalida: { tipo, duracion: dur } })
+    } else {
+      const dur = capa.transicion?.duracion ?? 0.5
+      actualizarCapa(capa.id, { transicion: { tipo, duracion: dur } })
+    }
     seleccionarCapa(capa.id)
   }
 
@@ -274,10 +288,9 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
             : 'Figura'
 
   // la imagen se dibuja como un clip aparte: su miniatura se repite a lo ancho
-  // (sin estirarse) y encima lleva un velo celeste con su rótulo, para que se
-  // distinga de un texto o una figura de un vistazo
+  // conservando su proporción real, sobre un fondo oscuro con su rótulo, para que
+  // se distinga de un texto o una figura de un vistazo y el nombre se lea bien
   const esImagen = capa.tipo === 'imagen'
-  const aspectoImg = esImagen && capa.altoNatural > 0 ? capa.anchoNatural / capa.altoNatural : 1
 
   return (
     <Tooltip texto={etiqueta} retardo={2000} lado="arriba">
@@ -290,11 +303,12 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes(TIPO_TRANSICION)) {
           e.preventDefault()
-          if (!transEncima) setTransEncima(true)
+          const lado = ladoDe(e)
+          if (lado !== ladoTrans) setLadoTrans(lado)
         }
       }}
       onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) setTransEncima(false)
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setLadoTrans(null)
       }}
       onDrop={alSoltarTransicion}
       // el botón derecho abre el menú de este bloque en el punto donde se pulsó
@@ -314,7 +328,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       style={{
         left: capa.inicio * pxPorSegundo,
         width: Math.max(capa.duracion * pxPorSegundo, 8),
-        backgroundColor: esImagen ? 'rgba(56, 189, 248, 0.28)' : 'rgba(245, 158, 11, 0.25)',
+        backgroundColor: esImagen ? 'rgba(10, 12, 20, 0.72)' : 'rgba(245, 158, 11, 0.25)',
         // en reposo la posición se anima con una curva suave; durante el arrastre
         // el suavizado se apaga para que el bloque no vaya por detrás del cursor
         transition: interactuando ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -322,19 +336,25 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     >
       {esImagen ? (
         <>
-          {/* la miniatura se repite a lo ancho a su proporción real, nunca estirada */}
+          {/* la miniatura se repite a lo ancho conservando su proporción real: la
+              altura llena el bloque y el ancho sale solo con `auto`, así no se
+              deforma como antes, que forzaba un ancho relativo al bloque */}
           <div
             className="pointer-events-none absolute inset-0"
             style={{
               backgroundImage: `url(${capa.src})`,
               backgroundRepeat: 'repeat-x',
-              backgroundSize: `${aspectoImg * 100}% 100%`,
-              opacity: 0.5,
+              backgroundSize: 'auto 100%',
+              opacity: 0.85,
             }}
           />
-          {/* velo celeste encima, la señal de que es una imagen */}
-          <div className="pointer-events-none absolute inset-0" style={{ background: 'rgba(56, 189, 248, 0.32)' }} />
-          <span className="pointer-events-none relative flex items-center gap-1 truncate text-[10px] font-medium text-white">
+          {/* velo negro suave por encima: oscurece lo justo para que el rótulo blanco
+              se lea sobre cualquier imagen, sin tapar del todo la miniatura */}
+          <div className="pointer-events-none absolute inset-0" style={{ background: 'rgba(0, 0, 0, 0.4)' }} />
+          <span
+            className="pointer-events-none relative flex items-center gap-1 truncate text-[10px] font-medium text-white"
+            style={{ textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}
+          >
             <Icon name="imagen" size={11} /> Imagen
           </span>
         </>
@@ -358,17 +378,21 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
         </>
       )}
 
-      {/* cuña de la transición de entrada, si la tiene */}
-      <TransicionCapaBlock capa={capa} pxPorSegundo={pxPorSegundo} />
+      {/* cuñas de las transiciones de entrada y de salida, si las tiene */}
+      <TransicionCapaBlock capa={capa} pxPorSegundo={pxPorSegundo} lado="entrada" />
+      <TransicionCapaBlock capa={capa} pxPorSegundo={pxPorSegundo} lado="salida" />
 
-      {/* resalte al arrastrar una transición encima, en el borde de entrada */}
-      {transEncima && (
+      {/* resalte al arrastrar una transición encima, en el borde donde caería: entrada
+          por la izquierda o salida por la derecha, según la mitad bajo el cursor */}
+      {ladoTrans && (
         <div className="pointer-events-none absolute inset-0 z-20 rounded-md ring-2 ring-inset ring-brand">
           <div
-            className="absolute left-0 top-0 h-full w-6"
+            className={`absolute top-0 h-full w-6 ${ladoTrans === 'salida' ? 'right-0' : 'left-0'}`}
             style={{
               background:
-                'linear-gradient(105deg, rgb(24 97 255 / 0.75) 0%, rgb(24 97 255 / 0.25) 60%, transparent 100%)',
+                ladoTrans === 'salida'
+                  ? 'linear-gradient(255deg, rgb(24 97 255 / 0.75) 0%, rgb(24 97 255 / 0.25) 60%, transparent 100%)'
+                  : 'linear-gradient(105deg, rgb(24 97 255 / 0.75) 0%, rgb(24 97 255 / 0.25) 60%, transparent 100%)',
             }}
           />
         </div>
