@@ -1,7 +1,7 @@
 {
   "name": "video-editor",
   "private": true,
-  "version": "2.32.0",
+  "version": "2.33.0",
   "description": "Editor de video que funciona por completo en el navegador: línea de tiempo con varios niveles, corrección de color, censura en movimiento, capas y exportación, sin que los archivos salgan del equipo.",
   "keywords": [
     "video-editor",
@@ -48,6 +48,8 @@
     "framer-motion": "^12.42.2",
     "lenis": "^1.3.25",
     "lucide-react": "^1.25.0",
+    "mp4-muxer": "^5.2.2",
+    "mp4box": "^2.4.1",
     "react": "^18.3.1",
     "react-colorful": "^5.8.0",
     "react-dom": "^18.3.1",
