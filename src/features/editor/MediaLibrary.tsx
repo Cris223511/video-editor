@@ -178,7 +178,7 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
                       su opacidad y se reproduce, así la transición entre foto y
                       video se ve suave. va sin arrastre propio para no estorbar al
                       draggable de la tarjeta */}
-                  {m.clase === 'video' && (
+                  {m.clase === 'video' && !m.faltante && (
                     <video
                       src={m.url}
                       muted
@@ -187,6 +187,16 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
                       draggable={false}
                       className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100"
                     />
+                  )}
+                  {/* el archivo ya no está en el equipo: se marca la portada como no
+                      encontrada, en vez de intentar cargar un video roto */}
+                  {m.faltante && (
+                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[rgb(9_14_24/0.72)] text-center">
+                      <Icon name="alerta" size={20} className="text-amber-400" />
+                      <span className="px-2 text-[11px] font-semibold leading-tight text-white/90">
+                        No encontrado
+                      </span>
+                    </div>
                   )}
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2 py-1.5">
                     <p className="truncate text-[12px] font-medium text-white">{m.nombre}</p>

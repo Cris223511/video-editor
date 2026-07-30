@@ -856,7 +856,9 @@ export default function Timeline({
                             key={c.id}
                             clip={c}
                             nombre={asset?.nombre ?? 'clip'}
-                            url={asset?.url}
+                            // sin url el bloque muestra "no encontrado"; se fuerza cuando el
+                            // archivo ya no está para no intentar sacarle fotogramas
+                            url={asset?.faltante ? undefined : asset?.url}
                             altoPista={altosPista[p]}
                             pxPorSegundo={pxPorSegundo}
                             puntos={puntos}

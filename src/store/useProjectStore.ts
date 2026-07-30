@@ -22,6 +22,9 @@ interface EstadoProyecto {
   renombrar: (titulo: string) => void
   agregar: (medio: MediaAsset) => void
   quitar: (id: string) => void
+  // marca un medio como no encontrado (su archivo ya no se puede leer). la interfaz lo
+  // pinta como tal y deja de intentar cargarlo
+  marcarFaltante: (id: string) => void
   limpiar: () => void
 }
 
@@ -71,6 +74,8 @@ export const useProjectStore = create<EstadoProyecto>((set) => ({
       if (objetivo) URL.revokeObjectURL(objetivo.url)
       return { medios: s.medios.filter((m) => m.id !== id) }
     }),
+  marcarFaltante: (id) =>
+    set((s) => ({ medios: s.medios.map((m) => (m.id === id ? { ...m, faltante: true } : m)) })),
   limpiar: () =>
     set((s) => {
       s.medios.forEach((m) => URL.revokeObjectURL(m.url))

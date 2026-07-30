@@ -248,6 +248,8 @@ export default function Preview() {
   // terminar. con este recorte, el final enseña el último fotograma del último clip
   const phVista = total > 0 ? Math.min(playhead, Math.max(0, total - 0.001)) : playhead
   const activo = clipEnTiempo(clipsOrdenados, phVista, ocultas)
+  // el archivo del clip visible ya no está: se avisa en el lienzo en vez de dejarlo negro
+  const activoFaltante = !!(activo && assetPorId.get(activo.assetId)?.faltante)
 
   // en pausa, el cabezal manda: phRef lo sigue para arrancar donde toca
   useEffect(() => {
@@ -1217,7 +1219,7 @@ export default function Preview() {
               {fondo === 'desenfoque' &&
                 clipsOrdenados.map((c) => {
                   const asset = assetPorId.get(c.assetId)
-                  if (!asset) return null
+                  if (!asset || asset.faltante) return null
                   // se ve solo el fondo del clip activo; los demás quedan cargados y a
                   // opacidad cero, de modo que al pasar al siguiente ya tiene su fotograma
                   // listo y no aparece el negro del lienzo entre un clip y otro
@@ -1268,7 +1270,7 @@ export default function Preview() {
                   efectos: mezclarEfectos(c.efectos ?? [], mixEf),
                   animando: !!c.transicionEfecto && mixEf < 1,
                 }
-                if (!asset) return null
+                if (!asset || asset.faltante) return null
                 // el encuadre se aplica como transformación del elemento: se
                 // escala respecto al centro y luego se lleva a su posición, en
                 // fracción del lienzo. coincide con lo que dibuja el compositor
@@ -1452,6 +1454,22 @@ export default function Preview() {
             <MarcoOverlay alturaLienzo={lienzoRect.h} />
             <CuentaRegresiva />
 
+            {/* el video del clip visible ya no está en el equipo: en lugar de dejar el
+                lienzo en negro (y llenar la consola de errores intentando cargarlo), se
+                avisa claro de que hay que volver a importarlo */}
+            {activoFaltante && (
+              <div
+                className="pointer-events-none absolute inset-0 z-40 flex flex-col items-center justify-center gap-2 px-6 text-center"
+                style={{ background: 'rgb(9 14 24 / 0.82)' }}
+              >
+                <Icon name="alerta" size={30} className="text-amber-400" />
+                <p className="text-sm font-semibold text-white">Video no encontrado</p>
+                <p className="max-w-xs text-[12px] leading-relaxed text-white/70">
+                  El archivo se borró de tu equipo. Vuelve a importarlo desde el panel de medios para verlo.
+                </p>
+              </div>
+            )}
+
             {/* velo del impacto (flash a negro, a blanco o de color) por encima de
                 todo lo que se ve, incluidas las imágenes y textos de delante */}
             {imp.veloOpacidad > 0 && (
@@ -1475,7 +1493,7 @@ export default function Preview() {
                 suenan, sincronizados con el cabezal por el efecto de arriba */}
             {audios.map((a) => {
               const asset = assetPorId.get(a.assetId)
-              if (!asset) return null
+              if (!asset || asset.faltante) return null
               return (
                 <audio
                   key={a.id}

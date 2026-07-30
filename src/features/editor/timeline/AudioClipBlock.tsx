@@ -7,6 +7,7 @@ import { amplitudEn, picosDeMedio } from '../../../lib/audio/picos'
 import { alturasOnda } from './AudioBlock'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
 import { nivelBajoCursor, separacionBajoCursor, porDebajoDelUltimo } from './nivelCursor'
+import MedioNoDisponible from '../../../components/ui/MedioNoDisponible'
 
 interface Props {
   audio: ClipAudio
@@ -56,7 +57,9 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
   // onda real leída del propio archivo. mientras se decodifica, o si no se puede,
   // queda null y se cae a una onda sintética estable a partir del id
   useEffect(() => {
-    if (!asset) return
+    // sin asset, o con el archivo ya borrado del equipo, no se intenta leer la onda:
+    // leerlo fallaría, así que se deja la onda sintética y el bloque avisa aparte
+    if (!asset || asset.faltante) return
     let vivo = true
     picosDeMedio(asset.id, asset.file).then((perfil) => {
       if (!vivo) return
@@ -260,7 +263,15 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
         transition: interactuando ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
-      <Lineas alturas={onda} color="rgba(56, 189, 248, 0.7)" />
+      {asset?.faltante ? (
+        // el archivo del audio ya no está: se avisa en el propio bloque en vez de dejar
+        // una onda sintética que no explica nada
+        <div className="absolute inset-0 z-10 p-1">
+          <MedioNoDisponible nombre={asset?.nombre ?? 'audio'} etiqueta="Audio no encontrado" compacto />
+        </div>
+      ) : (
+        <Lineas alturas={onda} color="rgba(56, 189, 248, 0.7)" />
+      )}
       {/* el nombre solo asoma al pasar el cursor o con el audio elegido: fijo todo
           el tiempo tapaba la onda y molestaba */}
       <span

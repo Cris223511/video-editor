@@ -18,4 +18,9 @@ export interface MediaAsset {
   alto: number // 0 en el audio
   url: string // object url para previsualizar sin recodificar
   miniatura: string // data url de portada; vacía en el audio
+  // el archivo ya no se puede leer: pasa cuando se guardó una referencia al fichero
+  // del disco y el usuario lo borró de su explorador. el medio sigue en el proyecto,
+  // pero se muestra como "no encontrado" y no se intenta cargar para no llenar la
+  // consola de errores ni dejar el visor en negro
+  faltante?: boolean
 }

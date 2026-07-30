@@ -160,6 +160,12 @@ export async function abrirSesion(id: string): Promise<boolean> {
   // al abrir se adopta la identidad del proyecto guardado, para que los
   // siguientes guardados actualicen este mismo y no creen uno nuevo
   useProjectStore.setState({ idProyecto: p.id, creado: p.creado, titulo: p.titulo, medios })
+  // en segundo plano se revisa que cada archivo se pueda leer. algunos navegadores
+  // guardan una referencia al fichero del disco en vez de una copia, así que si el
+  // usuario lo borró de su explorador, el medio deja de existir. leer un byte falla con
+  // una excepción que se atrapa (no ensucia la consola), y el medio se marca como
+  // faltante para que la interfaz lo muestre así en vez de cargar un blob roto
+  revisarMediosFaltantes(medios)
   try {
     localStorage.setItem(CLAVE_SESION, p.id)
   } catch {
@@ -246,6 +252,24 @@ function regenerarMiniaturas(medios: MediaAsset[]): void {
       })
       if (cambio) useProjectStore.setState({ medios: nuevos })
     })
+  }
+}
+
+// revisa en segundo plano que el archivo de cada medio se pueda leer. leer un solo byte
+// es barato y, si el fichero de disco ya no está, la promesa se rechaza con una excepción
+// que se atrapa sin ensuciar la consola. el medio que falle se marca como faltante en el
+// store, y la interfaz lo muestra como "no encontrado" en vez de intentar cargarlo
+function revisarMediosFaltantes(medios: MediaAsset[]): void {
+  for (const medio of medios) {
+    medio.file
+      .slice(0, 1)
+      .arrayBuffer()
+      .catch(() => {
+        // solo el proyecto que sigue vivo se toca, por si se cerró mientras se revisaba
+        if (useProjectStore.getState().medios.some((m) => m.id === medio.id)) {
+          useProjectStore.getState().marcarFaltante(medio.id)
+        }
+      })
   }
 }
 

@@ -7,9 +7,12 @@ import { AlertTriangle } from 'lucide-react'
 export default function MedioNoDisponible({
   nombre,
   compacto = false,
+  etiqueta = 'Video no encontrado',
 }: {
   nombre: string
   compacto?: boolean
+  // qué dice el aviso; el audio usa "Audio no encontrado", el video el valor por defecto
+  etiqueta?: string
 }) {
   return (
     <div
@@ -35,7 +38,7 @@ export default function MedioNoDisponible({
           ].join(' ')}
           style={{ color: 'rgb(var(--alerta))' }}
         >
-          Video no encontrado
+          {etiqueta}
         </span>
         {!compacto && (
           <span className="mt-0.5 block truncate text-[13px] text-[color:var(--muted)]">
