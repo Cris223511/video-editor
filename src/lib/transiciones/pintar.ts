@@ -205,22 +205,37 @@ export function pintarTransicion(
     }
 
     case 'mascara': {
-      if (saliente) pintar(saliente, 1)
       if (!t.forma) {
+        if (saliente) pintar(saliente, 1)
         if (entrante) pintar(entrante, 1)
         return
       }
-      ctx.save()
-      // el borde difuminado se consigue con una sombra proyectada sobre la
-      // propia máscara: sin él, el corte se ve duro y barato
-      if (t.suavizado) {
-        const radio = Math.min(ancho, alto) * t.suavizado
-        ctx.filter = `blur(${radio}px)`
-      }
-      trazarForma(ctx, t.forma, p, ancho, alto)
-      ctx.clip()
-      ctx.filter = 'none'
+      // parámetros que el clip puede afinar por su cuenta: el grosor del borde suave
+      // (que se puede subir para un degradado ancho o bajar a cero para un corte duro)
+      // se lee de la transición del propio clip, y si no trae, manda el del catálogo
+      const trParams = tipoForzado ? saliente?.transicionSalida : entrante?.transicion
+      const suave = trParams?.grosor ?? t.suavizado ?? 0
+      const esquina = trParams?.esquina ?? t.esquina
+      // el que entra se pinta entero y luego se conserva solo dentro de la forma con una
+      // máscara de borde difuminado (destination-in sobre la silueta desenfocada); el que
+      // sale se mete por detrás (destination-over). así el corte lleva un degradado de
+      // verdad, cosa que un clip() duro nunca permitió: recortaba con borde seco por más
+      // desenfoque que se le pusiera al filtro, porque clip() no mira el filtro
       if (entrante) pintar(entrante, 1)
+      ctx.save()
+      ctx.globalCompositeOperation = 'destination-in'
+      if (suave > 0) {
+        const radio = Math.min(ancho, alto) * suave
+        ctx.filter = `blur(${radio.toFixed(1)}px)`
+      }
+      ctx.fillStyle = '#fff'
+      trazarForma(ctx, t.forma, p, ancho, alto, esquina)
+      ctx.fill()
+      ctx.filter = 'none'
+      ctx.restore()
+      ctx.save()
+      ctx.globalCompositeOperation = 'destination-over'
+      if (saliente) pintar(saliente, 1)
       ctx.restore()
       return
     }

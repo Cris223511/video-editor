@@ -4,25 +4,47 @@ import { TipoImpacto } from '../../types/impacto'
 // hasta un clip. lleva dentro el tipo de efecto elegido
 export const TIPO_IMPACTO = 'application/x-ve-impacto'
 
-// el catálogo de impactos: cada tipo con su nombre para la interfaz y una breve
+// categorías de impactos, para los tabs del panel
+export type CategoriaImpacto = 'camara' | 'neon'
+
+export const NOMBRES_CATEGORIA_IMPACTO: Record<CategoriaImpacto, string> = {
+  camara: 'Cámara',
+  neon: 'Neón 3D',
+}
+
+// el catálogo de impactos: cada tipo con su nombre, su categoría y una breve
 // descripción. el orden es el que se ve en la paleta de bolitas del panel
 export interface DefImpacto {
   tipo: TipoImpacto
   nombre: string
+  categoria: CategoriaImpacto
   descripcion: string
 }
 
 export const IMPACTOS: DefImpacto[] = [
-  { tipo: 'rebote', nombre: 'Rebote', descripcion: 'Un golpe de zoom que rebota y se asienta, con algo de desenfoque.' },
-  { tipo: 'zoom', nombre: 'Acercamiento', descripcion: 'Se acerca y vuelve, suave.' },
-  { tipo: 'sacudida', nombre: 'Sacudida', descripcion: 'Tiembla un momento, como un golpe de cámara.' },
-  { tipo: 'latido', nombre: 'Latido', descripcion: 'Un par de pulsos rápidos, como un corazón.' },
-  { tipo: 'flashNegro', nombre: 'Flash a negro', descripcion: 'Se oscurece un instante y vuelve.' },
-  { tipo: 'flashBlanco', nombre: 'Flash a blanco', descripcion: 'Se aclara un instante y vuelve.' },
-  { tipo: 'destello', nombre: 'Destello', descripcion: 'Un fogonazo de luz seco que se apaga solo.' },
-  { tipo: 'parpadeo', nombre: 'Parpadeo', descripcion: 'Parpadea a negro varias veces, tipo estroboscopio.' },
-  { tipo: 'flashColor', nombre: 'Flash de color', descripcion: 'Un destello del color de la bolita.' },
+  { tipo: 'rebote', nombre: 'Rebote', categoria: 'camara', descripcion: 'Golpe de zoom que rebota y se asienta.' },
+  { tipo: 'zoom', nombre: 'Acercamiento', categoria: 'camara', descripcion: 'Se acerca y vuelve, suave.' },
+  { tipo: 'sacudida', nombre: 'Sacudida', categoria: 'camara', descripcion: 'Tiembla un momento, como un golpe.' },
+  { tipo: 'latido', nombre: 'Latido', categoria: 'camara', descripcion: 'Un par de pulsos rápidos.' },
+  { tipo: 'flashNegro', nombre: 'Flash a negro', categoria: 'camara', descripcion: 'Se oscurece un instante y vuelve.' },
+  { tipo: 'flashBlanco', nombre: 'Flash a blanco', categoria: 'camara', descripcion: 'Se aclara un instante y vuelve.' },
+  { tipo: 'destello', nombre: 'Destello', categoria: 'camara', descripcion: 'Un fogonazo de luz seco.' },
+  { tipo: 'parpadeo', nombre: 'Parpadeo', categoria: 'camara', descripcion: 'Parpadea a negro varias veces.' },
+  { tipo: 'flashColor', nombre: 'Flash de color', categoria: 'camara', descripcion: 'Un destello del color elegido.' },
+  { tipo: 'contorno', nombre: 'Contorno de neón', categoria: 'neon', descripcion: 'Enciende los bordes como líneas de neón.' },
+  { tipo: 'lineas3d', nombre: 'Líneas 3D', categoria: 'neon', descripcion: 'Malla de curvas que envuelve la forma del objeto.' },
+  { tipo: 'rayosObjeto', nombre: 'Rayos', categoria: 'neon', descripcion: 'Resplandor con destellos que emana del objeto.' },
 ]
+
+// categoría a la que pertenece un tipo de impacto, para abrir su tab al seleccionarlo
+export function categoriaImpacto(tipo: TipoImpacto): CategoriaImpacto {
+  return IMPACTOS.find((i) => i.tipo === tipo)?.categoria ?? 'camara'
+}
+
+// nombre legible de un impacto por su tipo, para la interfaz
+export function nombreImpacto(tipo: TipoImpacto): string {
+  return IMPACTOS.find((i) => i.tipo === tipo)?.nombre ?? tipo
+}
 
 // el color por defecto de una bolita recién puesta: un celeste, como pidió el
 // usuario. desde ahí se puede cambiar

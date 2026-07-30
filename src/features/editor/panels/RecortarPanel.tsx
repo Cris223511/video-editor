@@ -6,8 +6,8 @@ import { Campo, Deslizador, Segmentado } from '../../../components/ui/Controls'
 import { hayRecorte } from '../../../lib/layers/recorteMascara'
 
 // panel de la herramienta de recortar. el recuadro se arrastra sobre el video en
-// el visor; aquí van la forma del recorte, el difuminado del borde y la viñeta
-// blanca, además del botón para quitarlo. actúa sobre el clip de video elegido
+// el visor; aquí van la forma del recorte y el difuminado del borde, más el botón
+// para quitarlo. actúa sobre el clip de video elegido
 export default function RecortarPanel() {
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
   const clips = useEditorStore((s) => s.pista.clips)
@@ -62,7 +62,7 @@ export default function RecortarPanel() {
 
   const rec = clip.recorte
   const forma = rec?.forma ?? 'rectangulo'
-  // el difuminado y la viñeta valen tanto para el óvalo como para el círculo
+  // el difuminado del borde vale tanto para el óvalo como para el círculo
   const esOvalo = forma === 'elipse' || forma === 'circulo'
 
   return (
@@ -76,7 +76,7 @@ export default function RecortarPanel() {
         <Segmentado
           valor={forma}
           opciones={[
-            { valor: 'rectangulo', etiqueta: 'Rectángulo' },
+            { valor: 'rectangulo', etiqueta: 'Cuadrado' },
             { valor: 'circulo', etiqueta: 'Círculo' },
             { valor: 'elipse', etiqueta: 'Difuminado' },
           ]}
@@ -96,25 +96,15 @@ export default function RecortarPanel() {
               onChange={(v) => recortarClipImagen(clip.id, { difuminado: v })}
             />
           </Campo>
-
-          {/* tiñe de blanco el borde interior en vez de dejarlo transparente, para el
-              aire de foto antigua o de recuerdo */}
-          <Campo etiqueta={`Viñeta blanca (${rec?.vinetaBlanca ?? 0}%)`}>
-            <Deslizador
-              valor={rec?.vinetaBlanca ?? 0}
-              min={0}
-              max={100}
-              onChange={(v) => recortarClipImagen(clip.id, { vinetaBlanca: v })}
-            />
-          </Campo>
         </>
       )}
 
       <p className="text-[11px] leading-relaxed text-[color:var(--muted)]">
         {esOvalo ? (
           <>
-            El círculo y el difuminado nacen redondos. Con <b className="text-brand">Alt</b> se libera
-            el lado que arrastras y puedes estirarlos a un óvalo.{' '}
+            El círculo y el difuminado nacen redondos. Estirando un lado se vuelven un óvalo, y con{' '}
+            <b className="text-brand">Shift</b> se mantienen circulares. Son los mismos atajos que
+            las figuras y las censuras.{' '}
           </>
         ) : (
           <>

@@ -12,6 +12,8 @@ import { useFrameEnTiempo } from '../../../lib/media/useFrameEnTiempo'
 import { EfectoClip } from '../../../types/timeline'
 import {
   CATEGORIAS_EFECTO,
+  GrupoEfecto,
+  NOMBRES_GRUPO_EFECTO,
   buscarEfecto,
   esFiltro,
   claveEfecto,
@@ -570,9 +572,20 @@ function Catalogo({
   onCancelarAgregar: () => void
   onElegir: (id: string) => void
 }) {
-  const [categoria, setCategoria] = useState(CATEGORIAS_EFECTO[0].id)
+  // dos familias de arriba del todo: los EFECTOS (movimiento y textura) y los FILTROS
+  // (solo color y tono). el selector cambia entre ellas y, con él, las subcategorías
+  const [grupo, setGrupo] = useState<GrupoEfecto>('efecto')
+  const cats = CATEGORIAS_EFECTO.filter((c) => c.grupo === grupo)
+  const [categoria, setCategoria] = useState(cats[0].id)
   const [encima, setEncima] = useState<string | null>(null)
-  const actual = CATEGORIAS_EFECTO.find((c) => c.id === categoria) ?? CATEGORIAS_EFECTO[0]
+  const actual = cats.find((c) => c.id === categoria) ?? cats[0]
+  // al cambiar de familia, la subcategoría vuelve a la primera de esa familia, para no
+  // quedar señalando una que ya no está en la lista
+  const cambiarGrupo = (g: GrupoEfecto) => {
+    setGrupo(g)
+    const primera = CATEGORIAS_EFECTO.find((c) => c.grupo === g)
+    if (primera) setCategoria(primera.id)
+  }
   const fondo = miniatura
     ? { backgroundImage: `url(${miniatura})`, backgroundSize: 'cover', backgroundPosition: 'center' }
     : cargando
@@ -598,8 +611,27 @@ function Catalogo({
       ) : (
         <span className="text-xs font-medium text-[color:var(--muted)]">Catálogo de efectos</span>
       )}
+
+      {/* selector de familia: Efectos (movimiento y textura) o Filtros (color y tono) */}
+      <div className="flex gap-1 rounded-xl p-1" style={{ background: 'rgb(var(--border) / 0.07)' }}>
+        {(['efecto', 'filtro'] as GrupoEfecto[]).map((g) => (
+          <button
+            key={g}
+            onClick={() => cambiarGrupo(g)}
+            className={[
+              'flex-1 whitespace-nowrap rounded-lg py-1.5 text-[12px] transition-colors duration-100',
+              grupo === g
+                ? 'bg-brand text-white shadow-sm'
+                : 'text-[color:var(--muted)] hover:text-[color:var(--text)]',
+            ].join(' ')}
+          >
+            {NOMBRES_GRUPO_EFECTO[g]}
+          </button>
+        ))}
+      </div>
+
       <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
-        {CATEGORIAS_EFECTO.map((c) => (
+        {cats.map((c) => (
           <button
             key={c.id}
             onClick={() => setCategoria(c.id)}
@@ -640,13 +672,21 @@ function Catalogo({
                       ? 'border-brand/60 ring-2 ring-brand/25'
                       : 'border-black/10 group-hover:border-brand dark:border-white/10',
                 ].join(' ')}
-                style={{ ...fondo, filter: e.css(encima === e.id ? 100 : 50) }}
               >
-                {/* al pasar el cursor la muestra reproduce el propio video con el
-                    efecto ya aplicado, desde el frame que se ve en el visor */}
-                {encima === e.id && videoUrl && (
-                  <MuestraVideo src={videoUrl} tiempo={tiempo} className="absolute inset-0 h-full w-full object-cover" />
-                )}
+                {/* el fondo y el video con el filtro van en una capa interna. el
+                    desenfoque de un elemento se desborda por fuera de su propio recorte,
+                    así que el filtro se pone aquí dentro y el recuadro de arriba, sin
+                    filtro, es el que recorta lo que sobresale para que no se salga feo */}
+                <span
+                  className="absolute inset-0"
+                  style={{ ...fondo, filter: e.css(encima === e.id ? 100 : 50) }}
+                >
+                  {/* al pasar el cursor la muestra reproduce el propio video con el
+                      efecto ya aplicado, desde el frame que se ve en el visor */}
+                  {encima === e.id && videoUrl && (
+                    <MuestraVideo src={videoUrl} tiempo={tiempo} className="absolute inset-0 h-full w-full object-cover" />
+                  )}
+                </span>
                 {/* señal de que ese efecto ya está en la lista */}
                 {puesto && (
                   <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-brand text-white shadow">

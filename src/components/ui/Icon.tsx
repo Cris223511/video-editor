@@ -21,6 +21,7 @@ import {
   Palette,
   Pause,
   Pencil,
+  Pipette,
   Play,
   Plus,
   RotateCcw,
@@ -84,6 +85,7 @@ const iconos = {
   transformar: FlipHorizontal2,
   recortar: Crop,
   impacto: Zap,
+  gota: Pipette,
 } as const
 
 export type NombreIcono = keyof typeof iconos

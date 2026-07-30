@@ -10,7 +10,7 @@ import { useEditorStore } from '../../store/useEditorStore'
 import { useProjectStore } from '../../store/useProjectStore'
 import { MediaAsset } from '../../types/media'
 import { clipEnTiempo, duracionProyecto } from '../../lib/timeline/clips'
-import { encuadreDe, encuadreNeutro, rectClip } from '../../lib/timeline/encuadre'
+import { encuadreDe, encuadreNeutro, rectClip, giradoUnCuarto } from '../../lib/timeline/encuadre'
 import { gananciaEn, fundidoEn } from '../../lib/audio/ganancia'
 import { rectContenido } from '../../lib/layers/rect'
 import { posicionCapa } from '../../lib/layers/motion'
@@ -30,6 +30,7 @@ import { cssEfectos } from '../../lib/efectos/catalogo'
 import { paramsNB, nodosFiltroNB, NodoFiltro } from '../../lib/efectos/nitidezBrillo'
 import { paramsGoPro, nodosFiltroGoPro } from '../../lib/efectos/goPro'
 import { estadoImpactosEn } from '../../lib/impactos/catalogo'
+import { dibujarContorno, dibujarLineas3d, dibujarRayos, crearLienzosContorno, LienzosContorno } from '../../lib/impactos/contorno'
 
 // pinta un nodo del filtro de nitidez y brillo (y sus hijos) como elemento svg.
 // la receta viene en datos desde el helper, la misma que usa la exportación, así
@@ -42,7 +43,7 @@ function pintarNodoNB(n: NodoFiltro, clave: number): ReactElement {
   )
 }
 import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../../lib/color/mezcla'
-import { estiloRecorte, vinetaRecorte } from '../../lib/layers/recorteMascara'
+import { estiloRecorte, cajaContain } from '../../lib/layers/recorteMascara'
 import { buscarTransicion } from '../../lib/transiciones/catalogo'
 import { sufijoTransformCss, aplicarTransformCanvas } from '../../lib/layers/transform'
 import { TIPO_FIGURA } from './panels/FiguraPanel'
@@ -70,10 +71,14 @@ export default function Preview() {
   const agregarFigura = useEditorStore((s) => s.agregarFigura)
   const hayCapas = useEditorStore((s) => s.capas.length > 0)
   const hayCensura = useEditorStore((s) => s.capas.some((c) => c.tipo === 'censura'))
+  const hayContorno = useEditorStore((s) =>
+    s.impactos.some((i) => i.tipo === 'contorno' || i.tipo === 'lineas3d' || i.tipo === 'rayosObjeto'),
+  )
   const resolucion = useEditorStore((s) => s.resolucion)
   const colorFondo = useEditorStore((s) => s.colorFondo)
   const fondo = useEditorStore((s) => s.fondo)
   const desenfoqueFondo = useEditorStore((s) => s.desenfoqueFondo)
+  const fondoGiro = useEditorStore((s) => s.fondoGiro)
   const audioRegiones = useEditorStore((s) => s.audioRegiones)
   const audios = useEditorStore((s) => s.audios)
   const capasTodas = useEditorStore((s) => s.capas)
@@ -87,10 +92,16 @@ export default function Preview() {
   const videosRef = useRef<Map<string, HTMLVideoElement>>(new Map())
   const phRef = useRef(playhead)
   const censuraCanvasRef = useRef<HTMLCanvasElement>(null)
+  // lienzo del impacto de contorno de neón, y los lienzos de trabajo que reaprovecha
+  // el detector de bordes para no crear basura en cada fotograma
+  const contornoCanvasRef = useRef<HTMLCanvasElement>(null)
+  const contornoLienzos = useRef<LienzosContorno | null>(null)
   // lienzo que solo se enciende mientras dura una transición con geometría
   const transRef = useRef<HTMLCanvasElement>(null)
-  // video del relleno borroso: sigue el tiempo del clip activo sin sonar
-  const fondoRef = useRef<HTMLVideoElement | null>(null)
+  // videos del relleno borroso, uno por clip (igual que los principales) para que el
+  // del clip siguiente ya esté cargado y no haya un fotograma en negro al cambiar de
+  // clip. solo se ve el del clip activo; el resto queda a opacidad cero, listo
+  const fondosRef = useRef<Map<string, HTMLVideoElement>>(new Map())
   // elementos de sonido de los audios importados, uno por clip de audio
   const audiosRef = useRef<Map<string, HTMLAudioElement>>(new Map())
   const areaRef = useRef<HTMLDivElement>(null)
@@ -265,19 +276,21 @@ export default function Preview() {
       if (!v.paused) v.pause()
     })
     // el relleno borroso comparte asset y tiempos con el clip activo, así que se
-    // coloca en el mismo fotograma y se queda quieto mientras el visor no corre
-    const f = fondoRef.current
-    if (f && act) {
-      const objetivo = act.recorteInicio + (phVista - act.inicio) * act.velocidad
-      if (Math.abs(f.currentTime - objetivo) > 0.05) {
-        try {
-          f.currentTime = objetivo
-        } catch {
-          // todavía sin metadatos, no pasa nada
+    // coloca en el mismo fotograma y se queda quieto mientras el visor no corre. los
+    // fondos de los demás clips se dejan en pausa, listos para cuando les toque
+    fondosRef.current.forEach((f, id) => {
+      if (act && id === act.id) {
+        const objetivo = act.recorteInicio + (phVista - act.inicio) * act.velocidad
+        if (Math.abs(f.currentTime - objetivo) > 0.05) {
+          try {
+            f.currentTime = objetivo
+          } catch {
+            // todavía sin metadatos, no pasa nada
+          }
         }
       }
       if (!f.paused) f.pause()
-    }
+    })
   }, [phVista, reproduciendo, clipsOrdenados, ocultas])
 
   // los audios importados siguen al cabezal: cada uno suena mientras el cabezal
@@ -361,6 +374,14 @@ export default function Preview() {
         ph = playheadStore
         phRef.current = ph
       }
+      // tiempo real transcurrido desde el fotograma anterior, acotado por si la pestaña
+      // estuvo en segundo plano y volvió con un salto enorme. se calcula aquí arriba
+      // porque también hace avanzar el cabezal cuando no hay ningún clip de video que
+      // marque el ritmo. antes se sumaba un 0.033 fijo por fotograma dando por hecho 30
+      // hz, y en una pantalla de 60 o 120 hz el cabezal corría al doble o al cuádruple
+      const ahora = performance.now()
+      const dt = Math.min(0.25, (ahora - tPrev) / 1000)
+      tPrev = ahora
       // mientras se graba un recorrido, la reproducción no se para al llegar al
       // final: el cabezal sigue y el elemento se va estirando para abarcar todo el
       // movimiento, tal como se pidió. fuera de la grabación, al acabar el montaje
@@ -379,8 +400,9 @@ export default function Preview() {
         videosRef.current.forEach((el) => {
           if (!el.paused) el.pause()
         })
-        const fondoFin = fondoRef.current
-        if (fondoFin && !fondoFin.paused) fondoFin.pause()
+        fondosRef.current.forEach((el) => {
+          if (!el.paused) el.pause()
+        })
         return
       }
       // los metadatos se leen en vivo para que esconder o silenciar un nivel
@@ -392,9 +414,21 @@ export default function Preview() {
       })
       const act = clipEnTiempo(clipsOrdenados, ph, ocultasVivo)
       if (!act) {
+        // ya en el final del montaje y sin video que marque el ritmo (el audio o una
+        // capa duran un poco más que el último clip): se detiene de verdad. sin esto
+        // el bucle se quedaba girando con reproduciendo en true, y darle al play luego
+        // solo pausaba ese estado congelado, dando la sensación de que "no hacía nada"
+        if (!grabando && ph >= total - 0.02) {
+          irA(total)
+          pausar()
+          videosRef.current.forEach((el) => { if (!el.paused) el.pause() })
+          fondosRef.current.forEach((f) => { if (!f.paused) f.pause() })
+          return
+        }
+        // sin clip de video que marque el ritmo, el cabezal avanza con el reloj real.
         // el avance normal se topa al final del montaje; grabando no, para que el
         // recorrido pueda pasarse y estirar el bloque
-        phRef.current = grabando ? ph + 0.033 : Math.min(ph + 0.033, total)
+        phRef.current = grabando ? ph + dt : Math.min(ph + dt, total)
         irA(phRef.current)
         raf = requestAnimationFrame(paso)
         return
@@ -412,15 +446,25 @@ export default function Preview() {
       // reinicia desde cero: de ahí que la reproducción "volviera sola al inicio"
       const finUsoClip = act.recorteInicio + act.duracion * act.velocidad
       const finClip = act.inicio + act.duracion
-      if (!grabando && finClip >= total - 0.02 && (v.ended || v.currentTime >= finUsoClip - 0.03)) {
+      // se detiene solo si el cabezal llegó de verdad al final. antes bastaba con que el
+      // video estuviera en `ended`, y al reiniciar desde el principio (con el `ended`
+      // todavía puesto del pase anterior) esta guarda saltaba en el primer fotograma y
+      // devolvía el cabezal al total: por eso "no se podía volver a reproducir"
+      if (
+        !grabando &&
+        finClip >= total - 0.02 &&
+        ph >= finClip - 0.05 &&
+        (v.ended || v.currentTime >= finUsoClip - 0.03)
+      ) {
         v.pause()
         irA(total)
         pausar()
         videosRef.current.forEach((el) => {
           if (!el.paused) el.pause()
         })
-        const fondoFin = fondoRef.current
-        if (fondoFin && !fondoFin.paused) fondoFin.pause()
+        fondosRef.current.forEach((el) => {
+          if (!el.paused) el.pause()
+        })
         return
       }
       clipsOrdenados.forEach((c) => {
@@ -452,8 +496,10 @@ export default function Preview() {
       const st = useEditorStore.getState()
       v.playbackRate = act.velocidad * (st.grabandoMovimiento ? st.velocidadGrabacion : 1)
       // se recoloca el video si estaba en pausa o si el cabezal acaba de saltar a
-      // mano; así el arrastre de la línea azul mueve de verdad la imagen
-      if (v.paused || salto) {
+      // mano; así el arrastre de la línea azul mueve de verdad la imagen. también pasa
+      // al cambiar de un clip al siguiente, cuando el nuevo video entra pausado
+      const recolocado = v.paused || salto
+      if (recolocado) {
         try {
           v.currentTime = act.recorteInicio + (ph - act.inicio) * act.velocidad
         } catch {
@@ -461,10 +507,14 @@ export default function Preview() {
         }
         if (v.paused) v.play().catch(() => {})
       }
-      // el fondo borroso persigue al video real: mismo asset, misma velocidad y
-      // mismo tiempo, para que se vea el material en movimiento y no un cuadro
-      // congelado. si se desfasa un poco se reengancha sin cortar la imagen
-      const f = fondoRef.current
+      // el fondo borroso del clip activo persigue al video real: mismo asset, misma
+      // velocidad y mismo tiempo, para que se vea el material en movimiento y no un
+      // cuadro congelado. si se desfasa un poco se reengancha sin cortar la imagen. los
+      // fondos de los otros clips se pausan para que no corran por detrás
+      fondosRef.current.forEach((otro, id) => {
+        if (id !== act.id && !otro.paused) otro.pause()
+      })
+      const f = fondosRef.current.get(act.id)
       if (f) {
         f.playbackRate = v.playbackRate
         if (Math.abs(f.currentTime - v.currentTime) > 0.15) {
@@ -476,6 +526,45 @@ export default function Preview() {
         }
         if (f.paused) f.play().catch(() => {})
       }
+      // mientras se reproduce este clip se deja ya colocado el primer fotograma del que
+      // viene después, para que al cambiar de clip muestre su imagen buena de una vez.
+      // sin esto asomaba un instante su fotograma inicial (el segundo cero del video)
+      // antes de saltar a donde toca, y el corte se veía con un frame malo
+      const sig = posterior(act, clipsOrdenados)
+      if (sig) {
+        const vsig = videosRef.current.get(sig.id)
+        if (vsig && Math.abs(vsig.currentTime - sig.recorteInicio) > 0.05) {
+          try {
+            vsig.currentTime = sig.recorteInicio
+          } catch {
+            // sin metadatos todavía
+          }
+        }
+        // el relleno borroso del clip que viene se deja colocado igual que su video: si
+        // no, al cruzar el corte sus bandas aparecen un instante en negro porque el video
+        // del fondo aún no tiene fotograma decodificado en esa posición
+        const fsig = fondosRef.current.get(sig.id)
+        if (fsig && Math.abs(fsig.currentTime - sig.recorteInicio) > 0.05) {
+          try {
+            fsig.currentTime = sig.recorteInicio
+          } catch {
+            // sin metadatos todavía
+          }
+        }
+      }
+      // recolocar el video es un seek asíncrono: su currentTime todavía no refleja el
+      // instante pedido, así que este fotograma se mantiene el cabezal donde debe estar
+      // y se espera al siguiente. sin esto, calcular el cabezal desde un currentTime que
+      // aún vale 0 lo mandaba al inicio del clip: era el reset que saltaba al pasar de un
+      // clip a otro o al darle play parado en el límite entre dos clips
+      if (recolocado) {
+        phRef.current = Math.min(ph, total)
+        irA(phRef.current)
+        ctPrev = -1
+        estancado = 0
+        raf = requestAnimationFrame(paso)
+        return
+      }
       const finUso = act.recorteInicio + act.duracion * act.velocidad
       if (v.currentTime >= finUso - 0.02) {
         v.pause()
@@ -484,11 +573,6 @@ export default function Preview() {
         raf = requestAnimationFrame(paso)
         return
       }
-      // tiempo real transcurrido desde el fotograma anterior, acotado por si la
-      // pestaña estuvo en segundo plano y volvió con un salto enorme
-      const ahora = performance.now()
-      const dt = Math.min(0.25, (ahora - tPrev) / 1000)
-      tPrev = ahora
       // ¿avanzó el video desde la última vuelta? si no, se acumula ese tiempo; en
       // cuanto cambia su currentTime se reinicia el contador de estancamiento
       if (v.currentTime === ctPrev) estancado += dt
@@ -520,7 +604,7 @@ export default function Preview() {
       cancelado = true
       cancelAnimationFrame(raf)
       videosRef.current.forEach((v) => v.pause())
-      fondoRef.current?.pause()
+      fondosRef.current.forEach((f) => f.pause())
     }
   }, [reproduciendo, clipsOrdenados, total, irA, pausar])
 
@@ -737,6 +821,85 @@ export default function Preview() {
     }
   }, [hayCensura])
 
+  // render del impacto de contorno de neón: mientras un impacto de este tipo está
+  // dentro de su ventana, se muestrea el video activo, se le detectan los bordes y se
+  // pintan como líneas eléctricas del color de la bolita. va en su propio lienzo, por
+  // encima del video, y solo se enciende cuando hay un impacto así en el proyecto
+  useEffect(() => {
+    if (!hayContorno) {
+      const c = contornoCanvasRef.current
+      const ctx = c?.getContext('2d')
+      if (c && ctx) ctx.clearRect(0, 0, c.width, c.height)
+      return
+    }
+    if (!contornoLienzos.current) contornoLienzos.current = crearLienzosContorno()
+    let raf = 0
+    let cancelado = false
+    const render = () => {
+      if (cancelado) return
+      const canvas = contornoCanvasRef.current
+      const stage = canvas?.parentElement
+      const ctx = canvas?.getContext('2d')
+      if (canvas && stage && ctx) {
+        const dpr = window.devicePixelRatio || 1
+        const w = stage.clientWidth
+        const h = stage.clientHeight
+        if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+          canvas.width = Math.round(w * dpr)
+          canvas.height = Math.round(h * dpr)
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        ctx.clearRect(0, 0, w, h)
+        const st = useEditorStore.getState()
+        const ph = st.playhead
+        const activos = st.impactos.filter(
+          (i) =>
+            (i.tipo === 'contorno' || i.tipo === 'lineas3d' || i.tipo === 'rayosObjeto') &&
+            ph >= i.t &&
+            ph < i.t + i.duracion,
+        )
+        if (activos.length) {
+          const ordenados = [...st.pista.clips].sort((a, b) => a.inicio - b.inicio)
+          const ocultasSt = new Set<number>()
+          st.pistasMeta.forEach((m, i) => {
+            if (m.oculta) ocultasSt.add(i)
+          })
+          const activoClip = clipEnTiempo(ordenados, ph, ocultasSt)
+          const video = activoClip ? videosRef.current.get(activoClip.id) : null
+          const rect = rectContenido(w, h, st.resolucion.ancho / st.resolucion.alto)
+          const enc = activoClip ? encuadreDe(activoClip) : { x: 0.5, y: 0.5, escala: 1 }
+          // los tres impactos de neón muestrean el video (el objeto se aísla por brillo),
+          // así que todos necesitan el rectángulo real del video
+          const vr = video && video.videoWidth > 0 ? rectClip(video.videoWidth, video.videoHeight, rect.w, rect.h, enc) : null
+          const dst = vr ? { dx: rect.ox + vr.dx, dy: rect.oy + vr.dy, dw: vr.dw, dh: vr.dh } : null
+          const trans = { rotacion: enc.rotacion, espejoH: enc.espejoH, espejoV: enc.espejoV }
+          const lz = contornoLienzos.current!
+          if (video && video.videoWidth > 0 && dst) {
+            const vw = video.videoWidth
+            const vh = video.videoHeight
+            for (const im of activos) {
+              const p = (ph - im.t) / im.duracion
+              const suav = (im.suavidad ?? 50) / 100
+              if (im.tipo === 'lineas3d') {
+                dibujarLineas3d(ctx, video, vw, vh, dst, im.color, im.intensidad, im.densidad ?? 55, suav, im.direccion ?? 'der', p, ph, lz, trans)
+              } else if (im.tipo === 'rayosObjeto') {
+                dibujarRayos(ctx, video, vw, vh, dst, im.color, im.intensidad, suav, p, ph, lz, trans)
+              } else {
+                dibujarContorno(ctx, video, vw, vh, dst, im.color, im.intensidad, suav, p, ph, lz, trans)
+              }
+            }
+          }
+        }
+      }
+      raf = requestAnimationFrame(render)
+    }
+    raf = requestAnimationFrame(render)
+    return () => {
+      cancelado = true
+      cancelAnimationFrame(raf)
+    }
+  }, [hayContorno])
+
   // opacidad de cada video teniendo en cuenta las transiciones: el clip activo
   // entra con su transición (fundido a negro o desvanecido con el anterior), y
   // el clip anterior se mantiene visible mientras dura un desvanecido
@@ -748,13 +911,13 @@ export default function Preview() {
       // pintan encima de toda la composición (negro, desenfoque, flash...) dejan el
       // video como está y su velo o desenfoque se aplica aparte, sobre todo el lienzo
       if (t.tipo !== 'ninguna' && buscarTransicion(t.tipo).tecnica === 'opacidad') {
-        const entrado = playhead - clip.inicio
+        const entrado = phVista - clip.inicio
         if (entrado < t.duracion) op = Math.min(op, Math.max(0, entrado / t.duracion))
       }
       const idx = clipsOrdenados.findIndex((c) => c.id === clip.id)
       const siguiente = clipsOrdenados[idx + 1]
       if (siguiente && siguiente.transicion.tipo === 'fundido') {
-        const restante = clip.inicio + clip.duracion - playhead
+        const restante = clip.inicio + clip.duracion - phVista
         if (restante < siguiente.transicion.duracion) {
           op = Math.min(op, Math.max(0, restante / siguiente.transicion.duracion))
         }
@@ -765,7 +928,7 @@ export default function Preview() {
       const idxAct = clipsOrdenados.findIndex((c) => c.id === activo.id)
       const anterior = idxAct > 0 ? clipsOrdenados[idxAct - 1] : null
       if (anterior && anterior.id === clip.id) {
-        const entrado = playhead - activo.inicio
+        const entrado = phVista - activo.inicio
         if (entrado < activo.transicion.duracion) {
           return Math.max(0, 1 - entrado / activo.transicion.duracion)
         }
@@ -777,7 +940,7 @@ export default function Preview() {
   // las transiciones de mezcla y el corte los resuelve el propio elemento de
   // video con su opacidad, que es más fluido. las que mueven o recortan la
   // imagen necesitan lienzo, así que solo ahí se enciende
-  const pTrans = activo ? progreso(activo, playhead) : 1
+  const pTrans = activo ? progreso(activo, phVista) : 1
   const tecnicaActual = activo ? buscarTransicion(activo.transicion.tipo).tecnica : 'corte'
 
   // transición que abre o cierra un solo clip contra el fondo (sin otro clip pegado):
@@ -790,14 +953,25 @@ export default function Preview() {
     activo?.transicionSalida && activo.transicionSalida.tipo !== 'ninguna'
       ? buscarTransicion(activo.transicionSalida.tipo).tecnica
       : 'corte'
-  const qTrans = activo ? progresoSalida(activo, playhead) : 1
+  const qTrans = activo ? progresoSalida(activo, phVista) : 1
 
-  const conLienzo =
+  // el canvas de la transición se enciende tanto para la de ENTRADA como para la de
+  // SALIDA. antes solo miraba la de entrada, así que una transición de salida con forma
+  // (redondeado, barridos, puertas) no se animaba: el video se veía entero durante toda
+  // su ventana y solo cortaba de golpe al final, dando la sensación de que "iba rápido"
+  // y de que no respetaba el largo estirado. las globales de un plano aislado (negro,
+  // desenfoque, flash) no usan el canvas: su velo se pinta encima de todo, aparte
+  const conLienzoEntrada =
     pTrans < 1 &&
     tecnicaActual !== 'corte' &&
     tecnicaActual !== 'opacidad' &&
-    // una transición global de un clip aislado no usa el canvas: se pinta encima de todo
     !(esTransicionGlobal(tecnicaActual) && !anteriorAct)
+  const conLienzoSalida =
+    qTrans < 1 &&
+    tecSal !== 'corte' &&
+    tecSal !== 'opacidad' &&
+    !(esTransicionGlobal(tecSal) && !posteriorAct)
+  const conLienzo = conLienzoEntrada || conLienzoSalida
 
   // dibuja la transición fotograma a fotograma mientras dura. se apoya en el
   // mismo motor que la exportación, así que lo que se ve aquí es lo que saldrá
@@ -871,7 +1045,7 @@ export default function Preview() {
   // instante actual, así la def está lista justo cuando empieza a hacer falta
   const filtrosClip = clipsOrdenados
     .map((c) => {
-      const mix = mixEntradaEfecto(c.inicio, c.transicionEfecto, playhead)
+      const mix = mixEntradaEfecto(c.inicio, c.transicionEfecto, phVista)
       return { clip: c, tono: mezclarTono(c.tono, mix), efectos: mezclarEfectos(c.efectos ?? [], mix) }
     })
     .filter(
@@ -906,7 +1080,7 @@ export default function Preview() {
   // efecto combinado de los impactos activos en este instante: deforma el cuadro
   // entero (clip y lo que tenga delante) y puede echarle un velo. va en tiempo
   // real, sin suavizado, para que el golpe se sienta seco
-  const imp = estadoImpactosEn(impactos, playhead)
+  const imp = estadoImpactosEn(impactos, phVista)
   const impactoActivo = imp.escala !== 1 || imp.desenfoque > 0 || imp.x !== 0 || imp.y !== 0
   const impactoTransform = impactoActivo
     ? `scale(${imp.escala}) translate(${imp.x * lienzoRect.h}px, ${imp.y * lienzoRect.h}px)`
@@ -990,21 +1164,15 @@ export default function Preview() {
               width: lienzoRect.w,
               height: lienzoRect.h,
               background: colorFondo,
-              // el zoom del visor (lupa de la interfaz) y el impacto se apilan en la
-              // misma transformación: primero el impacto sobre el contenido y luego
-              // la lupa por encima
+              // aquí solo va la lupa del visor. el impacto ya no se aplica al contenedor
+              // entero (eso deformaba también el relleno borroso de las bandas): ahora se
+              // aplica a un envoltorio interno que deja el fondo fuera. el desenfoque de
+              // una transición que difumina todo el lienzo sí va aquí, sobre todo
               transform:
-                `${zoomVisor.z > 1 ? `translate(${zoomVisor.x}px, ${zoomVisor.y}px) scale(${zoomVisor.z})` : ''} ${impactoTransform}`.trim() ||
-                undefined,
-              // al filtro del impacto se le suma el desenfoque de una transición que
-              // difumina todo el lienzo (video y capas). así el difuminado de la
-              // transición no se queda solo en el video con la censura nítida por encima
-              filter:
-                [impactoFiltro, blurTrans > 0 ? `blur(${blurTrans.toFixed(2)}px)` : '']
-                  .filter(Boolean)
-                  .join(' ') || undefined,
-              // durante un impacto no hay suavizado: el efecto debe verse cuadro a
-              // cuadro tal cual, no interpolado
+                zoomVisor.z > 1
+                  ? `translate(${zoomVisor.x}px, ${zoomVisor.y}px) scale(${zoomVisor.z})`
+                  : undefined,
+              filter: blurTrans > 0 ? `blur(${blurTrans.toFixed(2)}px)` : undefined,
               transition: impactoActivo ? 'none' : 'transform 140ms ease-out',
             }}
             // un clic sobre la imagen elige el clip que hay bajo el cabezal para
@@ -1036,9 +1204,9 @@ export default function Preview() {
               agregarFigura(forma, x, y)
             }}
           >
-            {/* capa recortada: aquí vive todo lo que es imagen del video. el
-                overflow oculto hace que lo que un clip empuje fuera del lienzo no
-                asome, tal como lo recorta el lienzo de la exportación */}
+            {/* capa del relleno borroso de las bandas, aparte del resto. queda fuera del
+                envoltorio del impacto para que un golpe no la sacuda ni la difumine. el
+                overflow oculto recorta su ampliación, igual que hace la exportación */}
             <div className="absolute inset-0 overflow-hidden">
               {/* relleno de las bandas con el propio video, ampliado y borroso,
                   para que un video apaisado en un lienzo vertical no deje dos
@@ -1047,16 +1215,19 @@ export default function Preview() {
                   hundía por detrás del fondo del lienzo y no se veía. no suena,
                   que el sonido lo lleva el video de delante */}
               {fondo === 'desenfoque' &&
-                (() => {
-                  const act = clipEnTiempo(clipsOrdenados, phVista, ocultas)
-                  const asset = act ? assetPorId.get(act.assetId) : null
+                clipsOrdenados.map((c) => {
+                  const asset = assetPorId.get(c.assetId)
                   if (!asset) return null
+                  // se ve solo el fondo del clip activo; los demás quedan cargados y a
+                  // opacidad cero, de modo que al pasar al siguiente ya tiene su fotograma
+                  // listo y no aparece el negro del lienzo entre un clip y otro
+                  const esActivo = !!activo && activo.id === c.id
                   return (
                     <video
-                      key={`fondo-${act!.id}`}
+                      key={`fondo-${c.id}`}
                       ref={(el) => {
-                        if (el) fondoRef.current = el
-                        else fondoRef.current = null
+                        if (el) fondosRef.current.set(c.id, el)
+                        else fondosRef.current.delete(c.id)
                       }}
                       src={asset.url}
                       muted
@@ -1066,15 +1237,32 @@ export default function Preview() {
                       className="pointer-events-none absolute inset-0 h-full w-full object-cover"
                       style={{
                         filter: `blur(${Math.round(desenfoqueFondo * 0.6)}px) brightness(0.72)`,
-                        transform: 'scale(1.12)',
+                        // giro del fondo en pasos de 90°. al girar un cuarto de vuelta hay
+                        // que ampliar más para que el relleno siga cubriendo todo el lienzo
+                        transform: `scale(${(1.12 * (fondoGiro % 180 === 90 ? Math.max(resolucion.ancho / resolucion.alto, resolucion.alto / resolucion.ancho) : 1)).toFixed(3)})${fondoGiro ? ` rotate(${fondoGiro}deg)` : ''}`,
+                        opacity: esActivo ? 1 : 0,
                       }}
                     />
                   )
-                })()}
+                })}
+            </div>
+            {/* envoltorio del impacto: aquí va lo que el impacto SÍ debe deformar (el
+                video y lo que lleva delante: censura, texto, figuras). el relleno borroso
+                de las bandas quedó en la capa de arriba, fuera de este transform, para que
+                no se sacuda ni se difumine con el golpe */}
+            <div
+              className="absolute inset-0"
+              style={{
+                transform: impactoTransform || undefined,
+                filter: impactoFiltro,
+                transition: impactoActivo ? 'none' : 'transform 140ms ease-out',
+              }}
+            >
+            <div className="absolute inset-0 overflow-hidden">
               {clipsOrdenados.map((c) => {
                 const asset = assetPorId.get(c.assetId)
                 // aparición progresiva del color y los efectos, si el clip la lleva
-                const mixEf = mixEntradaEfecto(c.inicio, c.transicionEfecto, playhead)
+                const mixEf = mixEntradaEfecto(c.inicio, c.transicionEfecto, phVista)
                 const mezclaEfecto = {
                   tono: mezclarTono(c.tono, mixEf),
                   efectos: mezclarEfectos(c.efectos ?? [], mixEf),
@@ -1096,7 +1284,19 @@ export default function Preview() {
                   espejoH: enc.espejoH,
                   espejoV: enc.espejoV,
                 })
-                const transform = `${base} ${giro}`.trim() || undefined
+                // el video del visor se coloca con object-contain, que encaja sin
+                // saber del giro. cuando el clip va de lado, se le suma un factor de
+                // escala para que, ya girado, llene el lienzo igual que en el
+                // compositor (que sí encaja con las medidas cruzadas). así el visor y
+                // la exportación muestran lo mismo
+                let factorGiro = 1
+                if (giradoUnCuarto(enc.rotacion)) {
+                  const sinGirar = Math.min(resolucion.ancho / asset.ancho, resolucion.alto / asset.alto)
+                  const cruzado = Math.min(resolucion.ancho / asset.alto, resolucion.alto / asset.ancho)
+                  if (sinGirar > 0) factorGiro = cruzado / sinGirar
+                }
+                const escalaGiro = factorGiro !== 1 ? ` scale(${factorGiro.toFixed(4)})` : ''
+                const transform = `${base} ${giro}${escalaGiro}`.trim() || undefined
                 // el recorte se aplica al propio elemento: el rectángulo con un
                 // clip-path duro y el óvalo con una máscara radial que, difuminada,
                 // deja el borde suave y transparente. la viñeta blanca opcional va
@@ -1107,19 +1307,20 @@ export default function Preview() {
                 // lo que se descarta. pero si el recorte lleva borde difuminado o
                 // viñeta, sí se aplica la máscara mientras se edita, porque solo así
                 // se ve en vivo cómo va quedando ese difuminado al mover sus mandos
-                const recorteSuave = !!(
-                  c.recorte &&
-                  ((c.recorte.difuminado ?? 0) > 0 || (c.recorte.vinetaBlanca ?? 0) > 0)
-                )
+                const recorteSuave = !!(c.recorte && (c.recorte.difuminado ?? 0) > 0)
                 const editandoRecorte =
                   (herramienta === 'recortar' || categoriaClip === 'recortar' || recorteRapido) &&
                   clipSeleccionado === c.id &&
                   !recorteSuave
+                // el video se pinta con object-contain, así que si su proporción no
+                // coincide con la del lienzo queda encajado con bandas. la máscara del
+                // recorte tiene que caer sobre esa caja real del video (no sobre todo
+                // el elemento), o el óvalo se deforma y asoma el borde duro como un corte
+                const cajaVideo = cajaContain(asset.ancho, asset.alto, resolucion.ancho, resolucion.alto)
                 const recEstilo = editandoRecorte
                   ? { clipPath: undefined, maskImage: undefined, WebkitMaskImage: undefined }
-                  : estiloRecorte(c.recorte)
+                  : estiloRecorte(c.recorte, cajaVideo)
                 const clipPath = recEstilo.clipPath
-                const vineta = editandoRecorte ? null : vinetaRecorte(c.recorte)
                 return (
                   <Fragment key={c.id}>
                   <video
@@ -1174,22 +1375,6 @@ export default function Preview() {
                       })(),
                     }}
                   />
-                  {/* viñeta blanca interior del óvalo, si la lleva. sigue el mismo
-                      encuadre y la misma silueta que el video */}
-                  {vineta && !conLienzo && (
-                    <div
-                      aria-hidden
-                      className="pointer-events-none absolute inset-0 h-full w-full"
-                      style={{
-                        opacity: opacidadDe(c),
-                        transform,
-                        transformOrigin: 'center',
-                        background: vineta.background,
-                        maskImage: vineta.maskImage,
-                        WebkitMaskImage: vineta.WebkitMaskImage,
-                      }}
-                    />
-                  )}
                   </Fragment>
                 )
               })}
@@ -1202,6 +1387,11 @@ export default function Preview() {
               )}
               <canvas
                 ref={censuraCanvasRef}
+                className="pointer-events-none absolute inset-0 h-full w-full"
+              />
+              {/* líneas de neón del impacto de contorno, por encima de todo lo demás */}
+              <canvas
+                ref={contornoCanvasRef}
                 className="pointer-events-none absolute inset-0 h-full w-full"
               />
             </div>
@@ -1298,6 +1488,7 @@ export default function Preview() {
                 />
               )
             })}
+            </div>
           </div>
         </div>
       )}

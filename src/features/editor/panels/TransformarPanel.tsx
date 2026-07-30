@@ -63,6 +63,7 @@ export default function TransformarPanel() {
   const clips = useEditorStore((s) => s.pista.clips)
   const actualizarCapa = useEditorStore((s) => s.actualizarCapa)
   const actualizarEncuadre = useEditorStore((s) => s.actualizarEncuadre)
+  const girarClipStore = useEditorStore((s) => s.girarClip)
   const traerAlFrente = useEditorStore((s) => s.traerAlFrente)
   const enviarAtras = useEditorStore((s) => s.enviarAtras)
 
@@ -102,21 +103,23 @@ export default function TransformarPanel() {
   if (clip) {
     const enc = clip.encuadre
     const rot = enc?.rotacion ?? 0
-    const girarClip = (delta: number) =>
-      actualizarEncuadre(clip.id, { rotacion: rot + delta })
     return (
       <Contenido
         titulo="Transformar video"
         rotacion={rot}
         espejoH={!!enc?.espejoH}
         espejoV={!!enc?.espejoV}
-        onGirarIzq={() => girarClip(-90)}
-        onGirarDer={() => girarClip(90)}
+        // los cuartos de vuelta pasan por girarClip, que además voltea el lienzo a la
+        // orientación del video girado para que lo llene sin bandas
+        onGirarIzq={() => girarClipStore(clip.id, -90)}
+        onGirarDer={() => girarClipStore(clip.id, 90)}
         onEspejoH={() => actualizarEncuadre(clip.id, { espejoH: !enc?.espejoH })}
         onEspejoV={() => actualizarEncuadre(clip.id, { espejoV: !enc?.espejoV })}
-        onReiniciar={() =>
+        onReiniciar={() => {
           actualizarEncuadre(clip.id, { rotacion: 0, espejoH: false, espejoV: false, escala: 1 })
-        }
+          // al quitar el giro, el lienzo vuelve a la orientación nativa del video
+          girarClipStore(clip.id, 0)
+        }}
         onRotacionLibre={(v) => actualizarEncuadre(clip.id, { rotacion: anguloContinuo(rot, v) })}
         escala={enc?.escala ?? 1}
         onEscala={(v) => actualizarEncuadre(clip.id, { escala: v })}

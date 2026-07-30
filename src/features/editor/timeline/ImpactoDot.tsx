@@ -18,6 +18,7 @@ export default function ImpactoDot({ impacto, clip, pxPorSegundo }: Props) {
   const moverImpacto = useEditorStore((s) => s.moverImpacto)
   const recortarImpacto = useEditorStore((s) => s.recortarImpacto)
   const seleccionarImpacto = useEditorStore((s) => s.seleccionarImpacto)
+  const duplicarImpacto = useEditorStore((s) => s.duplicarImpacto)
   // la línea guía celeste que cruza la línea de tiempo mientras se arrastra la
   // bolita, para saber en qué segundo va a caer el impacto
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
@@ -33,13 +34,25 @@ export default function ImpactoDot({ impacto, clip, pxPorSegundo }: Props) {
     e.preventDefault()
     const startX = e.clientX
     const tOriginal = impacto.t
+    // con Alt pulsado el arrastre saca una copia y mueve la copia, dejando el
+    // original clavado donde estaba. mismo gesto que con clips y capas
+    const conCopia = e.altKey
+    let idArrastrado = impacto.id
+    let copiado = false
     let movido = false
     const mover = (ev: globalThis.PointerEvent) => {
       const dx = (ev.clientX - startX) / pxPorSegundo
       if (!movido && Math.abs(ev.clientX - startX) < 3) return
       movido = true
+      // la copia nace en cuanto arranca el arrastre de verdad, sobre el original, y a
+      // partir de ahí es a ella a la que se mueve
+      if (conCopia && !copiado) {
+        const nuevo = duplicarImpacto(impacto.id, tOriginal)
+        if (nuevo) idArrastrado = nuevo
+        copiado = true
+      }
       const nuevoT = Math.max(0, tOriginal + dx)
-      moverImpacto(impacto.id, nuevoT)
+      moverImpacto(idArrastrado, nuevoT)
       // la línea guía marca dónde quedará la bolita mientras se arrastra
       setGuiaImantado(nuevoT)
     }
@@ -74,16 +87,15 @@ export default function ImpactoDot({ impacto, clip, pxPorSegundo }: Props) {
 
   return (
     <span className="pointer-events-none absolute left-0 top-0 z-30" style={{ transform: `translateX(${izquierda}px)` }}>
-      {/* la rayita de duración, justo debajo de la bolita */}
+      {/* la rayita de duración, arrancando desde el centro de la bolita, a color pleno
+          para que se lea igual que la bolita y no se vea desvaída */}
       <span
-        className="pointer-events-auto absolute top-[9px] h-[3px] cursor-ew-resize rounded-full"
+        className="pointer-events-auto absolute top-[6px] h-[3px] cursor-ew-resize rounded-full"
         style={{
           width: anchoLinea,
           background: impacto.color,
-          opacity: seleccionado ? 0.95 : 0.6,
         }}
         onPointerDown={iniciarDuracion}
-        title="Arrastra para cambiar cuánto dura"
       />
       {/* la bolita */}
       <span
@@ -97,7 +109,6 @@ export default function ImpactoDot({ impacto, clip, pxPorSegundo }: Props) {
           outlineOffset: 1,
         }}
         onPointerDown={iniciarMover}
-        title="Arrastra para moverla · clic para editarla"
       />
     </span>
   )

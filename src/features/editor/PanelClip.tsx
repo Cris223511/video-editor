@@ -166,13 +166,17 @@ export default function PanelClip() {
               style={{ background: 'rgb(var(--brand) / 0.8)' }}
             />
             <div className="flex h-full flex-col" style={{ width: ancho }}>
-              <div
-                className="flex items-center gap-2 px-3 py-2.5"
-                style={{ borderBottom: '1px solid rgb(var(--border) / 0.1)' }}
-              >
-                <Icon name={abierta.icono} size={14} className="text-brand" />
-                <h2 className="font-display text-[13px] font-bold">{abierta.etiqueta}</h2>
-              </div>
+              {/* el editor de un impacto ya trae su propia flecha con el nombre, así que
+                  ahí se omite este encabezado para no repetir el título */}
+              {activa !== 'impacto-editor' && (
+                <div
+                  className="flex items-center gap-2 px-3 py-2.5"
+                  style={{ borderBottom: '1px solid rgb(var(--border) / 0.1)' }}
+                >
+                  <Icon name={abierta.icono} size={14} className="text-brand" />
+                  <h2 className="font-display text-[13px] font-bold">{abierta.etiqueta}</h2>
+                </div>
+              )}
               <motion.div
                 // el contenido cae un poco al entrar, ese aire de aparecer que se pidió
                 key={activa}

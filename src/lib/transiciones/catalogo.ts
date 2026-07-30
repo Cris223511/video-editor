@@ -36,6 +36,7 @@ export type Forma =
   | 'barrido-arr'
   | 'barrido-aba'
   | 'diagonal'
+  | 'esquina-radial'
   | 'persianas'
   | 'puertas-h'
   | 'puertas-v'
@@ -45,6 +46,10 @@ export type Forma =
 
 export type Direccion = 'izq' | 'der' | 'arr' | 'aba'
 
+// esquina de arranque de un barrido redondeado: arriba-izquierda, arriba-derecha,
+// abajo-izquierda o abajo-derecha. el frente crece desde ahí hacia la esquina contraria
+export type Esquina = 'ai' | 'ad' | 'bi' | 'bd'
+
 export interface Transicion {
   id: string
   nombre: string
@@ -52,6 +57,8 @@ export interface Transicion {
   tecnica: Tecnica
   forma?: Forma
   direccion?: Direccion
+  // esquina de arranque para los barridos redondeados
+  esquina?: Esquina
   // suaviza el borde del recorte, en fracción del lado menor del lienzo. un
   // barrido con borde duro se ve barato; con un poco de difuminado parece hecho
   // a propósito
@@ -134,6 +141,46 @@ export const CATALOGO: Transicion[] = [
     forma: 'diagonal',
     suavizado: 0.05,
     descripcion: 'El corte avanza en diagonal desde una esquina.',
+  },
+  {
+    id: 'redondo-ai',
+    nombre: 'Barrido redondeado ↘',
+    grupo: 'barridos',
+    tecnica: 'mascara',
+    forma: 'esquina-radial',
+    esquina: 'ai',
+    suavizado: 0.08,
+    descripcion: 'Un frente curvo crece desde la esquina superior izquierda hacia la inferior derecha.',
+  },
+  {
+    id: 'redondo-ad',
+    nombre: 'Barrido redondeado ↙',
+    grupo: 'barridos',
+    tecnica: 'mascara',
+    forma: 'esquina-radial',
+    esquina: 'ad',
+    suavizado: 0.08,
+    descripcion: 'Un frente curvo crece desde la esquina superior derecha hacia la inferior izquierda.',
+  },
+  {
+    id: 'redondo-bi',
+    nombre: 'Barrido redondeado ↗',
+    grupo: 'barridos',
+    tecnica: 'mascara',
+    forma: 'esquina-radial',
+    esquina: 'bi',
+    suavizado: 0.08,
+    descripcion: 'Un frente curvo crece desde la esquina inferior izquierda hacia la superior derecha.',
+  },
+  {
+    id: 'redondo-bd',
+    nombre: 'Barrido redondeado ↖',
+    grupo: 'barridos',
+    tecnica: 'mascara',
+    forma: 'esquina-radial',
+    esquina: 'bd',
+    suavizado: 0.08,
+    descripcion: 'Un frente curvo crece desde la esquina inferior derecha hacia la superior izquierda.',
   },
 
   {

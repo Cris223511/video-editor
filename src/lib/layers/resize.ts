@@ -13,6 +13,35 @@ export interface Caja {
   h: number
 }
 
+// ángulo (grados, sentido horario desde el eje x con y hacia abajo) de la dirección
+// en la que estira cada tirador desde el centro del elemento
+const ANGULO_ANCLA: Record<Ancla, number> = {
+  e: 0,
+  se: 45,
+  s: 90,
+  sw: 135,
+  w: 180,
+  nw: 225,
+  n: 270,
+  ne: 315,
+}
+
+// cursor de un tirador teniendo en cuenta el giro y el volteo del elemento. sin esto,
+// al girar algo las flechas diagonales quedan al revés de lo que se ve: la esquina de
+// arriba a la izquierda mostraba la flecha de la de abajo a la derecha. el volteo
+// (espejo) refleja el ángulo, y el giro lo suma, en el mismo orden que la css
+export function cursorGirado(ancla: Ancla, rotacion = 0, espejoH = false, espejoV = false): string {
+  let a = ANGULO_ANCLA[ancla]
+  if (espejoH) a = 180 - a
+  if (espejoV) a = -a
+  a += rotacion
+  a = ((a % 180) + 180) % 180
+  if (a < 22.5 || a >= 157.5) return 'ew-resize'
+  if (a < 67.5) return 'nwse-resize'
+  if (a < 112.5) return 'ns-resize'
+  return 'nesw-resize'
+}
+
 // cursor que corresponde a cada agarre, para que el puntero indique hacia dónde
 // se va a estirar
 export const CURSORES: Record<Ancla, string> = {
@@ -36,6 +65,69 @@ export const POSICION: Record<Ancla, { left: string; top: string }> = {
   sw: { left: '0%', top: '100%' },
   s: { left: '50%', top: '100%' },
   se: { left: '100%', top: '100%' },
+}
+
+// lleva un punto del lienzo (en fracción 0..1) al marco local de un elemento girado
+// o volteado: resta el centro, pasa a píxeles con el aspecto del área, des-rota y
+// des-voltea (en el orden inverso a la css, que es girar y luego escalar), y vuelve a
+// fracción. así `redimensionar` puede trabajar como si el elemento estuviera derecho,
+// y estirar un lado significa de verdad ese lado y no otro
+export function aMarcoLocal(
+  p: { x: number; y: number },
+  centro: { x: number; y: number },
+  rect: { w: number; h: number },
+  rotacion = 0,
+  espejoH = false,
+  espejoV = false,
+): { x: number; y: number } {
+  const dx = (p.x - centro.x) * rect.w
+  const dy = (p.y - centro.y) * rect.h
+  const rad = (-rotacion * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  const rx = dx * cos - dy * sin
+  const ry = dx * sin + dy * cos
+  return {
+    x: centro.x + (espejoH ? -rx : rx) / rect.w,
+    y: centro.y + (espejoV ? -ry : ry) / rect.h,
+  }
+}
+
+// operación inversa: un desplazamiento medido en el marco local (fracción) se lleva al
+// del lienzo, para recolocar el centro tras un estirado no simétrico de un elemento
+// girado. se voltea y luego se gira, el mismo orden que aplica la css
+export function aMarcoLienzo(
+  off: { x: number; y: number },
+  rect: { w: number; h: number },
+  rotacion = 0,
+  espejoH = false,
+  espejoV = false,
+): { x: number; y: number } {
+  const dx = (espejoH ? -off.x : off.x) * rect.w
+  const dy = (espejoV ? -off.y : off.y) * rect.h
+  const rad = (rotacion * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  return { x: (dx * cos - dy * sin) / rect.w, y: (dx * sin + dy * cos) / rect.h }
+}
+
+// dimensiones (en fracción) de la caja envolvente recta de un rectángulo girado. la
+// rotación es visual (en píxeles de pantalla), así que se mide con el aspecto del área
+// y se vuelve a fracción. sirve para que las guías salten cuando el borde que se VE (el
+// del rectángulo girado) toca el del lienzo, y no el borde sin girar, que cae en otro sitio
+export function envolventeGirada(
+  w: number,
+  h: number,
+  rect: { w: number; h: number },
+  rotacion = 0,
+): { w: number; h: number } {
+  if (!rotacion) return { w, h }
+  const rad = (rotacion * Math.PI) / 180
+  const c = Math.abs(Math.cos(rad))
+  const s = Math.abs(Math.sin(rad))
+  const wp = w * rect.w
+  const hp = h * rect.h
+  return { w: (wp * c + hp * s) / rect.w, h: (wp * s + hp * c) / rect.h }
 }
 
 // modificadores del redimensionado, iguales para cualquier elemento:

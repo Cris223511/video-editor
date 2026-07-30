@@ -9,9 +9,22 @@ export interface EfectoCatalogo {
   css: (i: number) => string
 }
 
+// dos familias de arriba del todo: los EFECTOS mueven o texturizan el cuadro
+// (desenfoques, nitidez, resplandor, cámara de acción) y los FILTROS solo cambian la
+// tonalidad y el color (luz, virados, épocas, cine). se separan para que cada cosa
+// esté donde se la busca, pero por debajo comparten el mismo mecanismo de efecto, así
+// que un proyecto guardado con cualquiera de ellos se sigue abriendo igual
+export type GrupoEfecto = 'efecto' | 'filtro'
+
+export const NOMBRES_GRUPO_EFECTO: Record<GrupoEfecto, string> = {
+  efecto: 'Efectos',
+  filtro: 'Filtros',
+}
+
 export interface CategoriaEfecto {
   id: string
   nombre: string
+  grupo: GrupoEfecto
   efectos: EfectoCatalogo[]
 }
 
@@ -20,17 +33,11 @@ const p = (i: number) => Math.max(0, Math.min(1, i / 100))
 
 export const CATEGORIAS_EFECTO: CategoriaEfecto[] = [
   {
-    // realce: los efectos que no salen de un filtro css suelto (nitidez por máscara
-    // y desenfoque de movimiento). la muestra es solo una aproximación para elegir a
-    // ojo; el efecto de verdad lo arma el panel con sus propios mandos al aplicarlo
-    id: 'realce',
-    nombre: 'Realce',
+    // desenfoques: los borrosos, que texturizan el cuadro sin tocar la tonalidad
+    id: 'desenfoque',
+    nombre: 'Desenfoque',
+    grupo: 'efecto',
     efectos: [
-      {
-        id: 'nitidez-brillo',
-        nombre: 'Nítido y brilloso',
-        css: (i) => `contrast(${1 + p(i) * 0.35}) brightness(${1 + p(i) * 0.16}) saturate(${1 + p(i) * 0.22})`,
-      },
       // desenfoque de foco: el cuadro entero se pone borroso como una foto fuera de
       // foco, sin dirección. es un blur css a secas, así que va por la cadena de filtros
       // normal y la intensidad manda cuánto se difumina, desde nada hasta bastante
@@ -38,6 +45,25 @@ export const CATEGORIAS_EFECTO: CategoriaEfecto[] = [
       // desenfoque de movimiento: el borroso direccional, tipo barrido de cámara. es
       // otro efecto, con su propio ángulo, y por eso lo pinta un filtro svg aparte
       { id: 'desenfoque-movimiento', nombre: 'Desenfoque de movimiento', css: (i) => `blur(${(p(i) * 3).toFixed(2)}px)` },
+    ],
+  },
+  {
+    // realce: los que afilan, hacen resplandecer o curvan el cuadro. no salen de un
+    // filtro css suelto; la muestra es solo una aproximación para elegir a ojo, y el
+    // efecto de verdad lo arma el panel con sus propios mandos al aplicarlo
+    id: 'realce',
+    nombre: 'Realce',
+    grupo: 'efecto',
+    efectos: [
+      {
+        id: 'nitidez-brillo',
+        nombre: 'Nítido y brilloso',
+        css: (i) => `contrast(${1 + p(i) * 0.35}) brightness(${1 + p(i) * 0.16}) saturate(${1 + p(i) * 0.22})`,
+      },
+      // resplandor (bloom): aísla las luces, las difumina y las suma en modo pantalla,
+      // el destello que envuelve lo brillante del plano. la muestra solo lo insinúa con
+      // brillo y contraste; el glow real lo arma el filtro svg al aplicarlo
+      { id: 'resplandor', nombre: 'Resplandor', css: (i) => `brightness(${1 + p(i) * 0.4}) contrast(${1 - p(i) * 0.06}) saturate(${1 + p(i) * 0.15})` },
       // la curvatura de lente no se puede imitar con un filtro css, así que la muestra
       // solo insinúa el aire de cámara de acción con un poco de contraste y color; la
       // curva de verdad la aplica el visor al elegirlo
@@ -47,6 +73,7 @@ export const CATEGORIAS_EFECTO: CategoriaEfecto[] = [
   {
     id: 'luz',
     nombre: 'Luz',
+    grupo: 'filtro',
     efectos: [
       { id: 'brillo', nombre: 'Más luz', css: (i) => `brightness(${1 + p(i) * 0.6})` },
       { id: 'sombra', nombre: 'Menos luz', css: (i) => `brightness(${1 - p(i) * 0.55})` },
@@ -58,6 +85,7 @@ export const CATEGORIAS_EFECTO: CategoriaEfecto[] = [
   {
     id: 'color',
     nombre: 'Color',
+    grupo: 'filtro',
     efectos: [
       { id: 'vivo', nombre: 'Vivo', css: (i) => `saturate(${1 + p(i) * 1.4})` },
       { id: 'apagado', nombre: 'Apagado', css: (i) => `saturate(${1 - p(i) * 0.9})` },
@@ -70,6 +98,7 @@ export const CATEGORIAS_EFECTO: CategoriaEfecto[] = [
   {
     id: 'epoca',
     nombre: 'Época',
+    grupo: 'filtro',
     efectos: [
       { id: 'antiguo', nombre: 'Antiguo', css: (i) => `sepia(${p(i) * 0.8}) contrast(${1 + p(i) * 0.2}) saturate(${1 - p(i) * 0.3})` },
       { id: 'super8', nombre: 'Súper 8', css: (i) => `sepia(${p(i) * 0.5}) contrast(${1 + p(i) * 0.35}) brightness(${1 + p(i) * 0.12})` },
@@ -80,6 +109,7 @@ export const CATEGORIAS_EFECTO: CategoriaEfecto[] = [
   {
     id: 'ambiente',
     nombre: 'Ambiente',
+    grupo: 'filtro',
     efectos: [
       { id: 'frio', nombre: 'Frío', css: (i) => `hue-rotate(${Math.round(-p(i) * 22)}deg) saturate(${1 + p(i) * 0.2})` },
       { id: 'calido', nombre: 'Cálido', css: (i) => `sepia(${p(i) * 0.45}) saturate(${1 + p(i) * 0.3})` },
@@ -93,6 +123,7 @@ export const CATEGORIAS_EFECTO: CategoriaEfecto[] = [
     // luces reventadas y las sombras cerradas, el aire de vídeo nocturno de coches
     id: 'cine',
     nombre: 'Cine',
+    grupo: 'filtro',
     efectos: [
       { id: 'noir', nombre: 'Noir', css: (i) => `grayscale(1) contrast(${1 + p(i) * 0.8}) brightness(${1 - p(i) * 0.08})` },
       { id: 'infrarrojo', nombre: 'Infrarrojo', css: (i) => `grayscale(1) contrast(${1 + p(i) * 1.1}) brightness(${1 + p(i) * 0.28})` },
@@ -124,9 +155,11 @@ export function claveEfecto(e: EfectoClip): string {
   return 'nitidez-brillo'
 }
 
-// la misma identidad, pero calculada desde el id de una muestra del catálogo
+// la misma identidad, pero calculada desde el id de una muestra del catálogo. el
+// resplandor comparte el motor de nitidez-brillo (aislar luces, difuminar y sumar),
+// así que ocupa esa misma ranura: es el mismo efecto en su variante de solo brillo
 export function claveCatalogo(id: string): string {
-  if (id === 'nitidez-brillo') return 'nitidez-brillo'
+  if (id === 'nitidez-brillo' || id === 'resplandor') return 'nitidez-brillo'
   if (id === 'desenfoque-movimiento') return 'desenfoque'
   if (id === 'gopro') return 'gopro'
   return `filtro:${id}`
@@ -137,6 +170,9 @@ export function claveCatalogo(id: string): string {
 // la dirección más habitual en un travelling
 export function crearEfecto(id: string): EfectoClip {
   if (id === 'nitidez-brillo') return { id: crypto.randomUUID(), tipo: 'nitidez-brillo', nitidez: 55, brillo: 35 }
+  // el resplandor nace con la nitidez apagada y el brillo alto: solo glow, ya marcado,
+  // y desde ahí el panel lo sube o lo baja con el mismo mando de brillo
+  if (id === 'resplandor') return { id: crypto.randomUUID(), tipo: 'nitidez-brillo', nitidez: 0, brillo: 80 }
   if (id === 'desenfoque-movimiento')
     return { id: crypto.randomUUID(), tipo: 'desenfoque-movimiento', intensidad: 40, angulo: 0 }
   if (id === 'gopro') return { id: crypto.randomUUID(), tipo: 'gopro', curvatura: 55 }

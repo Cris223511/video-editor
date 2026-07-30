@@ -142,8 +142,8 @@ export default function RecorteOverlay() {
   // imagen por ahora solo recorta en rectángulo, así que ahí se queda en rectángulo
   const forma = (objetivo?.recorte?.forma ?? 'rectangulo') as 'rectangulo' | 'elipse' | 'circulo'
   // las dos formas redondas (círculo nítido y círculo con borde difuminado) se
-  // comportan igual al medir y redimensionar: nacen redondas y con Alt se pueden
-  // estirar a un óvalo. lo único que cambia entre ellas es el borde
+  // comportan igual al medir y redimensionar: nacen redondas y estirando un lado se
+  // vuelven óvalo, mientras que con Shift se mantienen circulares. cambia solo el borde
   const esRedondo = forma === 'circulo' || forma === 'elipse'
   const nativoW = capaImagen ? capaImagen.anchoNatural : asset?.ancho ?? 0
   const nativoH = capaImagen ? capaImagen.altoNatural : asset?.alto ?? 0
@@ -191,11 +191,14 @@ export default function RecorteOverlay() {
     const escX = rr.width > 0 ? tam.w / rr.width : 1
     const escY = rr.height > 0 ? tam.h / rr.height : 1
     const mover = (ev: globalThis.MouseEvent) => {
-      // una forma redonda se redimensiona a la vez por ancho y alto para mantenerse
-      // redonda: el radio sale de la distancia del cursor al centro, y queda un
-      // círculo perfecto centrado en su sitio. con Alt se rompe esa regla y se pasa
-      // al ajuste libre por lado, que es como se estira a un óvalo
-      if (esRedondo && !ev.altKey) {
+      // los atajos son los mismos que en las figuras y las censuras del lienzo, para
+      // no tener que recordar dos juegos de teclas: sin nada, cada lado se estira
+      // libre (y una forma redonda se puede volver óvalo); con Shift se conserva la
+      // proporción, que en un redondo significa mantenerlo circular perfecto; y con
+      // Alt crece desde el centro por los dos costados a la vez.
+      // el redondo perfecto se resuelve por ambos ejes a la vez: el radio sale de la
+      // distancia del cursor al centro y queda un círculo centrado en su sitio
+      if (esRedondo && ev.shiftKey) {
         const cxpx = caja.x + ((rec.izq + (1 - rec.der)) / 2) * caja.w
         const cypx = caja.y + ((rec.arr + (1 - rec.aba)) / 2) * caja.h
         const dxp = Math.abs((ev.clientX - rr.left) * escX - cxpx)
@@ -212,11 +215,9 @@ export default function RecorteOverlay() {
         if (lado === 'arr') cambios.arr = fy
         if (lado === 'aba') cambios.aba = 1 - fy
       }
-      // en el rectángulo, Alt cierra el recuadro por los dos costados a la vez,
-      // midiendo desde el centro. en las formas redondas Alt hace lo contrario: en
-      // vez de mantenerlas redondas, libera el lado que se arrastra para poder
-      // estirarlas a óvalo, así que ahí no se refleja el borde de enfrente
-      if (ev.altKey && !esRedondo) {
+      // Alt refleja el lado que se arrastra en su opuesto, así el recorte se cierra o
+      // se abre por los dos costados a la vez midiendo desde el centro
+      if (ev.altKey) {
         if (cambios.izq !== undefined) cambios.der = cambios.izq
         if (cambios.der !== undefined && cambios.izq === undefined) cambios.izq = cambios.der
         if (cambios.arr !== undefined) cambios.aba = cambios.arr

@@ -206,6 +206,7 @@ export function useAtajos() {
           }
           if (st.clipSeleccionado) st.quitarClip(st.clipSeleccionado)
           else if (st.capaSeleccionada) st.quitarCapa(st.capaSeleccionada)
+          else if (st.impactoSeleccionado) st.quitarImpacto(st.impactoSeleccionado)
           else if (st.regionSeleccionada) {
             // regionSeleccionada guarda tanto un audio importado como una franja de
             // ganancia, así que se mira en qué lista vive para borrar de la correcta.

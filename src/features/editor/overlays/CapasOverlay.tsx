@@ -6,8 +6,8 @@ import { rectContenido } from '../../../lib/layers/rect'
 import { puntosEstrella } from '../../../lib/layers/figuras'
 import { posicionCapa } from '../../../lib/layers/motion'
 import { fundidoEn } from '../../../lib/audio/ganancia'
-import { Ancla, Caja, redimensionar } from '../../../lib/layers/resize'
-import { CajaGuia, Guia, imantar, imantarValor, imanesPorEje } from '../../../lib/layers/guias'
+import { Ancla, Caja, redimensionar, aMarcoLocal, aMarcoLienzo, envolventeGirada } from '../../../lib/layers/resize'
+import { CajaGuia, Guia, imantar, imanesPorEje, imantarRedimension } from '../../../lib/layers/guias'
 import { sufijoTransformCss } from '../../../lib/layers/transform'
 import {
   estiloEntrada,
@@ -191,7 +191,10 @@ export default function CapasOverlay() {
           setGuias([])
         } else {
           const iman = imanesPorEje(rect)
-          const r = imantar({ x: cx, y: cy, w: propia.w, h: propia.h }, vecinas, iman.x, iman.y)
+          // con la capa girada el imantado usa su caja envolvente recta, para que la
+          // guía salte cuando el borde que se ve toca el del lienzo y no el sin girar
+          const env = envolventeGirada(propia.w, propia.h, rect, capa.rotacion ?? 0)
+          const r = imantar({ x: cx, y: cy, w: env.w, h: env.h }, vecinas, iman.x, iman.y)
           moverCapaLienzo(capa.id, r.x, r.y)
           setGuias(r.guias)
         }
@@ -376,37 +379,52 @@ export default function CapasOverlay() {
     const norte = ancla.startsWith('n')
     const sur = ancla.startsWith('s')
 
+    // giro y volteo de la capa: si los tiene, el cursor se lleva al marco derecho de la
+    // capa antes de calcular, y el nuevo centro se devuelve al del lienzo después. sin
+    // esto, girar o voltear una capa dejaba el estirado al revés (una esquina hacía lo
+    // de la contraria) y las guías caían del lado equivocado
+    const rot = capa.rotacion ?? 0
+    const eH = !!capa.espejoH
+    const eV = !!capa.espejoV
+    const transformada = !!rot || eH || eV
+
     const mover = (ev: globalThis.PointerEvent) => {
-      const p = normalizar(ev)
-      // se imanta el borde que se arrastra a las líneas cercanas y ahí sale la guía,
-      // igual que al mover. con Alt no se imanta, para poder clavar un tamaño libre
-      const gs: Guia[] = []
-      let px = p.x
-      let py = p.y
-      if (!ev.altKey) {
-        // enganche por eje para que la guía de arriba/abajo se pegue con la misma
-        // holgura en pantalla que las laterales, sin importar la forma del lienzo
-        const iman = imanesPorEje(rect)
-        if (este || oeste) {
-          const s = imantarValor(px, objX, iman.x)
-          px = s.v
-          if (s.pos !== null) gs.push({ eje: 'x', pos: s.pos })
-        }
-        if (norte || sur) {
-          const s = imantarValor(py, objY, iman.y)
-          py = s.v
-          if (s.pos !== null) gs.push({ eje: 'y', pos: s.pos })
-        }
-      }
-      setGuias(gs)
+      const bruto = normalizar(ev)
+      const p = transformada ? aMarcoLocal(bruto, { x: inicial.x, y: inicial.y }, rect, rot, eH, eV) : bruto
       // por defecto cada lado se estira libre, moviendo solo el borde que se arrastra;
       // con Shift se conserva la proporción, cambiando alto y ancho a la vez. es al
       // revés que en los clips de video, que siempre van proporcionales. con Alt, aparte,
       // crece desde el centro por los dos lados. el texto es la excepción: escala su
       // tamaño de letra, un único valor, así que va proporcional pase lo que pase
       const proporcional = capa.tipo === 'texto' ? true : ev.shiftKey
-      const n = redimensionar(inicial, ancla, px, py, { proporcional, simetrico: ev.altKey })
-      const posicion = fija ? { x: entre(0, 1, n.x), y: entre(0, 1, n.y) } : {}
+      // la caja tentativa sale de la posición cruda del cursor
+      const n0 = redimensionar(inicial, ancla, p.x, p.y, { proporcional, simetrico: ev.altKey })
+      let n = n0
+      let gs: Guia[] = []
+      // el imantado mira a dónde caen los cuatro bordes de la caja ya estirada, no el
+      // tirador: así la guía aparece cuando cualquier lado toca el centro o los bordes
+      // del lienzo (o de una capa vecina), aunque el cursor estire por otro lado. con
+      // Alt se deja libre. con la capa girada o volteada el recuadro se inclina y las
+      // guías del lienzo dejarían de cuadrar, así que ahí también se estira libre
+      if (!ev.altKey && !transformada) {
+        const iman = imanesPorEje(rect)
+        const anclaX = este ? 'min' : oeste ? 'max' : 'centro'
+        const anclaY = norte ? 'max' : sur ? 'min' : 'centro'
+        const r = imantarRedimension(inicial, proporcional, anclaX, anclaY, n0, iman.x, iman.y, objX, objY)
+        n = r.caja
+        gs = r.guias
+      }
+      setGuias(gs)
+      // el centro sale en el marco local; si la capa está transformada se devuelve al
+      // marco del lienzo para que el borde anclado quede quieto en pantalla
+      let cx = n.x
+      let cy = n.y
+      if (transformada) {
+        const off = aMarcoLienzo({ x: n.x - inicial.x, y: n.y - inicial.y }, rect, rot, eH, eV)
+        cx = inicial.x + off.x
+        cy = inicial.y + off.y
+      }
+      const posicion = fija ? { x: entre(0, 1, cx), y: entre(0, 1, cy) } : {}
 
       if (capa.tipo === 'texto') {
         const factor = inicial.w > 0 ? n.w / inicial.w : 1
@@ -620,7 +638,7 @@ export default function CapasOverlay() {
               }}
             >
               {seleccion && (
-                <Tiradores onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
+                <Tiradores rotacion={c.rotacion} espejoH={c.espejoH} espejoV={c.espejoV} onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
               )}
             </div>
           )
@@ -659,7 +677,7 @@ export default function CapasOverlay() {
               </svg>
               {seleccion && (
                 <>
-                  <Tiradores onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
+                  <Tiradores rotacion={c.rotacion} espejoH={c.espejoH} espejoV={c.espejoV} onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
                   <ManijaGiro onAgarrar={(e) => iniciarGiro(e, c)} />
                 </>
               )}
@@ -813,6 +831,9 @@ export default function CapasOverlay() {
                   style={{ left: rect.ox + minX - m, top: rect.oy + minY - m, width: maxX - minX + m * 2, height: maxY - minY + m * 2 }}
                 >
                   <Tiradores
+                    rotacion={c.rotacion}
+                    espejoH={c.espejoH}
+                    espejoV={c.espejoV}
                     onAgarrar={(_a, ev) =>
                       iniciarEscalaTrazo(ev, c.id, {
                         x: rect.ox + (minX + maxX) / 2,
@@ -872,7 +893,7 @@ export default function CapasOverlay() {
               </div>
               {seleccion && (
                 <>
-                  <Tiradores onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
+                  <Tiradores rotacion={c.rotacion} espejoH={c.espejoH} espejoV={c.espejoV} onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
                   <ManijaGiro onAgarrar={(e) => iniciarGiro(e, c)} />
                 </>
               )}
@@ -980,7 +1001,7 @@ export default function CapasOverlay() {
                 deformaría y dejaría de leerse bien */}
             {seleccion && !enEdicion && (
               <>
-                <Tiradores soloEsquinas onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
+                <Tiradores soloEsquinas rotacion={c.rotacion} espejoH={c.espejoH} espejoV={c.espejoV} onAgarrar={(a, e) => iniciarRedimension(e, c, a)} />
                 <ManijaGiro onAgarrar={(e) => iniciarGiro(e, c)} />
               </>
             )}

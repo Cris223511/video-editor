@@ -79,6 +79,7 @@ export interface ProyectoGuardado {
     colorFondo: string
     fondo: 'color' | 'desenfoque'
     desenfoqueFondo: number
+    fondoGiro?: number
     marco: Marco
   }
 }

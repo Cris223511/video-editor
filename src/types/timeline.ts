@@ -89,6 +89,12 @@ export type TipoTransicion = string
 export interface Transicion {
   tipo: TipoTransicion
   duracion: number
+  // esquina de arranque del barrido redondeado ('ai'|'ad'|'bi'|'bd'); sin definir se
+  // usa la de la entrada del catálogo
+  esquina?: 'ai' | 'ad' | 'bi' | 'bd'
+  // grosor del borde suave del corte, en fracción del lado menor (0 = corte duro).
+  // sin definir manda el valor por defecto de la transición del catálogo
+  grosor?: number
 }
 
 // modelo de la línea de tiempo. un clip apunta a un medio importado y define

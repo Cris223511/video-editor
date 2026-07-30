@@ -66,36 +66,53 @@ export function nodosFiltroNB(p: ParamsNB): NodoFiltro[] {
   })
 
   if (p.brillo > 0) {
-    // se quedan solo las zonas claras: la recta empuja las sombras a cero y deja
-    // pasar de la mitad alta para arriba, que es de donde nace el resplandor
+    const b = p.brillo / 100
+    // se quedan las zonas claras, de donde nace el resplandor. el umbral baja un poco
+    // conforme sube el brillo: a poco brillo solo brillan las luces más fuertes, y a
+    // mucho brillo el resplandor agarra también los tonos medios y el destello envuelve
+    // más al objeto, como el fogonazo que se pega a todo el plano
+    const pendiente = (3 + b * 1.5).toFixed(2)
+    const corte = (-(1.4 + b * 1.1)).toFixed(2)
     nodos.push({
       tag: 'feComponentTransfer',
       attrs: { in: 'nbSharp', result: 'nbLuces' },
-      children: canales({ type: 'linear', slope: '4', intercept: '-2.4' }),
+      children: canales({ type: 'linear', slope: pendiente, intercept: corte }),
     })
 
-    // el halo: se difumina lo aislado. cuanto más brillo, más se expande
-    const radio = 2 + (p.brillo / 100) * 8
+    // el halo: se difumina lo aislado. cuanto más brillo, más se expande y más lejos
+    // llega el resplandor
+    const radio = 2 + b * 16
     nodos.push({
       tag: 'feGaussianBlur',
       attrs: { in: 'nbLuces', stdDeviation: radio.toFixed(2), result: 'nbHalo' },
     })
 
-    // se atenúa el halo según la intensidad elegida antes de sumarlo, para ir de un
-    // brillo sutil a uno marcado sin cambiar de fórmula
-    const fuerza = (p.brillo / 100).toFixed(3)
+    // se pondera el halo según la intensidad antes de sumarlo. la curva sube más que
+    // lineal para que, pasado medio camino, el destello se dispare y de verdad reviente
+    // de luz, no un halo tibio
+    const fuerza = (b * (0.8 + b * 0.9)).toFixed(3)
     nodos.push({
       tag: 'feComponentTransfer',
       attrs: { in: 'nbHalo', result: 'nbHaloAtenuado' },
       children: canales({ type: 'linear', slope: fuerza, intercept: '0' }),
     })
 
-    // se combina el halo con la imagen afilada en modo pantalla, que aclara sin
-    // tapar: es lo que se lee como «brilloso»
+    // se combina el halo con la imagen afilada en modo pantalla, que aclara sin tapar:
+    // es lo que se lee como «brilloso». a brillo alto se suma dos veces para empujar el
+    // destello hasta reventar las luces, el aire de los planos con glow marcado
+    const doble = b > 0.5
     nodos.push({
       tag: 'feBlend',
-      attrs: { mode: 'screen', in: 'nbSharp', in2: 'nbHaloAtenuado' },
+      attrs: doble
+        ? { mode: 'screen', in: 'nbSharp', in2: 'nbHaloAtenuado', result: 'nbGlow1' }
+        : { mode: 'screen', in: 'nbSharp', in2: 'nbHaloAtenuado' },
     })
+    if (doble) {
+      nodos.push({
+        tag: 'feBlend',
+        attrs: { mode: 'screen', in: 'nbGlow1', in2: 'nbHaloAtenuado' },
+      })
+    }
   }
 
   return nodos

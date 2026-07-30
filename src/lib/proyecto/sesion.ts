@@ -3,6 +3,8 @@ import { useProjectStore, CLAVE_SESION } from '../../store/useProjectStore'
 import { guardarProyecto, leerProyecto } from './almacen'
 import { clipEnTiempo, duracionTotal } from '../timeline/clips'
 import { frameDeVideo } from '../media/probeVideo'
+import { frameCompuesto } from '../export/portada'
+import { Escena } from '../export/compositor'
 import { MediaAsset } from '../../types/media'
 import {
   guardadoAMedio,
@@ -23,12 +25,12 @@ export function hayProyectoEnMemoria(): boolean {
   return proyectoEnMemoria
 }
 
-// arma la portada del proyecto para la lista. con línea de tiempo montada, se
-// toma el fotograma que se ve justo en la mitad del montaje: se busca qué clip
-// cae en ese instante y se captura el frame de su medio en el segundo que le
-// corresponde, teniendo en cuenta el recorte y la velocidad, igual que haría el
-// visor. sin nada montado, se cae al fotograma de la mitad del primer medio, que
-// ya viene calculado. si no hay medios, queda vacía y la lista pinta su marcador
+// arma la portada del proyecto para la lista. con línea de tiempo montada se compone
+// un fotograma real de lo que se está editando (a la mitad del montaje) con el mismo
+// motor que la exportación: sale con su giro, su encuadre, el fondo, el marco, las
+// capas y el color, no el video crudo importado. si esa composición falla por lo que
+// sea, se recurre al fotograma directo del medio, y sin nada montado a la miniatura del
+// primer medio. si no hay medios, queda vacía y la lista pinta su marcador
 async function calcularPortada(): Promise<string> {
   const ed = useEditorStore.getState()
   const medios = useProjectStore.getState().medios
@@ -37,10 +39,36 @@ async function calcularPortada(): Promise<string> {
   if (clips.length > 0) {
     const total = duracionTotal(clips)
     const ordenados = [...clips].sort((a, b) => a.inicio - b.inicio)
-    const activo = clipEnTiempo(ordenados, total / 2) ?? ordenados[0]
+
+    // el fotograma compuesto refleja la edición completa. el instante es la mitad del
+    // montaje, salvo que ahí no haya nada que ver, en cuyo caso se acerca a un clip
+    const t = total / 2
+    const ocultas = new Set<number>()
+    ed.pistasMeta.forEach((m, i) => {
+      if (m.oculta) ocultas.add(i)
+    })
+    const escena: Escena = {
+      ancho: ed.resolucion.ancho,
+      alto: ed.resolucion.alto,
+      colorFondo: ed.colorFondo,
+      fondo: ed.fondo,
+      desenfoqueFondo: ed.desenfoqueFondo,
+      fondoGiro: ed.fondoGiro,
+      clips: ordenados,
+      capas: ed.capas,
+      impactos: ed.impactos,
+      marco: ed.marco,
+      ocultas,
+    }
+    const url = (assetId: string) => medios.find((m) => m.id === assetId)?.url
+    const compuesta = await frameCompuesto(escena, t, url)
+    if (compuesta) return compuesta
+
+    // el compositor no pudo: como mínimo, el fotograma crudo del clip de esa mitad
+    const activo = clipEnTiempo(ordenados, t) ?? ordenados[0]
     const medio = medios.find((m) => m.id === activo.assetId)
     if (medio) {
-      const segundoFuente = activo.recorteInicio + (total / 2 - activo.inicio) * activo.velocidad
+      const segundoFuente = activo.recorteInicio + (t - activo.inicio) * activo.velocidad
       const frame = await frameDeVideo(medio.url, segundoFuente)
       if (frame) return frame
     }
@@ -93,6 +121,7 @@ export function capturarProyecto(id: string, creado: number, portada: string): P
       colorFondo: ed.colorFondo,
       fondo: ed.fondo,
       desenfoqueFondo: ed.desenfoqueFondo,
+      fondoGiro: ed.fondoGiro,
       marco: ed.marco,
     },
   }
@@ -179,6 +208,7 @@ export async function abrirSesion(id: string): Promise<boolean> {
     colorFondo: e.colorFondo ?? '#000000',
     fondo: e.fondo ?? 'color',
     desenfoqueFondo: e.desenfoqueFondo ?? 45,
+    fondoGiro: e.fondoGiro ?? 0,
     marco: e.marco,
     playhead: 0,
     reproduciendo: false,

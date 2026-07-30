@@ -18,6 +18,7 @@ export interface DatosExport {
   colorFondo: string
   fondo?: 'color' | 'desenfoque'
   desenfoqueFondo?: number
+  fondoGiro?: number
   clips: Clip[]
   capas: Capa[]
   impactos: Impacto[]
@@ -463,6 +464,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
           colorFondo: datos.colorFondo,
           fondo: datos.fondo,
           desenfoqueFondo: datos.desenfoqueFondo,
+          fondoGiro: datos.fondoGiro,
           clips,
           capas: datos.capas,
           impactos: datos.impactos,

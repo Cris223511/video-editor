@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { CalendarPlus, ChevronDown, Download, PencilLine, Play, X } from 'lucide-react'
@@ -168,13 +168,27 @@ function FilaArchivo({ m }: { m: MedioGuardado }) {
   const [reproduciendo, setReproduciendo] = useState(false)
   const [portada, setPortada] = useState(m.miniatura)
 
-  // url viva del archivo, para previsualizarlo y para sacarle un fotograma
-  const url = useMemo(() => URL.createObjectURL(m.archivo), [m.archivo])
-  useEffect(() => () => URL.revokeObjectURL(url), [url])
+  // url viva del archivo, para previsualizarlo y para sacarle un fotograma. se crea y se
+  // revoca dentro del MISMO efecto a propósito: si se creara en un useMemo y se revocara
+  // en un efecto aparte, el doble montaje de StrictMode (en desarrollo) la revocaba sin
+  // volver a crearla, y el <video> se quedaba con una url muerta (ERR_FILE_NOT_FOUND),
+  // todo en negro. además el blob se envuelve en un File con su tipo por si vuelve de
+  // IndexedDB sin el tipo MIME, que también dejaría al <video> sin poder decodificar
+  const [url, setUrl] = useState('')
+  useEffect(() => {
+    const f =
+      m.archivo instanceof File
+        ? m.archivo
+        : new File([m.archivo], m.nombre, { type: m.tipo || m.archivo.type })
+    const u = URL.createObjectURL(f)
+    setUrl(u)
+    return () => URL.revokeObjectURL(u)
+  }, [m.archivo, m.nombre, m.tipo])
 
   // se rehace la portada tomando el fotograma de la mitad; si sale algo, sustituye
   // a la guardada, que en proyectos viejos podía ser el primer frame en negro
   useEffect(() => {
+    if (!url) return
     let vivo = true
     frameDeVideo(url, (m.duracion || 0) / 2).then((f) => {
       if (vivo && f) setPortada(f)

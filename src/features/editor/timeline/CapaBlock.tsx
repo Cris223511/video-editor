@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion'
 import { PointerEvent as ReactPointerEvent, useState } from 'react'
 import { Capa } from '../../../types/layers'
-import Tooltip from '../../../components/ui/Tooltip'
 import Icon from '../../../components/ui/Icon'
 import { TIPO_TRANSICION } from '../GaleriaTransiciones'
 import TransicionCapaBlock from './TransicionCapaBlock'
@@ -20,6 +19,7 @@ interface Props {
 // aparece; se mueve con imantado y se recorta por los bordes
 export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   const seleccionado = useEditorStore((s) => s.capaSeleccionada === capa.id)
+  const congelarLayout = useEditorStore((s) => s.congelarLayout)
   const seleccionarCapa = useEditorStore((s) => s.seleccionarCapa)
   const actualizarCapa = useEditorStore((s) => s.actualizarCapa)
   const moverCapaTiempo = useEditorStore((s) => s.moverCapaTiempo)
@@ -293,9 +293,8 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   const esImagen = capa.tipo === 'imagen'
 
   return (
-    <Tooltip texto={etiqueta} retardo={2000} lado="arriba">
     <motion.div
-      layout={interactuando ? false : 'position'}
+      layout={interactuando || congelarLayout ? false : 'position'}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={capa.nivel ?? 0}
       data-bloque-id={capa.id}
@@ -413,6 +412,5 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
         ].join(' ')}
       />
     </motion.div>
-    </Tooltip>
   )
 }

@@ -37,9 +37,6 @@ const ALTO_REGLA = 29
 // columna de cabeceras y en las filas del lado derecho para que no se
 // desalineen. el hueco entre niveles de video vive en HUECO_PISTA
 const SEP_SECCION = 12
-// ancho que se reserva para el rótulo «Añadir audio» del carril vacío. la onda
-// tenue de relleno arranca pasado ese punto para no quedar por debajo del texto
-const ANCHO_ROTULO_AUDIO = 120
 // alto de cada fila de los carriles de texto y de audio, y el hueco entre filas
 // de un mismo carril. la cabecera de la columna izquierda se dibuja a la altura
 // total de su bloque de filas para que ambas columnas cuadren
@@ -99,6 +96,8 @@ export default function Timeline({
   const setAltoCarril = useEditorStore((s) => s.setAltoCarril)
   const anchoCabeceras = useEditorStore((s) => s.anchoCabeceras)
   const setAnchoCabeceras = useEditorStore((s) => s.setAnchoCabeceras)
+  const congelarLayout = useEditorStore((s) => s.congelarLayout)
+  const setCongelarLayout = useEditorStore((s) => s.setCongelarLayout)
   const agregarNivelTexto = useEditorStore((s) => s.agregarNivelTexto)
   const agregarNivelAudio = useEditorStore((s) => s.agregarNivelAudio)
   const ordenCarriles = useEditorStore((s) => s.ordenCarriles)
@@ -140,6 +139,9 @@ export default function Timeline({
   // hacen falta muchos niveles, también el vertical. dentro conviven la columna
   // de cabeceras (pegada a la izquierda) y la zona de filas
   const scrollRef = useRef<HTMLDivElement>(null)
+  // temporizador para reactivar las animaciones de posición un instante después de
+  // la última rueda de zoom, de modo que un gesto continuo no las vuelva a encender
+  const zoomFreno = useRef<number | null>(null)
   // zona de las filas propiamente dicha, la que se desplaza en horizontal. sus
   // coordenadas de pantalla ya incluyen el desplazamiento, así que sirve de
   // origen para traducir la posición del cursor a segundos sin sumar scrollLeft
@@ -188,8 +190,12 @@ export default function Timeline({
     e.preventDefault()
     const inicioX = e.clientX
     const original = anchoCabeceras
+    // mientras dura el arrastre se apagan las animaciones de posición para que los
+    // bloques se peguen al ancho nuevo sin ir por detrás del cursor con suavizado
+    setCongelarLayout(true)
     const mover = (ev: globalThis.PointerEvent) => setAnchoCabeceras(original + (ev.clientX - inicioX))
     const soltar = () => {
+      setCongelarLayout(false)
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)
       document.body.style.cursor = ''
@@ -241,7 +247,12 @@ export default function Timeline({
     const x = playhead * pxPorSegundo
     const margen = 48
     if (x < cont.scrollLeft + margen || x > cont.scrollLeft + cont.clientWidth - margen) {
-      cont.scrollLeft = Math.max(0, x - cont.clientWidth * 0.35)
+      // salto de página: en cuanto el cabezal toca el borde de lo visible, el
+      // desplazamiento salta de golpe al siguiente bloque y deja el cabezal pegado al
+      // borde izquierdo, con toda la ventana por delante para seguir avanzando. así se
+      // pasa al bloque nuevo de una vez, sin quedarse a media vista ni con suavizado
+      cont.style.scrollBehavior = 'auto'
+      cont.scrollLeft = Math.max(0, x - margen)
     }
   }, [playhead, reproduciendo, pxPorSegundo])
 
@@ -290,6 +301,14 @@ export default function Timeline({
       const d = e.clientX - zona.getBoundingClientRect().left
       const st = useEditorStore.getState()
       const pxAntes = st.pxPorSegundo
+      // el zoom cambia la escala de golpe, no es un desplazamiento: si las animaciones
+      // de posición siguen encendidas, cada paso de rueda hace que los bloques se
+      // deslicen hacia su nuevo sitio y, al acercar o alejar rápido, se cruzan entre sí
+      // y parece que se reordenan. se congelan mientras dura el gesto y se reactivan un
+      // instante después de la última rueda, para que la escala se aplique clavada
+      setCongelarLayout(true)
+      if (zoomFreno.current) clearTimeout(zoomFreno.current)
+      zoomFreno.current = window.setTimeout(() => setCongelarLayout(false), 180)
       st.aplicarZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15)
       const pxDespues = useEditorStore.getState().pxPorSegundo
       // se conserva bajo el cursor el mismo instante: al crecer la escala, el
@@ -300,7 +319,7 @@ export default function Timeline({
 
     cont.addEventListener('wheel', alGirar, { passive: false })
     return () => cont.removeEventListener('wheel', alGirar)
-  }, [])
+  }, [setCongelarLayout])
 
   // el resalte de la fila y la guía de nueva pista solo deben vivir mientras dura
   // un arrastre. si el gesto termina fuera de la línea de tiempo no llega ni el
@@ -350,7 +369,11 @@ export default function Timeline({
     const zona = contenidoRef.current
     if (!zona) return
     const rect = zona.getBoundingClientRect()
-    irA(Math.max(0, (clientX - rect.left) / pxPorSegundo))
+    const t = Math.max(0, (clientX - rect.left) / pxPorSegundo)
+    // el cabezal no se deja arrastrar más allá del final del montaje: pasado el
+    // último clip no hay nada que mostrar, así que se topa justo en el total. con la
+    // pista vacía (total cero) se deja libre, que ahí sí hace falta para posicionar
+    irA(total > 0 ? Math.min(t, total) : t)
   }
 
   // el cabezal se puede arrastrar agarrando su manija superior, además de
@@ -681,7 +704,7 @@ export default function Timeline({
             {ordenCarriles.map((carril, i) => (
               <motion.div
                 key={carril}
-                layout="position"
+                layout={congelarLayout ? false : 'position'}
                 transition={DESLIZA}
                 className="relative"
                 style={{ marginTop: i === 0 ? 8 : SEP_SECCION }}
@@ -695,7 +718,7 @@ export default function Timeline({
                 {carril === 'video' && (
                   <div className="relative flex flex-col" style={{ gap: HUECO_PISTA }}>
                     {filas.map((p) => (
-                      <motion.div key={pistasMeta[p]?.id ?? p} layout="position" transition={DESLIZA}>
+                      <motion.div key={pistasMeta[p]?.id ?? p} layout={congelarLayout ? false : 'position'} transition={DESLIZA}>
                         <PistaHeader indice={p} alto={altosPista[p]} />
                       </motion.div>
                     ))}
@@ -762,7 +785,7 @@ export default function Timeline({
           {/* las filas siguen el mismo orden que la columna de cabeceras, para que
               cada sección quede enfrente de su rótulo pase lo que pase */}
           {ordenCarriles.map((carril, i) => (
-            <motion.div key={carril} layout="position" transition={DESLIZA} style={{ marginTop: i === 0 ? 8 : SEP_SECCION }}>
+            <motion.div key={carril} layout={congelarLayout ? false : 'position'} transition={DESLIZA} style={{ marginTop: i === 0 ? 8 : SEP_SECCION }}>
               {carril === 'video' && (
                 <>
               {/* niveles de video, del más alto al más bajo */}
@@ -782,7 +805,7 @@ export default function Timeline({
                   return (
                     <motion.div
                       key={pistasMeta[p]?.id ?? p}
-                      layout="position"
+                      layout={congelarLayout ? false : 'position'}
                       transition={DESLIZA}
                       data-fila-pista={p}
                       onContextMenu={(e) => {
@@ -972,16 +995,18 @@ export default function Timeline({
                             <Icon name="musica" size={13} />
                             <span>Añadir audio</span>
                           </div>
-                          {/* onda tenue de fondo, arrancando pasado el rótulo, para
-                              que la fila vacía se lea como una pista de audio y no como
-                              una banda plana. cada fila lleva su propia semilla para que
-                              su dibujo no sea idéntico al de al lado */}
-                          <div className="absolute inset-y-0 right-0" style={{ left: ANCHO_ROTULO_AUDIO }}>
+                          {/* onda tenue de fondo, desde el mismo inicio de la fila, para
+                              que la pista de audio vacía se lea como tal de punta a punta
+                              y no arranque con un corte tras el rótulo. el rótulo va en una
+                              capa por encima, así que se lee bien sobre la onda apagada.
+                              cada fila lleva su propia semilla para que su dibujo no sea
+                              idéntico al de al lado */}
+                          <div className="absolute inset-0">
                             <OndaAudio
                               semilla={`fondo-audio-${n}`}
                               color="rgb(var(--border) / 0.5)"
                               opacidad={0.35}
-                              barras={Math.max(80, Math.floor((anchoContenido - ANCHO_ROTULO_AUDIO) / 2))}
+                              barras={Math.max(80, Math.floor(anchoContenido / 2))}
                             />
                           </div>
                         </>

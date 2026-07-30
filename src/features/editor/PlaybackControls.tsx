@@ -51,15 +51,15 @@ function ControlVolumen({ oscuro = false }: { oscuro?: boolean }) {
 
   return (
     <div ref={cajaRef} className="relative" onMouseEnter={abrir} onMouseLeave={cerrarConRetraso}>
-      <Tooltip texto="Volumen de la vista previa" lado="arriba">
-        <button
-          onClick={() => setAbierto((v) => !v)}
-          aria-label="Volumen de la vista previa"
-          className={['grid h-9 w-9 place-items-center rounded-lg transition-colors', colorBoton].join(' ')}
-        >
-          <Bocina size={18} />
-        </button>
-      </Tooltip>
+      {/* sin tooltip: al pasar el cursor ya se abre el deslizador de volumen, así que
+          el globo de ayuda solo estorbaba tapando el control */}
+      <button
+        onClick={() => setAbierto((v) => !v)}
+        aria-label="Volumen de la vista previa"
+        className={['grid h-9 w-9 place-items-center rounded-lg transition-colors', colorBoton].join(' ')}
+      >
+        <Bocina size={18} />
+      </button>
       {abierto && (
         <div
           className="absolute bottom-full left-1/2 z-[70] flex -translate-x-1/2 flex-col items-center gap-2 rounded-xl px-3 pb-3 pt-3 shadow-xl before:absolute before:left-0 before:top-full before:h-2 before:w-full before:content-['']"

@@ -2,7 +2,6 @@ import { motion } from 'framer-motion'
 import { PointerEvent as ReactPointerEvent, useEffect, useState } from 'react'
 import { ClipAudio } from '../../../types/audio'
 import { MediaAsset } from '../../../types/media'
-import Tooltip from '../../../components/ui/Tooltip'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { amplitudEn, picosDeMedio } from '../../../lib/audio/picos'
 import { alturasOnda } from './AudioBlock'
@@ -34,6 +33,7 @@ function Lineas({ alturas, color }: { alturas: number[]; color: string }) {
 // fuente. al no tener imagen, el nombre basta para reconocerlo
 export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: Props) {
   const seleccionado = useEditorStore((s) => s.regionSeleccionada === audio.id)
+  const congelarLayout = useEditorStore((s) => s.congelarLayout)
   const seleccionarRegion = useEditorStore((s) => s.seleccionarRegion)
   const moverAudio = useEditorStore((s) => s.moverAudio)
   const moverAudioNivel = useEditorStore((s) => s.moverAudioNivel)
@@ -233,9 +233,8 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
   const onda = alturas ?? alturasOnda(audio.id, barras)
 
   return (
-    <Tooltip texto={asset?.nombre ?? 'Audio'} retardo={2000} lado="arriba">
     <motion.div
-      layout={interactuando ? false : 'position'}
+      layout={interactuando || congelarLayout ? false : 'position'}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={audio.nivel ?? 0}
       data-bloque-id={audio.id}
@@ -287,6 +286,5 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
         ].join(' ')}
       />
     </motion.div>
-    </Tooltip>
   )
 }

@@ -16,7 +16,8 @@ import {
   crearCapaTrazo,
 } from '../lib/layers/defaults'
 import { simplificarRecorrido } from '../lib/layers/motion'
-import { duracionTotal, duracionProyecto } from '../lib/timeline/clips'
+import { duracionTotal, duracionProyecto, clipEnTiempo } from '../lib/timeline/clips'
+import { giradoUnCuarto } from '../lib/timeline/encuadre'
 
 // estado del clip al empezar un arrastre de recorte o de velocidad. arrastrar
 // midiendo el desplazamiento total desde este punto de partida, en vez de sumar
@@ -169,6 +170,9 @@ interface EstadoEditor {
   fondo: 'color' | 'desenfoque'
   // cuánto se desenfoca ese relleno, de 1 a 100
   desenfoqueFondo: number
+  // giro del relleno borroso, en pasos de 90° (0/90/180/270). solo orienta el fondo,
+  // no el video de delante
+  fondoGiro: number
   marco: Marco
   volumenGlobal: number
   // volumen de monitorización de la vista previa, de 0 a 1. es solo para escuchar el
@@ -212,6 +216,10 @@ interface EstadoEditor {
   // encuadre del clip en el lienzo: posición y tamaño del video. actualizar
   // recibe cambios sueltos y reset lo devuelve al centrado de siempre
   actualizarEncuadre: (id: string, cambios: Partial<Encuadre>) => void
+  // gira el clip un cuarto de vuelta y, de paso, adapta el lienzo a la orientación
+  // del video ya girado, para que lo llene limpio en lugar de quedarse echado con
+  // bandas. delta es el giro en grados (normalmente ±90)
+  girarClip: (id: string, delta: number) => void
   resetEncuadre: (id: string) => void
   // recorte de la IMAGEN del clip por lados, en fracción (distinto de recortarClip,
   // que recorta el clip en el tiempo). actualizar recibe cambios sueltos y reset lo
@@ -275,6 +283,10 @@ interface EstadoEditor {
   recortarImpacto: (id: string, duracion: number) => void
   actualizarImpacto: (id: string, cambios: Partial<Impacto>) => void
   quitarImpacto: (id: string) => void
+  // clona un impacto en otro instante, conservando todo lo demás (tipo, color,
+  // fuerza, dirección). devuelve el id de la copia para poder arrastrarla al vuelo
+  // con Alt, o null si el original ya no existe
+  duplicarImpacto: (id: string, t: number) => string | null
   seleccionarImpacto: (id: string | null) => void
   // desplaza en el tiempo todos los bloques marcados a la vez, sumando el mismo
   // salto a cada uno. ninguno baja de cero, y si uno topa con el arranque el resto
@@ -362,6 +374,11 @@ interface EstadoEditor {
   // etiqueta que acompaña al cursor. null cuando no hay ningún gesto en marcha
   arrastreVivo: { etiqueta: string; x: number; y: number } | null
   setArrastreVivo: (a: { etiqueta: string; x: number; y: number } | null) => void
+  // mientras se arrastra el separador que ancha o achica la columna de cabeceras, se
+  // congelan las animaciones de posición de los bloques: si no, cada bloque se desliza
+  // con suavizado detrás del cursor en vez de pegarse al ancho nuevo al instante
+  congelarLayout: boolean
+  setCongelarLayout: (v: boolean) => void
   // silueta fantasma de la copia mientras se arrastra un clip con Alt: dónde caería
   // (pista y segundo), cuánto mide y si el sitio está libre. la copia no se crea hasta
   // soltar en un hueco válido, así que hasta entonces esto es solo una vista previa
@@ -437,6 +454,7 @@ interface EstadoEditor {
     | { tipo: 'clip'; dato: Clip }
     | { tipo: 'capa'; dato: Capa }
     | { tipo: 'audio'; dato: ClipAudio }
+    | { tipo: 'impacto'; dato: Impacto }
     | null
   copiar: () => void
   pegar: () => void
@@ -558,6 +576,7 @@ interface EstadoEditor {
   setColorFondo: (color: string) => void
   setFondo: (f: 'color' | 'desenfoque') => void
   setDesenfoqueFondo: (v: number) => void
+  setFondoGiro: (v: number) => void
   setMarco: (cambios: Partial<Marco>) => void
   irA: (t: number) => void
   reproducir: () => void
@@ -610,6 +629,7 @@ type Documento = Pick<
   | 'colorFondo'
   | 'fondo'
   | 'desenfoqueFondo'
+  | 'fondoGiro'
 >
 
 // toma la foto del documento a partir del estado. como el store siempre sustituye
@@ -640,6 +660,7 @@ function tomarDocumento(s: EstadoEditor): Documento {
     colorFondo: s.colorFondo,
     fondo: s.fondo,
     desenfoqueFondo: s.desenfoqueFondo,
+    fondoGiro: s.fondoGiro,
   }
 }
 
@@ -683,6 +704,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'setTono',
   'resetTono',
   'actualizarEncuadre',
+  'girarClip',
   'resetEncuadre',
   'recortarClipImagen',
   'resetRecorteClipImagen',
@@ -701,6 +723,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'recortarImpacto',
   'actualizarImpacto',
   'quitarImpacto',
+  'duplicarImpacto',
   'dividirEnCabezal',
   'cerrarHueco',
   'agregarPista',
@@ -787,6 +810,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'setColorFondo',
   'setFondo',
   'setDesenfoqueFondo',
+  'setFondoGiro',
   'setMarco',
 ]
 
@@ -1110,6 +1134,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   colorFondo: '#000000',
   fondo: 'color',
   desenfoqueFondo: 45,
+  fondoGiro: 0,
   marco: { tipo: 'ninguno', color: '#ffffff', grosor: 30, radio: 40 },
   volumenGlobal: 1,
   volumenPreview: 1,
@@ -1119,6 +1144,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   dibujandoMascara: false,
   insercionPista: null,
   arrastreVivo: null,
+  congelarLayout: false,
   fantasmaDup: null,
   guiaImantado: null,
   portapapeles: null,
@@ -1126,6 +1152,10 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   // guarda una copia de lo seleccionado (clip, capa o audio) para pegarla luego
   copiar: () =>
     set((s) => {
+      if (s.impactoSeleccionado) {
+        const im = s.impactos.find((x) => x.id === s.impactoSeleccionado)
+        return im ? { portapapeles: { tipo: 'impacto', dato: structuredClone(im) } } : {}
+      }
       if (s.clipSeleccionado) {
         const c = s.pista.clips.find((x) => x.id === s.clipSeleccionado)
         return c ? { portapapeles: { tipo: 'clip', dato: structuredClone(c) } } : {}
@@ -1172,6 +1202,21 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
           regionSeleccionada: null,
         }
       }
+      if (p.tipo === 'impacto') {
+        // el impacto se pega justo al lado del que se copió, pegado a su final. no se
+        // recorta contra el borde del clip: si se sale, se sale, tal como se pidió
+        const im = structuredClone(p.dato)
+        im.id = crypto.randomUUID()
+        im.t = Math.max(0, p.dato.t + p.dato.duracion)
+        return {
+          impactos: [...s.impactos, im],
+          impactoSeleccionado: im.id,
+          clipSeleccionado: null,
+          capaSeleccionada: null,
+          capasSeleccionadas: [],
+          regionSeleccionada: null,
+        }
+      }
       const a = structuredClone(p.dato)
       a.id = crypto.randomUUID()
       a.inicio = ph
@@ -1214,6 +1259,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       colorFondo: '#000000',
       fondo: 'color',
       desenfoqueFondo: 45,
+  fondoGiro: 0,
       marco: { tipo: 'ninguno', color: '#ffffff', grosor: 30, radio: 40 },
       volumenGlobal: 1,
       audioRegiones: [],
@@ -1428,10 +1474,34 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     set((s) => ({ impactos: s.impactos.map((im) => (im.id === id ? { ...im, ...cambios } : im)) })),
 
   quitarImpacto: (id) =>
-    set((s) => ({
-      impactos: s.impactos.filter((im) => im.id !== id),
-      impactoSeleccionado: s.impactoSeleccionado === id ? null : s.impactoSeleccionado,
-    })),
+    set((s) => {
+      // antes de soltarlo, se mira sobre qué clip vivía la bolita (por su instante en
+      // la línea de tiempo). así, al borrarla, se deja seleccionado ese clip con su
+      // lista de impactos abierta en el panel derecho, como si se le hubiera dado clic:
+      // el usuario sigue en el mismo sitio y puede agregar otro sin buscar nada
+      const borrado = s.impactos.find((im) => im.id === id)
+      const clip = borrado ? clipEnTiempo(s.pista.clips, borrado.t) : null
+      return {
+        impactos: s.impactos.filter((im) => im.id !== id),
+        impactoSeleccionado: null,
+        clipSeleccionado: clip ? clip.id : s.clipSeleccionado,
+        // se abre la lista de impactos de ese clip. si no se halló clip debajo (raro),
+        // se conserva lo que hubiera para no dejar el panel en un estado incoherente
+        categoriaClip: clip ? 'impactos' : s.categoriaClip,
+        capaSeleccionada: clip ? null : s.capaSeleccionada,
+        capasSeleccionadas: clip ? [] : s.capasSeleccionadas,
+        regionSeleccionada: clip ? null : s.regionSeleccionada,
+      }
+    }),
+
+  duplicarImpacto: (id, t) => {
+    const s = get()
+    const orig = s.impactos.find((im) => im.id === id)
+    if (!orig) return null
+    const copia: Impacto = { ...orig, id: crypto.randomUUID(), t: Math.max(0, t) }
+    set({ impactos: [...s.impactos, copia], impactoSeleccionado: copia.id })
+    return copia.id
+  },
 
   seleccionarImpacto: (id) =>
     set((s) => ({
@@ -1836,6 +1906,46 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       },
     })),
 
+  girarClip: (id, delta) =>
+    set((s) => {
+      const clip = s.pista.clips.find((c) => c.id === id)
+      if (!clip) return {}
+      const prev = clip.encuadre ?? { x: 0.5, y: 0.5, escala: 1 }
+      const rotacion = (prev.rotacion ?? 0) + delta
+      // el clip se recentra y vuelve a escala 1 al girar (conservando su volteo), para
+      // que encaje limpio en el lienzo nuevo sin arrastrar un reencuadre anterior
+      const nuevoEnc = { x: 0.5, y: 0.5, escala: 1, rotacion, espejoH: prev.espejoH, espejoV: prev.espejoV }
+      const clips = s.pista.clips.map((c) => (c.id === id ? { ...c, encuadre: nuevoEnc } : c))
+
+      // el lienzo adopta la orientación del video ya girado: se parte de las medidas
+      // nativas del proyecto y, si el video queda de lado, se intercambian ancho y alto
+      const auto = s.resolucionAuto
+      const res = giradoUnCuarto(rotacion) ? { ancho: auto.alto, alto: auto.ancho } : { ...auto }
+
+      // las capas no deben deformarse con el cambio de proporción: el ancho va en
+      // fracción del ancho y el alto en fracción del alto, así que se compensan por el
+      // factor inverso para conservar sus píxeles, igual que hace setLienzo
+      const fx = s.resolucion.ancho / res.ancho
+      const fy = s.resolucion.alto / res.alto
+      const capas =
+        fx === 1 && fy === 1
+          ? s.capas
+          : s.capas.map((c) => {
+              if (c.tipo === 'figura' || c.tipo === 'censura') {
+                return { ...c, anchoRel: c.anchoRel * fx, altoRel: c.altoRel * fy }
+              }
+              if (c.tipo === 'imagen') {
+                return { ...c, anchoRel: c.anchoRel * fx, altoRel: c.altoRel !== undefined ? c.altoRel * fy : c.altoRel }
+              }
+              if (c.tipo === 'trazo') {
+                return { ...c, trazos: c.trazos.map((t) => t.map((p) => ({ x: p.x * fx, y: p.y * fy }))) }
+              }
+              return c
+            })
+
+      return { pista: { ...s.pista, clips }, resolucion: res, capas }
+    }),
+
   resetEncuadre: (id) =>
     set((s) => ({
       pista: {
@@ -2140,6 +2250,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   setFilaTextoResaltada: (nivel) => set({ filaTextoResaltada: nivel }),
 
   setArrastreVivo: (a) => set({ arrastreVivo: a }),
+  setCongelarLayout: (v) => set({ congelarLayout: v }),
   setFantasmaDup: (f) => set({ fantasmaDup: f }),
 
   duplicarClipEn: (id, inicio, pista) => {
@@ -3342,14 +3453,28 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   setLienzo: (ancho, alto) =>
     set((s) => {
       // cuando hay un solo clip, al cambiar la proporción del lienzo el video se
-      // reacomoda solo para acoplarse al nuevo cuadro, aunque estuviera reencuadrado:
-      // deja de quedar mal encajado, que es incómodo. con varios clips no se toca
-      // nada, porque cada uno pudo colocarse a mano y no queremos deshacer ese trabajo
+      // reacomoda solo (centrado, a escala 1) para acoplarse al nuevo cuadro, aunque
+      // estuviera reencuadrado. pero se conserva su giro y su volteo: cambiar la
+      // proporción no debe deshacer la rotación que el usuario aplicó al video. con
+      // varios clips no se toca nada, porque cada uno pudo colocarse a mano
       const clips = s.pista.clips
+      const reacomodar = (c: typeof clips[number]) => {
+        const gira = c.encuadre?.rotacion || c.encuadre?.espejoH || c.encuadre?.espejoV
+        if (!gira) return { ...c, encuadre: undefined }
+        return {
+          ...c,
+          encuadre: {
+            x: 0.5,
+            y: 0.5,
+            escala: 1,
+            rotacion: c.encuadre?.rotacion,
+            espejoH: c.encuadre?.espejoH,
+            espejoV: c.encuadre?.espejoV,
+          },
+        }
+      }
       const pista =
-        clips.length === 1
-          ? { ...s.pista, clips: clips.map((c) => ({ ...c, encuadre: undefined })) }
-          : s.pista
+        clips.length === 1 ? { ...s.pista, clips: clips.map(reacomodar) } : s.pista
 
       // los elementos (figuras, imágenes, censuras, dibujos) no deben cambiar de
       // tamaño ni deformarse al cambiar la proporción. como el ancho se guarda en
@@ -3386,11 +3511,25 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       return { resolucion: { ancho, alto }, lienzoManual: true, pista, capas }
     }),
 
-  setLienzoAuto: () => set((s) => ({ resolucion: { ...s.resolucionAuto }, lienzoManual: false })),
+  setLienzoAuto: () =>
+    set((s) => {
+      // "ajustar al primer video" toma su tamaño. si ese video está girado un cuarto
+      // (90° o 270°), lo que se ve tiene el ancho y el alto intercambiados, así que el
+      // lienzo debe tomar esas medidas ya volteadas para calzar su proporción real
+      const auto = s.resolucionAuto
+      const primero = [...s.pista.clips].sort((a, b) => a.inicio - b.inicio)[0]
+      const rot = primero?.encuadre?.rotacion ?? 0
+      const cuarto = Math.abs(Math.round(rot / 90)) % 2 === 1
+      const res = cuarto ? { ancho: auto.alto, alto: auto.ancho } : { ...auto }
+      return { resolucion: res, lienzoManual: false }
+    }),
 
   setColorFondo: (color) => set({ colorFondo: color }),
   setFondo: (f) => set({ fondo: f }),
   setDesenfoqueFondo: (v) => set({ desenfoqueFondo: Math.max(1, Math.min(100, v)) }),
+
+  // el giro del fondo se guarda normalizado a 0/90/180/270
+  setFondoGiro: (v) => set({ fondoGiro: ((Math.round(v / 90) * 90) % 360 + 360) % 360 }),
 
   setMarco: (cambios) => set((s) => ({ marco: { ...s.marco, ...cambios } })),
 

@@ -1,6 +1,67 @@
 import { ReactNode, useEffect, useRef, useState } from 'react'
 import { HexColorPicker } from 'react-colorful'
 import { Ayuda } from './Tooltip'
+import Icon from './Icon'
+
+// el navegador de Chromium trae una pipeta nativa que deja tomar un color de
+// cualquier píxel de la pantalla, incluso fuera de la pestaña, con su lupa y el
+// código encima del cursor. no está en los tipos de TS, así que se declara aquí
+interface CuentagotasNativo {
+  open: () => Promise<{ sRGBHex: string }>
+}
+interface ConCuentagotas {
+  EyeDropper?: new () => CuentagotasNativo
+}
+
+// pasa un hexadecimal suelto a la forma #rrggbb; admite el atajo de tres dígitos y
+// devuelve null si no es un color válido, para no mostrar cuentas sin sentido
+function normalizarHex(hex: string): string | null {
+  let h = hex.replace('#', '').trim()
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('')
+  if (h.length !== 6 || /[^0-9a-f]/i.test(h)) return null
+  return '#' + h.toLowerCase()
+}
+
+function hexARgb(hex: string): { r: number; g: number; b: number } | null {
+  const n = normalizarHex(hex)
+  if (!n) return null
+  return {
+    r: parseInt(n.slice(1, 3), 16),
+    g: parseInt(n.slice(3, 5), 16),
+    b: parseInt(n.slice(5, 7), 16),
+  }
+}
+
+// rgb a hsl, con el tono en grados y saturación y luminosidad en porcentaje, que es
+// como lo muestran illustrator y photoshop
+function rgbAHsl(r: number, g: number, b: number) {
+  const rr = r / 255, gg = g / 255, bb = b / 255
+  const max = Math.max(rr, gg, bb), min = Math.min(rr, gg, bb)
+  const l = (max + min) / 2
+  const d = max - min
+  let h = 0, s = 0
+  if (d !== 0) {
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+    if (max === rr) h = (gg - bb) / d + (gg < bb ? 6 : 0)
+    else if (max === gg) h = (bb - rr) / d + 2
+    else h = (rr - gg) / d + 4
+    h /= 6
+  }
+  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) }
+}
+
+// rgb a cmyk (0 a 100), la vista pensada para imprenta que se ve en illustrator
+function rgbACmyk(r: number, g: number, b: number) {
+  const rr = r / 255, gg = g / 255, bb = b / 255
+  const k = 1 - Math.max(rr, gg, bb)
+  if (k >= 1) return { c: 0, m: 0, y: 0, k: 100 }
+  return {
+    c: Math.round(((1 - rr - k) / (1 - k)) * 100),
+    m: Math.round(((1 - gg - k) / (1 - k)) * 100),
+    y: Math.round(((1 - bb - k) / (1 - k)) * 100),
+    k: Math.round(k * 100),
+  }
+}
 
 // estilo común de los botones que agregan un elemento (texto, censura, figura,
 // dibujo). van con nuestro celeste primario relleno, igual en claro y en oscuro,
@@ -135,6 +196,32 @@ export function ColorCampo({ valor, onChange }: { valor: string; onChange: (v: s
 
   useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current) }, [])
 
+  // la pipeta nativa solo existe en Chromium; en Firefox no está y por eso el botón
+  // se oculta en lugar de fallar al pulsarlo. se resuelve una vez al montar
+  const [hayGota, setHayGota] = useState(false)
+  useEffect(() => {
+    setHayGota(typeof (window as unknown as ConCuentagotas).EyeDropper === 'function')
+  }, [])
+
+  async function tomarConGota() {
+    const Cuentagotas = (window as unknown as ConCuentagotas).EyeDropper
+    if (!Cuentagotas) return
+    try {
+      // abre la lupa sobre el cursor y espera a que se pulse un píxel de la pantalla;
+      // si se cancela con Escape simplemente no cambia nada
+      const { sRGBHex } = await new Cuentagotas().open()
+      empujar(sRGBHex)
+    } catch {
+      // cancelado por el usuario, no hay nada que reportar
+    }
+  }
+
+  // las tres vistas del color para el bloque de detalle, recalculadas del color en
+  // curso. si el hexadecimal está a medio escribir, no se dibujan cuentas raras
+  const rgb = hexARgb(local)
+  const hsl = rgb ? rgbAHsl(rgb.r, rgb.g, rgb.b) : null
+  const cmyk = rgb ? rgbACmyk(rgb.r, rgb.g, rgb.b) : null
+
   // la rueda se cierra solo con Escape o con un clic fuera de ella. nunca por soltar
   // el cursor a media edición: por eso el botón de la muestra solo abre (ver abajo),
   // así el clic que a veces genera el navegador al terminar un arrastre no la cierra
@@ -179,16 +266,67 @@ export function ColorCampo({ valor, onChange }: { valor: string; onChange: (v: s
           desmontaje de framer-motion llegaba a sacar la rueda de en medio */}
       {abierto && (
         <div
-          className="absolute left-0 top-full z-50 mt-2 rounded-xl p-3 shadow-xl"
+          className="absolute left-0 top-full z-50 mt-2 w-[200px] rounded-xl p-3 shadow-xl"
           style={{
             background: 'rgb(var(--surface))',
             border: '1px solid rgb(var(--border) / 0.14)',
             animation: 'fundido-in 0.16s ease-out',
           }}
         >
+          {/* fila de arriba: la pipeta para robar un color de la pantalla y, al lado,
+              el hexadecimal en curso. la pipeta solo aparece si el navegador la trae */}
+          <div className="mb-2.5 flex items-center gap-2">
+            {hayGota && (
+              <button
+                type="button"
+                onClick={tomarConGota}
+                aria-label="Tomar un color de la pantalla"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors hover:border-brand hover:text-brand"
+                style={{ borderColor: 'rgb(var(--border) / 0.2)', color: 'rgb(var(--muted))' }}
+              >
+                <Icon name="gota" size={15} />
+              </button>
+            )}
+            <span
+              className="flex-1 rounded-lg px-2 py-1.5 text-center text-[12px] font-medium uppercase tracking-wide"
+              style={{ background: 'rgb(var(--border) / 0.12)', color: 'rgb(var(--text))' }}
+            >
+              {local}
+            </span>
+          </div>
+
           <HexColorPicker color={local} onChange={empujar} />
+
+          {/* detalle del color al estilo illustrator: rgb, hsl y cmyk. es solo lectura,
+              para tener las cuentas a la vista sin salir a otra herramienta */}
+          {rgb && hsl && cmyk && (
+            <div className="mt-3 flex flex-col gap-1.5 text-[11px]" style={{ color: 'rgb(var(--muted))' }}>
+              <FilaColor etiqueta="RGB" partes={[['R', rgb.r], ['G', rgb.g], ['B', rgb.b]]} />
+              <FilaColor etiqueta="HSL" partes={[['H', `${hsl.h}°`], ['S', `${hsl.s}%`], ['L', `${hsl.l}%`]]} />
+              <FilaColor etiqueta="CMYK" partes={[['C', cmyk.c], ['M', cmyk.m], ['Y', cmyk.y], ['K', cmyk.k]]} />
+            </div>
+          )}
         </div>
       )}
+    </div>
+  )
+}
+
+// una fila del bloque de detalle: la etiqueta del espacio de color a la izquierda y
+// sus componentes con su letra, repartidos en lo que queda de ancho
+function FilaColor({ etiqueta, partes }: { etiqueta: string; partes: [string, string | number][] }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-9 shrink-0 font-semibold" style={{ color: 'rgb(var(--text))' }}>
+        {etiqueta}
+      </span>
+      <div className="flex flex-1 justify-between gap-1">
+        {partes.map(([letra, valor]) => (
+          <span key={letra} className="tabular-nums">
+            <span style={{ opacity: 0.6 }}>{letra}</span> {valor}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
@@ -250,10 +388,15 @@ export function Segmentado<T extends string>({
           title={o.titulo}
           onClick={() => onChange(o.valor)}
           className={[
-            'flex h-8 flex-1 items-center justify-center rounded-lg text-sm transition-colors duration-100',
+            // texto un punto más chico y en una sola línea, para que tres etiquetas
+            // largas (cuadrado, círculo, difuminado) quepan sin quedar apretadas
+            'flex h-8 flex-1 items-center justify-center whitespace-nowrap rounded-lg px-1 text-[13px] transition-colors duration-100',
             valor === o.valor
               ? 'bg-brand text-white shadow-sm'
-              : 'text-[color:var(--muted)] hover:bg-brand/10 hover:text-brand',
+              : // solo el botón activo lleva relleno. el hover NO pinta ninguna caja,
+                // únicamente aclara el texto: así nunca se ven dos botones marcados a la
+                // vez (el activo y el que se está señalando), que confundía al elegir
+                'text-[color:var(--muted)] hover:text-[color:var(--text)] cursor-pointer',
           ].join(' ')}
         >
           {o.etiqueta}

@@ -5,6 +5,7 @@ import { clipEnTiempo } from '../timeline/clips'
 import { posicionCapa } from '../layers/motion'
 import { puntosEstrella } from '../layers/figuras'
 import { estadoImpactosEn } from '../impactos/catalogo'
+import { dibujarContorno, dibujarLineas3d, dibujarRayos, crearLienzosContorno, LienzosContorno } from '../impactos/contorno'
 import { Impacto } from '../../types/impacto'
 import { esTonoNeutro, filtroCss, hayEfectoFiltro } from '../color/tono'
 import { REPETICIONES_BRILLO, desenfoqueBrillo } from '../layers/defaults'
@@ -27,6 +28,8 @@ export interface Escena {
   // lugar de con un color plano
   fondo?: 'color' | 'desenfoque'
   desenfoqueFondo?: number
+  // giro del relleno borroso, en pasos de 90°
+  fondoGiro?: number
   clips: Clip[] // ya ordenados por inicio
   capas: Capa[]
   // impactos: efectos momentáneos que deforman el cuadro entero en su tramo
@@ -84,6 +87,20 @@ function auxImpacto(w: number, h: number): HTMLCanvasElement {
   if (lienzoImpacto.height !== h) lienzoImpacto.height = h
   return lienzoImpacto
 }
+
+// lienzo aparte para el relleno borroso de las bandas cuando hay un impacto: se dibuja
+// aquí para dejarlo fuera del transform del golpe, de modo que el impacto solo deforme
+// el video y lo que va delante, no el fondo. luego se recompone quieto por detrás
+let lienzoFondoImp: HTMLCanvasElement | null = null
+function auxFondo(w: number, h: number): HTMLCanvasElement {
+  if (!lienzoFondoImp) lienzoFondoImp = document.createElement('canvas')
+  if (lienzoFondoImp.width !== w) lienzoFondoImp.width = w
+  if (lienzoFondoImp.height !== h) lienzoFondoImp.height = h
+  return lienzoFondoImp
+}
+
+// lienzos de trabajo del impacto de contorno, reaprovechados entre fotogramas
+let lienzosContornoExp: LienzosContorno | null = null
 
 // gradiente radial del óvalo, de negro sólido a transparente según el difuminado.
 // sirve tanto para la máscara del recorte como para confinar la viñeta blanca
@@ -556,13 +573,34 @@ export function dibujarFotograma(
   imagenDe: (capaId: string) => HTMLImageElement | undefined,
   off: HTMLCanvasElement,
 ) {
-  const { ancho, alto, colorFondo, fondo, desenfoqueFondo = 45, clips, capas, marco } = escena
+  const { ancho, alto, colorFondo, fondo, desenfoqueFondo = 45, fondoGiro = 0, clips, capas, marco } = escena
   const escala = alto / 1080
 
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.clearRect(0, 0, ancho, alto)
-  ctx.fillStyle = colorFondo
-  ctx.fillRect(0, 0, ancho, alto)
+
+  // el impacto se calcula ya, para decidir si hay que apartar el relleno borroso. un
+  // impacto no debe deformar las bandas de fondo: cuando lo hay y el relleno es borroso,
+  // ese relleno se pinta en su propio lienzo (fondoCtx) y se recompone quieto por detrás
+  const imp = estadoImpactosEn(escena.impactos ?? [], t)
+  const hayImpacto = imp.escala !== 1 || imp.desenfoque > 0 || imp.x !== 0 || imp.y !== 0
+  const separarFondo = fondo === 'desenfoque' && hayImpacto
+  let fondoCtx: CanvasRenderingContext2D | null = null
+  if (separarFondo) {
+    const fc = auxFondo(ancho, alto)
+    fondoCtx = fc.getContext('2d')
+    if (fondoCtx) {
+      fondoCtx.setTransform(1, 0, 0, 1, 0, 0)
+      fondoCtx.clearRect(0, 0, ancho, alto)
+    }
+  }
+  // el color de fondo va a la base, salvo al apartar el relleno borroso: entonces el
+  // lienzo arranca transparente en las bandas para que el fondo quieto asome por detrás,
+  // y el color y el relleno se ponen como base al recomponer con el impacto
+  if (!separarFondo) {
+    ctx.fillStyle = colorFondo
+    ctx.fillRect(0, 0, ancho, alto)
+  }
 
   const activo = clipEnTiempo(clips, t, escena.ocultas)
 
@@ -609,31 +647,40 @@ export function dibujarFotograma(
       ctx.globalAlpha = alfa
 
       // relleno con el propio video ampliado y borroso, para que una toma
-      // vertical en un lienzo cuadrado no deje dos franjas planas
+      // vertical en un lienzo cuadrado no deje dos franjas planas. cuando hay un impacto,
+      // el relleno va a su propio lienzo (fondoCtx) para quedar fuera del transform del
+      // golpe; si no, va directo al lienzo principal como siempre
       if (fondo === 'desenfoque' && (dw < ancho - 1 || dh < alto - 1)) {
-        const escB = Math.max(ancho / video.videoWidth, alto / video.videoHeight) * 1.12
+        const fCtx = separarFondo && fondoCtx ? fondoCtx : ctx
+        // al girar el fondo un cuarto de vuelta se amplía más para que siga cubriendo
+        const cuarto = fondoGiro % 180 === 90
+        const cobertura = cuarto ? Math.max(ancho / alto, alto / ancho) : 1
+        const escB = Math.max(ancho / video.videoWidth, alto / video.videoHeight) * 1.12 * cobertura
         const bw = video.videoWidth * escB
         const bh = video.videoHeight * escB
-        ctx.save()
+        fCtx.save()
+        // en una transición el relleno hereda la opacidad del plano; en el lienzo aparte
+        // hay que ponérsela a mano porque no está bajo el save con globalAlpha del clip
+        fCtx.globalAlpha = alfa
         // el ajuste va de 1 a 100 y se traduce a una fracción del alto, así el
         // resultado se ve igual en cualquier resolución
-        ctx.filter = `blur(${Math.round(alto * 0.001 * desenfoqueFondo)}px) brightness(0.72)`
-        ctx.drawImage(video, (ancho - bw) / 2, (alto - bh) / 2, bw, bh)
-        ctx.restore()
+        fCtx.filter = `blur(${Math.round(alto * 0.001 * desenfoqueFondo)}px) brightness(0.72)`
+        if (fondoGiro) {
+          fCtx.translate(ancho / 2, alto / 2)
+          fCtx.rotate((fondoGiro * Math.PI) / 180)
+          fCtx.translate(-ancho / 2, -alto / 2)
+        }
+        fCtx.drawImage(video, (ancho - bw) / 2, (alto - bh) / 2, bw, bh)
+        fCtx.restore()
       }
 
-      // el recorte en óvalo con difuminado o con viñeta no se puede resolver con un
-      // simple recorte del lienzo (el borde suave agujerearía el fondo), así que en
-      // ese caso el clip se pinta en un lienzo aparte, se le pone la máscara suave y
-      // luego se vuelca sobre el principal. el rectángulo y el óvalo limpio siguen
-      // yendo con un recorte normal, sin lienzo extra
+      // el recorte en óvalo con difuminado no se puede resolver con un simple recorte
+      // del lienzo (el borde suave agujerearía el fondo), así que en ese caso el clip se
+      // pinta en un lienzo aparte, se le pone la máscara suave y luego se vuelca sobre el
+      // principal. el rectángulo y el óvalo limpio siguen yendo con un recorte normal
       const rec = clip.recorte
       const ovaloRec = rec?.forma === 'elipse' || rec?.forma === 'circulo'
-      const usaMascara = !!(
-        rec &&
-        ovaloRec &&
-        ((rec.difuminado ?? 0) > 0 || (rec.vinetaBlanca ?? 0) > 0)
-      )
+      const usaMascara = !!(rec && ovaloRec && (rec.difuminado ?? 0) > 0)
       let dst = ctx
       let rctx: CanvasRenderingContext2D | null = null
       if (usaMascara) {
@@ -754,30 +801,14 @@ export function dibujarFotograma(
       // cierra el espejo del video
       dst.restore()
 
-      // óvalo con borde suave: se tiñe la viñeta blanca sobre el contenido, luego se
-      // recorta todo con la silueta difuminada, y el resultado se vuelca al lienzo
-      // principal respetando el alfa del clip
+      // óvalo con borde suave: se recorta el contenido con la silueta difuminada y el
+      // resultado se vuelca al lienzo principal respetando el alfa del clip
       if (usaMascara && rctx && rec) {
         const rl = rctx.canvas
         const cx = dx + ((rec.izq + (1 - rec.der)) / 2) * dw
         const cy = dy + ((rec.arr + (1 - rec.aba)) / 2) * dh
         const rx = Math.max(0.5, ((1 - rec.der - rec.izq) / 2) * dw)
         const ry = Math.max(0.5, ((1 - rec.aba - rec.arr) / 2) * dh)
-        if ((rec.vinetaBlanca ?? 0) > 0) {
-          rctx.save()
-          rctx.translate(cx, cy)
-          rctx.scale(rx, ry)
-          const gv = rctx.createRadialGradient(0, 0, 0, 0, 0, 1)
-          const a = (rec.vinetaBlanca ?? 0) / 100
-          gv.addColorStop(0, 'rgba(255,255,255,0)')
-          gv.addColorStop(0.42, 'rgba(255,255,255,0)')
-          gv.addColorStop(1, `rgba(255,255,255,${a})`)
-          rctx.fillStyle = gv
-          rctx.beginPath()
-          rctx.arc(0, 0, 1, 0, Math.PI * 2)
-          rctx.fill()
-          rctx.restore()
-        }
         rctx.save()
         rctx.globalCompositeOperation = 'destination-in'
         rctx.translate(cx, cy)
@@ -856,11 +887,40 @@ export function dibujarFotograma(
 
   dibujarMarco(ctx, marco, ancho, alto, escala)
 
-  // impactos: deforman el cuadro entero ya compuesto (clip, capas y marco), igual
-  // que en el visor. el geométrico se aplica copiando a un lienzo aparte y
-  // volviéndolo a volcar escalado y desenfocado; el velo se pinta encima
-  const imp = estadoImpactosEn(escena.impactos ?? [], t)
-  if (imp.escala !== 1 || imp.desenfoque > 0 || imp.x !== 0 || imp.y !== 0) {
+  // impactos de neón (contorno, líneas 3D, rayos): con el mismo motor que el visor, por
+  // encima de todo, para que el archivo salga idéntico. los tres muestrean el video
+  const neones = (escena.impactos ?? []).filter(
+    (i) =>
+      (i.tipo === 'contorno' || i.tipo === 'lineas3d' || i.tipo === 'rayosObjeto') &&
+      t >= i.t &&
+      t < i.t + i.duracion,
+  )
+  if (neones.length && activoVideo && activoVideo.videoWidth > 0) {
+    if (!lienzosContornoExp) lienzosContornoExp = crearLienzosContorno()
+    const enc = activo ? encuadreDe(activo) : ENCUADRE_NEUTRO
+    const vr = rectClip(activoVideo.videoWidth, activoVideo.videoHeight, ancho, alto, enc)
+    const trans = { rotacion: enc.rotacion, espejoH: enc.espejoH, espejoV: enc.espejoV }
+    const dst = { dx: vr.dx, dy: vr.dy, dw: vr.dw, dh: vr.dh }
+    const vw = activoVideo.videoWidth
+    const vh = activoVideo.videoHeight
+    for (const im of neones) {
+      const p = (t - im.t) / im.duracion
+      const suav = (im.suavidad ?? 50) / 100
+      if (im.tipo === 'lineas3d') {
+        dibujarLineas3d(ctx, activoVideo, vw, vh, dst, im.color, im.intensidad, im.densidad ?? 55, suav, im.direccion ?? 'der', p, t, lienzosContornoExp, trans)
+      } else if (im.tipo === 'rayosObjeto') {
+        dibujarRayos(ctx, activoVideo, vw, vh, dst, im.color, im.intensidad, suav, p, t, lienzosContornoExp, trans)
+      } else {
+        dibujarContorno(ctx, activoVideo, vw, vh, dst, im.color, im.intensidad, suav, p, t, lienzosContornoExp, trans)
+      }
+    }
+  }
+
+  // impactos: deforman el video y lo que va delante (capas, marco), igual que en el
+  // visor. el geométrico se aplica copiando el contenido a un lienzo aparte y volviéndolo
+  // a volcar escalado y desenfocado; el relleno borroso, si se apartó, se recompone
+  // quieto por detrás para que el golpe no lo sacuda. el velo se pinta encima
+  if (hayImpacto) {
     const aux = auxImpacto(ancho, alto)
     const actx = aux.getContext('2d')
     if (actx) {
@@ -869,6 +929,8 @@ export function dibujarFotograma(
       ctx.clearRect(0, 0, ancho, alto)
       ctx.fillStyle = colorFondo
       ctx.fillRect(0, 0, ancho, alto)
+      // el relleno borroso, quieto, va detrás del contenido que el impacto sí deforma
+      if (separarFondo) ctx.drawImage(auxFondo(ancho, alto), 0, 0)
       ctx.save()
       ctx.filter = imp.desenfoque > 0 ? `blur(${(imp.desenfoque * alto).toFixed(2)}px)` : 'none'
       ctx.translate(ancho / 2 + imp.x * alto, alto / 2 + imp.y * alto)

@@ -1,4 +1,18 @@
-import { Forma, Transicion } from './catalogo'
+import { Esquina, Forma, Transicion } from './catalogo'
+
+// centro en píxeles de cada esquina del lienzo, para los barridos redondeados
+function centroEsquina(esquina: Esquina, ancho: number, alto: number): [number, number] {
+  switch (esquina) {
+    case 'ai':
+      return [0, 0]
+    case 'ad':
+      return [ancho, 0]
+    case 'bi':
+      return [0, alto]
+    case 'bd':
+      return [ancho, alto]
+  }
+}
 
 // dibuja la forma del recorte para un progreso dado, de 0 a 1. la ruta se traza
 // en el contexto que se pase y quien llame decide si la usa para recortar o para
@@ -10,6 +24,8 @@ export function trazarForma(
   p: number,
   ancho: number,
   alto: number,
+  // esquina de arranque, solo para el barrido redondeado
+  esquina: Esquina = 'ai',
 ) {
   ctx.beginPath()
 
@@ -35,6 +51,16 @@ export function trazarForma(
       ctx.lineTo(Math.min(avance, ancho), 0)
       ctx.lineTo(0, Math.min(avance, alto))
       ctx.closePath()
+      break
+    }
+
+    case 'esquina-radial': {
+      // un frente curvo (un arco de círculo) que nace en una esquina y crece hacia
+      // la contraria. el radio llega a la diagonal completa del lienzo, así que en
+      // p=1 el arco ya pasó por la esquina opuesta y cubre todo el cuadro
+      const [cx, cy] = centroEsquina(esquina, ancho, alto)
+      const maximo = Math.hypot(ancho, alto)
+      ctx.arc(cx, cy, maximo * p, 0, Math.PI * 2)
       break
     }
 

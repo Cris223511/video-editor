@@ -7,7 +7,9 @@ import { useProjectStore } from '../../store/useProjectStore'
 import { duracionProyecto } from '../../lib/timeline/clips'
 import { formatearDuracion } from '../../lib/format/duracion'
 import { formatearBytes } from '../../lib/format/bytes'
-import { exportarProyecto, ControlExport, elegirMime, bitrateVideo } from '../../lib/export/exportar'
+import { exportarProyecto, ControlExport, elegirMime, bitrateVideo, DatosExport } from '../../lib/export/exportar'
+import { exportarRapido } from '../../lib/export/exportarRapido'
+import { haiWebCodecs } from '../../lib/export/decode'
 
 type Fase = 'inicio' | 'exportando' | 'listo' | 'error'
 
@@ -46,6 +48,9 @@ export default function ExportDialog() {
   // 30 es el valor corriente para material de pantalla; 60 se nota en el
   // movimiento rápido a cambio de un archivo bastante más pesado
   const [fps, setFps] = useState(30)
+  // calidad = a cuántos píxeles se limita el lado menor del video. 1080 es el tope; se
+  // puede bajar a 720 para un archivo más liviano y una exportación algo más rápida
+  const [calidad, setCalidad] = useState(1080)
   const controlRef = useRef<ControlExport | null>(null)
   // contenedor donde se cuelga el lienzo de la exportación mientras dura
   const cajaVista = useRef<HTMLDivElement>(null)
@@ -53,7 +58,14 @@ export default function ExportDialog() {
   const estado = useEditorStore.getState()
   const medios = useProjectStore.getState().medios
   const total = duracionProyecto(estado.pista.clips, estado.capas, estado.audios, estado.audioRegiones)
-  const { ancho, alto } = estado.resolucion
+  // resolución de salida: la del proyecto, pero con el lado menor limitado a la calidad
+  // elegida (1080 como tope). así un proyecto en 4K sale en 1080p y a 1080p es idéntico
+  // a la vista previa. se redondea a par, que es lo que piden los códecs de video
+  const par = (n: number) => Math.max(2, Math.round(n / 2) * 2)
+  const menorProy = Math.min(estado.resolucion.ancho, estado.resolucion.alto)
+  const escalaSalida = Math.min(1, calidad / menorProy)
+  const ancho = par(estado.resolucion.ancho * escalaSalida)
+  const alto = par(estado.resolucion.alto * escalaSalida)
 
   // formato probable de salida, deducido del mismo mime que elegirá la grabadora
   const formatoSalida = elegirMime().includes('mp4') ? 'MP4' : 'WebM'
@@ -75,6 +87,16 @@ export default function ExportDialog() {
     cerrarExport()
   }
 
+  // cuelga el lienzo de una exportación en el diálogo para ver por dónde va
+  function colgarLienzo(control: ControlExport) {
+    requestAnimationFrame(() => {
+      const caja = cajaVista.current
+      if (!caja || !control.lienzo) return
+      control.lienzo.className = 'h-full w-full object-contain'
+      caja.replaceChildren(control.lienzo)
+    })
+  }
+
   async function iniciar() {
     // se pausa la reproducción del visor para no competir por los videos
     useEditorStore.getState().pausar()
@@ -82,38 +104,49 @@ export default function ExportDialog() {
     setProgreso(0)
     setError('')
 
-    const control = exportarProyecto(
-      {
-        ancho: estado.resolucion.ancho,
-        alto: estado.resolucion.alto,
-        fps,
-        colorFondo: estado.colorFondo,
-        fondo: estado.fondo,
-        desenfoqueFondo: estado.desenfoqueFondo,
-        clips: estado.pista.clips,
-        capas: estado.capas,
-        impactos: estado.impactos,
-        marco: estado.marco,
-        audioRegiones: estado.audioRegiones,
-        audios: estado.audios,
-        volumenGlobal: estado.volumenGlobal,
-        pistasMeta: estado.pistasMeta,
-        urlDeAsset: (id) => medios.find((m) => m.id === id)?.url,
-      },
-      (v) => setProgreso(v),
-    )
-    controlRef.current = control
-    // el lienzo se cuelga en cuanto existe. como el contenedor se pinta en el
-    // mismo cambio de fase, se espera un cuadro a que esté en el dom
-    requestAnimationFrame(() => {
-      const caja = cajaVista.current
-      if (!caja || !control.lienzo) return
-      control.lienzo.className = 'h-full w-full object-contain'
-      caja.replaceChildren(control.lienzo)
-    })
+    const datos: DatosExport = {
+      ancho,
+      alto,
+      fps,
+      colorFondo: estado.colorFondo,
+      fondo: estado.fondo,
+      desenfoqueFondo: estado.desenfoqueFondo,
+      fondoGiro: estado.fondoGiro,
+      clips: estado.pista.clips,
+      capas: estado.capas,
+      impactos: estado.impactos,
+      marco: estado.marco,
+      audioRegiones: estado.audioRegiones,
+      audios: estado.audios,
+      volumenGlobal: estado.volumenGlobal,
+      pistasMeta: estado.pistasMeta,
+      urlDeAsset: (id) => medios.find((m) => m.id === id)?.url,
+    }
+
+    // lanza una exportación con el motor que se le pase y espera su resultado
+    const correr = async (motor: (d: DatosExport, p: (v: number) => void) => ControlExport) => {
+      const control = motor(datos, (v) => setProgreso(v))
+      controlRef.current = control
+      colgarLienzo(control)
+      return control.promesa
+    }
 
     try {
-      const blob = await control.promesa
+      // ruta rápida con WebCodecs cuando el navegador la trae: decodifica y codifica sin
+      // pasar por <video> a tiempo real, así que exporta varias veces más rápido. si algo
+      // no encaja (un códec que no soporta), se cae a la ruta clásica sin molestar al usuario
+      let blob: Blob | null = null
+      if (haiWebCodecs()) {
+        try {
+          blob = await correr(exportarRapido)
+        } catch (e) {
+          // la ruta rápida no pudo; se sigue con la clásica más abajo
+          if (e instanceof Error && e.message.includes('cancelada')) throw e
+          setProgreso(0)
+        }
+      }
+      if (!blob) blob = await correr(exportarProyecto)
+
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm'
       setExtension(ext)
       const url = URL.createObjectURL(blob)
@@ -153,6 +186,34 @@ export default function ExportDialog() {
           {/* control segmentado de imágenes por segundo: los tres valores viven
               dentro de una misma cápsula y el activo se resalta con un chip de
               color que se desliza con una transición suave */}
+          {/* calidad de salida: el lado menor se limita a 1080 (tope) o 720 */}
+          <div className="mb-4">
+            <span className="mb-2 block text-[13px] font-medium text-[color:var(--muted)]">
+              Calidad
+            </span>
+            <div className="flex gap-1 rounded-xl p-1" style={{ background: 'rgb(var(--border) / 0.12)' }}>
+              {[
+                { v: 1080, txt: '1080p', nota: 'Máxima' },
+                { v: 720, txt: '720p', nota: 'Más liviano' },
+              ].map(({ v, txt, nota }) => {
+                const activo = calidad === v
+                return (
+                  <button
+                    key={v}
+                    onClick={() => setCalidad(v)}
+                    className={[
+                      'flex-1 rounded-lg py-2 text-sm font-semibold transition-all duration-200',
+                      activo ? 'bg-brand text-white shadow-sm' : 'text-[color:var(--muted)] hover:text-[color:var(--text)]',
+                    ].join(' ')}
+                  >
+                    {txt}
+                    <span className="ml-1 text-[11px] font-normal opacity-70">{nota}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           <div className="mb-4">
             <span className="mb-2 block text-[13px] font-medium text-[color:var(--muted)]">
               Imágenes por segundo
@@ -213,13 +274,15 @@ export default function ExportDialog() {
             style={{ aspectRatio: `${ancho} / ${alto}`, maxHeight: '38vh' }}
           />
           <p className="mb-3 text-sm">Exportando… {Math.round(progreso * 100)}%</p>
-          {/* riel de fondo tenue con un relleno de marca bien contrastado. el ancho
-              se ata directamente a progreso (0 a 1) y anima suave al crecer. el
-              degradado y el brillo que recorre el relleno dan sensación de trabajo
-              en curso sin resultar estridentes */}
+          {/* riel de fondo tenue con un relleno de marca bien contrastado. el ancho se
+              ata directamente a progreso (0 a 1). va SIN transición de ancho a propósito:
+              con la exportación rápida el progreso avanza a saltos veloces y una
+              transición dejaba la barra siempre 300 ms por detrás del porcentaje; así el
+              relleno queda pegado al número. el brillo que lo recorre da sensación de
+              trabajo en curso */}
           <div className="mb-5 h-3 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
             <div
-              className="relative h-full min-w-[0.75rem] rounded-full bg-brand transition-[width] duration-300 ease-out"
+              className="relative h-full min-w-[0.75rem] rounded-full bg-brand"
               style={{
                 width: `${Math.max(0, Math.min(1, progreso)) * 100}%`,
                 // colores literales del azul de marca: el tema no expone --brand

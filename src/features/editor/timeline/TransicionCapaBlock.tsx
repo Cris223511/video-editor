@@ -1,8 +1,6 @@
 import { PointerEvent as ReactPointerEvent } from 'react'
-import Tooltip from '../../../components/ui/Tooltip'
 import { Capa } from '../../../types/layers'
 import { useEditorStore } from '../../../store/useEditorStore'
-import { buscarTransicion } from '../../../lib/transiciones/catalogo'
 
 // cuña de la transición de una capa, sobre su borde izquierdo si es de entrada o el
 // derecho si es de salida. mismo lenguaje visual que la de los clips de video: el ancho
@@ -24,7 +22,9 @@ export default function TransicionCapaBlock({
   const duracion = tr?.duracion ?? 0
   if (tipo === 'ninguna' || duracion <= 0) return null
 
-  const ancho = Math.max(duracion * pxPorSegundo, 6)
+  // ancho mínimo generoso para que el tirador quede separado del borde de recorte de
+  // la capa y siempre se pueda agarrar para volver a agrandar la transición
+  const ancho = Math.max(duracion * pxPorSegundo, 14)
   const maximo = capa.duracion / 2
 
   // por eventos de puntero y cortando la propagación, para que arrastrar el tirador
@@ -50,7 +50,6 @@ export default function TransicionCapaBlock({
   }
 
   return (
-    <Tooltip texto={`${esSalida ? 'Salida' : 'Entrada'} · ${buscarTransicion(tipo).nombre} · ${duracion.toFixed(2)} s`}>
       <div
         // la cuña no captura el puntero: el clic la atraviesa hasta el propio elemento
         // (para moverlo o recortarlo); solo el tirador de duración lo captura
@@ -68,11 +67,11 @@ export default function TransicionCapaBlock({
         />
         <div
           onPointerDown={estirar}
-          className={`pointer-events-auto absolute top-0 flex h-full w-1.5 cursor-ew-resize items-center justify-center bg-white/70 transition-colors duration-150 group-hover/tr:bg-white ${esSalida ? 'left-0 rounded-l-sm' : 'right-0 rounded-r-sm'}`}
+          className={`pointer-events-auto absolute top-0 flex h-full w-2.5 cursor-ew-resize flex-col items-center justify-between bg-white/70 py-1 transition-colors duration-150 group-hover/tr:bg-white ${esSalida ? 'left-0 rounded-l-sm' : 'right-0 rounded-r-sm'}`}
         >
-          <span className="h-2.5 w-px bg-black/40" />
+          <span className="h-2 w-px bg-black/40" />
+          <span className="h-2 w-px bg-black/40" />
         </div>
       </div>
-    </Tooltip>
   )
 }

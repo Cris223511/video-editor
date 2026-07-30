@@ -1,0 +1,164 @@
+import { DatosExport, ControlExport, bitrateVideo } from './exportar'
+import { Escena, dibujarFotograma } from './compositor'
+import { clipEnTiempo, duracionProyecto } from '../timeline/clips'
+import { anterior, posterior } from '../transiciones/pintar'
+import { montarDefsColor } from './defsColor'
+import { demuxVideo, VideoDemux } from './demux'
+import { FuenteDecodificada } from './fuente'
+import { EscritorVideo } from './muxRapido'
+import { mezclarAudio } from './audioOffline'
+import { Clip } from '../../types/timeline'
+
+function cargarImagen(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('imagen'))
+    img.src = src
+  })
+}
+
+// exportación rápida: decodifica cada video con WebCodecs (mucho más veloz que a 1x),
+// compone cada cuadro con el mismo motor que el visor y lo codifica con WebCodecs + un
+// muxer, sin pasar por <video> ni MediaRecorder. el resultado es el mismo archivo que la
+// ruta clásica, pero en una fracción del tiempo. de momento solo escribe el video; el
+// audio se añade en el siguiente paso
+export function exportarRapido(datos: DatosExport, onProgreso: (v: number) => void): ControlExport {
+  const { ancho, alto, fps } = datos
+  // el lienzo se crea ya para devolverlo enseguida: el diálogo lo enseña como vista del
+  // avance, igual que en la ruta clásica
+  const canvas = document.createElement('canvas')
+  canvas.width = ancho
+  canvas.height = alto
+  const señal = { cancelado: false }
+  const cancelar = () => {
+    señal.cancelado = true
+  }
+
+  const promesa = correr()
+  return { promesa, cancelar, lienzo: canvas }
+
+  async function correr(): Promise<Blob> {
+  const clips = [...datos.clips].sort((a, b) => a.inicio - b.inicio)
+  const ocultas = new Set<number>()
+  datos.pistasMeta.forEach((m, i) => {
+    if (m.oculta) ocultas.add(i)
+  })
+  const total = duracionProyecto(clips, datos.capas, datos.audios, datos.audioRegiones)
+  if (total <= 0) throw new Error('No hay nada que exportar.')
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('No se pudo preparar el lienzo.')
+  const off = document.createElement('canvas')
+
+  const defs = montarDefsColor(clips, datos.capas)
+  const fuentes = new Map<string, FuenteDecodificada>()
+  const limpiar = () => {
+    defs.quitar()
+    fuentes.forEach((f) => f.cerrar())
+  }
+
+  try {
+    // imágenes de las capas
+    const imagenes = new Map<string, HTMLImageElement>()
+    await Promise.all(
+      datos.capas
+        .filter((c) => c.tipo === 'imagen')
+        .map(async (c) => {
+          if (c.tipo === 'imagen') imagenes.set(c.id, await cargarImagen(c.src))
+        }),
+    )
+
+    // un proveedor de cuadros por clip. cada asset se desarma una sola vez y sus paquetes
+    // se comparten entre los clips del mismo medio (cada clip con su propio decodificador,
+    // porque cada uno va por un instante distinto)
+    const demuxCache = new Map<string, VideoDemux>()
+    for (const c of clips) {
+      const url = datos.urlDeAsset(c.assetId)
+      if (!url) continue
+      let dem = demuxCache.get(c.assetId)
+      if (!dem) {
+        const blob = await (await fetch(url)).blob()
+        dem = await demuxVideo(blob)
+        demuxCache.set(c.assetId, dem)
+      }
+      fuentes.set(c.id, new FuenteDecodificada(dem.config, dem.chunks))
+    }
+
+    // se mezcla todo el audio del proyecto en un solo buffer (rápido, con
+    // OfflineAudioContext) antes de armar el escritor, que necesita saber si hay pista de
+    // sonido para configurar el muxer
+    const mezclaAudio = await mezclarAudio(datos, total)
+    const escritor = await EscritorVideo.crear(
+      ancho,
+      alto,
+      fps,
+      bitrateVideo(ancho, alto, fps),
+      mezclaAudio ? { sampleRate: mezclaAudio.sampleRate, canales: mezclaAudio.numberOfChannels } : null,
+    )
+
+    const escena = (): Escena => ({
+      ancho,
+      alto,
+      colorFondo: datos.colorFondo,
+      fondo: datos.fondo,
+      desenfoqueFondo: datos.desenfoqueFondo,
+      fondoGiro: datos.fondoGiro,
+      clips,
+      capas: datos.capas,
+      impactos: datos.impactos,
+      marco: datos.marco,
+      ocultas,
+    })
+    // el compositor solo le pide a la "fuente de video" su videoWidth/videoHeight y la
+    // dibuja con drawImage; el lienzo del proveedor cumple ambas cosas, así que se pasa
+    // como si fuera un <video> (el cast es a propósito, el runtime es correcto)
+    const videoDe = (id: string) =>
+      (fuentes.get(id)?.lienzo ?? null) as unknown as HTMLVideoElement | null
+    const imagenDe = (id: string) => imagenes.get(id)
+
+    const totalFrames = Math.max(1, Math.round(total * fps))
+    for (let f = 0; f < totalFrames; f++) {
+      if (señal?.cancelado) throw new Error('Exportación cancelada.')
+      // instante del cuadro. el último se recorta un pelo por debajo del total, igual que
+      // el visor, para que el rango [inicio, fin) del último clip aún lo incluya
+      const t = Math.min(f / fps, total - 0.0001)
+
+      // se colocan los proveedores que este cuadro puede necesitar: el clip visible y, por
+      // si hay transición, el de antes y el de después. cada uno en su instante de fuente,
+      // acotado a su tramo (fuera de él se muestra su primer o último fotograma)
+      const activo = clipEnTiempo(clips, t, ocultas)
+      const necesarios = new Set<Clip>()
+      if (activo) {
+        necesarios.add(activo)
+        const a = anterior(activo, clips)
+        if (a) necesarios.add(a)
+        const p = posterior(activo, clips)
+        if (p) necesarios.add(p)
+      }
+      for (const c of necesarios) {
+        const fu = fuentes.get(c.id)
+        if (!fu) continue
+        const s = c.recorteInicio + Math.max(0, Math.min(t - c.inicio, c.duracion)) * c.velocidad
+        await fu.irAlSegundo(s)
+      }
+
+      defs.refrescar(t)
+      dibujarFotograma(ctx, escena(), t, videoDe, imagenDe, off)
+      await escritor.agregar(canvas, (f / fps) * 1_000_000)
+      onProgreso(Math.min(0.97, f / totalFrames))
+    }
+
+    // el audio ya mezclado se codifica al final; el muxer ordena video y audio por su
+    // timestamp al empaquetar
+    if (mezclaAudio) await escritor.escribirAudio(mezclaAudio)
+    onProgreso(0.99)
+
+    const blob = await escritor.finalizar()
+    onProgreso(1)
+    return blob
+  } finally {
+    limpiar()
+  }
+  }
+}

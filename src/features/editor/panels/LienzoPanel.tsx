@@ -11,6 +11,8 @@ import {
   Maximize2,
   MoveHorizontal,
   MoveVertical,
+  RotateCcw,
+  RotateCw,
 } from 'lucide-react'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
@@ -73,6 +75,8 @@ export default function LienzoPanel() {
   const setFondo = useEditorStore((s) => s.setFondo)
   const desenfoqueFondo = useEditorStore((s) => s.desenfoqueFondo)
   const setDesenfoqueFondo = useEditorStore((s) => s.setDesenfoqueFondo)
+  const fondoGiro = useEditorStore((s) => s.fondoGiro)
+  const setFondoGiro = useEditorStore((s) => s.setFondoGiro)
   const setLienzo = useEditorStore((s) => s.setLienzo)
   const setLienzoAuto = useEditorStore((s) => s.setLienzoAuto)
   const setColorFondo = useEditorStore((s) => s.setColorFondo)
@@ -234,6 +238,30 @@ export default function LienzoPanel() {
           {fondo === 'desenfoque' && (
             <Campo etiqueta={`Desenfoque (${desenfoqueFondo})`}>
               <Deslizador valor={desenfoqueFondo} min={0} max={100} onChange={setDesenfoqueFondo} />
+            </Campo>
+          )}
+
+          {fondo === 'desenfoque' && (
+            <Campo etiqueta="Girar el fondo">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFondoGiro(fondoGiro - 90)}
+                  className="grid h-9 flex-1 place-items-center rounded-lg border border-black/10 text-[color:var(--muted)] transition-colors hover:border-brand hover:text-brand dark:border-white/10"
+                  title="Girar el fondo un cuarto a la izquierda"
+                >
+                  <RotateCcw size={16} />
+                </button>
+                <span className="w-12 text-center text-[13px] font-semibold tabular-nums">{fondoGiro}°</span>
+                <button
+                  type="button"
+                  onClick={() => setFondoGiro(fondoGiro + 90)}
+                  className="grid h-9 flex-1 place-items-center rounded-lg border border-black/10 text-[color:var(--muted)] transition-colors hover:border-brand hover:text-brand dark:border-white/10"
+                  title="Girar el fondo un cuarto a la derecha"
+                >
+                  <RotateCw size={16} />
+                </button>
+              </div>
             </Campo>
           )}
 

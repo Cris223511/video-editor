@@ -41,6 +41,7 @@ export default function ClipBlock({
   puntos,
 }: Props) {
   const seleccionado = useEditorStore((s) => s.clipSeleccionado === clip.id)
+  const congelarLayout = useEditorStore((s) => s.congelarLayout)
   const alternarSilencioClip = useEditorStore((s) => s.alternarSilencioClip)
   const alternarBloque = useEditorStore((s) => s.alternarBloque)
   const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
@@ -412,9 +413,8 @@ export default function ClipBlock({
   }
 
   return (
-    <Tooltip texto={nombre} retardo={2000} lado="arriba">
     <motion.div
-      layout={interactuando ? false : 'position'}
+      layout={interactuando || congelarLayout ? false : 'position'}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={clip.pista}
       data-bloque-id={clip.id}
@@ -632,6 +632,5 @@ export default function ClipBlock({
         </>
       )}
     </motion.div>
-    </Tooltip>
   )
 }
