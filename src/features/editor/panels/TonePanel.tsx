@@ -68,6 +68,7 @@ export default function TonePanel() {
   const capas = useEditorStore((s) => s.capas)
   const playhead = useEditorStore((s) => s.playhead)
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
+  const bloquesSeleccionados = useEditorStore((s) => s.bloquesSeleccionados)
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const setTono = useEditorStore((s) => s.setTono)
   const resetTono = useEditorStore((s) => s.resetTono)
@@ -79,7 +80,13 @@ export default function TonePanel() {
   // un hook después de ese return rompería las reglas de los hooks al deseleccionar
   const [curvaActiva, setCurvaActiva] = useState<keyof Curvas>('maestra')
 
-  const clip = clips.find((c) => c.id === clipSeleccionado)
+  // clip "líder" del conjunto: el seleccionado, o el primero de un recuadro de varios sin uno
+  // activo. la corrección de color que se toque aquí la aplica el store a TODO el conjunto
+  const clipsConjunto = bloquesSeleccionados.filter((id) => clips.some((c) => c.id === id))
+  const liderId =
+    clipSeleccionado && clips.some((c) => c.id === clipSeleccionado) ? clipSeleccionado : clipsConjunto[0]
+  const clip = clips.find((c) => c.id === liderId)
+  const aplicaAVarios = clipsConjunto.length > 1 && !!liderId && clipsConjunto.includes(liderId)
   const capaImagen = capas.find((c) => c.id === capaSeleccionada && c.tipo === 'imagen') as
     | CapaImagen
     | undefined
@@ -171,6 +178,12 @@ export default function TonePanel() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* aviso de que hay varios clips marcados: la corrección de color cae sobre todos */}
+      {clip && aplicaAVarios && (
+        <div className="rounded-lg bg-brand/10 px-2.5 py-1.5 text-[11px] font-medium text-brand">
+          Se aplica a los {clipsConjunto.length} clips seleccionados.
+        </div>
+      )}
       {/* 1) Tinte rápido: el baño de color de un clic va primero, que es lo más usado */}
       <div>
         <div className="mb-2 flex items-center justify-between gap-2">

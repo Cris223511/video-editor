@@ -4,6 +4,7 @@ import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
 import { amplitudEn, picosDeMedio, PerfilPicos } from '../../../lib/audio/picos'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
+import { origenesDe } from '../../../lib/timeline/bloques'
 import { nivelBajoCursor, separacionBajoCursor, porDebajoDelUltimo } from './nivelCursor'
 
 interface Props {
@@ -175,7 +176,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
   const alternarBloque = useEditorStore((s) => s.alternarBloque)
   const insertarNivelAudio = useEditorStore((s) => s.insertarNivelAudio)
   const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
-  const moverBloques = useEditorStore((s) => s.moverBloques)
+  const moverBloquesDesde = useEditorStore((s) => s.moverBloquesDesde)
   const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(region.id))
   const arrastreBloques = useEditorStore((s) => s.arrastreBloques)
 
@@ -200,6 +201,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     const st = useEditorStore.getState()
     const enGrupo = st.bloquesSeleccionados.includes(region.id) && st.bloquesSeleccionados.length > 1
     const grupo = enGrupo ? [...st.bloquesSeleccionados] : []
+    const origenesGrupo = origenesDe(st, grupo)
     if (enGrupo) st.setArrastreBloques(true)
     // con alt la copia nace al empezar a mover, no al pulsar: así alt y clic seco
     // sirve para sumar el bloque al conjunto sin duplicar nada
@@ -253,7 +255,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
       }
       // con varios bloques marcados se desplazan todos a la vez
       if (grupo.length) {
-        moverBloques(grupo, inicioOriginal + (ev.clientX - startX) / pxPorSegundo - region.inicio)
+        moverBloquesDesde(grupo, (ev.clientX - startX) / pxPorSegundo, origenesGrupo)
         return
       }
       const dx = (ev.clientX - startX) / pxPorSegundo
@@ -341,7 +343,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
         abrirMenuContextual({ x: e.clientX, y: e.clientY, tipo: 'region', id: region.id })
       }}
       className={[
-        'group absolute top-0 flex h-full cursor-grab items-center overflow-hidden rounded-lg border px-2 transition-[border-color]',
+        'group/bloque absolute top-0 flex h-full cursor-grab items-center overflow-hidden rounded-lg border px-2 transition-[border-color]',
         seleccionado
           ? 'border-emerald-400'
           : enConjunto
@@ -373,14 +375,14 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
         onPointerDown={(e) => iniciarRecorte(e, 'inicio')}
         className={[
           'absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-emerald-400/80 transition-opacity',
-          seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          seleccionado ? 'opacity-100' : 'opacity-0 group-hover/bloque:opacity-100',
         ].join(' ')}
       />
       <div
         onPointerDown={(e) => iniciarRecorte(e, 'fin')}
         className={[
           'absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-emerald-400/80 transition-opacity',
-          seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          seleccionado ? 'opacity-100' : 'opacity-0 group-hover/bloque:opacity-100',
         ].join(' ')}
       />
     </div>

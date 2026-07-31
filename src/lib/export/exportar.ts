@@ -4,7 +4,7 @@ import { Impacto } from '../../types/impacto'
 import { Marco } from '../../types/marco'
 import { RegionAudio, ClipAudio } from '../../types/audio'
 import { clipEnTiempo, duracionProyecto } from '../timeline/clips'
-import { gananciaEn, fundidoEn } from '../audio/ganancia'
+import { gananciaEn, fundidoAudioEn } from '../audio/ganancia'
 import { usaMatriz, matrizTono, tablasColor, stdDeviationsDesenfoque } from '../color/tono'
 import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../color/mezcla'
 import { paramsNB, nodosFiltroNB, NodoFiltro } from '../efectos/nitidezBrillo'
@@ -389,7 +389,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
               g.gain.value =
                 a.volumen *
                 datos.volumenGlobal *
-                fundidoEn(t, a.inicio, a.duracion, a.fundidoEntrada, a.fundidoSalida)
+                fundidoAudioEn(t, a.inicio, a.duracion, a.fundidoEntrada, a.fundidoSalida)
             }
             const objetivo = a.recorteInicio + (t - a.inicio)
             if (Math.abs(el.currentTime - objetivo) > 0.25) el.currentTime = objetivo
@@ -432,7 +432,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
             ? 0
             : gananciaEn(datos.audioRegiones, datos.volumenGlobal, t) *
               (act.volumen ?? 1) *
-              fundidoEn(t, act.inicio, act.duracion, act.fundidoEntrada, act.fundidoSalida)
+              fundidoAudioEn(t, act.inicio, act.duracion, act.fundidoEntrada, act.fundidoSalida)
           v.playbackRate = act.velocidad
           if (v.paused) {
             try {

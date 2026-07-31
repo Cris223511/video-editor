@@ -17,6 +17,7 @@ import { TipoImpacto } from '../../../types/impacto'
 import ImpactoDot from './ImpactoDot'
 import { resolverDestinoVertical } from './destinoVertical'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
+import { origenesDe } from '../../../lib/timeline/bloques'
 
 interface Props {
   clip: Clip
@@ -56,7 +57,7 @@ export default function ClipBlock({
   const alternarSilencioClip = useEditorStore((s) => s.alternarSilencioClip)
   const alternarBloque = useEditorStore((s) => s.alternarBloque)
   const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
-  const moverBloques = useEditorStore((s) => s.moverBloques)
+  const moverBloquesDesde = useEditorStore((s) => s.moverBloquesDesde)
   const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(clip.id))
   const seleccionar = useEditorStore((s) => s.seleccionar)
   const setTransicion = useEditorStore((s) => s.setTransicion)
@@ -148,6 +149,9 @@ export default function ClipBlock({
     // si el clip forma parte de un conjunto de varios, el arrastre los lleva a todos
     const enGrupo = st.bloquesSeleccionados.includes(clip.id) && st.bloquesSeleccionados.length > 1
     const grupo = enGrupo ? [...st.bloquesSeleccionados] : []
+    // posiciones ORIGINALES de cada bloque del conjunto al empezar el gesto: el arrastre las usa
+    // para colocar cada uno en origen + desplazamiento, sin acumular fotograma a fotograma
+    const origenesGrupo = origenesDe(st, grupo)
     // arrastrando un conjunto: se avisa para que TODOS los bloques del grupo apaguen su suavizado
     // de posición y sigan al cursor a la par (se apaga al soltar)
     if (enGrupo) st.setArrastreBloques(true)
@@ -238,7 +242,7 @@ export default function ClipBlock({
       // no hay imantado ni cambio de pista: solo el desplazamiento compartido
       if (grupo.length) {
         const dxg = (ev.clientX - startX) / pxPorSegundo
-        moverBloques(grupo, inicioOriginal + dxg - clip.inicio)
+        moverBloquesDesde(grupo, dxg, origenesGrupo)
         return
       }
       // primero se mueve en el tiempo (horizontal) y luego se resuelve el nivel. así
@@ -537,7 +541,7 @@ export default function ClipBlock({
       }}
       onDrop={alSoltar}
       className={[
-        'group absolute top-0 flex h-full touch-none items-end overflow-hidden rounded-lg border transition-[border-color]',
+        'group/bloque absolute top-0 flex h-full touch-none items-end overflow-hidden rounded-lg border transition-[border-color]',
         bloqueada ? 'cursor-default' : 'cursor-grab',
         // seleccionado suelto: borde brand. en un conjunto: además un aro interior bien visible,
         // para que se note de un vistazo qué bloques están marcados al seleccionar varios
@@ -658,7 +662,7 @@ export default function ClipBlock({
           }}
           className={[
             'absolute left-1 top-1 z-30 grid h-5 w-5 place-items-center rounded-md bg-black/60 text-white transition-opacity duration-200 hover:bg-black/80',
-            verPropiedades || seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+            verPropiedades || seleccionado ? 'opacity-100' : 'opacity-0 group-hover/bloque:opacity-100',
           ].join(' ')}
         >
           <Info size={12} />
@@ -686,7 +690,7 @@ export default function ClipBlock({
             clip.mudo ? 'cursor-default' : '',
             verPropiedades || seleccionado || clip.silenciado || clip.mudo
               ? 'opacity-100'
-              : 'opacity-0 group-hover:opacity-100',
+              : 'opacity-0 group-hover/bloque:opacity-100',
           ].join(' ')}
         >
           {clip.mudo || clip.silenciado ? <VolumeX size={12} /> : <Volume2 size={12} />}
@@ -710,7 +714,7 @@ export default function ClipBlock({
             title="Recortar por el inicio (con Alt cambia la velocidad)"
             className={[
               'absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-brand/80 transition-opacity',
-              seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+              seleccionado ? 'opacity-100' : 'opacity-0 group-hover/bloque:opacity-100',
             ].join(' ')}
           />
           <div
@@ -718,7 +722,7 @@ export default function ClipBlock({
             title="Recortar por el final (con Alt cambia la velocidad)"
             className={[
               'absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-brand/80 transition-opacity',
-              seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+              seleccionado ? 'opacity-100' : 'opacity-0 group-hover/bloque:opacity-100',
             ].join(' ')}
           />
         </>

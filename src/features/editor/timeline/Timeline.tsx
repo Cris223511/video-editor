@@ -464,6 +464,22 @@ export default function Timeline({
     const x0 = e.clientX
     const y0 = e.clientY
     let movido = false
+    // los bloques que cruza el recuadro ahora mismo, según sus dos esquinas en
+    // pantalla. se usa tanto en vivo (mientras se arrastra) como al soltar
+    const bloquesEn = (ex: number, ey: number): string[] => {
+      const mx0 = Math.min(x0, ex)
+      const my0 = Math.min(y0, ey)
+      const mx1 = Math.max(x0, ex)
+      const my1 = Math.max(y0, ey)
+      const ids: string[] = []
+      cont.querySelectorAll('[data-bloque-id]').forEach((el) => {
+        const b = el.getBoundingClientRect()
+        const cruza = !(b.right < mx0 || b.left > mx1 || b.bottom < my0 || b.top > my1)
+        const id = (el as HTMLElement).getAttribute('data-bloque-id')
+        if (cruza && id && !ids.includes(id)) ids.push(id)
+      })
+      return ids
+    }
     const mover = (ev: globalThis.PointerEvent) => {
       if (Math.abs(ev.clientX - x0) > 3 || Math.abs(ev.clientY - y0) > 3) movido = true
       setMarquee({
@@ -472,6 +488,10 @@ export default function Timeline({
         w: Math.abs(ev.clientX - x0),
         h: Math.abs(ev.clientY - y0),
       })
+      // el sombreado tiene que verse mientras se arrastra, no solo al soltar: apenas
+      // el recuadro toca un bloque ya queda marcado, y si se sale del recuadro se
+      // desmarca. así el usuario ve en vivo qué va a seleccionar
+      if (movido) marcarBloques(bloquesEn(ev.clientX, ev.clientY))
     }
     const soltar = (ev: globalThis.PointerEvent) => {
       window.removeEventListener('pointermove', mover)
@@ -481,17 +501,7 @@ export default function Timeline({
         limpiarSeleccion()
         return
       }
-      const mx0 = Math.min(x0, ev.clientX)
-      const my0 = Math.min(y0, ev.clientY)
-      const mx1 = Math.max(x0, ev.clientX)
-      const my1 = Math.max(y0, ev.clientY)
-      const ids: string[] = []
-      cont.querySelectorAll('[data-bloque-id]').forEach((el) => {
-        const b = el.getBoundingClientRect()
-        const cruza = !(b.right < mx0 || b.left > mx1 || b.bottom < my0 || b.top > my1)
-        const id = (el as HTMLElement).getAttribute('data-bloque-id')
-        if (cruza && id && !ids.includes(id)) ids.push(id)
-      })
+      const ids = bloquesEn(ev.clientX, ev.clientY)
       if (ids.length) marcarBloques(ids)
       else limpiarSeleccion()
     }

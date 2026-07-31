@@ -46,6 +46,20 @@ function zoomParaEncuadrar(total: number, anchoUtil: number): number | null {
   const px = (anchoUtil - 40) / total
   return Math.max(PX_MIN, Math.min(PX_MAX, px))
 }
+
+// a qué clips aplica un cambio de un clip. si hay VARIOS clips seleccionados en conjunto
+// (bloquesSeleccionados) y el que se edita es uno de ellos, el cambio se aplica a TODO el
+// conjunto, no solo al líder: así, con varios clips marcados, un efecto o una corrección de color
+// caen sobre todos a la vez. si no hay conjunto de clips, o el editado no forma parte, es solo ese
+function clipsObjetivo(
+  s: { pista: { clips: { id: string }[] }; bloquesSeleccionados: string[] },
+  id: string,
+): Set<string> {
+  const enClips = new Set(s.pista.clips.map((c) => c.id))
+  const conjunto = s.bloquesSeleccionados.filter((x) => enClips.has(x))
+  if (conjunto.length > 1 && conjunto.includes(id)) return new Set(conjunto)
+  return new Set([id])
+}
 const DURACION_MINIMA = 0.1
 const DURACION_MINIMA_CAPA = 0.2
 
@@ -292,6 +306,10 @@ interface EstadoEditor {
   // salto a cada uno. ninguno baja de cero, y si uno topa con el arranque el resto
   // se frena con él para no descuadrar el conjunto
   moverBloques: (ids: string[], delta: number) => void
+  // mueve un conjunto de bloques a partir de sus posiciones ORIGINALES (capturadas al empezar el
+  // gesto): cada uno queda en origen + delta. es idempotente por fotograma (no acumula), así el
+  // grupo sigue al cursor a la par en vez de acelerarse
+  moverBloquesDesde: (ids: string[], delta: number, origenes: Record<string, number>) => void
 
   // vacía el documento por completo y borra el historial, para estrenar un
   // proyecto en blanco sin que quede nada del anterior
@@ -746,6 +764,7 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'setFundido',
   'quitarBloques',
   'moverBloques',
+  'moverBloquesDesde',
   'moverCarril',
   'agregarNivelTexto',
   'agregarNivelAudio',
@@ -1553,6 +1572,30 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       }
     }),
 
+  moverBloquesDesde: (ids, delta, origenes) =>
+    set((s) => {
+      const dentro = new Set(ids)
+      // el desplazamiento se acota para que el bloque cuyo ORIGEN estaba más a la izquierda no
+      // cruce el cero. como el grupo se mueve rígido, basta el mínimo de los orígenes
+      let minOrigen = Infinity
+      for (const id of ids) {
+        const o = origenes[id]
+        if (o !== undefined) minOrigen = Math.min(minOrigen, o)
+      }
+      if (!Number.isFinite(minOrigen)) return {}
+      const d = Math.max(delta, -minOrigen)
+      // cada bloque se coloca en su ORIGEN + d (posición absoluta), no sumando sobre la actual. así
+      // no se acumula fotograma a fotograma y el grupo sigue al cursor exactamente
+      const correr = <T extends { id: string; inicio: number }>(x: T): T =>
+        dentro.has(x.id) && origenes[x.id] !== undefined ? { ...x, inicio: origenes[x.id] + d } : x
+      return {
+        pista: { ...s.pista, clips: s.pista.clips.map(correr) },
+        capas: s.capas.map(correr),
+        audios: s.audios.map(correr),
+        audioRegiones: s.audioRegiones.map(correr),
+      }
+    }),
+
   quitarBloques: (ids) =>
     set((s) => {
       const fuera = new Set(ids)
@@ -1928,22 +1971,28 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     }),
 
   setTono: (id, cambios) =>
-    set((s) => ({
-      pista: {
-        ...s.pista,
-        clips: s.pista.clips.map((c) =>
-          c.id === id ? { ...c, tono: { ...c.tono, ...cambios } } : c,
-        ),
-      },
-    })),
+    set((s) => {
+      const dest = clipsObjetivo(s, id)
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) =>
+            dest.has(c.id) ? { ...c, tono: { ...c.tono, ...cambios } } : c,
+          ),
+        },
+      }
+    }),
 
   resetTono: (id) =>
-    set((s) => ({
-      pista: {
-        ...s.pista,
-        clips: s.pista.clips.map((c) => (c.id === id ? { ...c, tono: { ...tonoNeutro } } : c)),
-      },
-    })),
+    set((s) => {
+      const dest = clipsObjetivo(s, id)
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) => (dest.has(c.id) ? { ...c, tono: { ...tonoNeutro } } : c)),
+        },
+      }
+    }),
 
   actualizarEncuadre: (id, cambios) =>
     set((s) => ({
@@ -2036,41 +2085,73 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     })),
 
   agregarEfecto: (id, efecto) =>
-    set((s) => ({
-      pista: {
-        ...s.pista,
-        clips: s.pista.clips.map((c) =>
-          c.id === id ? { ...c, efectos: [...(c.efectos ?? []), efecto] } : c,
-        ),
-      },
-    })),
+    set((s) => {
+      const dest = clipsObjetivo(s, id)
+      const clave = claveEfecto(efecto)
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) => {
+            if (!dest.has(c.id)) return c
+            const efs = c.efectos ?? []
+            // no se duplica el mismo efecto en un clip que ya lo tiene
+            if (efs.some((e) => claveEfecto(e) === clave)) return c
+            // el líder guarda el efecto tal cual (su id es el que el panel selecciona); los demás
+            // clips del conjunto reciben una copia con su propio id
+            const nuevo = c.id === id ? efecto : ({ ...efecto, id: crypto.randomUUID() } as EfectoClip)
+            return { ...c, efectos: [...efs, nuevo] }
+          }),
+        },
+      }
+    }),
 
+  // el cambio de un ajuste del efecto (nivel, dirección, etc.) se refleja en el efecto equivalente
+  // de todos los clips del conjunto: se busca por su clave (el mismo tipo de efecto), ya que cada
+  // clip tiene su propia copia con distinto id
   actualizarEfecto: (id, efectoId, cambios) =>
-    set((s) => ({
-      pista: {
-        ...s.pista,
-        clips: s.pista.clips.map((c) =>
-          c.id === id
-            ? {
-                ...c,
-                efectos: (c.efectos ?? []).map((e) =>
-                  e.id === efectoId ? ({ ...e, ...cambios } as EfectoClip) : e,
-                ),
-              }
-            : c,
-        ),
-      },
-    })),
+    set((s) => {
+      const dest = clipsObjetivo(s, id)
+      const lider = s.pista.clips.find((c) => c.id === id)
+      const objetivo = (lider?.efectos ?? []).find((e) => e.id === efectoId)
+      const clave = objetivo ? claveEfecto(objetivo) : null
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) => {
+            if (!dest.has(c.id)) return c
+            return {
+              ...c,
+              efectos: (c.efectos ?? []).map((e) => {
+                const coincide = c.id === id ? e.id === efectoId : clave !== null && claveEfecto(e) === clave
+                return coincide ? ({ ...e, ...cambios } as EfectoClip) : e
+              }),
+            }
+          }),
+        },
+      }
+    }),
 
   quitarEfecto: (id, efectoId) =>
-    set((s) => ({
-      pista: {
-        ...s.pista,
-        clips: s.pista.clips.map((c) =>
-          c.id === id ? { ...c, efectos: (c.efectos ?? []).filter((e) => e.id !== efectoId) } : c,
-        ),
-      },
-    })),
+    set((s) => {
+      const dest = clipsObjetivo(s, id)
+      const lider = s.pista.clips.find((c) => c.id === id)
+      const objetivo = (lider?.efectos ?? []).find((e) => e.id === efectoId)
+      const clave = objetivo ? claveEfecto(objetivo) : null
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) => {
+            if (!dest.has(c.id)) return c
+            return {
+              ...c,
+              efectos: (c.efectos ?? []).filter((e) =>
+                c.id === id ? e.id !== efectoId : !(clave !== null && claveEfecto(e) === clave),
+              ),
+            }
+          }),
+        },
+      }
+    }),
 
   // sube o baja un efecto una posición en la lista. el orden importa porque los
   // efectos se aplican en cadena, uno sobre el resultado del anterior, igual que
@@ -2114,38 +2195,55 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   // cambia un efecto por otro sin moverlo de sitio: el nuevo ocupa la misma
   // posición que el viejo, que es lo que se espera al reemplazar una capa
   reemplazarEfecto: (id, efectoId, nuevo) =>
-    set((s) => ({
-      pista: {
-        ...s.pista,
-        clips: s.pista.clips.map((c) =>
-          c.id === id
-            ? { ...c, efectos: (c.efectos ?? []).map((e) => (e.id === efectoId ? nuevo : e)) }
-            : c,
-        ),
-      },
-    })),
+    set((s) => {
+      const dest = clipsObjetivo(s, id)
+      const lider = s.pista.clips.find((c) => c.id === id)
+      const viejo = (lider?.efectos ?? []).find((e) => e.id === efectoId)
+      const claveVieja = viejo ? claveEfecto(viejo) : null
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) => {
+            if (!dest.has(c.id)) return c
+            return {
+              ...c,
+              efectos: (c.efectos ?? []).map((e) => {
+                const coincide = c.id === id ? e.id === efectoId : claveVieja !== null && claveEfecto(e) === claveVieja
+                if (!coincide) return e
+                return c.id === id ? nuevo : ({ ...nuevo, id: crypto.randomUUID() } as EfectoClip)
+              }),
+            }
+          }),
+        },
+      }
+    }),
 
   // deja un efecto en el primer lugar de la pila (nivel 1, por encima de todos). se
   // usa al arrastrar una muestra sobre el clip: si ese efecto ya estaba se sube al
   // tope conservando sus ajustes, si no estaba entra nuevo como primero, y si ya era
   // el primero no cambia nada
   ponerEfectoEncima: (id, efecto) =>
-    set((s) => ({
-      pista: {
-        ...s.pista,
-        clips: s.pista.clips.map((c) => {
-          if (c.id !== id) return c
-          const efs = c.efectos ?? []
-          const clave = claveEfecto(efecto)
-          const existente = efs.find((e) => claveEfecto(e) === clave)
-          if (existente) {
-            if (efs[0]?.id === existente.id) return c
-            return { ...c, efectos: [existente, ...efs.filter((e) => e.id !== existente.id)] }
-          }
-          return { ...c, efectos: [efecto, ...efs] }
-        }),
-      },
-    })),
+    set((s) => {
+      const dest = clipsObjetivo(s, id)
+      const clave = claveEfecto(efecto)
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) => {
+            if (!dest.has(c.id)) return c
+            const efs = c.efectos ?? []
+            const existente = efs.find((e) => claveEfecto(e) === clave)
+            if (existente) {
+              if (efs[0]?.id === existente.id) return c
+              return { ...c, efectos: [existente, ...efs.filter((e) => e.id !== existente.id)] }
+            }
+            // el líder guarda el efecto tal cual; los demás clips reciben una copia con su id
+            const nuevo = c.id === id ? efecto : ({ ...efecto, id: crypto.randomUUID() } as EfectoClip)
+            return { ...c, efectos: [nuevo, ...efs] }
+          }),
+        },
+      }
+    }),
 
   setTransicion: (id, cambios) =>
     set((s) => ({

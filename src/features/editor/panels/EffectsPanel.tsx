@@ -44,6 +44,7 @@ function nombreEfecto(e: EfectoClip): string {
 export default function EffectsPanel() {
   const clips = useEditorStore((s) => s.pista.clips)
   const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
+  const bloquesSeleccionados = useEditorStore((s) => s.bloquesSeleccionados)
   const playhead = useEditorStore((s) => s.playhead)
   const agregarEfecto = useEditorStore((s) => s.agregarEfecto)
   const actualizarEfecto = useEditorStore((s) => s.actualizarEfecto)
@@ -54,7 +55,14 @@ export default function EffectsPanel() {
   const setTransicionEfecto = useEditorStore((s) => s.setTransicionEfecto)
 
   const medios = useProjectStore((s) => s.medios)
-  const clip = clips.find((c) => c.id === clipSeleccionado)
+  // clip "líder" que muestra el panel: el seleccionado, o si solo hay un recuadro de varios (sin
+  // uno activo), el primero del conjunto. así al marcar varios clips el panel sigue enseñando
+  // opciones. cualquier efecto que se toque aquí lo aplica el store a TODO el conjunto
+  const clipsConjunto = bloquesSeleccionados.filter((id) => clips.some((c) => c.id === id))
+  const liderId =
+    clipSeleccionado && clips.some((c) => c.id === clipSeleccionado) ? clipSeleccionado : clipsConjunto[0]
+  const clip = clips.find((c) => c.id === liderId)
+  const aplicaAVarios = clipsConjunto.length > 1 && !!liderId && clipsConjunto.includes(liderId)
   const medioClip = clip ? medios.find((m) => m.id === clip.assetId) : undefined
   // el video del clip, para reproducir la muestra al pasar el cursor. solo si el
   // medio es de video; una imagen no tiene qué reproducir
@@ -173,6 +181,12 @@ export default function EffectsPanel() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* aviso de que hay varios clips marcados: lo que se toque aquí cae sobre todos ellos */}
+      {aplicaAVarios && (
+        <div className="rounded-lg bg-brand/10 px-2.5 py-1.5 text-[11px] font-medium text-brand">
+          Se aplica a los {clipsConjunto.length} clips seleccionados.
+        </div>
+      )}
       {/* catálogo arriba: de aquí se eligen los efectos */}
       <Catalogo
         miniatura={miniatura}

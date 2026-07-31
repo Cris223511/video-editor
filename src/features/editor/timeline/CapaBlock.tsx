@@ -6,6 +6,7 @@ import { TIPO_TRANSICION } from '../GaleriaTransiciones'
 import TransicionCapaBlock from './TransicionCapaBlock'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timeline/imantar'
+import { origenesDe } from '../../../lib/timeline/bloques'
 import { nivelBajoCursor, separacionBajoCursor, porDebajoDelUltimo } from './nivelCursor'
 import { resolverDestinoVertical } from './destinoVertical'
 
@@ -32,7 +33,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   const insertarPistaEn = useEditorStore((s) => s.insertarPistaEn)
   const setInsercionPista = useEditorStore((s) => s.setInsercionPista)
   const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
-  const moverBloques = useEditorStore((s) => s.moverBloques)
+  const moverBloquesDesde = useEditorStore((s) => s.moverBloquesDesde)
   const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(capa.id))
   const arrastreBloques = useEditorStore((s) => s.arrastreBloques)
   // las figuras y las imágenes viven ahora en las pistas de video, así que su
@@ -90,6 +91,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     const st = useEditorStore.getState()
     const enGrupo = st.bloquesSeleccionados.includes(capa.id) && st.bloquesSeleccionados.length > 1
     const grupo = enGrupo ? [...st.bloquesSeleccionados] : []
+    const origenesGrupo = origenesDe(st, grupo)
     // arrastrando un conjunto: todos los bloques del grupo apagan su suavizado para ir a la par
     if (enGrupo) st.setArrastreBloques(true)
     // con alt la copia nace al empezar a mover, no al pulsar: así alt y clic seco
@@ -147,9 +149,10 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
           if (nuevo) idGesto = nuevo
         }
       }
-      // con varios bloques marcados se desplazan todos a la vez
+      // con varios bloques marcados se desplazan todos a la vez, cada uno a su origen + el
+      // desplazamiento del cursor (sin acumular, para que sigan al cursor a la par)
       if (grupo.length) {
-        moverBloques(grupo, inicioOriginal + (ev.clientX - startX) / pxPorSegundo - capa.inicio)
+        moverBloquesDesde(grupo, (ev.clientX - startX) / pxPorSegundo, origenesGrupo)
         return
       }
       // una figura o imagen resuelve su pista de video en vivo, igual que un clip:
@@ -321,7 +324,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
         abrirMenuContextual({ x: e.clientX, y: e.clientY, tipo: 'capa', id: capa.id })
       }}
       className={[
-        'group absolute top-0 flex h-full cursor-grab items-center overflow-hidden rounded-md border px-2 transition-[border-color]',
+        'group/bloque absolute top-0 flex h-full cursor-grab items-center overflow-hidden rounded-md border px-2 transition-[border-color]',
         seleccionado
           ? esImagen ? 'border-sky-400' : 'border-amber-400'
           : enConjunto
@@ -405,14 +408,14 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
         onPointerDown={(e) => iniciarRecorte(e, 'inicio')}
         className={[
           'absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-amber-400/80 transition-opacity',
-          seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          seleccionado ? 'opacity-100' : 'opacity-0 group-hover/bloque:opacity-100',
         ].join(' ')}
       />
       <div
         onPointerDown={(e) => iniciarRecorte(e, 'fin')}
         className={[
           'absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-amber-400/80 transition-opacity',
-          seleccionado ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          seleccionado ? 'opacity-100' : 'opacity-0 group-hover/bloque:opacity-100',
         ].join(' ')}
       />
     </motion.div>

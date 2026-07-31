@@ -1,5 +1,5 @@
 import { DatosExport } from './exportar'
-import { gananciaEn, fundidoEn } from '../audio/ganancia'
+import { gananciaEn, fundidoAudioEn } from '../audio/ganancia'
 
 const SR = 48_000
 
@@ -76,7 +76,7 @@ export async function mezclarAudio(datos: DatosExport, total: number): Promise<A
       (t) =>
         gananciaEn(datos.audioRegiones, datos.volumenGlobal, t) *
         (c.volumen ?? 1) *
-        fundidoEn(t, c.inicio, c.duracion, c.fundidoEntrada, c.fundidoSalida),
+        fundidoAudioEn(t, c.inicio, c.duracion, c.fundidoEntrada, c.fundidoSalida),
     )
   }
 
@@ -91,7 +91,7 @@ export async function mezclarAudio(datos: DatosExport, total: number): Promise<A
       a.duracion,
       a.recorteInicio,
       1,
-      (t) => (a.volumen ?? 1) * datos.volumenGlobal * fundidoEn(t, a.inicio, a.duracion, a.fundidoEntrada, a.fundidoSalida),
+      (t) => (a.volumen ?? 1) * datos.volumenGlobal * fundidoAudioEn(t, a.inicio, a.duracion, a.fundidoEntrada, a.fundidoSalida),
     )
   }
 

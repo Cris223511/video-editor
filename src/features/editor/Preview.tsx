@@ -11,7 +11,7 @@ import { useProjectStore } from '../../store/useProjectStore'
 import { MediaAsset } from '../../types/media'
 import { clipEnTiempo, duracionProyecto } from '../../lib/timeline/clips'
 import { encuadreDe, encuadreNeutro, rectClip, giradoUnCuarto } from '../../lib/timeline/encuadre'
-import { gananciaEn, fundidoEn } from '../../lib/audio/ganancia'
+import { gananciaEn, fundidoAudioEn } from '../../lib/audio/ganancia'
 import { rectContenido } from '../../lib/layers/rect'
 import { posicionCapa } from '../../lib/layers/motion'
 import { CapaCensura, CapaFigura } from '../../types/layers'
@@ -376,7 +376,7 @@ export default function Preview() {
           a.volumen *
             volumenGlobal *
             volumenPreview *
-            fundidoEn(playhead, a.inicio, a.duracion, a.fundidoEntrada, a.fundidoSalida),
+            fundidoAudioEn(playhead, a.inicio, a.duracion, a.fundidoEntrada, a.fundidoSalida),
         ),
       )
       if (!dentro) {
@@ -585,7 +585,7 @@ export default function Preview() {
           : gananciaEn(audioRef.current.regiones, audioRef.current.general, ph) *
             audioRef.current.preview *
             (act.volumen ?? 1) *
-            fundidoEn(ph, act.inicio, act.duracion, act.fundidoEntrada, act.fundidoSalida)
+            fundidoAudioEn(ph, act.inicio, act.duracion, act.fundidoEntrada, act.fundidoSalida)
       }
       // grabando un recorrido el video corre más despacio, que es la única forma
       // de seguir con el cursor algo que se mueve rápido sin ir a tirones. el
@@ -1152,14 +1152,12 @@ export default function Preview() {
         const entrado = phVista - clip.inicio
         if (entrado < t.duracion) op = Math.min(op, Math.max(0, entrado / t.duracion))
       }
-      const idx = clipsOrdenados.findIndex((c) => c.id === clip.id)
-      const siguiente = clipsOrdenados[idx + 1]
-      if (siguiente && siguiente.transicion.tipo === 'fundido') {
-        const restante = clip.inicio + clip.duracion - phVista
-        if (restante < siguiente.transicion.duracion) {
-          op = Math.min(op, Math.max(0, restante / siguiente.transicion.duracion))
-        }
-      }
+      // NOTA: se quitó un resto viejo que, cuando el clip SIGUIENTE tenía un fundido a negro,
+      // bajaba la opacidad de este clip (el que sale) desde corte − duración. eso oscurecía el
+      // plano ANTES de que empezara la ventana centrada del cruce (el canvas aún no está, así que
+      // el video semitransparente dejaba ver el negro de fondo), y luego, al entrar la ventana, el
+      // canvas lo volvía a pintar opaco y se "aclaraba". ahora el fundido a negro entre dos clips
+      // lo lleva ENTERO el cruce centrado, así que aquí el video del que sale se queda opaco
       return op
     }
     // el fundido del plano anterior también lo maneja ya el cruce centrado (lo deja entero

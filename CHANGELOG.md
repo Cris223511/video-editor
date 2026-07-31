@@ -4,6 +4,49 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.34.2 (2026-07-31)
+
+Correcciones de la línea de tiempo y del sonido: la selección múltiple ahora se comporta como se
+espera, el fundido de audio suena parejo y un efecto o un color caen sobre todos los clips marcados.
+
+### Línea de tiempo
+
+- **Arrastre en conjunto que seguía al cursor.** Con varios bloques seleccionados, moverlos se
+  aceleraba y se despegaba del ratón cuanto más lejos llevabas el gesto. Ahora cada bloque se coloca
+  a partir de su posición original más el desplazamiento real del cursor, así que el grupo va pegado
+  al puntero de principio a fin. Vale para clips, capas, audios y franjas de volumen.
+- **La selección con recuadro se ve mientras arrastras.** Antes no se sombreaba nada hasta soltar el
+  clic; ahora, apenas el rectángulo toca un bloque, este queda marcado en vivo, y si lo sacas del
+  recuadro se desmarca. Así sabes en todo momento qué vas a seleccionar.
+- **El resaltado de recorte sale solo en el bloque señalado.** Al pasar el cursor por una fila
+  aparecían los tiradores gruesos en todos sus bloques a la vez; ahora solo se encienden en el que
+  está bajo el puntero.
+
+### Color y efectos
+
+- **Se aplican a todos los clips seleccionados.** Con varios clips marcados, un efecto o una
+  corrección de color caen sobre todos, no solo sobre el primero. Los paneles avisan a cuántos clips
+  se está aplicando.
+
+### Sonido
+
+- **Fundido de audio más natural.** El fundido de entrada y salida usaba una rampa lineal que sonaba
+  callada al principio y de golpe después, porque el oído no percibe el volumen de forma lineal.
+  Ahora sigue una curva de igual potencia: aparece de menos a más de forma pareja y se asienta
+  suave. A más duración, más lento, igual que antes.
+
+### Correcciones
+
+- **Fundido a negro que oscurecía antes de tiempo.** Entre dos clips, el plano de salida empezaba a
+  apagarse antes de entrar en la transición. Ahora el oscurecido lo lleva entero el cruce centrado
+  en el corte.
+
+## 2.34.1 (2026-07-31)
+
+- **La bocina del visor silencia con un clic.** Pulsar el icono de volumen corta o devuelve el
+  sonido de la vista previa, recordando el nivel para restaurarlo. El deslizador sigue apareciendo
+  al pasar el cursor por encima.
+
 ## 2.34.0 (2026-07-30)
 
 Una tanda grande centrada en las transiciones, un catálogo de efectos mucho más amplio, tres
