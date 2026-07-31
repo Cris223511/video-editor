@@ -223,22 +223,8 @@ html.ve-visor-completo [data-visor] {
   background: transparent !important;
 }
 
-html.lenis,
-html.lenis body {
-  height: auto;
-}
-.lenis.lenis-smooth {
-  scroll-behavior: auto !important;
-}
-.lenis.lenis-smooth [data-lenis-prevent] {
-  overscroll-behavior: contain;
-}
-.lenis.lenis-stopped {
-  overflow: hidden;
-}
-.lenis.lenis-smooth iframe {
-  pointer-events: none;
-}
+/* el desplazamiento con inercia (Lenis) se quitó: se sentía demasiado resbaladizo en el sitio.
+   con él se fueron también sus clases .lenis, que ya no las añade nadie */
 
 /* aquí estaba el salto de los modales. el body valía height 100%, o sea justo el
    alto de una pantalla. al abrir un modal, radix bloquea el scroll del fondo

@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react'
+import { ReactNode, Ref, useEffect, useRef, useState } from 'react'
 import * as Tip from '@radix-ui/react-tooltip'
 import { HelpCircle } from 'lucide-react'
 
@@ -67,15 +67,33 @@ export default function Tooltip({
   // radix sigue decidiendo cuándo abrir al pasar el cursor, y solo interceptamos el
   // cierre por desplazamiento
   const [abierto, setAbierto] = useState(false)
+  const disparadorRef = useRef<HTMLElement>(null)
   useEffect(() => {
     const cerrar = () => setAbierto(false)
     window.addEventListener(EVENTO_CERRAR, cerrar)
     return () => window.removeEventListener(EVENTO_CERRAR, cerrar)
   }, [])
 
+  // red de seguridad contra la burbuja pegada: radix a veces no recibe el pointerleave del
+  // disparador (el cursor sale muy rápido, el elemento se desvanece al salir, un re-render lo
+  // reemplaza) y el tooltip se quedaba flotando aunque el ratón ya no estuviera encima. mientras
+  // está abierto se vigila el movimiento del puntero y, en cuanto deja de caer sobre el disparador,
+  // se cierra a mano. va en captura para enterarse aunque algún elemento intermedio corte el evento
+  useEffect(() => {
+    if (!abierto) return
+    const alMover = (e: PointerEvent) => {
+      const el = disparadorRef.current
+      if (el && !el.contains(e.target as Node)) setAbierto(false)
+    }
+    window.addEventListener('pointermove', alMover, true)
+    return () => window.removeEventListener('pointermove', alMover, true)
+  }, [abierto])
+
   return (
     <Tip.Root open={abierto} onOpenChange={setAbierto} delayDuration={retardo} disableHoverableContent>
-      <Tip.Trigger asChild>{children}</Tip.Trigger>
+      <Tip.Trigger asChild ref={disparadorRef as Ref<HTMLButtonElement>}>
+        {children}
+      </Tip.Trigger>
       <Tip.Portal>
         <Tip.Content
           side={lados[lado]}

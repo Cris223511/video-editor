@@ -4,6 +4,64 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.34.3 (2026-07-31)
+
+Una tanda de arreglos de la línea de tiempo, del visor y del sonido, el impacto de Manchas rehecho,
+el selector de color ahora editable por RGB/HSL/CMYK, y un par de decisiones de diseño (sin scroll
+con inercia y bordes de selección iguales para todos).
+
+### Línea de tiempo
+
+- **Selección con recuadro más lista.** Un recuadro que atrapa un solo elemento se comporta como un
+  clic normal (ofrece todas sus opciones); con dos o más sí es un conjunto. Clicar fuera del conjunto
+  (otro clip, un impacto, un tirador de recorte) deshace la selección múltiple; arrastrar el grupo por
+  el cuerpo lo mueve entero y lo mantiene marcado.
+- **Clips que ya no se separan al hacer zoom.** Alejando y acercando rápido, los clips pegados dejaban
+  un hueco un instante; ahora saltan a su sitio nuevo sin despegarse.
+- **Bordes de selección iguales para todos.** El clip llevaba un aro extra que lo hacía verse distinto
+  a las capas, audios y franjas; ahora los cuatro muestran el mismo borde sólido al seleccionarlos.
+- **El borrado múltiple usa el aviso de la app.** Al borrar varios elementos con Suprimir ya no sale
+  el cuadro del navegador, sino el modal de confirmación de siempre.
+- **Panel de la derecha en selección múltiple.** Con varios clips marcados aparecen Ajustar colores,
+  Efectos y Audio, que se aplican a todo el conjunto; sin nada elegido el panel queda vacío.
+
+### Visor
+
+- **Sin frame negro en el corte entre clips.** Al pausar en una junta o arrastrar el cabezal, el clip
+  que entra podía asomar en negro un instante mientras cargaba; ahora se mantiene el cuadro anterior
+  hasta que el nuevo está listo. La reproducción sigue fluida, sin frenar en las juntas.
+
+### Sonido
+
+- **La franja de volumen dibuja el sonido real.** Donde hay clip con audio pinta su onda; donde no
+  suena nada (un hueco o silencio) queda una línea plana, en vez de una onda inventada.
+- **Volumen y silencio de varios clips a la vez** desde el nuevo apartado Audio de la selección
+  múltiple.
+
+### Impactos
+
+- **Manchas rehecho.** Deja de ser un montón de círculos: ahora es un revoltijo aleatorio de formas
+  (manchas de tinta, triángulos, rombos, aros, brochazos rectos y salpicaduras de puntos) que
+  aparecen y se van invirtiendo el color, como un collage en negativo. El color elige la tonalidad de
+  la inversión y la fuerza cuánto se marca.
+
+### Color
+
+- **Selector de color editable y ordenado.** Los valores RGB, HSL y CMYK pasan a pestañas y cada canal
+  se puede escribir a mano (además de la rueda y el hexadecimal). El desplegable ya no se corta contra
+  el borde de la pantalla. Vale para todos los selectores de color de la app.
+
+### Otros
+
+- **Interfaz sin desplazamiento con inercia.** Se quitó el scroll suave del sitio, que se sentía
+  demasiado resbaladizo; la rueda vuelve al comportamiento normal del navegador.
+- **Los tooltips ya no se quedan pegados.** Al sacar el cursor del botón, la burbuja de ayuda se
+  cierra de inmediato.
+- **Volver desde el editor de un impacto** vuelve a dejar seleccionado su clip con la lista de
+  impactos abierta, en vez de un panel vacío.
+- **Exportación más robusta.** Si el motor rápido se queda clavado sin avanzar, ahora se pasa solo al
+  motor clásico en lugar de quedarse esperando.
+
 ## 2.34.2 (2026-07-31)
 
 Correcciones de la línea de tiempo y del sonido: la selección múltiple ahora se comporta como se

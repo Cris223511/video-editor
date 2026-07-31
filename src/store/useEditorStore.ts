@@ -1459,15 +1459,28 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   limpiarBloques: () => set({ bloquesSeleccionados: [] }),
 
   marcarBloques: (ids) =>
-    set({
-      bloquesSeleccionados: ids,
-      // el recuadro reemplaza cualquier selección de uno solo, para que el menú y
-      // los atajos operen sobre el conjunto y no sobre un elemento suelto de antes
-      clipSeleccionado: null,
-      capaSeleccionada: null,
-      capasSeleccionadas: [],
-      regionSeleccionada: null,
-      impactoSeleccionado: null,
+    set((s) => {
+      // un recuadro que atrapa un solo elemento no es una selección múltiple: equivale a
+      // elegirlo con un clic, así que se trata como selección suelta y ofrece TODAS sus
+      // opciones (no solo las dos del conjunto). se detecta su tipo para elegir el campo
+      const limpio = {
+        bloquesSeleccionados: [] as string[],
+        clipSeleccionado: null as string | null,
+        capaSeleccionada: null as string | null,
+        capasSeleccionadas: [] as string[],
+        regionSeleccionada: null as string | null,
+        impactoSeleccionado: null as string | null,
+      }
+      if (ids.length === 1) {
+        const id = ids[0]
+        if (s.pista.clips.some((c) => c.id === id)) return { ...limpio, clipSeleccionado: id }
+        if (s.capas.some((c) => c.id === id)) return { ...limpio, capaSeleccionada: id, capasSeleccionadas: [id] }
+        if (s.audios.some((a) => a.id === id) || s.audioRegiones.some((r) => r.id === id))
+          return { ...limpio, regionSeleccionada: id }
+      }
+      // varios (o ninguno): el recuadro reemplaza cualquier selección suelta de antes,
+      // para que el menú y los atajos operen sobre el conjunto
+      return { ...limpio, bloquesSeleccionados: ids }
     }),
 
   agregarImpacto: (t, tipo = 'rebote') =>
@@ -1542,6 +1555,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       capaSeleccionada: id ? null : s.capaSeleccionada,
       capasSeleccionadas: id ? [] : s.capasSeleccionadas,
       regionSeleccionada: id ? null : s.regionSeleccionada,
+      // una bolita nunca forma parte del conjunto marcado, así que elegirla siempre
+      // deshace la selección múltiple
+      bloquesSeleccionados: id ? [] : s.bloquesSeleccionados,
     })),
 
   abrirMenuContextual: (m) => set({ menuContextual: m }),
@@ -2319,6 +2335,10 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       capasSeleccionadas: id ? [] : s.capasSeleccionadas,
       regionSeleccionada: id ? null : s.regionSeleccionada,
       impactoSeleccionado: id ? null : s.impactoSeleccionado,
+      // elegir un clip suelto deshace la selección múltiple. el arrastre de un grupo NO
+      // pasa por aquí (el bloque omite esta llamada cuando el clic cae en un elemento ya
+      // marcado), así que arrastrar el conjunto no lo desmarca; cualquier otro clic sí
+      bloquesSeleccionados: id ? [] : s.bloquesSeleccionados,
       // un clic normal sobre un clip solo lo selecciona: si se venía del modo recorte
       // (abierto con el menú, la tecla C o el doble clic) se sale de él, para que
       // volver a pulsar el clip no lo reabra. entrar al recorte es siempre un gesto
@@ -2652,19 +2672,26 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     }),
 
   alternarSilencioClip: (id) =>
-    set((s) => ({
-      pista: {
-        ...s.pista,
-        clips: s.pista.clips.map((c) => {
-          if (c.id !== id) return c
-          const silenciado = !c.silenciado
-          // al quitar el silencio de un clip que estaba a cero se le devuelve un
-          // nivel audible; si no, el botón diría que suena y se seguiría sin oír
-          const volumen = !silenciado && (c.volumen ?? 1) === 0 ? 1 : c.volumen
-          return { ...c, silenciado, volumen }
-        }),
-      },
-    })),
+    set((s) => {
+      const dest = clipsObjetivo(s, id)
+      // el nuevo estado lo marca el clip que se pulsó y se copia igual a todo el conjunto,
+      // para que "silenciar" deje a TODOS en silencio (y no cada uno alternando su propio
+      // estado, que dejaría unos con sonido y otros sin él)
+      const objetivo = s.pista.clips.find((c) => c.id === id)
+      const silenciado = !objetivo?.silenciado
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) => {
+            if (!dest.has(c.id)) return c
+            // al quitar el silencio de un clip que estaba a cero se le devuelve un
+            // nivel audible; si no, el botón diría que suena y se seguiría sin oír
+            const volumen = !silenciado && (c.volumen ?? 1) === 0 ? 1 : c.volumen
+            return { ...c, silenciado, volumen }
+          }),
+        },
+      }
+    }),
 
   setFundido: (id, lado, segundos) =>
     set((s) => {
@@ -2682,13 +2709,15 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   setVolumenClip: (id, volumen) =>
     set((s) => {
       const v = Math.max(0, Math.min(2, volumen))
+      const dest = clipsObjetivo(s, id)
       return {
         pista: {
           ...s.pista,
           clips: s.pista.clips.map((c) =>
             // bajar a cero es lo mismo que silenciar, y subir desde cero devuelve
-            // el sonido: así el deslizador y el botón nunca se contradicen
-            c.id === id ? { ...c, volumen: v, silenciado: v === 0 } : c,
+            // el sonido: así el deslizador y el botón nunca se contradicen. con varios
+            // clips marcados el mismo volumen cae sobre todo el conjunto
+            dest.has(c.id) ? { ...c, volumen: v, silenciado: v === 0 } : c,
           ),
         },
       }
@@ -3035,6 +3064,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         // al elegir una sola capa se abre su herramienta; sumando al conjunto no
         // se cambia de panel, para no sacar al usuario de donde estaba
         herramienta: !aditivo && capa ? herrCapa : s.herramienta,
+        // elegir una capa suelta deshace la selección múltiple de la línea de tiempo. el
+        // arrastre del grupo no llama aquí, así que moverlo no lo desmarca
+        bloquesSeleccionados: id ? [] : s.bloquesSeleccionados,
       }
     }),
 
@@ -3462,6 +3494,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       capaSeleccionada: null,
       impactoSeleccionado: id ? null : s.impactoSeleccionado,
       herramienta: id ? 'audio' : s.herramienta,
+      // igual que con los clips: elegir un audio o franja suelto deshace el conjunto. el
+      // arrastre del grupo no llama aquí, así que no se desmarca al moverlo
+      bloquesSeleccionados: id ? [] : s.bloquesSeleccionados,
     })),
 
   moverRegionAudio: (id, nuevoInicio) =>

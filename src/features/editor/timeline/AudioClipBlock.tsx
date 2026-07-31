@@ -110,7 +110,9 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
     const conAlt = e.altKey
     let idGesto = audio.id
     let movido = false
-    if (!conAlt) seleccionarRegion(audio.id)
+    // arrastrando un conjunto no se reduce la selección a este audio (seleccionar
+    // limpiaría el grupo). suelto, el clic sí lo selecciona
+    if (!conAlt && !enGrupo) seleccionarRegion(audio.id)
     const startX = e.clientX
     const inicioOriginal = audio.inicio
     const umbral = UMBRAL_IMAN_PX / pxPorSegundo
@@ -265,7 +267,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
         left: audio.inicio * pxPorSegundo,
         width: ancho,
         backgroundColor: 'rgba(56, 189, 248, 0.22)',
-        transition: interactuando || (arrastreBloques && enConjunto) ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+        transition: interactuando || (arrastreBloques && enConjunto) || congelarLayout ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       {asset?.faltante ? (

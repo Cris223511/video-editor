@@ -199,9 +199,13 @@ export function useAtajos() {
           // muy caro aunque exista deshacer
           if (st.bloquesSeleccionados.length > 1) {
             const cuantos = st.bloquesSeleccionados.length
-            if (window.confirm(`¿Borrar estos ${cuantos} elementos de la línea de tiempo?`)) {
-              st.quitarBloques(st.bloquesSeleccionados)
-            }
+            const ids = [...st.bloquesSeleccionados]
+            st.pedirConfirmacion({
+              titulo: 'Eliminar',
+              mensaje: `¿Borrar estos ${cuantos} elementos de la línea de tiempo?`,
+              aceptar: 'Eliminar',
+              onAceptar: () => st.quitarBloques(ids),
+            })
             return
           }
           if (st.clipSeleccionado) st.quitarClip(st.clipSeleccionado)

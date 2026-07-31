@@ -99,7 +99,9 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     const conAlt = e.altKey
     let idGesto = capa.id
     let movido = false
-    if (!conAlt) seleccionarCapa(capa.id)
+    // arrastrando un conjunto no se reduce la selección a esta capa (seleccionar
+    // limpiaría el grupo). suelta, el clic sí la selecciona
+    if (!conAlt && !enGrupo) seleccionarCapa(capa.id)
     const startX = e.clientX
     const inicioOriginal = capa.inicio
     const umbral = UMBRAL_IMAN_PX / pxPorSegundo
@@ -337,7 +339,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
         backgroundColor: esImagen ? 'rgba(10, 12, 20, 0.72)' : 'rgba(245, 158, 11, 0.25)',
         // en reposo la posición se anima con una curva suave; durante el arrastre propio o de todo
         // el conjunto el suavizado se apaga para que el bloque no vaya por detrás del cursor
-        transition: interactuando || (arrastreBloques && enConjunto) ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+        transition: interactuando || (arrastreBloques && enConjunto) || congelarLayout ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       {esImagen ? (

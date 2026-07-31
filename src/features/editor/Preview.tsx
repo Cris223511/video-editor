@@ -1128,6 +1128,56 @@ export default function Preview() {
   // se pinta en el canvas, no con la opacidad del DOM
   const cruceGeom = cruceCentradoEn(clipsOrdenados, phVista, esGeometrica)
 
+  // id del clip cuyo video ya tiene un fotograma decodificado y se puede mostrar sin riesgo
+  // de negro. al pausar en la junta o al arrastrar el cabezal a otro punto, el video del clip
+  // nuevo hace un seek a su recorte; mientras decodifica, algunos navegadores (chrome con
+  // decodificación por hardware) pintan ese cuadro en NEGRO en vez de conservar el último. para
+  // evitar ese parpadeo se mantiene visible el clip anterior hasta que el nuevo confirma cuadro.
+  // OJO: esto SOLO se hace en pausa. durante la reproducción manda la fluidez: retener el cuadro
+  // anterior mientras el nuevo hace un seek lento congelaba la imagen un momento en la junta, y
+  // ahí el clip que entra ya viene pre-posicionado por el bucle de reproducción, así que aparece
+  // a tiempo sin necesidad de retención
+  const [clipListoId, setClipListoId] = useState<string | null>(null)
+  useEffect(() => {
+    // reproduciendo, o en un cruce (sus opacidades las maneja el cruce): no se retiene nada,
+    // el clip activo se muestra de una vez para no cortar la fluidez
+    if (!activo || cruce || reproduciendo) {
+      setClipListoId(activo ? activo.id : null)
+      return
+    }
+    const v = videosRef.current.get(activo.id)
+    // sin elemento todavía, o con un cuadro ya listo y sin seek en curso, se muestra de una vez
+    if (!v || (v.readyState >= 2 && !v.seeking)) {
+      setClipListoId(activo.id)
+      return
+    }
+    // aún decodificando: se avanza al clip nuevo recién cuando su video tiene cuadro
+    const marcar = () => {
+      if (v.readyState >= 2 && !v.seeking) setClipListoId(activo.id)
+    }
+    v.addEventListener('seeked', marcar)
+    v.addEventListener('loadeddata', marcar)
+    v.addEventListener('canplay', marcar)
+    return () => {
+      v.removeEventListener('seeked', marcar)
+      v.removeEventListener('loadeddata', marcar)
+      v.removeEventListener('canplay', marcar)
+    }
+  }, [activo?.id, phVista, cruce, reproduciendo])
+
+  // clip que de verdad se pinta opaco en un corte seco: normalmente el activo, pero si estando
+  // en pausa su video todavía no tiene cuadro se sigue enseñando el anterior (clipListoId) para
+  // no dejar un negro. solo fuera de un cruce, en pausa, y con el clip retenido aún existente
+  const idMostrado =
+    !cruce &&
+    !reproduciendo &&
+    activo &&
+    clipListoId &&
+    clipListoId !== activo.id &&
+    clipsOrdenados.some((c) => c.id === clipListoId)
+      ? clipListoId
+      : activo?.id ?? null
+
   // opacidad de cada video teniendo en cuenta las transiciones: el clip activo
   // entra con su transición (fundido a negro o desvanecido con el anterior), y
   // el clip anterior se mantiene visible mientras dura un desvanecido
@@ -1137,6 +1187,12 @@ export default function Preview() {
     if (cruce) {
       if (clip.id === cruce.entra.id) return cruce.p
       if (clip.id === cruce.sale.id) return 1
+    }
+    // el video del clip nuevo aún no tiene cuadro: se mantiene opaco el anterior retenido y el
+    // activo se deja invisible hasta que confirme, para que el corte no pase por un negro
+    if (idMostrado && activo && idMostrado !== activo.id) {
+      if (clip.id === idMostrado) return 1
+      if (clip.id === activo.id) return 0
     }
     if (activo && clip.id === activo.id) {
       let op = 1

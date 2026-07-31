@@ -20,17 +20,23 @@ const CON_SUAVIDAD = new Set(['contorno', 'lineas3d', 'rayosObjeto', 'manchas'])
 export default function ImpactoEditorPanel() {
   const impactoSeleccionado = useEditorStore((s) => s.impactoSeleccionado)
   const impactos = useEditorStore((s) => s.impactos)
+  const clips = useEditorStore((s) => s.pista.clips)
   const actualizarImpacto = useEditorStore((s) => s.actualizarImpacto)
   const quitarImpacto = useEditorStore((s) => s.quitarImpacto)
   const seleccionarImpacto = useEditorStore((s) => s.seleccionarImpacto)
+  const seleccionar = useEditorStore((s) => s.seleccionar)
   const setCategoriaClip = useEditorStore((s) => s.setCategoriaClip)
 
   const im = impactos.find((x) => x.id === impactoSeleccionado)
   if (!im) return null
 
   const volver = () => {
-    // deselecciona el impacto y vuelve a la lista para agregar otro
+    // volver no deja el panel vacío: se selecciona el clip donde vive esta bolita (por su
+    // instante) y se abre su lista de impactos, para seguir editando ese plano. sin esto,
+    // al soltar el impacto no quedaba nada elegido y el panel se cerraba
+    const clip = clips.find((c) => im.t >= c.inicio && im.t < c.inicio + c.duracion)
     seleccionarImpacto(null)
+    if (clip) seleccionar(clip.id)
     setCategoriaClip('impactos')
   }
 

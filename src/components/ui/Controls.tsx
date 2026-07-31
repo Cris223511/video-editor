@@ -63,6 +63,54 @@ function rgbACmyk(r: number, g: number, b: number) {
   }
 }
 
+// los caminos de vuelta, para poder EDITAR el color escribiendo en rgb, hsl o cmyk y que
+// la rueda y el hexadecimal se pongan al día. cada canal se acota a su rango antes de convertir
+function acotar(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, Math.round(Number.isFinite(v) ? v : min)))
+}
+
+function rgbAHex(r: number, g: number, b: number): string {
+  const h = (n: number) => acotar(n, 0, 255).toString(16).padStart(2, '0')
+  return '#' + h(r) + h(g) + h(b)
+}
+
+function hslARgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
+  const hh = ((h % 360) + 360) % 360 / 360
+  const ss = acotar(s, 0, 100) / 100
+  const ll = acotar(l, 0, 100) / 100
+  if (ss === 0) {
+    const v = Math.round(ll * 255)
+    return { r: v, g: v, b: v }
+  }
+  const q = ll < 0.5 ? ll * (1 + ss) : ll + ss - ll * ss
+  const p = 2 * ll - q
+  const canal = (t: number) => {
+    if (t < 0) t += 1
+    if (t > 1) t -= 1
+    if (t < 1 / 6) return p + (q - p) * 6 * t
+    if (t < 1 / 2) return q
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+    return p
+  }
+  return {
+    r: Math.round(canal(hh + 1 / 3) * 255),
+    g: Math.round(canal(hh) * 255),
+    b: Math.round(canal(hh - 1 / 3) * 255),
+  }
+}
+
+function cmykARgb(c: number, m: number, y: number, k: number): { r: number; g: number; b: number } {
+  const cc = acotar(c, 0, 100) / 100
+  const mm = acotar(m, 0, 100) / 100
+  const yy = acotar(y, 0, 100) / 100
+  const kk = acotar(k, 0, 100) / 100
+  return {
+    r: Math.round(255 * (1 - cc) * (1 - kk)),
+    g: Math.round(255 * (1 - mm) * (1 - kk)),
+    b: Math.round(255 * (1 - yy) * (1 - kk)),
+  }
+}
+
 // estilo común de los botones que agregan un elemento (texto, censura, figura,
 // dibujo). van con nuestro celeste primario relleno, igual en claro y en oscuro,
 // en vez del fondo blanco de borde fino que se veía básico
@@ -177,6 +225,12 @@ export function ColorCampo({ valor, onChange }: { valor: string; onChange: (v: s
   // así el resto de la app deja de re-renderizarse a lo loco durante el arrastre
   const [local, setLocal] = useState(valor)
   const raf = useRef<number | null>(null)
+  // pestaña activa del bloque de detalle (rgb, hsl o cmyk); cada una deja editar sus canales
+  const [tab, setTab] = useState<'RGB' | 'HSL' | 'CMYK'>('RGB')
+  // desplazamiento horizontal del desplegable para que no se salga de la pantalla cuando el
+  // campo está pegado al borde (típico en el panel derecho, que va contra el filo de la ventana)
+  const pop = useRef<HTMLDivElement>(null)
+  const [dx, setDx] = useState(0)
 
   // cuando el valor llega de fuera (deshacer, otro control) la rueda se pone al día
   useEffect(() => {
@@ -241,6 +295,24 @@ export function ColorCampo({ valor, onChange }: { valor: string; onChange: (v: s
     }
   }, [abierto])
 
+  // al abrir, se comprueba si el desplegable se sale de la pantalla y se corre lo justo para que
+  // quepa. es lo que faltaba: en el panel derecho el campo va pegado al borde y la rueda se cortaba
+  useEffect(() => {
+    if (!abierto) {
+      setDx(0)
+      return
+    }
+    const id = requestAnimationFrame(() => {
+      const el = pop.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      const margen = 8
+      if (r.right > window.innerWidth - margen) setDx((prev) => prev + (window.innerWidth - margen - r.right))
+      else if (r.left < margen) setDx((prev) => prev + (margen - r.left))
+    })
+    return () => cancelAnimationFrame(id)
+  }, [abierto])
+
   return (
     <div ref={caja} className="relative flex items-center gap-2">
       {/* la muestra solo ABRE la rueda; cerrar es cosa de Escape o de un clic fuera.
@@ -266,11 +338,13 @@ export function ColorCampo({ valor, onChange }: { valor: string; onChange: (v: s
           desmontaje de framer-motion llegaba a sacar la rueda de en medio */}
       {abierto && (
         <div
-          className="absolute left-0 top-full z-50 mt-2 w-[200px] rounded-xl p-3 shadow-xl"
+          ref={pop}
+          className="absolute left-0 top-full z-50 mt-2 max-h-[70vh] w-[212px] overflow-y-auto rounded-xl p-3 shadow-xl scroll-modal"
           style={{
             background: 'rgb(var(--surface))',
             border: '1px solid rgb(var(--border) / 0.14)',
             animation: 'fundido-in 0.16s ease-out',
+            transform: `translateX(${dx}px)`,
           }}
         >
           {/* fila de arriba: la pipeta para robar un color de la pantalla y, al lado,
@@ -287,23 +361,83 @@ export function ColorCampo({ valor, onChange }: { valor: string; onChange: (v: s
                 <Icon name="gota" size={15} />
               </button>
             )}
-            <span
-              className="flex-1 rounded-lg px-2 py-1.5 text-center text-[12px] font-medium uppercase tracking-wide"
+            {/* el hexadecimal también se puede escribir a mano aquí, no solo mirar */}
+            <input
+              value={local}
+              onChange={(e) => empujar(e.target.value)}
+              spellCheck={false}
+              className="w-full min-w-0 flex-1 rounded-lg px-2 py-1.5 text-center text-[12px] font-medium uppercase tracking-wide outline-none focus:ring-1 focus:ring-brand"
               style={{ background: 'rgb(var(--border) / 0.12)', color: 'rgb(var(--text))' }}
-            >
-              {local}
-            </span>
+            />
           </div>
 
           <HexColorPicker color={local} onChange={empujar} />
 
-          {/* detalle del color al estilo illustrator: rgb, hsl y cmyk. es solo lectura,
-              para tener las cuentas a la vista sin salir a otra herramienta */}
+          {/* detalle editable del color, repartido en pestañas rgb / hsl / cmyk. escribir en
+              cualquier canal recompone el color y pone al día la rueda y el hexadecimal */}
           {rgb && hsl && cmyk && (
-            <div className="mt-3 flex flex-col gap-1.5 text-[11px]" style={{ color: 'rgb(var(--muted))' }}>
-              <FilaColor etiqueta="RGB" partes={[['R', rgb.r], ['G', rgb.g], ['B', rgb.b]]} />
-              <FilaColor etiqueta="HSL" partes={[['H', `${hsl.h}°`], ['S', `${hsl.s}%`], ['L', `${hsl.l}%`]]} />
-              <FilaColor etiqueta="CMYK" partes={[['C', cmyk.c], ['M', cmyk.m], ['Y', cmyk.y], ['K', cmyk.k]]} />
+            <div className="mt-3">
+              <div className="mb-2 flex gap-1 rounded-lg p-0.5" style={{ background: 'rgb(var(--border) / 0.1)' }}>
+                {(['RGB', 'HSL', 'CMYK'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTab(t)}
+                    className={[
+                      'flex-1 rounded-md py-1 text-[11px] font-medium transition-colors',
+                      tab === t ? 'bg-brand text-white' : 'text-[color:var(--muted)] hover:text-[color:var(--text)]',
+                    ].join(' ')}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                {tab === 'RGB' &&
+                  (['R', 'G', 'B'] as const).map((c, i) => (
+                    <CanalColor
+                      key={c}
+                      etiqueta={c}
+                      valor={[rgb.r, rgb.g, rgb.b][i]}
+                      max={255}
+                      onChange={(v) => {
+                        const n = [rgb.r, rgb.g, rgb.b]
+                        n[i] = v
+                        empujar(rgbAHex(n[0], n[1], n[2]))
+                      }}
+                    />
+                  ))}
+                {tab === 'HSL' &&
+                  (['H', 'S', 'L'] as const).map((c, i) => (
+                    <CanalColor
+                      key={c}
+                      etiqueta={c}
+                      valor={[hsl.h, hsl.s, hsl.l][i]}
+                      max={i === 0 ? 360 : 100}
+                      onChange={(v) => {
+                        const n = [hsl.h, hsl.s, hsl.l]
+                        n[i] = v
+                        const { r, g, b } = hslARgb(n[0], n[1], n[2])
+                        empujar(rgbAHex(r, g, b))
+                      }}
+                    />
+                  ))}
+                {tab === 'CMYK' &&
+                  (['C', 'M', 'Y', 'K'] as const).map((c, i) => (
+                    <CanalColor
+                      key={c}
+                      etiqueta={c}
+                      valor={[cmyk.c, cmyk.m, cmyk.y, cmyk.k][i]}
+                      max={100}
+                      onChange={(v) => {
+                        const n = [cmyk.c, cmyk.m, cmyk.y, cmyk.k]
+                        n[i] = v
+                        const { r, g, b } = cmykARgb(n[0], n[1], n[2], n[3])
+                        empujar(rgbAHex(r, g, b))
+                      }}
+                    />
+                  ))}
+              </div>
             </div>
           )}
         </div>
@@ -312,22 +446,34 @@ export function ColorCampo({ valor, onChange }: { valor: string; onChange: (v: s
   )
 }
 
-// una fila del bloque de detalle: la etiqueta del espacio de color a la izquierda y
-// sus componentes con su letra, repartidos en lo que queda de ancho
-function FilaColor({ etiqueta, partes }: { etiqueta: string; partes: [string, string | number][] }) {
+// un canal editable del color (R, G, B, H, S...): su letra encima y una casilla numérica debajo.
+// escribir un valor lo acota a su rango y avisa al padre, que recompone el color completo
+function CanalColor({
+  etiqueta,
+  valor,
+  max,
+  onChange,
+}: {
+  etiqueta: string
+  valor: number
+  max: number
+  onChange: (v: number) => void
+}) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="w-9 shrink-0 font-semibold" style={{ color: 'rgb(var(--text))' }}>
+    <label className="flex flex-1 flex-col items-center gap-1">
+      <span className="text-[10px] font-semibold" style={{ color: 'rgb(var(--muted))' }}>
         {etiqueta}
       </span>
-      <div className="flex flex-1 justify-between gap-1">
-        {partes.map(([letra, valor]) => (
-          <span key={letra} className="tabular-nums">
-            <span style={{ opacity: 0.6 }}>{letra}</span> {valor}
-          </span>
-        ))}
-      </div>
-    </div>
+      <input
+        type="number"
+        min={0}
+        max={max}
+        value={valor}
+        onChange={(e) => onChange(acotar(parseInt(e.target.value, 10), 0, max))}
+        className="w-full min-w-0 rounded-md border bg-transparent px-1 py-1 text-center text-[11px] tabular-nums outline-none transition-colors focus:border-brand"
+        style={{ borderColor: 'rgb(var(--border) / 0.15)', color: 'rgb(var(--text))' }}
+      />
+    </label>
   )
 }
 

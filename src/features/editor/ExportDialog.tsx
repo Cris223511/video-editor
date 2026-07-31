@@ -131,16 +131,58 @@ export default function ExportDialog() {
       return control.promesa
     }
 
+    // como correr, pero vigilando que el progreso AVANCE. la ruta rápida (WebCodecs) puede
+    // quedarse clavada esperando un cuadro que su decodificador no logra arrancar con ciertos
+    // archivos: ni resuelve ni lanza error, así que la exportación se quedaba en 0% para siempre
+    // sin llegar nunca a probar la ruta clásica. si no avanza nada en un buen rato, se cancela y
+    // se rechaza para poder caer al motor clásico
+    const correrVigilado = (
+      motor: (d: DatosExport, p: (v: number) => void) => ControlExport,
+      topeSinAvance = 25000,
+    ) =>
+      new Promise<Blob>((resolve, reject) => {
+        let ultimo = -1
+        let marca = performance.now()
+        const control = motor(datos, (v) => {
+          if (v > ultimo + 0.0005) {
+            ultimo = v
+            marca = performance.now()
+          }
+          setProgreso(v)
+        })
+        controlRef.current = control
+        colgarLienzo(control)
+        const iv = window.setInterval(() => {
+          if (performance.now() - marca > topeSinAvance) {
+            window.clearInterval(iv)
+            control.cancelar()
+            reject(new Error('sin-avance'))
+          }
+        }, 2000)
+        control.promesa.then(
+          (b) => {
+            window.clearInterval(iv)
+            resolve(b)
+          },
+          (err) => {
+            window.clearInterval(iv)
+            reject(err)
+          },
+        )
+      })
+
     try {
       // ruta rápida con WebCodecs cuando el navegador la trae: decodifica y codifica sin
       // pasar por <video> a tiempo real, así que exporta varias veces más rápido. si algo
-      // no encaja (un códec que no soporta), se cae a la ruta clásica sin molestar al usuario
+      // no encaja (un códec que no soporta) o se cuelga sin avanzar, se cae a la ruta clásica
+      // sin molestar al usuario
       let blob: Blob | null = null
       if (haiWebCodecs()) {
         try {
-          blob = await correr(exportarRapido)
+          blob = await correrVigilado(exportarRapido)
         } catch (e) {
-          // la ruta rápida no pudo; se sigue con la clásica más abajo
+          // la ruta rápida no pudo (error o cuelgue); se sigue con la clásica más abajo. si el
+          // usuario canceló a mano, sí se corta de verdad
           if (e instanceof Error && e.message.includes('cancelada')) throw e
           setProgreso(0)
         }

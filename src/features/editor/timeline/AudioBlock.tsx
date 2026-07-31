@@ -179,6 +179,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
   const moverBloquesDesde = useEditorStore((s) => s.moverBloquesDesde)
   const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(region.id))
   const arrastreBloques = useEditorStore((s) => s.arrastreBloques)
+  const congelarLayout = useEditorStore((s) => s.congelarLayout)
 
   // mientras dura un gesto propio el bloque sigue al cursor sin suavizado; en
   // reposo se anima su posición para que se deslice al acomodarse en vez de saltar
@@ -208,7 +209,9 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     const conAlt = e.altKey
     let idGesto = region.id
     let movido = false
-    if (!conAlt) seleccionarRegion(region.id)
+    // arrastrando un conjunto no se reduce la selección a esta franja (seleccionar
+    // limpiaría el grupo). suelta, el clic sí la selecciona
+    if (!conAlt && !enGrupo) seleccionarRegion(region.id)
     const startX = e.clientX
     const inicioOriginal = region.inicio
     const umbral = UMBRAL_IMAN_PX / pxPorSegundo
@@ -356,16 +359,16 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
         backgroundColor: 'rgba(16, 185, 129, 0.25)',
         // suavizado de la posición en reposo; se apaga durante el arrastre propio o del conjunto
         // para seguir al cursor sin retraso
-        transition: interactuando || (arrastreBloques && enConjunto) ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+        transition: interactuando || (arrastreBloques && enConjunto) || congelarLayout ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
-      {/* la onda ocupa el fondo del bloque; encima va el porcentaje de ganancia.
-          si se logró leer el sonido real se pintan sus picos; si no, la sintética */}
-      {ondaReal ? (
-        <OndaReal alturas={ondaReal} color="rgba(16, 185, 129, 0.6)" />
-      ) : (
-        <OndaAudio semilla={region.id} color="rgba(16, 185, 129, 0.55)" barras={barras} />
-      )}
+      {/* la onda ocupa el fondo del bloque; encima va el porcentaje de ganancia. una franja de
+          volumen dibuja el sonido que gobierna: donde hay clip con audio se pintan sus picos, y
+          donde no hay nada que suene (un hueco de la pista, o silencio) queda una línea plana, no
+          una onda inventada. mientras se decodifica también se muestra plana, que es más honesto */}
+      <OndaReal alturas={ondaReal ?? Array.from({ length: barras }, () => 0.06)} color="rgba(16, 185, 129, 0.6)" />
+      {/* OndaAudio (onda sintética) ya no se usa en la franja: engañaba mostrando sonido donde no lo
+          había. sigue disponible para el fondo tenue del carril de audio vacío */}
 
       <span className="pointer-events-none relative truncate rounded bg-black/35 px-1 text-[10px] font-medium text-white">
         {Math.round(region.ganancia * 100)}%

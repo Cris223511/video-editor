@@ -17,6 +17,7 @@ import AudioPanel from './panels/AudioPanel'
 import AudioClipPanel from './panels/AudioClipPanel'
 import ImpactosPanel from './panels/ImpactosPanel'
 import ImpactoEditorPanel from './panels/ImpactoEditorPanel'
+import MultiAudioPanel from './panels/MultiAudioPanel'
 
 // una categoría del panel de la derecha: su icono en el sub-riel y el panel de
 // controles que abre. cada tipo de elemento ofrece las suyas
@@ -42,6 +43,15 @@ const CLIP: Categoria[] = [
 // cuando hay una bolita elegida, el panel de la derecha muestra solo su editor
 const IMPACTO_EDITOR: Categoria[] = [
   { id: 'impacto-editor', icono: 'impacto', etiqueta: 'Impacto', panel: <ImpactoEditorPanel /> },
+]
+
+// con varios clips marcados a la vez, el panel ofrece solo lo que sabe aplicarse a
+// todo el conjunto: el color y los efectos. el resto (transiciones, velocidad,
+// recortar, transformar) es cosa de un clip concreto, así que ahí no tiene sentido
+const MULTI: Categoria[] = [
+  { id: 'tono', icono: 'tono', etiqueta: 'Ajustar colores', panel: <TonePanel /> },
+  { id: 'efectos', icono: 'efectos', etiqueta: 'Efectos', panel: <EffectsPanel /> },
+  { id: 'audio', icono: 'audio', etiqueta: 'Audio', panel: <MultiAudioPanel /> },
 ]
 
 // según el tipo de la capa elegida, sus propias categorías. el estilo del
@@ -81,11 +91,22 @@ export default function PanelClip() {
   const impactoSeleccionado = useEditorStore((s) => s.impactoSeleccionado)
   const capas = useEditorStore((s) => s.capas)
   const audios = useEditorStore((s) => s.audios)
+  const clips = useEditorStore((s) => s.pista.clips)
+  const bloquesSeleccionados = useEditorStore((s) => s.bloquesSeleccionados)
 
   const capa = capas.find((c) => c.id === capaSeleccionada)
   // la selección de audio comparte campo entre un clip de audio importado o
   // separado y una franja de ganancia; se distinguen mirando en qué lista está
   const esClipAudio = regionSeleccionada && audios.some((a) => a.id === regionSeleccionada)
+  // recuadro con varios clips de video dentro y sin una selección suelta encima: el
+  // panel se enciende con las opciones que valen para todo el grupo (color, efectos)
+  const clipsEnConjunto = bloquesSeleccionados.filter((id) => clips.some((c) => c.id === id))
+  const esMulti =
+    !clipSeleccionado &&
+    !capaSeleccionada &&
+    !regionSeleccionada &&
+    !impactoSeleccionado &&
+    clipsEnConjunto.length > 1
   const categorias: Categoria[] = impactoSeleccionado
     ? IMPACTO_EDITOR
     : clipSeleccionado
@@ -96,7 +117,9 @@ export default function PanelClip() {
           ? [{ id: 'audio', icono: 'audio', etiqueta: 'Audio', panel: <AudioClipPanel /> }]
           : regionSeleccionada
             ? [{ id: 'audio', icono: 'audio', etiqueta: 'Audio', panel: <AudioPanel /> }]
-            : []
+            : esMulti
+              ? MULTI
+              : []
 
   const hayAlgo = categorias.length > 0
   // la categoría abierta vive en el store para que los overlays del visor (el
@@ -117,7 +140,7 @@ export default function PanelClip() {
     if (!hayAlgo || (activa && !categorias.some((c) => c.id === activa))) setActiva(null)
     // solo interesa reaccionar a qué categorías hay, no a la propia elección
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clipSeleccionado, capaSeleccionada, regionSeleccionada, impactoSeleccionado, capa?.tipo])
+  }, [clipSeleccionado, capaSeleccionada, regionSeleccionada, impactoSeleccionado, capa?.tipo, esMulti])
 
   const abierta = categorias.find((c) => c.id === activa)
 
@@ -215,17 +238,7 @@ export default function PanelClip() {
               </Tooltip>
             )
           })
-        ) : (
-          // hueco de reposo: unas marcas tenues que dejan claro que aquí saldrán las
-          // opciones al elegir algo, sin medir ni mover nada
-          <div className="flex flex-col items-center gap-2 pt-1 opacity-30">
-            {['transiciones', 'tono', 'efectos', 'velocidad'].map((n) => (
-              <div key={n} className="grid h-10 w-10 place-items-center rounded-lg">
-                <Icon name={n as NombreIcono} size={18} className="text-[color:var(--muted)]" />
-              </div>
-            ))}
-          </div>
-        )}
+        ) : null}
 
         {/* flecha al fondo del sub-riel para abrir o cerrar el panel de controles,
             igual que la del riel de la izquierda. plegado apunta hacia la izquierda,

@@ -160,7 +160,9 @@ export default function ClipBlock({
     const conAlt = e.altKey && !bloqueada
     let idGesto = clip.id
     let movido = false
-    if (!conAlt) seleccionar(clip.id)
+    // arrastrando un conjunto no se reduce la selección a este clip: seleccionar lo
+    // desmarcaría (limpia el grupo). fuera de un grupo, el clic sí selecciona este clip
+    if (!conAlt && !enGrupo) seleccionar(clip.id)
     // en un nivel bloqueado el gesto termina en la selección: no se mueve nada
     if (bloqueada) return
     setInteractuando(true)
@@ -543,10 +545,12 @@ export default function ClipBlock({
       className={[
         'group/bloque absolute top-0 flex h-full touch-none items-end overflow-hidden rounded-lg border transition-[border-color]',
         bloqueada ? 'cursor-default' : 'cursor-grab',
-        // seleccionado suelto: borde brand. en un conjunto: además un aro interior bien visible,
-        // para que se note de un vistazo qué bloques están marcados al seleccionar varios
+        // seleccionado suelto: solo el borde sólido de color, del MISMO grosor que el resto de
+        // elementos de la línea de tiempo (capas, audios, franjas), sin el aro tenue de antes que lo
+        // hacía verse distinto. en un conjunto sí lleva el aro interior bien visible, para notar de
+        // un vistazo qué bloques están marcados al seleccionar varios
         seleccionado
-          ? 'border-brand ring-2 ring-inset ring-brand/45'
+          ? 'border-brand'
           : enConjunto
             ? 'border-brand ring-2 ring-inset ring-brand/80'
             : 'border-transparent hover:border-white/30',
@@ -556,8 +560,10 @@ export default function ClipBlock({
         width: ancho,
         // en reposo la posición se anima con una curva suave, de modo que al
         // cerrar un hueco los clips se deslizan hasta su nuevo sitio; durante un
-        // arrastre propio o de todo el conjunto el suavizado se apaga para no ir por detrás del cursor
-        transition: sinSuavizado ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+        // arrastre propio o de todo el conjunto el suavizado se apaga para no ir por detrás del cursor.
+        // en un zoom (congelarLayout) también se apaga: si no, el left animado y el ancho que cambia
+        // de golpe hacían que clips pegados se separaran un instante y se volvieran a juntar
+        transition: sinSuavizado || congelarLayout ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
         // mientras la tira se extrae, el clip descansa sobre un azul sólido tenue,
         // sin la miniatura estirada que antes se veía borrosa y rota hasta que
         // llegaban los fotogramas de verdad
