@@ -19,7 +19,21 @@ function ControlVolumen({ oscuro = false }: { oscuro?: boolean }) {
   // instante. así hay tiempo de cruzar el hueco entre la bocina y el deslizador sin
   // que el panel desaparezca a mitad de camino
   const cierre = useRef<number>()
+  // nivel al que volver al quitar el silencio: se recuerda el volumen que había antes de mutear,
+  // para que un clic de vuelta lo restaure en vez de dejarlo en un valor cualquiera
+  const volumenPrevio = useRef(1)
   const pct = Math.round(volumen * 100)
+
+  // un clic en la bocina silencia o devuelve el sonido de la vista previa. el deslizador sigue
+  // saliendo al pasar el cursor por encima, así que el clic queda libre para el mute
+  const alternarSilencio = () => {
+    if (volumen > 0) {
+      volumenPrevio.current = volumen
+      setVolumen(0)
+    } else {
+      setVolumen(volumenPrevio.current > 0 ? volumenPrevio.current : 1)
+    }
+  }
 
   const abrir = () => {
     window.clearTimeout(cierre.current)
@@ -54,8 +68,8 @@ function ControlVolumen({ oscuro = false }: { oscuro?: boolean }) {
       {/* sin tooltip: al pasar el cursor ya se abre el deslizador de volumen, así que
           el globo de ayuda solo estorbaba tapando el control */}
       <button
-        onClick={() => setAbierto((v) => !v)}
-        aria-label="Volumen de la vista previa"
+        onClick={alternarSilencio}
+        aria-label={volumen === 0 ? 'Quitar el silencio de la vista previa' : 'Silenciar la vista previa'}
         className={['grid h-9 w-9 place-items-center rounded-lg transition-colors', colorBoton].join(' ')}
       >
         <Bocina size={18} />
