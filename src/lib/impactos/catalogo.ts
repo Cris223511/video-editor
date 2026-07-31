@@ -1,4 +1,4 @@
-import { TipoImpacto } from '../../types/impacto'
+import { TipoImpacto, DireccionImpacto } from '../../types/impacto'
 
 // tipo de arrastre nativo con el que una bolita viaja desde la paleta del panel
 // hasta un clip. lleva dentro el tipo de efecto elegido
@@ -19,6 +19,10 @@ export interface DefImpacto {
   nombre: string
   categoria: CategoriaImpacto
   descripcion: string
+  // no se muestra en la paleta, pero se conserva para que los proyectos guardados con ese
+  // tipo sigan resolviendo su nombre y su animación. lo usan los flash viejos (a negro y a
+  // blanco) que se unificaron en un solo "Flash" con color elegible
+  oculto?: boolean
 }
 
 export const IMPACTOS: DefImpacto[] = [
@@ -26,14 +30,18 @@ export const IMPACTOS: DefImpacto[] = [
   { tipo: 'zoom', nombre: 'Acercamiento', categoria: 'camara', descripcion: 'Se acerca y vuelve, suave.' },
   { tipo: 'sacudida', nombre: 'Sacudida', categoria: 'camara', descripcion: 'Tiembla un momento, como un golpe.' },
   { tipo: 'latido', nombre: 'Latido', categoria: 'camara', descripcion: 'Un par de pulsos rápidos.' },
-  { tipo: 'flashNegro', nombre: 'Flash a negro', categoria: 'camara', descripcion: 'Se oscurece un instante y vuelve.' },
-  { tipo: 'flashBlanco', nombre: 'Flash a blanco', categoria: 'camara', descripcion: 'Se aclara un instante y vuelve.' },
+  { tipo: 'movimiento', nombre: 'Movimiento', categoria: 'camara', descripcion: 'Un golpe de movimiento con desenfoque, como una sacudida rápida de cámara. La dirección se elige.' },
+  { tipo: 'flashColor', nombre: 'Flash', categoria: 'camara', descripcion: 'Un destello del color que elijas. Por defecto, negro.' },
   { tipo: 'destello', nombre: 'Destello', categoria: 'camara', descripcion: 'Un fogonazo de luz seco.' },
   { tipo: 'parpadeo', nombre: 'Parpadeo', categoria: 'camara', descripcion: 'Parpadea a negro varias veces.' },
-  { tipo: 'flashColor', nombre: 'Flash de color', categoria: 'camara', descripcion: 'Un destello del color elegido.' },
   { tipo: 'contorno', nombre: 'Contorno de neón', categoria: 'neon', descripcion: 'Enciende los bordes como líneas de neón.' },
   { tipo: 'lineas3d', nombre: 'Líneas 3D', categoria: 'neon', descripcion: 'Malla de curvas que envuelve la forma del objeto.' },
   { tipo: 'rayosObjeto', nombre: 'Rayos', categoria: 'neon', descripcion: 'Resplandor con destellos que emana del objeto.' },
+  { tipo: 'manchas', nombre: 'Manchas', categoria: 'neon', descripcion: 'Manchas que vagan por el cuadro e invierten el color de lo que tapan. El color y la fuerza se eligen.' },
+  // se quedan solo para no romper proyectos viejos: ya no salen en la paleta, ahora todo es el
+  // "Flash" de arriba con su color (negro para imitar el de a negro, blanco para el de a blanco)
+  { tipo: 'flashNegro', nombre: 'Flash a negro', categoria: 'camara', descripcion: 'Se oscurece un instante y vuelve.', oculto: true },
+  { tipo: 'flashBlanco', nombre: 'Flash a blanco', categoria: 'camara', descripcion: 'Se aclara un instante y vuelve.', oculto: true },
 ]
 
 // categoría a la que pertenece un tipo de impacto, para abrir su tab al seleccionarlo
@@ -49,6 +57,17 @@ export function nombreImpacto(tipo: TipoImpacto): string {
 // el color por defecto de una bolita recién puesta: un celeste, como pidió el
 // usuario. desde ahí se puede cambiar
 export const COLOR_IMPACTO_DEF = '#38bdf8'
+
+// color de partida según el tipo. el flash arranca en NEGRO (lo pidió así, es el uso más
+// común: oscurecer un golpe), mientras que los de neón y demás siguen en el celeste de marca.
+// en cualquier caso se puede cambiar luego con el selector de color del impacto
+export function colorPorDefectoImpacto(tipo: TipoImpacto): string {
+  if (tipo === 'flashColor') return '#000000'
+  // las manchas arrancan en blanco: en modo diferencia el blanco es la inversión total (el
+  // negativo puro), que es lo más parecido a "invierte el color" nada más ponerlo
+  if (tipo === 'manchas') return '#ffffff'
+  return COLOR_IMPACTO_DEF
+}
 
 // valores de partida de un impacto, compartidos entre el store al crearlo y el
 // editor al restablecer con doble clic
@@ -82,7 +101,13 @@ function ruido(n: number): number {
 // dado el tipo, el avance p (0 al empezar, 1 al terminar) y la intensidad de 0 a
 // 100, devuelve cuánto deforma el cuadro. el golpe es más fuerte al principio y
 // se va soltando, que es como se siente un impacto de verdad
-export function estadoImpacto(tipo: TipoImpacto, p: number, intensidad: number, color: string): EstadoImpacto {
+export function estadoImpacto(
+  tipo: TipoImpacto,
+  p: number,
+  intensidad: number,
+  color: string,
+  direccion?: DireccionImpacto,
+): EstadoImpacto {
   if (p < 0 || p > 1) return NEUTRO
   const amp = Math.max(0, Math.min(100, intensidad)) / 100
   switch (tipo) {
@@ -109,6 +134,22 @@ export function estadoImpacto(tipo: TipoImpacto, p: number, intensidad: number, 
       const f = Math.exp(-4.5 * p) * Math.abs(Math.sin(6 * p))
       return { ...NEUTRO, escala: 1 + 0.22 * amp * f, desenfoque: 0.01 * amp * f }
     }
+    case 'movimiento': {
+      // el cuadro se lanza hacia el lado elegido y regresa amortiguado (un resorte), con el
+      // desenfoque más fuerte en el golpe inicial, que es donde más rápido se mueve: se lee
+      // como una sacudida veloz de cámara. la dirección decide el eje; por defecto, horizontal
+      const dir = direccion ?? 'der'
+      const ux = dir === 'der' ? 1 : dir === 'izq' ? -1 : 0
+      const uy = dir === 'aba' ? 1 : dir === 'arr' ? -1 : 0
+      const resorte = Math.exp(-4.5 * p) * Math.cos(7 * p)
+      return {
+        ...NEUTRO,
+        x: 0.16 * amp * resorte * ux,
+        y: 0.16 * amp * resorte * uy,
+        escala: 1 + 0.03 * amp * Math.exp(-6 * p),
+        desenfoque: 0.05 * amp * Math.exp(-6 * p),
+      }
+    }
     case 'flashNegro':
       return { ...NEUTRO, veloColor: '#000000', veloOpacidad: amp * Math.sin(Math.PI * p) }
     case 'flashBlanco':
@@ -132,7 +173,7 @@ export function estadoImpacto(tipo: TipoImpacto, p: number, intensidad: number, 
 // se multiplican, los desplazamientos y desenfoques se suman, y los velos se
 // apilan quedándose con el más opaco por si dos se pisan
 export function estadoImpactosEn(
-  impactos: { t: number; duracion: number; tipo: TipoImpacto; intensidad: number; color: string }[],
+  impactos: { t: number; duracion: number; tipo: TipoImpacto; intensidad: number; color: string; direccion?: DireccionImpacto }[],
   t: number,
 ): EstadoImpacto {
   let escala = 1
@@ -145,7 +186,7 @@ export function estadoImpactosEn(
     if (im.duracion <= 0) continue
     const p = (t - im.t) / im.duracion
     if (p < 0 || p > 1) continue
-    const e = estadoImpacto(im.tipo, p, im.intensidad, im.color)
+    const e = estadoImpacto(im.tipo, p, im.intensidad, im.color, im.direccion)
     escala *= e.escala
     x += e.x
     y += e.y

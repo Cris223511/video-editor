@@ -27,8 +27,28 @@ const ZONAS: { campo: keyof Ruedas; etiqueta: string }[] = [
   { campo: 'altas', etiqueta: 'Luces' },
 ]
 
-// solo los ajustes numéricos; ruedas y curvas tienen sus propios controles
-type CampoNumerico = Exclude<keyof AjusteTono, 'ruedas' | 'curvas'>
+// solo los ajustes numéricos; ruedas, curvas y el tinte rápido tienen sus propios
+// controles y no van en los deslizadores de rango
+type CampoNumerico = Exclude<keyof AjusteTono, 'ruedas' | 'curvas' | 'tinteColor' | 'tinteFuerza'>
+
+// colores del tinte rápido: un puñado bien elegido para dar un baño de color de un
+// clic. son los tonos que más se piden (un rosado, un dorado, un verde de campo...)
+// sin llenar el panel de opciones. cualquier otro se puede lograr a mano con las ruedas
+const TINTES: { color: string; nombre: string }[] = [
+  { color: '#ff5fa2', nombre: 'Rosa' },
+  { color: '#ff5a5a', nombre: 'Rojo' },
+  { color: '#ff9f43', nombre: 'Naranja' },
+  { color: '#ffd54a', nombre: 'Amarillo' },
+  { color: '#46c46a', nombre: 'Verde' },
+  { color: '#2ec5c5', nombre: 'Turquesa' },
+  { color: '#4c8dff', nombre: 'Azul' },
+  { color: '#9b6bff', nombre: 'Violeta' },
+  { color: '#d661d6', nombre: 'Magenta' },
+]
+
+// fuerza con la que arranca un tinte recién elegido: se nota el color sin tapar la
+// imagen. desde ahí el deslizador lo sube o lo baja
+const FUERZA_TINTE_INICIAL = 45
 
 const CONTROLES: { campo: CampoNumerico; etiqueta: string }[] = [
   { campo: 'exposicion', etiqueta: 'Exposición' },
@@ -36,6 +56,8 @@ const CONTROLES: { campo: CampoNumerico; etiqueta: string }[] = [
   { campo: 'saturacion', etiqueta: 'Saturación' },
   { campo: 'temperatura', etiqueta: 'Temperatura' },
   { campo: 'tinte', etiqueta: 'Tinte' },
+  // la nitidez también se ajusta desde aquí: negativa ablanda, positiva afila
+  { campo: 'nitidez', etiqueta: 'Nitidez' },
 ]
 
 // panel de tono, al estilo Lumetri. corrige el color tanto de un clip de video
@@ -100,6 +122,11 @@ export default function TonePanel() {
   const ruedas = tono.ruedas ?? RUEDAS_NEUTRAS
   const curvas = tono.curvas ?? CURVAS_NEUTRAS
   const canalActivo = CANALES.find((c) => c.campo === curvaActiva) ?? CANALES[0]
+  // "hay tinte puesto" se mide por si HAY un color elegido, no por su fuerza: así, al bajar la
+  // fuerza a 0, el tinte sigue seleccionado y su control se queda a la vista (solo apaga el
+  // efecto). únicamente el botón "Quitar" o volver a pulsar el color lo saca del todo. antes se
+  // usaba usaTinte (fuerza > 0) y por eso al llegar a 0 el control desaparecía y se perdía el color
+  const tintePuesto = !!tono.tinteColor
 
   function cambiarRueda(zona: keyof Ruedas, p: PuntoRueda) {
     aplicar({ ruedas: { ...ruedas, [zona]: p } })
@@ -144,6 +171,65 @@ export default function TonePanel() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* 1) Tinte rápido: el baño de color de un clic va primero, que es lo más usado */}
+      <div>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-[color:var(--muted)]">Tinte rápido</span>
+          {tintePuesto && (
+            <button
+              onClick={() => aplicar({ tinteColor: undefined, tinteFuerza: 0 })}
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-[color:var(--muted)] transition-colors hover:text-brand"
+            >
+              <Icon name="restablecer" size={14} /> Quitar
+            </button>
+          )}
+        </div>
+        {/* un baño de color de un clic: al elegir un tono se vira toda la imagen hacia
+            él sin oscurecerla, y volver a pulsarlo lo saca. la fuerza se afina abajo */}
+        <div className="flex flex-wrap gap-2">
+          {TINTES.map((sw) => {
+            const activo = tintePuesto && tono.tinteColor?.toLowerCase() === sw.color.toLowerCase()
+            return (
+              <button
+                key={sw.color}
+                title={sw.nombre}
+                onClick={() =>
+                  aplicar(
+                    activo
+                      ? { tinteColor: undefined, tinteFuerza: 0 }
+                      : { tinteColor: sw.color, tinteFuerza: (tono.tinteFuerza ?? 0) > 0 ? tono.tinteFuerza : FUERZA_TINTE_INICIAL },
+                  )
+                }
+                className={[
+                  'h-7 w-7 rounded-full border transition-all',
+                  activo
+                    ? 'border-white ring-2 ring-brand ring-offset-1 ring-offset-[color:var(--panel)]'
+                    : 'border-black/15 hover:scale-110 dark:border-white/15',
+                ].join(' ')}
+                style={{ background: sw.color }}
+              />
+            )
+          })}
+        </div>
+        {/* el deslizador aparece con solo tener un color elegido, aunque la fuerza esté en 0:
+            así bajarla a cero no lo hace desaparecer ni pierde el color, solo apaga el efecto */}
+        {tintePuesto && (
+          <div className="mt-3">
+            <Campo etiqueta={`Fuerza (${tono.tinteFuerza ?? 0})`}>
+              <Deslizador
+                valor={tono.tinteFuerza ?? 0}
+                min={0}
+                max={100}
+                onChange={(v) => aplicar({ tinteFuerza: v })}
+              />
+            </Campo>
+          </div>
+        )}
+      </div>
+
+      <div className="h-px" style={{ background: 'rgb(var(--border) / 0.12)' }} />
+
+      {/* 2) Estilos de color (presets) */}
       <div>
         <div className="mb-2 flex items-start justify-between gap-2">
           <span className="text-xs font-medium text-[color:var(--muted)]">Estilos de color</span>
@@ -153,6 +239,9 @@ export default function TonePanel() {
         <PresetsColor tono={tono} miniatura={miniatura} videoUrl={videoUrl} tiempo={tiempoFrame} cargando={cargandoFrame} onAplicar={(t) => aplicar(t)} />
       </div>
 
+      <div className="h-px" style={{ background: 'rgb(var(--border) / 0.12)' }} />
+
+      {/* 3) Ruedas de color */}
       <div>
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="text-xs font-medium text-[color:var(--muted)]">Ruedas de color</span>
@@ -185,6 +274,25 @@ export default function TonePanel() {
 
       <div className="h-px" style={{ background: 'rgb(var(--border) / 0.12)' }} />
 
+      {/* 4) los ajustes numéricos (exposición, contraste, saturación, temperatura, nitidez) */}
+      {CONTROLES.map((c) => {
+        // la nitidez es opcional en los proyectos viejos, así que se cae a 0 si no está
+        const valor = tono[c.campo] ?? 0
+        return (
+          <Campo key={c.campo} etiqueta={`${c.etiqueta} (${valor})`}>
+            <Deslizador
+              valor={valor}
+              min={-100}
+              max={100}
+              onChange={(v) => aplicar({ [c.campo]: v } as Partial<AjusteTono>)}
+            />
+          </Campo>
+        )
+      })}
+
+      <div className="h-px" style={{ background: 'rgb(var(--border) / 0.12)' }} />
+
+      {/* 5) las curvas, al final */}
       <div>
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="text-xs font-medium text-[color:var(--muted)]">Curvas</span>
@@ -229,17 +337,6 @@ export default function TonePanel() {
       </div>
 
       <div className="h-px" style={{ background: 'rgb(var(--border) / 0.12)' }} />
-
-      {CONTROLES.map((c) => (
-        <Campo key={c.campo} etiqueta={`${c.etiqueta} (${tono[c.campo]})`}>
-          <Deslizador
-            valor={tono[c.campo]}
-            min={-100}
-            max={100}
-            onChange={(v) => aplicar({ [c.campo]: v } as Partial<AjusteTono>)}
-          />
-        </Campo>
-      ))}
 
       <button
         onClick={restablecerTono}

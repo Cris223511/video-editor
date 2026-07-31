@@ -6,10 +6,11 @@ import { posicionCapa } from '../layers/motion'
 import { puntosEstrella } from '../layers/figuras'
 import { estadoImpactosEn } from '../impactos/catalogo'
 import { dibujarContorno, dibujarLineas3d, dibujarRayos, crearLienzosContorno, LienzosContorno } from '../impactos/contorno'
+import { dibujarManchas } from '../impactos/manchas'
 import { Impacto } from '../../types/impacto'
-import { esTonoNeutro, filtroCss, hayEfectoFiltro } from '../color/tono'
+import { esTonoNeutro, filtroCss, hayEfectoFiltro, usaMatriz, usaNitidez } from '../color/tono'
 import { REPETICIONES_BRILLO, desenfoqueBrillo } from '../layers/defaults'
-import { anterior, posterior, pintarTransicion, progreso, progresoSalida, esTransicionGlobal, efectoGlobalTrans } from '../transiciones/pintar'
+import { anterior, posterior, pintarTransicion, progreso, progresoSalida, esTransicionGlobal, efectoGlobalTrans, cruceCentradoEn } from '../transiciones/pintar'
 import { buscarTransicion } from '../transiciones/catalogo'
 import { fundidoEn } from '../audio/ganancia'
 import { estiloEntrada, progresoEntrada, estiloSalida, progresoSalidaCapa, combinarEntradaSalida } from '../transiciones/entrada'
@@ -17,6 +18,8 @@ import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../color/mezcla'
 import { cssEfectos } from '../efectos/catalogo'
 import { paramsNB } from '../efectos/nitidezBrillo'
 import { paramsGoPro } from '../efectos/goPro'
+import { paramsCromatico } from '../efectos/cromatico'
+import { efectoAnimado, pintarAnimado } from '../efectos/animados'
 import { encuadreDe, rectClip, ENCUADRE_NEUTRO } from '../timeline/encuadre'
 import { aplicarTransformCanvas } from '../layers/transform'
 
@@ -75,6 +78,19 @@ function auxRecorte(w: number, h: number): HTMLCanvasElement {
   if (lienzoRecorte.width !== w) lienzoRecorte.width = w
   if (lienzoRecorte.height !== h) lienzoRecorte.height = h
   return lienzoRecorte
+}
+
+// lienzo aparte para la textura animada (grano, cine viejo, vhs, destellos). el efecto
+// se pinta aquí sobre transparente, exactamente igual que en el visor, y luego se vuelca
+// sobre el clip. hacerlo en su propio lienzo es lo que hace que el archivo coincida con
+// la vista previa: si se pintara directo encima del video, el modo de fusión actuaría
+// contra los píxeles del video y no contra el transparente, y saldría distinto
+let lienzoAnim: HTMLCanvasElement | null = null
+function auxAnim(w: number, h: number): HTMLCanvasElement {
+  if (!lienzoAnim) lienzoAnim = document.createElement('canvas')
+  if (lienzoAnim.width !== w) lienzoAnim.width = w
+  if (lienzoAnim.height !== h) lienzoAnim.height = h
+  return lienzoAnim
 }
 
 // lienzo aparte para el impacto: el cuadro ya compuesto se copia aquí y se vuelve
@@ -737,56 +753,48 @@ export function dibujarFotograma(
       const hayDesenfoque = hayEfectoFiltro(efectos)
       const hayNB = !!paramsNB(efectos)
       const hayGoPro = !!paramsGoPro(efectos)
-      if (hayDesenfoque || hayNB || hayGoPro) {
-        // cada filtro svg va en su propia pasada, porque mezclarlo con las funciones
-        // nativas en el mismo ctx.filter deja el fotograma en negro. primero el video
-        // con su color y sus efectos css, luego, si toca, el desenfoque, y por último
-        // la nitidez y el brillo. el resultado de cada pasada aterriza en un lienzo
-        // aparte, ya que no se puede filtrar un canvas sobre sí mismo
+      const hayCromatico = !!paramsCromatico(efectos)
+      // la nitidez del tono también va por filtro svg (lleva un desenfoque dentro para la máscara
+      // de realce), así que un clip con solo nitidez ya obliga al camino de pasadas
+      const conTonoUrl = usaMatriz(tonoEf) || usaNitidez(tonoEf)
+      if (hayDesenfoque || hayNB || hayGoPro || hayCromatico || usaNitidez(tonoEf)) {
+        // cada filtro svg va en su propia pasada, porque mezclarlo con las funciones nativas en el
+        // mismo ctx.filter deja el fotograma en negro (sobre todo si el filtro lleva un desenfoque).
+        // primero el video con sus funciones de color NATIVAS y los efectos css; luego, en pasadas
+        // sueltas, el color por matriz/tablas más la nitidez (filtro del tono), el desenfoque de
+        // movimiento, la nitidez-brillo, la curvatura y la aberración cromática. cada pasada aterriza
+        // en un lienzo auxiliar (dos, ping-pong), porque no se puede filtrar un canvas sobre sí mismo
         const aux = auxDesenfoque(ancho, alto)
         const actx = aux.getContext('2d')
         if (actx) {
           actx.setTransform(1, 0, 0, 1, 0, 0)
           actx.clearRect(0, 0, ancho, alto)
-          const base = hayColor ? filtroCss(tonoEf, `tonoexp-${clip.id}`, []) : ''
+          const nativo = hayColor
+            ? `brightness(${1 + tonoEf.exposicion / 100}) contrast(${1 + tonoEf.contraste / 100}) saturate(${1 + tonoEf.saturacion / 100})`
+            : ''
           const ef = cssEfectos(efectos)
-          actx.filter = `${base} ${ef}`.trim() || 'none'
+          actx.filter = `${nativo} ${ef}`.trim() || 'none'
           actx.drawImage(video, dx, dy, dw, dh)
           actx.filter = 'none'
 
           let fuente: HTMLCanvasElement = aux
-          if (hayDesenfoque) {
-            const aux2 = auxSegundo(ancho, alto)
-            const a2 = aux2.getContext('2d')
-            if (a2) {
-              a2.setTransform(1, 0, 0, 1, 0, 0)
-              a2.clearRect(0, 0, ancho, alto)
-              a2.filter = `url(#blurexp-${clip.id})`
-              a2.drawImage(fuente, 0, 0)
-              a2.filter = 'none'
-              fuente = aux2
-            }
+          const pasar = (url: string) => {
+            const destino = fuente === aux ? auxSegundo(ancho, alto) : aux
+            const dc = destino.getContext('2d')
+            if (!dc) return
+            dc.setTransform(1, 0, 0, 1, 0, 0)
+            dc.clearRect(0, 0, ancho, alto)
+            dc.filter = url
+            dc.drawImage(fuente, 0, 0)
+            dc.filter = 'none'
+            fuente = destino
           }
-          // la nitidez y el brillo van en su propia pasada. si además hay curvatura,
-          // el resultado aterriza en un lienzo aparte para curvarlo después; si no,
-          // se aplica directo al lienzo del clip
-          if (hayNB) {
-            const auxN = fuente === aux ? auxSegundo(ancho, alto) : aux
-            const aN = auxN.getContext('2d')
-            if (aN) {
-              aN.setTransform(1, 0, 0, 1, 0, 0)
-              aN.clearRect(0, 0, ancho, alto)
-              aN.filter = `url(#nbexp-${clip.id})`
-              aN.drawImage(fuente, 0, 0)
-              aN.filter = 'none'
-              fuente = auxN
-            }
-          }
-          // pasada final: la curvatura de lente dobla lo que traiga la fuente. si no
-          // la hay, se vuelca tal cual
-          dst.filter = hayGoPro ? `url(#goproexp-${clip.id})` : 'none'
+          if (conTonoUrl) pasar(`url(#tonoexp-${clip.id})`)
+          if (hayDesenfoque) pasar(`url(#blurexp-${clip.id})`)
+          if (hayNB) pasar(`url(#nbexp-${clip.id})`)
+          if (hayGoPro) pasar(`url(#goproexp-${clip.id})`)
+          if (hayCromatico) pasar(`url(#cromaticoexp-${clip.id})`)
           dst.drawImage(fuente, 0, 0)
-          dst.filter = 'none'
         }
       } else {
         {
@@ -820,13 +828,50 @@ export function dibujarFotograma(
         rctx.restore()
         ctx.drawImage(rl, 0, 0)
       }
+
+      // textura animada (grano, cine viejo, vhs, destellos) por encima del clip ya
+      // compuesto. se pinta en un lienzo transparente aparte, recortada al recuadro
+      // visible del video y con el tiempo del fotograma, y de ahí se vuelca sobre el
+      // clip. igual que el visor, así el archivo repite lo que se vio. la aparición
+      // progresiva y el alfa del clip la atenúan al volcarla
+      const anim = efectoAnimado(clip.efectos ?? [])
+      if (anim) {
+        const capa = auxAnim(ancho, alto)
+        const actx = capa.getContext('2d')
+        if (actx) {
+          actx.setTransform(1, 0, 0, 1, 0, 0)
+          actx.clearRect(0, 0, ancho, alto)
+          const rec3 = clip.recorte
+          actx.save()
+          actx.beginPath()
+          actx.rect(
+            dx + (rec3?.izq ?? 0) * dw,
+            dy + (rec3?.arr ?? 0) * dh,
+            dw * (1 - (rec3?.izq ?? 0) - (rec3?.der ?? 0)),
+            dh * (1 - (rec3?.arr ?? 0) - (rec3?.aba ?? 0)),
+          )
+          actx.clip()
+          pintarAnimado(actx, anim, t, { dx, dy, dw, dh }, mixEf)
+          actx.restore()
+          ctx.drawImage(capa, 0, 0)
+        }
+      }
+
       ctx.restore()
     }
 
+    // una disolución entre dos clips se centra en el corte (mitad cola del que sale, mitad
+    // cabeza del que entra), igual que en el visor. si el instante cae dentro de una, se
+    // pinta ese cruce y se ignora el despacho normal por clip activo. el motor dibuja el
+    // que sale entero y el que entra encima con opacidad p, con los dos videos ya colocados
+    // en su tiempo (frameCompuesto y el bucle de export traen sus colas)
+    const cruce = cruceCentradoEn(clips, t, (tipo) => tipo !== 'ninguna' && tipo !== 'corte')
     // misma decisión que en el visor: la salida manda sobre la entrada mientras
     // dura, para que el archivo exportado coincida con lo que se vio al montar
     const q = progresoSalida(activo, t)
-    if (globalAisladaTrans) {
+    if (cruce) {
+      pintarTransicion(ctx, ancho, alto, cruce.entra, cruce.sale, cruce.p, pintar, cruce.entra.transicion.tipo)
+    } else if (globalAisladaTrans) {
       // el clip se pinta normal; su velo y desenfoque se aplican al final, sobre todo
       pintar(activo, 1)
     } else if (q < 1 && activo.transicionSalida) {
@@ -914,6 +959,19 @@ export function dibujarFotograma(
         dibujarContorno(ctx, activoVideo, vw, vh, dst, im.color, im.intensidad, suav, p, t, lienzosContornoExp, trans)
       }
     }
+  }
+
+  // impacto de manchas: los blobs se pintan sobre el cuadro ya compuesto en modo DIFERENCIA, que
+  // invierte el color de lo que tapan, igual que en el visor (allí lo hace mix-blend-mode). va aquí,
+  // antes de la deformación geométrica, para que si coincide con otro impacto también se sacuda
+  const manchasImp = (escena.impactos ?? []).filter((i) => i.tipo === 'manchas' && t >= i.t && t < i.t + i.duracion)
+  for (const im of manchasImp) {
+    const p = (t - im.t) / im.duracion
+    const suav = (im.suavidad ?? 50) / 100
+    ctx.save()
+    ctx.globalCompositeOperation = 'difference'
+    dibujarManchas(ctx, 0, 0, ancho, alto, im.color, im.intensidad, suav, p, t)
+    ctx.restore()
   }
 
   // impactos: deforman el video y lo que va delante (capas, marco), igual que en el

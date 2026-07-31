@@ -144,7 +144,7 @@ export default function CarrilHeader({
           data-tirador-alto
           title="Arrastra para cambiar el alto"
           className="absolute inset-x-0 bottom-0 z-10 h-1.5 cursor-ns-resize opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover:opacity-60"
-          style={{ background: 'rgb(var(--brand) / 0.8)' }}
+          style={{ background: 'rgb(24 97 255 / 0.8)' }}
         />
       )}
       {onAgregar && (

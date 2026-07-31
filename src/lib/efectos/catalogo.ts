@@ -1,4 +1,5 @@
 import { EfectoClip, EfectoFiltro } from '../../types/timeline'
+import { TipoAnimado, TIPOS_ANIMADOS, efectoAnimado, cssBaseAnimado } from './animados'
 
 // un efecto del catálogo. css() devuelve las funciones de filtro que le
 // corresponden a una intensidad dada, y esa misma cadena la usan el visor y la
@@ -68,6 +69,37 @@ export const CATEGORIAS_EFECTO: CategoriaEfecto[] = [
       // solo insinúa el aire de cámara de acción con un poco de contraste y color; la
       // curva de verdad la aplica el visor al elegirlo
       { id: 'gopro', nombre: 'Cámara de acción', css: (i) => `contrast(${1 + p(i) * 0.25}) saturate(${1 + p(i) * 0.3})` },
+      // aberración cromática: el look 3D de canales corridos. no se puede imitar con un filtro
+      // css, así que la muestra solo lo insinúa con saturación y un pelín de contraste; la
+      // separación real de los canales la aplica el filtro svg al elegirlo
+      { id: 'cromatico', nombre: 'Cromático', css: (i) => `saturate(${1 + p(i) * 0.35}) contrast(${1 + p(i) * 0.08})` },
+    ],
+  },
+  {
+    // texturas que se mueven con el tiempo: grano, rayas de cine, líneas de vhs y
+    // destellos. no son filtros de color, se pintan por cuadro encima del video, así
+    // que la muestra de aquí es solo una aproximación para reconocerlas de un vistazo
+    id: 'animados',
+    nombre: 'Animados',
+    grupo: 'efecto',
+    efectos: [
+      { id: 'grano', nombre: 'Grano de película', css: (i) => `contrast(${1 + p(i) * 0.14}) brightness(${1 - p(i) * 0.04})` },
+      { id: 'cineviejo', nombre: 'Cine viejo', css: (i) => `sepia(${p(i) * 0.5}) contrast(${1 + p(i) * 0.22}) brightness(${1 - p(i) * 0.06})` },
+      { id: 'cinemudo', nombre: 'Cine mudo (1920)', css: (i) => `grayscale(1) contrast(${1 + p(i) * 0.3}) sepia(${p(i) * 0.15})` },
+      { id: 'proyector', nombre: 'Proyector viejo', css: (i) => `sepia(${p(i) * 0.35}) brightness(${1 - p(i) * 0.05}) contrast(${1 + p(i) * 0.15})` },
+      { id: 'polvo', nombre: 'Polvo y arañazos', css: (i) => `contrast(${1 + p(i) * 0.08}) brightness(${1 + p(i) * 0.03})` },
+      { id: 'vhs', nombre: 'VHS', css: (i) => `saturate(${1 + p(i) * 0.4}) contrast(${1 + p(i) * 0.1}) hue-rotate(${Math.round(p(i) * 6)}deg)` },
+      { id: 'crt', nombre: 'Monitor CRT', css: (i) => `saturate(${1 + p(i) * 0.15}) contrast(${1 + p(i) * 0.12}) hue-rotate(${Math.round(-p(i) * 8)}deg)` },
+      { id: 'cam2000', nombre: 'Cámara 2000', css: (i) => `blur(${(p(i) * 0.6).toFixed(2)}px) contrast(${1 - p(i) * 0.09}) brightness(${1 + p(i) * 0.05}) saturate(${1 + p(i) * 0.06})` },
+      { id: 'estatica', nombre: 'Estática de TV', css: (i) => `grayscale(${p(i) * 0.7}) contrast(${1 + p(i) * 0.2})` },
+      { id: 'glitch', nombre: 'Glitch digital', css: (i) => `saturate(${1 + p(i) * 0.5}) hue-rotate(${Math.round(p(i) * 10)}deg) contrast(${1 + p(i) * 0.1})` },
+      { id: 'interferencia', nombre: 'Interferencia', css: (i) => `contrast(${1 + p(i) * 0.2}) brightness(${1 + p(i) * 0.05})` },
+      { id: 'retro', nombre: 'Neón 80', css: (i) => `saturate(${1 + p(i) * 0.6}) contrast(${1 + p(i) * 0.15}) hue-rotate(${Math.round(-p(i) * 10)}deg)` },
+      { id: 'destellos', nombre: 'Destellos de luz', css: (i) => `brightness(${1 + p(i) * 0.16}) sepia(${p(i) * 0.2}) saturate(${1 + p(i) * 0.2})` },
+      { id: 'fugascolor', nombre: 'Fugas de color', css: (i) => `saturate(${1 + p(i) * 0.4}) brightness(${1 + p(i) * 0.12}) hue-rotate(${Math.round(p(i) * 20)}deg)` },
+      { id: 'bokeh', nombre: 'Luces bokeh', css: (i) => `brightness(${1 + p(i) * 0.14}) contrast(${1 - p(i) * 0.05})` },
+      { id: 'nieve', nombre: 'Nieve', css: (i) => `brightness(${1 + p(i) * 0.1}) contrast(${1 + p(i) * 0.05})` },
+      { id: 'lluvia', nombre: 'Lluvia', css: (i) => `brightness(${1 - p(i) * 0.05}) contrast(${1 + p(i) * 0.08})` },
     ],
   },
   {
@@ -152,16 +184,26 @@ export function claveEfecto(e: EfectoClip): string {
   if (e.tipo === 'filtro') return `filtro:${e.filtro}`
   if (e.tipo === 'desenfoque-movimiento') return 'desenfoque'
   if (e.tipo === 'gopro') return 'gopro'
-  return 'nitidez-brillo'
+  if (e.tipo === 'cromatico') return 'cromatico'
+  if (e.tipo === 'animado') return `animado:${e.animado}`
+  // el resplandor y el nítido y brilloso comparten motor pero son muestras distintas:
+  // la variante los separa para que en el catálogo solo se marque el que se aplicó
+  return e.tipo === 'nitidez-brillo' && e.variante === 'resplandor' ? 'resplandor' : 'nitidez-brillo'
 }
+
+// ids de las texturas animadas, para reconocerlas al crear o clasificar
+const IDS_ANIMADOS = new Set<string>(TIPOS_ANIMADOS.map((a) => a.id))
 
 // la misma identidad, pero calculada desde el id de una muestra del catálogo. el
 // resplandor comparte el motor de nitidez-brillo (aislar luces, difuminar y sumar),
-// así que ocupa esa misma ranura: es el mismo efecto en su variante de solo brillo
+// pero es una muestra propia, con su clave, para que marcar una no encienda la otra
 export function claveCatalogo(id: string): string {
-  if (id === 'nitidez-brillo' || id === 'resplandor') return 'nitidez-brillo'
+  if (id === 'resplandor') return 'resplandor'
+  if (id === 'nitidez-brillo') return 'nitidez-brillo'
   if (id === 'desenfoque-movimiento') return 'desenfoque'
   if (id === 'gopro') return 'gopro'
+  if (id === 'cromatico') return 'cromatico'
+  if (IDS_ANIMADOS.has(id)) return `animado:${id}`
   return `filtro:${id}`
 }
 
@@ -171,11 +213,15 @@ export function claveCatalogo(id: string): string {
 export function crearEfecto(id: string): EfectoClip {
   if (id === 'nitidez-brillo') return { id: crypto.randomUUID(), tipo: 'nitidez-brillo', nitidez: 55, brillo: 35 }
   // el resplandor nace con la nitidez apagada y el brillo alto: solo glow, ya marcado,
-  // y desde ahí el panel lo sube o lo baja con el mismo mando de brillo
-  if (id === 'resplandor') return { id: crypto.randomUUID(), tipo: 'nitidez-brillo', nitidez: 0, brillo: 80 }
+  // y desde ahí el panel lo sube o lo baja con el mismo mando de brillo. la variante lo
+  // distingue del nítido y brilloso en el catálogo aunque compartan motor
+  if (id === 'resplandor') return { id: crypto.randomUUID(), tipo: 'nitidez-brillo', nitidez: 0, brillo: 80, variante: 'resplandor' }
   if (id === 'desenfoque-movimiento')
     return { id: crypto.randomUUID(), tipo: 'desenfoque-movimiento', intensidad: 40, angulo: 0 }
-  if (id === 'gopro') return { id: crypto.randomUUID(), tipo: 'gopro', curvatura: 55 }
+  if (id === 'gopro') return { id: crypto.randomUUID(), tipo: 'gopro', curvatura: 45 }
+  if (id === 'cromatico') return { id: crypto.randomUUID(), tipo: 'cromatico', intensidad: 50 }
+  if (IDS_ANIMADOS.has(id))
+    return { id: crypto.randomUUID(), tipo: 'animado', animado: id as TipoAnimado, intensidad: 55 }
   return { id: crypto.randomUUID(), tipo: 'filtro', filtro: id, intensidad: 50 }
 }
 
@@ -185,12 +231,19 @@ export function esFiltro(e: EfectoClip): e is { id: string } & EfectoFiltro {
 
 // cadena css de todos los efectos de filtro de un clip, en el orden en que se
 // aplicaron. el desenfoque de movimiento no entra acá: ese va por su propio
-// filtro svg, porque encadenarlo con estos deja el fotograma en negro
+// filtro svg, porque encadenarlo con estos deja el fotograma en negro. algunos
+// efectos animados (cine mudo, estática) además cambian el color del video, y ese
+// filtro base se suma aquí para que salga igual en el visor y en la exportación
 export function cssEfectos(efectos: EfectoClip[] = []): string {
-  return efectos
+  const filtros = efectos
     .filter(esFiltro)
     .filter((e) => e.intensidad > 0)
     .map((e) => buscarEfecto(e.filtro)?.css(e.intensidad) ?? '')
     .filter(Boolean)
-    .join(' ')
+  const anim = efectoAnimado(efectos)
+  if (anim) {
+    const base = cssBaseAnimado(anim)
+    if (base) filtros.push(base)
+  }
+  return filtros.join(' ')
 }

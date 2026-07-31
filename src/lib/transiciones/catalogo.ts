@@ -321,28 +321,12 @@ export const CATALOGO: Transicion[] = [
     descripcion: 'El plano se acerca de golpe con desenfoque y el siguiente se asienta.',
   },
   {
-    id: 'whip-izq',
-    nombre: 'Latigazo a la izquierda',
+    id: 'desenfoque-movimiento',
+    nombre: 'Desenfoque de movimiento',
     grupo: 'desenfoques',
     tecnica: 'barrido-movimiento',
     direccion: 'izq',
-    descripcion: 'Un barrido lateral desenfocado que arrastra de un plano al otro.',
-  },
-  {
-    id: 'whip-der',
-    nombre: 'Latigazo a la derecha',
-    grupo: 'desenfoques',
-    tecnica: 'barrido-movimiento',
-    direccion: 'der',
-    descripcion: 'Igual que el anterior, pero hacia el otro lado.',
-  },
-  {
-    id: 'whip-arr',
-    nombre: 'Latigazo hacia arriba',
-    grupo: 'desenfoques',
-    tecnica: 'barrido-movimiento',
-    direccion: 'arr',
-    descripcion: 'Un barrido vertical desenfocado que empuja hacia arriba.',
+    descripcion: 'Un barrido de cámara: la imagen se estira en una dirección y de esa estela pasa al siguiente plano. La dirección se elige en los ajustes.',
   },
 ]
 

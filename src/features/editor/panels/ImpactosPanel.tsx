@@ -3,11 +3,13 @@ import {
   IMPACTOS,
   TIPO_IMPACTO,
   COLOR_IMPACTO_DEF,
+  colorPorDefectoImpacto,
   estadoImpacto,
   NOMBRES_CATEGORIA_IMPACTO,
   CategoriaImpacto,
 } from '../../../lib/impactos/catalogo'
 import { TipoImpacto } from '../../../types/impacto'
+import { imagenArrastreReducida } from '../../../lib/ui/arrastre'
 
 // duración de un pase de la vista previa y del ciclo completo (pase + descanso), en ms
 const PASE = 750
@@ -17,7 +19,7 @@ const REPOSO = 2
 
 // tipos de neón: su efecto real vive sobre el video, así que en la tarjeta se muestran
 // con una viñeta de líneas en vez de la escena que se deforma
-const NEON = new Set<TipoImpacto>(['contorno', 'lineas3d', 'rayosObjeto'])
+const NEON = new Set<TipoImpacto>(['contorno', 'lineas3d', 'rayosObjeto', 'manchas'])
 
 // viñeta para los impactos de neón: unas líneas y un brillo del color de marca
 function VinetaNeon({ tipo }: { tipo: TipoImpacto }) {
@@ -43,9 +45,11 @@ function VinetaNeon({ tipo }: { tipo: TipoImpacto }) {
   )
 }
 
-// escena mínima que se deforma para previsualizar los impactos de cámara
+// escena mínima que se deforma para previsualizar los impactos de cámara. el velo usa el
+// color de partida del propio tipo, así el Flash se ve negro en su tarjeta (su valor por
+// defecto), no celeste
 function MuestraImpacto({ tipo, p }: { tipo: TipoImpacto; p: number }) {
-  const e = estadoImpacto(tipo, p, 80, COLOR_IMPACTO_DEF)
+  const e = estadoImpacto(tipo, p, 80, colorPorDefectoImpacto(tipo))
   return (
     <span className="relative block h-11 w-full overflow-hidden rounded-md" style={{ background: '#0b1424' }}>
       <span
@@ -63,6 +67,24 @@ function MuestraImpacto({ tipo, p }: { tipo: TipoImpacto; p: number }) {
       {e.veloOpacidad > 0 && (
         <span className="absolute inset-0" style={{ background: e.veloColor, opacity: e.veloOpacidad }} />
       )}
+    </span>
+  )
+}
+
+// vista previa de las manchas: la misma escena, con un par de blobs blancos en modo diferencia
+// que invierten el color de lo que tapan, que es justo lo que hace el impacto
+function MuestraManchas() {
+  return (
+    <span className="relative block h-11 w-full overflow-hidden rounded-md" style={{ background: '#0b1424' }}>
+      <span className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #1d3557, #4a8fd6)' }}>
+        <span className="absolute right-2 top-2 h-4 w-4 rounded-full" style={{ background: '#fde68a', boxShadow: '0 0 7px #fde68a' }} />
+        <span className="absolute bottom-2 left-2 h-1 w-8 rounded-full" style={{ background: '#e2f0ff', opacity: 0.7 }} />
+      </span>
+      {/* los blobs invierten lo de abajo */}
+      <span className="absolute inset-0" style={{ mixBlendMode: 'difference' }}>
+        <span className="absolute h-8 w-8 rounded-full" style={{ left: '18%', top: '20%', background: 'radial-gradient(circle, #fff 0%, rgba(255,255,255,0) 70%)' }} />
+        <span className="absolute h-9 w-9 rounded-full" style={{ left: '52%', top: '30%', background: 'radial-gradient(circle, #fff 0%, rgba(255,255,255,0) 70%)' }} />
+      </span>
     </span>
   )
 }
@@ -107,6 +129,7 @@ function TarjetaImpacto({
       onDragStart={(ev) => {
         ev.dataTransfer.setData(TIPO_IMPACTO, im.tipo)
         ev.dataTransfer.effectAllowed = 'copy'
+        imagenArrastreReducida(ev)
       }}
       onMouseEnter={activar}
       onMouseLeave={desactivar}
@@ -122,7 +145,13 @@ function TarjetaImpacto({
       ].join(' ')}
       style={{ background: 'rgb(var(--border) / 0.05)' }}
     >
-      {esNeon ? <VinetaNeon tipo={im.tipo} /> : <MuestraImpacto tipo={im.tipo} p={p} />}
+      {im.tipo === 'manchas' ? (
+        <MuestraManchas />
+      ) : esNeon ? (
+        <VinetaNeon tipo={im.tipo} />
+      ) : (
+        <MuestraImpacto tipo={im.tipo} p={p} />
+      )}
       <span className="block truncate px-0.5 text-[11px] font-semibold leading-tight text-[color:var(--text)]">
         {im.nombre}
       </span>
@@ -156,6 +185,7 @@ export default function ImpactosPanel({
   const lista = useMemo(() => {
     const q = norm(busca.trim())
     return IMPACTOS.filter((im) => {
+      if (im.oculto) return false // los flash viejos no salen en la paleta
       if (im.categoria !== cat) return false
       if (!q) return true
       return norm(im.nombre).includes(q)

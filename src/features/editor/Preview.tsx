@@ -21,16 +21,21 @@ import {
   filtroCss,
   matrizTono,
   usaMatriz,
+  usaNitidez,
+  nodosNitidez,
   tablasColor,
   hayEfectoFiltro,
   stdDeviationsDesenfoque,
 } from '../../lib/color/tono'
-import { anterior, posterior, pintarTransicion, progreso, progresoSalida, esTransicionGlobal, efectoGlobalTrans } from '../../lib/transiciones/pintar'
+import { anterior, posterior, pintarTransicion, progreso, progresoSalida, esTransicionGlobal, efectoGlobalTrans, cruceCentradoEn } from '../../lib/transiciones/pintar'
 import { cssEfectos } from '../../lib/efectos/catalogo'
 import { paramsNB, nodosFiltroNB, NodoFiltro } from '../../lib/efectos/nitidezBrillo'
 import { paramsGoPro, nodosFiltroGoPro } from '../../lib/efectos/goPro'
+import { paramsCromatico, nodosFiltroCromatico } from '../../lib/efectos/cromatico'
+import { efectoAnimado, pintarAnimado } from '../../lib/efectos/animados'
 import { estadoImpactosEn } from '../../lib/impactos/catalogo'
 import { dibujarContorno, dibujarLineas3d, dibujarRayos, crearLienzosContorno, LienzosContorno } from '../../lib/impactos/contorno'
+import { dibujarManchas } from '../../lib/impactos/manchas'
 
 // pinta un nodo del filtro de nitidez y brillo (y sus hijos) como elemento svg.
 // la receta viene en datos desde el helper, la misma que usa la exportación, así
@@ -48,12 +53,34 @@ import { buscarTransicion } from '../../lib/transiciones/catalogo'
 import { sufijoTransformCss, aplicarTransformCanvas } from '../../lib/layers/transform'
 import { TIPO_FIGURA } from './panels/FiguraPanel'
 
+// una disolución (técnica de opacidad) se centra en el corte y se pinta con la opacidad de
+// los propios elementos del DOM. las demás transiciones entre dos clips —geométricas
+// (barridos, puertas, empujes, escalas) y las de velo global (negro, flash, desenfoque)—
+// también se centran, pero se pintan en el canvas con el motor compartido. y cualquier
+// transición real (no el corte) hace que corran los dos clips a la vez durante el cruce
+const esDisolucion = (tipo: string) => buscarTransicion(tipo).tecnica === 'opacidad'
+const esGeometrica = (tipo: string) => {
+  const t = buscarTransicion(tipo).tecnica
+  return t !== 'corte' && t !== 'opacidad'
+}
+const esTransicionReal = (tipo: string) => tipo !== 'ninguna' && tipo !== 'corte'
+
+// deja listo un lienzo auxiliar del tamaño pedido (lo crea la primera vez y lo redimensiona
+// si hace falta). lo usan las pasadas de graduación del plano durante una transición
+function prepararScratch(ref: React.MutableRefObject<HTMLCanvasElement | null>, w: number, h: number): HTMLCanvasElement {
+  if (!ref.current) ref.current = document.createElement('canvas')
+  if (ref.current.width !== w) ref.current.width = w
+  if (ref.current.height !== h) ref.current.height = h
+  return ref.current
+}
+
 // visor central. monta un video por clip y solo deja visible y sonando el que
 // corresponde al cabezal. la reproducción se apoya en el tiempo nativo de cada
 // video para que salga fluida, y el cabezal se deriva de ese tiempo
 export default function Preview() {
   const clips = useEditorStore((s) => s.pista.clips)
   const playhead = useEditorStore((s) => s.playhead)
+  const previsualizacion = useEditorStore((s) => s.previsualizacion)
   const impactos = useEditorStore((s) => s.impactos)
   const reproduciendo = useEditorStore((s) => s.reproduciendo)
   // mientras se edita el recorte de un clip, ese clip se muestra entero (sin
@@ -74,6 +101,12 @@ export default function Preview() {
   const hayContorno = useEditorStore((s) =>
     s.impactos.some((i) => i.tipo === 'contorno' || i.tipo === 'lineas3d' || i.tipo === 'rayosObjeto'),
   )
+  // hay algún impacto de manchas, para encender su lienzo de inversión por diferencia
+  const hayManchas = useEditorStore((s) => s.impactos.some((i) => i.tipo === 'manchas'))
+  // hay alguna textura animada en algún clip, para encender su lienzo de dibujo por cuadro
+  const hayAnimado = useEditorStore((s) =>
+    s.pista.clips.some((c) => (c.efectos ?? []).some((e) => e.tipo === 'animado' && e.intensidad > 0)),
+  )
   const resolucion = useEditorStore((s) => s.resolucion)
   const colorFondo = useEditorStore((s) => s.colorFondo)
   const fondo = useEditorStore((s) => s.fondo)
@@ -90,14 +123,29 @@ export default function Preview() {
   const medios = useProjectStore((s) => s.medios)
 
   const videosRef = useRef<Map<string, HTMLVideoElement>>(new Map())
+  // medios a los que ya se les rehízo la dirección tras un fallo de carga, para no
+  // entrar en un bucle si el blob nuevo también fallara: al segundo tropiezo se acepta
+  // que el archivo no está y se marca como faltante
+  const urlRehecha = useRef<Set<string>>(new Set())
   const phRef = useRef(playhead)
   const censuraCanvasRef = useRef<HTMLCanvasElement>(null)
   // lienzo del impacto de contorno de neón, y los lienzos de trabajo que reaprovecha
   // el detector de bordes para no crear basura en cada fotograma
   const contornoCanvasRef = useRef<HTMLCanvasElement>(null)
   const contornoLienzos = useRef<LienzosContorno | null>(null)
+  // lienzo del impacto de manchas: va con mix-blend-mode:difference, así los blobs invierten el
+  // color de lo que tienen debajo (video y capas), igual que la exportación lo hace por diferencia
+  const manchasCanvasRef = useRef<HTMLCanvasElement>(null)
+  // lienzo de las texturas animadas del clip (grano, cine viejo, vhs, destellos). se
+  // pinta por cuadro encima del video, con el mismo tiempo del cabezal
+  const animCanvasRef = useRef<HTMLCanvasElement>(null)
   // lienzo que solo se enciende mientras dura una transición con geometría
   const transRef = useRef<HTMLCanvasElement>(null)
+  // dos lienzos auxiliares para graduar cada plano de la transición en pasadas (color,
+  // efectos y filtros svg), del mismo modo que la exportación. sin esto, el plano se
+  // dibujaba crudo y en pleno cruce se veía su color original, sin la edición del clip
+  const scratchA = useRef<HTMLCanvasElement | null>(null)
+  const scratchB = useRef<HTMLCanvasElement | null>(null)
   // videos del relleno borroso, uno por clip (igual que los principales) para que el
   // del clip siguiente ya esté cargado y no haya un fotograma en negro al cambiar de
   // clip. solo se ve el del clip activo; el resto queda a opacidad cero, listo
@@ -165,6 +213,11 @@ export default function Preview() {
   const audioCtxRef = useRef<AudioContext | null>(null)
   const gananciaRef = useRef<GainNode | null>(null)
   const cableadosRef = useRef<Set<string>>(new Set())
+  // un nodo de ganancia por clip, entre su fuente y el nodo maestro. hace falta para las
+  // transiciones: durante un cruce el clip que sale se deja corriendo (para que sus
+  // fotogramas no se congelen) pero con su ganancia a cero, así no suena a la vez que el
+  // que entra. sin esto, con un solo nodo compartido, no se puede callar solo a uno
+  const gananciasClipRef = useRef<Map<string, GainNode>>(new Map())
   const audioRef = useRef({ regiones: audioRegiones, general: volumenGlobal, preview: volumenPreview })
 
   useEffect(() => {
@@ -190,7 +243,12 @@ export default function Preview() {
     if (!ctx || !nodo || cableadosRef.current.has(id)) return
     try {
       const fuente = ctx.createMediaElementSource(v)
-      fuente.connect(nodo)
+      // fuente -> ganancia propia del clip -> ganancia maestra -> salida. la propia
+      // arranca en 1 y solo se baja a cero cuando el clip es el que sale de un cruce
+      const propia = ctx.createGain()
+      fuente.connect(propia)
+      propia.connect(nodo)
+      gananciasClipRef.current.set(id, propia)
       cableadosRef.current.add(id)
     } catch {
       // el elemento ya estaba enrutado o el navegador no lo permite
@@ -246,7 +304,12 @@ export default function Preview() {
   // recortado justo por debajo del final del montaje: en el último instante exacto el
   // rango de un clip [inicio, fin) ya no lo incluye y el visor se quedaba en negro al
   // terminar. con este recorte, el final enseña el último fotograma del último clip
-  const phVista = total > 0 ? Math.min(playhead, Math.max(0, total - 0.001)) : playhead
+  // mientras se recorta un clip, el visor muestra el fotograma del borde que se arrastra en vez del
+  // cabezal, para saber desde dónde se recorta. al soltar (previsualizacion vuelve a null) manda el
+  // cabezal otra vez. como es el mismo tiempo que usa todo el visor, el fotograma sale con toda su
+  // edición (color, efectos, capas), no crudo
+  const baseTiempo = previsualizacion ?? playhead
+  const phVista = total > 0 ? Math.min(baseTiempo, Math.max(0, total - 0.001)) : baseTiempo
   const activo = clipEnTiempo(clipsOrdenados, phVista, ocultas)
   // el archivo del clip visible ya no está: se avisa en el lienzo en vez de dejarlo negro
   const activoFaltante = !!(activo && assetPorId.get(activo.assetId)?.faltante)
@@ -469,14 +532,47 @@ export default function Preview() {
         })
         return
       }
+      // en un cruce centrado corren los dos clips a la vez: el activo por su camino normal
+      // y el otro (el que sale, rodando hacia su cola; o el que entra, desde su cabeza aún
+      // antes de su inicio) también, para que ninguna imagen se congele. su audio va a
+      // cero para que no suene doble
+      const cruceVivo = cruceCentradoEn(clipsOrdenados, ph, esTransicionReal)
+      const companero = cruceVivo ? (act.id === cruceVivo.entra.id ? cruceVivo.sale : cruceVivo.entra) : null
+      const companeroId = companero?.id
       clipsOrdenados.forEach((c) => {
-        if (c.id !== act.id) {
+        if (c.id !== act.id && c.id !== companeroId) {
           const otro = videosRef.current.get(c.id)
           if (otro && !otro.paused) otro.pause()
         }
       })
       const nodo = asegurarGrafo()
       cablearVideo(act.id, v)
+      // la ganancia propia del activo vuelve a 1 por si venía de ser el saliente de un
+      // cruce anterior (donde quedó a cero)
+      const gAct = gananciasClipRef.current.get(act.id)
+      if (gAct) gAct.gain.value = 1
+      // el compañero sigue corriendo (silenciado) para que su imagen no se congele
+      if (companero) {
+        const cv = videosRef.current.get(companero.id)
+        if (cv) {
+          cablearVideo(companero.id, cv)
+          const gc = gananciasClipRef.current.get(companero.id)
+          if (gc) gc.gain.value = 0
+          cv.playbackRate = companero.velocidad
+          // su tiempo continuo: la cola del que sale, o la cabeza del que entra antes de
+          // su inicio (offset negativo). se recoloca si está pausado o se desfasó; si ya
+          // venía rodando, se deja para no dar tirones
+          const objetivo = companero.recorteInicio + (ph - companero.inicio) * companero.velocidad
+          if (cv.paused || Math.abs(cv.currentTime - objetivo) > 0.4) {
+            try {
+              cv.currentTime = Math.max(0, objetivo)
+            } catch {
+              // sin metadatos todavía
+            }
+          }
+          if (cv.paused) cv.play().catch(() => {})
+        }
+      }
       // un nivel silenciado no aporta sonido: su clip se ve pero la ganancia baja
       // a cero, igual que hará la exportación
       if (nodo) {
@@ -512,10 +608,18 @@ export default function Preview() {
       // el fondo borroso del clip activo persigue al video real: mismo asset, misma
       // velocidad y mismo tiempo, para que se vea el material en movimiento y no un
       // cuadro congelado. si se desfasa un poco se reengancha sin cortar la imagen. los
-      // fondos de los otros clips se pausan para que no corran por detrás
+      // fondos de los otros clips se pausan para que no corran por detrás, salvo el del
+      // compañero de un cruce, que sigue para que sus bandas tampoco se congelen
       fondosRef.current.forEach((otro, id) => {
-        if (id !== act.id && !otro.paused) otro.pause()
+        if (id !== act.id && id !== companeroId && !otro.paused) otro.pause()
       })
+      if (companero) {
+        const cf = fondosRef.current.get(companero.id)
+        if (cf) {
+          cf.playbackRate = companero.velocidad
+          if (cf.paused) cf.play().catch(() => {})
+        }
+      }
       const f = fondosRef.current.get(act.id)
       if (f) {
         f.playbackRate = v.playbackRate
@@ -555,12 +659,16 @@ export default function Preview() {
         }
       }
       // recolocar el video es un seek asíncrono: su currentTime todavía no refleja el
-      // instante pedido, así que este fotograma se mantiene el cabezal donde debe estar
-      // y se espera al siguiente. sin esto, calcular el cabezal desde un currentTime que
-      // aún vale 0 lo mandaba al inicio del clip: era el reset que saltaba al pasar de un
-      // clip a otro o al darle play parado en el límite entre dos clips
+      // instante pedido, así que no se puede calcular el cabezal desde él (aún valdría 0 y
+      // saltaría al inicio del clip). la diferencia clave está en QUÉ pasó:
+      // - salto a mano (arrastrando la línea azul): el cabezal se queda donde el usuario soltó,
+      //   esperando a que el video reenganche. no debe avanzar solo
+      // - cambio de clip normal: el video nuevo entra pausado y tarda uno o dos fotogramas en
+      //   arrancar. si el cabezal se CONGELA esperándolo, el corte se ve "pegado", repitiendo el
+      //   último cuadro varias veces. por eso, en este caso, el cabezal AVANZA con el reloj y el
+      //   video reengancha en cuanto tenga datos, dando un corte fluido
       if (recolocado) {
-        phRef.current = Math.min(ph, total)
+        phRef.current = Math.min(salto ? ph : ph + dt, total)
         irA(phRef.current)
         ctPrev = -1
         estancado = 0
@@ -902,17 +1010,145 @@ export default function Preview() {
     }
   }, [hayContorno])
 
+  // render del impacto de manchas: mientras un impacto de este tipo esté en su ventana, se pintan
+  // los blobs del color elegido dentro del recuadro del lienzo, sobre su propio canvas. ese canvas
+  // va con mix-blend-mode:difference (en el jsx), así los blobs invierten el color de lo que tienen
+  // debajo. las manchas se mueven con el tiempo del cabezal, igual que en la exportación
+  useEffect(() => {
+    if (!hayManchas) {
+      const c = manchasCanvasRef.current
+      const ctx = c?.getContext('2d')
+      if (c && ctx) ctx.clearRect(0, 0, c.width, c.height)
+      return
+    }
+    let raf = 0
+    let cancelado = false
+    const render = () => {
+      if (cancelado) return
+      const canvas = manchasCanvasRef.current
+      const stage = canvas?.parentElement
+      const ctx = canvas?.getContext('2d')
+      if (canvas && stage && ctx) {
+        const dpr = window.devicePixelRatio || 1
+        const w = stage.clientWidth
+        const h = stage.clientHeight
+        if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+          canvas.width = Math.round(w * dpr)
+          canvas.height = Math.round(h * dpr)
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        ctx.clearRect(0, 0, w, h)
+        const st = useEditorStore.getState()
+        const ph = st.playhead
+        const activos = st.impactos.filter((i) => i.tipo === 'manchas' && ph >= i.t && ph < i.t + i.duracion)
+        if (activos.length) {
+          // las manchas se quedan dentro del recuadro del lienzo (no de las bandas del fondo)
+          const rect = rectContenido(w, h, st.resolucion.ancho / st.resolucion.alto)
+          for (const im of activos) {
+            const p = (ph - im.t) / im.duracion
+            const suav = (im.suavidad ?? 50) / 100
+            dibujarManchas(ctx, rect.ox, rect.oy, rect.w, rect.h, im.color, im.intensidad, suav, p, ph)
+          }
+        }
+      }
+      raf = requestAnimationFrame(render)
+    }
+    raf = requestAnimationFrame(render)
+    return () => {
+      cancelado = true
+      cancelAnimationFrame(raf)
+    }
+  }, [hayManchas])
+
+  // render de las texturas animadas: mientras el clip activo tenga un efecto de este
+  // tipo (grano, cine viejo, vhs, destellos), se pinta por cuadro sobre el recuadro de
+  // su video, con el tiempo del cabezal. es el mismo dibujo que usa la exportación, así
+  // que lo que se ve aquí es lo que sale en el archivo
+  useEffect(() => {
+    if (!hayAnimado) {
+      const c = animCanvasRef.current
+      const ctx = c?.getContext('2d')
+      if (c && ctx) ctx.clearRect(0, 0, c.width, c.height)
+      return
+    }
+    let raf = 0
+    let cancelado = false
+    const render = () => {
+      if (cancelado) return
+      const canvas = animCanvasRef.current
+      const stage = canvas?.parentElement
+      const ctx = canvas?.getContext('2d')
+      if (canvas && stage && ctx) {
+        const dpr = window.devicePixelRatio || 1
+        const w = stage.clientWidth
+        const h = stage.clientHeight
+        if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+          canvas.width = Math.round(w * dpr)
+          canvas.height = Math.round(h * dpr)
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        ctx.clearRect(0, 0, w, h)
+        const st = useEditorStore.getState()
+        const ph = st.playhead
+        const ordenados = [...st.pista.clips].sort((a, b) => a.inicio - b.inicio)
+        const ocultasSt = new Set<number>()
+        st.pistasMeta.forEach((m, i) => {
+          if (m.oculta) ocultasSt.add(i)
+        })
+        const activoClip = clipEnTiempo(ordenados, ph, ocultasSt)
+        const anim = activoClip ? efectoAnimado(activoClip.efectos ?? []) : null
+        if (activoClip && anim) {
+          const video = videosRef.current.get(activoClip.id)
+          if (video && video.videoWidth > 0) {
+            const rect = rectContenido(w, h, st.resolucion.ancho / st.resolucion.alto)
+            const enc = encuadreDe(activoClip)
+            const vr = rectClip(video.videoWidth, video.videoHeight, rect.w, rect.h, enc)
+            const dst = { dx: rect.ox + vr.dx, dy: rect.oy + vr.dy, dw: vr.dw, dh: vr.dh }
+            const mix = mixEntradaEfecto(activoClip.inicio, activoClip.transicionEfecto, ph)
+            pintarAnimado(ctx, anim, ph, dst, mix)
+          }
+        }
+      }
+      raf = requestAnimationFrame(render)
+    }
+    raf = requestAnimationFrame(render)
+    return () => {
+      cancelado = true
+      cancelAnimationFrame(raf)
+    }
+  }, [hayAnimado])
+
+  // una disolución entre dos clips se resuelve como un cruce centrado en el corte: la
+  // mitad se come la cola del que sale y la otra la cabeza del que entra. si el instante
+  // cae dentro de uno, el que entra sube su opacidad y el que sale se queda entero por
+  // debajo, dando un fundido limpio sin bajón al centro. las demás técnicas siguen su
+  // camino de siempre
+  const cruce = cruceCentradoEn(clipsOrdenados, phVista, esDisolucion)
+  // el cruce centrado cuando la transición es geométrica o de velo (no una disolución): ese
+  // se pinta en el canvas, no con la opacidad del DOM
+  const cruceGeom = cruceCentradoEn(clipsOrdenados, phVista, esGeometrica)
+
   // opacidad de cada video teniendo en cuenta las transiciones: el clip activo
   // entra con su transición (fundido a negro o desvanecido con el anterior), y
   // el clip anterior se mantiene visible mientras dura un desvanecido
   function opacidadDe(clip: Clip): number {
+    // en un cruce centrado, el que entra se funde por encima (0 a 1) y el que sale se
+    // mantiene entero por debajo; así el resultado es p·entra + (1−p)·sale, sin bajón
+    if (cruce) {
+      if (clip.id === cruce.entra.id) return cruce.p
+      if (clip.id === cruce.sale.id) return 1
+    }
     if (activo && clip.id === activo.id) {
       let op = 1
       const t = clip.transicion
+      // una disolución entre dos clips ya la resuelve el cruce centrado de arriba dentro de
+      // su ventana; fuera de ella el clip va entero, así que aquí no se le vuelve a aplicar
+      // el fundido de entrada (si no, se sumaba un segundo fundido y quedaba a medias)
+      const esCruceCentrado = esDisolucion(t.tipo) && !!anterior(clip, clipsOrdenados)
       // solo el fundido por opacidad rebaja el propio video; las transiciones que se
       // pintan encima de toda la composición (negro, desenfoque, flash...) dejan el
       // video como está y su velo o desenfoque se aplica aparte, sobre todo el lienzo
-      if (t.tipo !== 'ninguna' && buscarTransicion(t.tipo).tecnica === 'opacidad') {
+      if (t.tipo !== 'ninguna' && buscarTransicion(t.tipo).tecnica === 'opacidad' && !esCruceCentrado) {
         const entrado = phVista - clip.inicio
         if (entrado < t.duracion) op = Math.min(op, Math.max(0, entrado / t.duracion))
       }
@@ -926,7 +1162,10 @@ export default function Preview() {
       }
       return op
     }
-    if (activo && activo.transicion.tipo === 'desvanecer') {
+    // el fundido del plano anterior también lo maneja ya el cruce centrado (lo deja entero
+    // dentro de la ventana y en cero fuera), así que este camino viejo solo queda para un
+    // 'desvanecer' que abra contra el fondo, sin plano anterior pegado
+    if (activo && activo.transicion.tipo === 'desvanecer' && !anterior(activo, clipsOrdenados)) {
       const idxAct = clipsOrdenados.findIndex((c) => c.id === activo.id)
       const anterior = idxAct > 0 ? clipsOrdenados[idxAct - 1] : null
       if (anterior && anterior.id === clip.id) {
@@ -963,17 +1202,27 @@ export default function Preview() {
   // su ventana y solo cortaba de golpe al final, dando la sensación de que "iba rápido"
   // y de que no respetaba el largo estirado. las globales de un plano aislado (negro,
   // desenfoque, flash) no usan el canvas: su velo se pinta encima de todo, aparte
+  // cuando el clip tiene un plano ANTERIOR, su transición de entrada es en realidad un cruce
+  // CENTRADO en el corte, y de eso ya se encarga cruceGeom dentro de su ventana [corte−medio,
+  // corte+medio]. fuera de esa ventana el clip va entero y NO se le vuelve a aplicar la entrada:
+  // si no, al pasar el corte la lógica de entrada no centrada seguía corriendo hasta corte+dur y
+  // repetía el velo (un fundido a blanco daba un parpadeo blanco justo al terminar el cruce). por
+  // eso la entrada por lienzo solo se enciende cuando el clip abre contra el fondo, sin anterior
   const conLienzoEntrada =
+    !anteriorAct &&
     pTrans < 1 &&
     tecnicaActual !== 'corte' &&
     tecnicaActual !== 'opacidad' &&
-    !(esTransicionGlobal(tecnicaActual) && !anteriorAct)
+    !esTransicionGlobal(tecnicaActual)
   const conLienzoSalida =
     qTrans < 1 &&
     tecSal !== 'corte' &&
     tecSal !== 'opacidad' &&
     !(esTransicionGlobal(tecSal) && !posteriorAct)
-  const conLienzo = conLienzoEntrada || conLienzoSalida
+  // además, un cruce centrado geométrico entre dos clips también se pinta en el canvas,
+  // aunque el cabezal aún esté en el primer clip (antes del corte): por eso se enciende con
+  // cruceGeom, no solo con la transición del clip activo
+  const conLienzo = conLienzoEntrada || conLienzoSalida || !!cruceGeom
 
   // dibuja la transición fotograma a fotograma mientras dura. se apoya en el
   // mismo motor que la exportación, así que lo que se ve aquí es lo que saldrá
@@ -1010,7 +1259,9 @@ export default function Preview() {
         // durante una transición geométrica el video también respeta su encuadre,
         // para que reencuadrar un clip se vea igual dentro y fuera de la transición
         const enc = encuadreDe(clip)
-        const { dx, dy, dw, dh } = rectClip(v.videoWidth, v.videoHeight, lienzo.width, lienzo.height, enc)
+        const W = lienzo.width
+        const H = lienzo.height
+        const { dx, dy, dw, dh } = rectClip(v.videoWidth, v.videoHeight, W, H, enc)
         ctx.save()
         ctx.globalAlpha = alfa
         // giro y espejo alrededor del centro del clip, para que se vean también
@@ -1020,18 +1271,98 @@ export default function Preview() {
           espejoH: enc.espejoH,
           espejoV: enc.espejoV,
         })
-        ctx.drawImage(v, dx, dy, dw, dh)
+
+        // el plano se dibuja con su MISMA graduación que fuera de la transición (color,
+        // efectos css, desenfoque de movimiento, nitidez, curvatura y textura animada), no
+        // crudo. antes se pintaba el video tal cual y por eso en pleno cruce el clip mostraba
+        // su color original sin editar, y al terminar la transición saltaba de golpe a como
+        // estaba corregido. se resuelve en pasadas, igual que la exportación, porque mezclar
+        // funciones nativas con un filtro svg en el mismo ctx.filter deja el cuadro en negro.
+        // cada url() apunta al mismo <filter> que usa el <video> del DOM, así el visor y el
+        // archivo exportado coinciden
+        const mixEf = mixEntradaEfecto(clip.inicio, clip.transicionEfecto, st.playhead)
+        const tonoEf = mezclarTono(clip.tono, mixEf)
+        const efectos = mezclarEfectos(clip.efectos ?? [], mixEf)
+        const nativo = `brightness(${1 + tonoEf.exposicion / 100}) contrast(${1 + tonoEf.contraste / 100}) saturate(${1 + tonoEf.saturacion / 100})`
+        const css = cssEfectos(efectos)
+        const usaTonoUrl = usaMatriz(tonoEf) || usaNitidez(tonoEf) || hayEfectoFiltro(efectos)
+        const conNB = !!paramsNB(efectos)
+        const conGoPro = !!paramsGoPro(efectos)
+        const conCromatico = !!paramsCromatico(efectos)
+
+        if (!usaTonoUrl && !conNB && !conGoPro && !conCromatico) {
+          // solo funciones nativas (o nada): caben en una pasada directa sobre el lienzo
+          const cadena = `${nativo} ${css}`.trim()
+          if (cadena && cadena !== 'brightness(1) contrast(1) saturate(1)') ctx.filter = cadena
+          ctx.drawImage(v, dx, dy, dw, dh)
+          ctx.filter = 'none'
+        } else {
+          // hay filtros svg: se encadenan en pasadas separadas sobre lienzos auxiliares
+          const sa = prepararScratch(scratchA, W, H)
+          const aCtx = sa.getContext('2d')
+          if (aCtx) {
+            aCtx.setTransform(1, 0, 0, 1, 0, 0)
+            aCtx.clearRect(0, 0, W, H)
+            aCtx.filter = `${nativo} ${css}`.trim() || 'none'
+            aCtx.drawImage(v, dx, dy, dw, dh)
+            aCtx.filter = 'none'
+            let fuente: HTMLCanvasElement = sa
+            const pasarUrl = (id: string) => {
+              const destino = prepararScratch(fuente === scratchA.current ? scratchB : scratchA, W, H)
+              const dCtx = destino.getContext('2d')
+              if (!dCtx) return
+              dCtx.setTransform(1, 0, 0, 1, 0, 0)
+              dCtx.clearRect(0, 0, W, H)
+              dCtx.filter = `url(#${id})`
+              dCtx.drawImage(fuente, 0, 0)
+              dCtx.filter = 'none'
+              fuente = destino
+            }
+            if (usaTonoUrl) pasarUrl(`tono-${clip.id}`)
+            if (conNB) pasarUrl(`nb-${clip.id}`)
+            if (conGoPro) pasarUrl(`gopro-${clip.id}`)
+            if (conCromatico) pasarUrl(`cromatico-${clip.id}`)
+            ctx.drawImage(fuente, 0, 0)
+          }
+        }
+
+        // textura animada (grano, vhs, cromático, etc.) por encima del plano, recortada a su
+        // recuadro y con el tiempo del cabezal. se pinta en un lienzo transparente aparte para
+        // que su modo de fusión actúe contra el transparente y no contra el propio video, igual
+        // que en la exportación, y luego se vuelca
+        const anim = efectoAnimado(clip.efectos ?? [])
+        if (anim) {
+          const sc = prepararScratch(scratchB, W, H)
+          const cCtx = sc.getContext('2d')
+          if (cCtx) {
+            cCtx.setTransform(1, 0, 0, 1, 0, 0)
+            cCtx.clearRect(0, 0, W, H)
+            cCtx.save()
+            cCtx.beginPath()
+            cCtx.rect(dx, dy, dw, dh)
+            cCtx.clip()
+            pintarAnimado(cCtx, anim, st.playhead, { dx, dy, dw, dh }, mixEf)
+            cCtx.restore()
+            ctx.drawImage(sc, 0, 0)
+          }
+        }
         ctx.restore()
       }
 
-      // si el clip está terminando y lleva transición de salida, manda ella: el
-      // plano se va con su efecto y por debajo asoma el siguiente, o el fondo si
-      // este era el último. si no, se pinta la de entrada de siempre
+      // un cruce geométrico entre dos clips pegados manda sobre todo: se pinta centrado en el
+      // corte, con los dos planos, igual que en la exportación. si no hay cruce, se cae a la
+      // transición de salida del clip (si está cerrando) o a la de entrada de siempre
+      const cruceVivo = cruceCentradoEn(clipsOrdenados, st.playhead, esGeometrica)
       const q = progresoSalida(act, st.playhead)
-      if (q < 1 && act.transicionSalida) {
+      if (cruceVivo) {
+        pintarTransicion(ctx, lienzo.width, lienzo.height, cruceVivo.entra, cruceVivo.sale, cruceVivo.p, pintar, cruceVivo.entra.transicion.tipo)
+      } else if (q < 1 && act.transicionSalida) {
         const sig = posterior(act, st.pista.clips)
         pintarTransicion(ctx, lienzo.width, lienzo.height, sig, act, q, pintar, act.transicionSalida.tipo)
-      } else {
+      } else if (!sal) {
+        // solo una entrada contra el fondo (sin plano anterior) se pinta como entrada suelta; si
+        // hay anterior es un cruce centrado y ya lo cubre cruceVivo dentro de su ventana. sin este
+        // filtro, en el borde de la ventana se colaba un fotograma de la entrada no centrada
         pintarTransicion(ctx, lienzo.width, lienzo.height, act, sal, p, pintar)
       }
       raf = requestAnimationFrame(paso)
@@ -1051,7 +1382,13 @@ export default function Preview() {
       return { clip: c, tono: mezclarTono(c.tono, mix), efectos: mezclarEfectos(c.efectos ?? [], mix) }
     })
     .filter(
-      (x) => usaMatriz(x.tono) || hayEfectoFiltro(x.efectos) || paramsNB(x.efectos) || paramsGoPro(x.efectos),
+      (x) =>
+        usaMatriz(x.tono) ||
+        usaNitidez(x.tono) ||
+        hayEfectoFiltro(x.efectos) ||
+        paramsNB(x.efectos) ||
+        paramsGoPro(x.efectos) ||
+        paramsCromatico(x.efectos),
     )
 
   const hayContenido = clipsOrdenados.length > 0 || hayCapas
@@ -1242,7 +1579,10 @@ export default function Preview() {
                         // giro del fondo en pasos de 90°. al girar un cuarto de vuelta hay
                         // que ampliar más para que el relleno siga cubriendo todo el lienzo
                         transform: `scale(${(1.12 * (fondoGiro % 180 === 90 ? Math.max(resolucion.ancho / resolucion.alto, resolucion.alto / resolucion.ancho) : 1)).toFixed(3)})${fondoGiro ? ` rotate(${fondoGiro}deg)` : ''}`,
-                        opacity: esActivo ? 1 : 0,
+                        // durante un cruce centrado, el fondo del que entra se funde igual
+                        // que su video y el del que sale se queda entero, para que las
+                        // bandas crucen a la par que la imagen
+                        opacity: cruce && cruce.entra.id === c.id ? cruce.p : cruce && cruce.sale.id === c.id ? 1 : esActivo ? 1 : 0,
                       }}
                     />
                   )
@@ -1326,6 +1666,7 @@ export default function Preview() {
                 return (
                   <Fragment key={c.id}>
                   <video
+                    data-clip-id={c.id}
                     ref={(el) => {
                       if (el) videosRef.current.set(c.id, el)
                       else videosRef.current.delete(c.id)
@@ -1339,9 +1680,36 @@ export default function Preview() {
                       if (useProjectStore.getState().preparando)
                         useProjectStore.setState({ preparando: false })
                     }}
+                    // el blob del medio dejó de cargar (se revocó, o el navegador perdió
+                    // su copia del archivo). se comprueba si el archivo aún se puede leer:
+                    // si sí, se rehace la dirección una vez y el video se recupera solo; si
+                    // no, se marca faltante para mostrar "no encontrado" y que nada vuelva a
+                    // pedir ese blob roto en cada autoguardado, que es lo que llenaba la
+                    // consola de errores de red
+                    onError={() => {
+                      const pr = useProjectStore.getState()
+                      const a = pr.medios.find((m) => m.id === c.assetId)
+                      if (!a || a.faltante) return
+                      a.file
+                        .slice(0, 1)
+                        .arrayBuffer()
+                        .then(() => {
+                          if (urlRehecha.current.has(a.id)) {
+                            pr.marcarFaltante(a.id)
+                            return
+                          }
+                          urlRehecha.current.add(a.id)
+                          pr.refrescarUrl(a.id)
+                        })
+                        .catch(() => pr.marcarFaltante(a.id))
+                    }}
                     className="absolute inset-0 h-full w-full object-contain"
                     style={{
-                      opacity: conLienzo ? 0 : opacidadDe(c),
+                      // durante la transición por canvas se ocultan los videos del DOM y pinta
+                      // el lienzo; pero el clip activo se deja visible por DEBAJO para tapar el
+                      // instante en que el canvas todavía no dibujó su primer cuadro (si no, se
+                      // veía un parpadeo negro justo al empezar la transición)
+                      opacity: conLienzo ? (activo?.id === c.id ? 1 : 0) : opacidadDe(c),
                       transform,
                       transformOrigin: 'center',
                       clipPath,
@@ -1373,6 +1741,9 @@ export default function Preview() {
                         // la curvatura de lente va la última: dobla el resultado ya
                         // corregido y afilado, como haría el cristal de la cámara
                         if (paramsGoPro(mezclaEfecto.efectos)) partes.push(`url(#gopro-${c.id})`)
+                        // la aberración cromática cierra la cadena: corre los canales de color
+                        // sobre lo que ya salió de todo lo anterior
+                        if (paramsCromatico(mezclaEfecto.efectos)) partes.push(`url(#cromatico-${c.id})`)
                         return partes.join(' ') || undefined
                       })(),
                     }}
@@ -1391,10 +1762,23 @@ export default function Preview() {
                 ref={censuraCanvasRef}
                 className="pointer-events-none absolute inset-0 h-full w-full"
               />
+              {/* texturas animadas del clip (grano, cine viejo, vhs, destellos), encima
+                  del video */}
+              <canvas
+                ref={animCanvasRef}
+                className="pointer-events-none absolute inset-0 h-full w-full"
+              />
               {/* líneas de neón del impacto de contorno, por encima de todo lo demás */}
               <canvas
                 ref={contornoCanvasRef}
                 className="pointer-events-none absolute inset-0 h-full w-full"
+              />
+              {/* manchas del impacto de inversión: el modo diferencia hace que sus blobs
+                  inviertan el color de todo lo que tienen debajo */}
+              <canvas
+                ref={manchasCanvasRef}
+                className="pointer-events-none absolute inset-0 h-full w-full"
+                style={{ mixBlendMode: 'difference' }}
               />
             </div>
 
@@ -1406,6 +1790,7 @@ export default function Preview() {
                     const desenfoques = stdDeviationsDesenfoque(efectos)
                     const nb = paramsNB(efectos)
                     const gopro = paramsGoPro(efectos)
+                    const cromatico = paramsCromatico(efectos)
                     return (
                       <Fragment key={c.id}>
                       {nb && (
@@ -1418,6 +1803,13 @@ export default function Preview() {
                         // igual en el visor pequeño y en el archivo a resolución completa
                         <filter id={`gopro-${c.id}`} primitiveUnits="objectBoundingBox">
                           {nodosFiltroGoPro(gopro).map((n, i) => pintarNodoNB(n, i))}
+                        </filter>
+                      )}
+                      {cromatico && (
+                        // el corrimiento de canales va en fracción del elemento, como la curvatura,
+                        // para verse igual en el visor y en el archivo
+                        <filter id={`cromatico-${c.id}`} primitiveUnits="objectBoundingBox" colorInterpolationFilters="sRGB">
+                          {nodosFiltroCromatico(cromatico).map((n, i) => pintarNodoNB(n, i))}
                         </filter>
                       )}
                       <filter id={`tono-${c.id}`} colorInterpolationFilters="sRGB">
@@ -1439,6 +1831,8 @@ export default function Preview() {
                         {desenfoques.map((sd, i) => (
                           <feGaussianBlur key={i} stdDeviation={sd} edgeMode="duplicate" />
                         ))}
+                        {/* la nitidez del tono cierra la cadena: afila o ablanda lo ya corregido */}
+                        {usaNitidez(tono) && nodosNitidez(tono).map((n, i) => pintarNodoNB(n, i))}
                       </filter>
                       </Fragment>
                     )

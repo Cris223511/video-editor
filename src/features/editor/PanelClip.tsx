@@ -163,7 +163,7 @@ export default function PanelClip() {
               onDoubleClick={() => setActiva(null)}
               title="Arrastra para el ancho, doble clic para cerrar"
               className="absolute inset-y-0 left-0 z-10 w-1.5 cursor-ew-resize opacity-0 transition-opacity duration-200 hover:opacity-100"
-              style={{ background: 'rgb(var(--brand) / 0.8)' }}
+              style={{ background: 'rgb(24 97 255 / 0.8)' }}
             />
             <div className="flex h-full flex-col" style={{ width: ancho }}>
               {/* el editor de un impacto ya trae su propia flecha con el nombre, así que

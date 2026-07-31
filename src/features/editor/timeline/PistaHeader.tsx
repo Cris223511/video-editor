@@ -40,8 +40,8 @@ function BotonPista({
         aria-pressed={activo}
         className="interactivo grid h-6 w-6 shrink-0 place-items-center rounded-md transition-colors disabled:pointer-events-none disabled:opacity-30"
         style={{
-          color: activo ? 'rgb(var(--brand))' : 'var(--muted)',
-          background: activo ? 'rgb(var(--brand) / 0.14)' : 'transparent',
+          color: activo ? 'rgb(24 97 255)' : 'var(--muted)',
+          background: activo ? 'rgb(24 97 255 / 0.14)' : 'transparent',
         }}
       >
         {children}
@@ -217,7 +217,7 @@ export default function PistaHeader({ indice, alto }: { indice: number; alto: nu
         data-tirador-alto
         title="Arrastra para cambiar el alto"
         className="absolute inset-x-0 -bottom-0.5 h-1.5 cursor-ns-resize opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover:opacity-60"
-        style={{ background: 'rgb(var(--brand) / 0.8)' }}
+        style={{ background: 'rgb(24 97 255 / 0.8)' }}
       />
 
       <Confirmar

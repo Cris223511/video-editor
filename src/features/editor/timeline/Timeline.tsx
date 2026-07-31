@@ -1,4 +1,4 @@
-import { MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import Icon from '../../../components/ui/Icon'
 import Tooltip from '../../../components/ui/Tooltip'
@@ -13,9 +13,11 @@ import { duracionProyecto } from '../../../lib/timeline/clips'
 import { formatearDuracion } from '../../../lib/format/duracion'
 import TimeRuler from './TimeRuler'
 import ClipBlock from './ClipBlock'
+import CruceBlock from './CruceBlock'
 import Hueco from './Hueco'
 import PistaHeader from './PistaHeader'
 import { HUECO_PISTA } from './ClipBlock'
+import { anterior } from '../../../lib/transiciones/pintar'
 import CapaBlock from './CapaBlock'
 import AudioBlock from './AudioBlock'
 import AudioClipBlock from './AudioClipBlock'
@@ -142,6 +144,30 @@ export default function Timeline({
   // temporizador para reactivar las animaciones de posición un instante después de
   // la última rueda de zoom, de modo que un gesto continuo no las vuelva a encender
   const zoomFreno = useRef<number | null>(null)
+  // apaga las animaciones de posición durante un instante: el zoom cambia la escala de
+  // golpe, y con las animaciones encendidas los bloques se deslizan a su nuevo sitio en
+  // vez de quedar clavados, que se ve mal. sirve tanto para la rueda como para los
+  // botones de acercar y alejar
+  const congelarLayoutUnInstante = useCallback(() => {
+    setCongelarLayout(true)
+    if (zoomFreno.current) clearTimeout(zoomFreno.current)
+    zoomFreno.current = window.setTimeout(() => setCongelarLayout(false), 180)
+  }, [setCongelarLayout])
+  // junta (corte entre dos clips pegados) sobre la que se está arrastrando una transición.
+  // se pinta una sombra centrada ahí, que monta sobre los dos clips, para que se vea que la
+  // transición irá al medio y no al borde de uno solo
+  const [resalteJunta, setResalteJunta] = useState<{ pista: number; corte: number } | null>(null)
+  // al terminar cualquier arrastre (se suelte donde se suelte) se apaga la sombra de la
+  // junta, por si el gesto acabó fuera de un clip y no llegó a limpiarla su onDragLeave
+  useEffect(() => {
+    const limpiar = () => setResalteJunta(null)
+    window.addEventListener('dragend', limpiar)
+    window.addEventListener('drop', limpiar)
+    return () => {
+      window.removeEventListener('dragend', limpiar)
+      window.removeEventListener('drop', limpiar)
+    }
+  }, [])
   // zona de las filas propiamente dicha, la que se desplaza en horizontal. sus
   // coordenadas de pantalla ya incluyen el desplazamiento, así que sirve de
   // origen para traducir la posición del cursor a segundos sin sumar scrollLeft
@@ -306,9 +332,7 @@ export default function Timeline({
       // deslicen hacia su nuevo sitio y, al acercar o alejar rápido, se cruzan entre sí
       // y parece que se reordenan. se congelan mientras dura el gesto y se reactivan un
       // instante después de la última rueda, para que la escala se aplique clavada
-      setCongelarLayout(true)
-      if (zoomFreno.current) clearTimeout(zoomFreno.current)
-      zoomFreno.current = window.setTimeout(() => setCongelarLayout(false), 180)
+      congelarLayoutUnInstante()
       st.aplicarZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15)
       const pxDespues = useEditorStore.getState().pxPorSegundo
       // se conserva bajo el cursor el mismo instante: al crecer la escala, el
@@ -319,7 +343,7 @@ export default function Timeline({
 
     cont.addEventListener('wheel', alGirar, { passive: false })
     return () => cont.removeEventListener('wheel', alGirar)
-  }, [setCongelarLayout])
+  }, [congelarLayoutUnInstante])
 
   // el resalte de la fila y la guía de nueva pista solo deben vivir mientras dura
   // un arrastre. si el gesto termina fuera de la línea de tiempo no llega ni el
@@ -654,7 +678,10 @@ export default function Timeline({
           <span className="mx-1 h-5 w-px" style={{ background: 'rgb(var(--border) / 0.14)' }} />
           <Tooltip texto="Alejar" lado="abajo">
             <button
-              onClick={() => aplicarZoom(1 / 1.3)}
+              onClick={() => {
+                congelarLayoutUnInstante()
+                aplicarZoom(1 / 1.3)
+              }}
               className="interactivo grid h-8 w-8 place-items-center rounded-lg text-[color:var(--muted)]"
             >
               <Icon name="zoomMenos" size={18} />
@@ -662,7 +689,10 @@ export default function Timeline({
           </Tooltip>
           <Tooltip texto="Acercar" lado="abajo">
             <button
-              onClick={() => aplicarZoom(1.3)}
+              onClick={() => {
+                congelarLayoutUnInstante()
+                aplicarZoom(1.3)
+              }}
               className="interactivo grid h-8 w-8 place-items-center rounded-lg text-[color:var(--muted)]"
             >
               <Icon name="zoomMas" size={18} />
@@ -763,7 +793,7 @@ export default function Timeline({
               onPointerDown={estirarCabeceras}
               title="Arrastra para cambiar el ancho"
               className="absolute inset-y-0 right-0 z-50 w-1.5 cursor-ew-resize opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover/cols:opacity-60"
-              style={{ background: 'rgb(var(--brand) / 0.8)' }}
+              style={{ background: 'rgb(24 97 255 / 0.8)' }}
             />
           </div>
 
@@ -802,6 +832,13 @@ export default function Timeline({
                   const oculta = pistasMeta[p]?.oculta
                   // esta fila es la que recibiría el medio que se arrastra ahora mismo
                   const resaltada = pistaResaltada === p
+                  // disoluciones entre dos clips pegados de esta fila: un cruce por cada
+                  // clip que entra con una transición de opacidad y un anterior adyacente
+                  const crucesFila = (fila?.clips ?? []).flatMap((B) => {
+                    if (B.transicion.tipo === 'ninguna' || B.transicion.tipo === 'corte') return []
+                    const A = anterior(B, fila?.clips ?? [])
+                    return A ? [{ entra: B, sale: A }] : []
+                  })
                   return (
                     <motion.div
                       key={pistasMeta[p]?.id ?? p}
@@ -862,9 +899,42 @@ export default function Timeline({
                             altoPista={altosPista[p]}
                             pxPorSegundo={pxPorSegundo}
                             puntos={puntos}
+                            // una disolución con un clip anterior pegado se dibuja como un
+                            // bloque de cruce que monta sobre ambos, así que el clip oculta
+                            // su cuña de entrada para no repetir la transición
+                            sinCuñaEntrada={crucesFila.some((x) => x.entra.id === c.id)}
+                            onResaltarJunta={(corte) =>
+                              setResalteJunta(corte === null ? null : { pista: p, corte })
+                            }
                           />
                         )
                       })}
+                      {/* sombra de la junta mientras se arrastra una transición sobre el corte
+                          entre dos clips pegados: una banda centrada que monta sobre ambos,
+                          para que se vea que la transición cae al medio y no al borde de uno */}
+                      {resalteJunta && resalteJunta.pista === p && (
+                        <div
+                          data-junta-sombra
+                          className="pointer-events-none absolute top-0 z-30 h-full -translate-x-1/2 rounded-md ring-2 ring-inset ring-brand"
+                          style={{
+                            left: resalteJunta.corte * pxPorSegundo,
+                            width: Math.max(24, 0.5 * pxPorSegundo),
+                            background:
+                              'linear-gradient(90deg, transparent 0%, rgb(24 97 255 / 0.5) 45%, rgb(24 97 255 / 0.5) 55%, transparent 100%)',
+                          }}
+                        />
+                      )}
+                      {/* bloques de cruce (disoluciones entre dos clips): montan sobre el
+                          corte, enganchando a los dos, y se estiran simétricos */}
+                      {crucesFila.map((x) => (
+                        <CruceBlock
+                          key={`cruce-${x.entra.id}`}
+                          entra={x.entra}
+                          sale={x.sale}
+                          altoPista={altosPista[p]}
+                          pxPorSegundo={pxPorSegundo}
+                        />
+                      ))}
                       {/* silueta de la copia mientras se arrastra un clip con Alt: verde
                           donde cabe, roja donde pisaría otro clip. no es un clip real
                           hasta soltar en un hueco válido */}
@@ -1121,10 +1191,10 @@ export default function Timeline({
               className="pointer-events-none absolute bottom-0 top-0 z-10"
               style={{ left: hoverSeg * pxPorSegundo }}
             >
-              <span className="absolute bottom-0 top-0 w-px" style={{ background: 'rgb(var(--brand) / 0.45)' }} />
+              <span className="absolute bottom-0 top-0 w-px" style={{ background: 'rgb(24 97 255 / 0.5)' }} />
               <span
                 className="absolute top-0 -translate-x-1/2 rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white shadow-sm"
-                style={{ background: 'rgb(var(--brand) / 0.85)' }}
+                style={{ background: 'rgb(24 97 255 / 0.9)' }}
               >
                 {formatearDuracion(hoverSeg)}
               </span>

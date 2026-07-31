@@ -349,7 +349,7 @@ function Tirador({
         style={{
           width: esVertical ? 2 : `calc(100% - ${RETIRO * 2}px)`,
           height: esVertical ? `calc(100% - ${RETIRO * 2}px)` : 2,
-          background: 'rgb(var(--brand))',
+          background: 'rgb(24 97 255)',
         }}
       />
     </PanelResizeHandle>

@@ -349,7 +349,7 @@ export default function ProyectosView() {
                     className="absolute inset-0"
                     style={{
                       background:
-                        'linear-gradient(135deg, rgb(var(--brand) / 0.14), rgb(var(--surface)) 55%, rgb(var(--brand) / 0.08))',
+                        'linear-gradient(135deg, rgb(24 97 255 / 0.14), rgb(var(--surface)) 55%, rgb(24 97 255 / 0.08))',
                     }}
                   />
                   {/* una retícula tenue de puntos le quita la sensación de vacío

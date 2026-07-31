@@ -9,6 +9,9 @@ export type TipoImpacto =
   | 'zoom'
   | 'sacudida'
   | 'latido'
+  // golpe de movimiento: el cuadro se lanza rápido hacia un lado y vuelve, con desenfoque,
+  // como una sacudida veloz de cámara. la dirección se elige en los ajustes
+  | 'movimiento'
   | 'flashNegro'
   | 'flashBlanco'
   | 'destello'
@@ -23,6 +26,9 @@ export type TipoImpacto =
   // rayos que emanan del objeto: un resplandor con destellos que sale de sus partes
   // brillantes y lo envuelve, apareciendo y creciendo
   | 'rayosObjeto'
+  // manchas: blobs suaves que vagan por el cuadro e invierten el color de lo que tapan (modo
+  // diferencia), el aire líquido/negativo. el color, la intensidad y la suavidad son a gusto
+  | 'manchas'
 
 // dirección de los impactos que fluyen o arrancan desde un lado
 export type DireccionImpacto = 'izq' | 'der' | 'arr' | 'aba'

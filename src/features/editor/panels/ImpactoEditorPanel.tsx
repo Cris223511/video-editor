@@ -9,9 +9,9 @@ const FUERZA_DEF = FUERZA_IMPACTO_DEF
 
 // las líneas 3D se pueden revelar en una dirección y ajustar su densidad; los de neón
 // entran y salen con un ritmo (suavidad) que se puede afinar
-const CON_DIRECCION = new Set(['lineas3d'])
+const CON_DIRECCION = new Set(['lineas3d', 'movimiento'])
 const CON_DENSIDAD = new Set(['lineas3d'])
-const CON_SUAVIDAD = new Set(['contorno', 'lineas3d', 'rayosObjeto'])
+const CON_SUAVIDAD = new Set(['contorno', 'lineas3d', 'rayosObjeto', 'manchas'])
 
 // editor de la bolita elegida: arriba una flecha para volver a la lista, luego las
 // configuraciones (color, dirección/densidad de los de neón, fuerza) y debajo la lista

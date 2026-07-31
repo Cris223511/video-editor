@@ -31,6 +31,7 @@ export function mezclarTono(t: AjusteTono, mix: number): AjusteTono {
     saturacion: t.saturacion * m,
     temperatura: t.temperatura * m,
     tinte: t.tinte * m,
+    nitidez: (t.nitidez ?? 0) * m,
     ruedas,
     curvas,
   }

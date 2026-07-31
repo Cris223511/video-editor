@@ -4,6 +4,100 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.34.0 (2026-07-30)
+
+Una tanda grande centrada en las transiciones, un catálogo de efectos mucho más amplio, tres
+impactos nuevos y varios arreglos de la reproducción y de la edición en la línea de tiempo.
+
+### Transiciones
+
+- **Cruce centrado para todas.** Cuando dos clips están pegados, cualquier transición (no solo el
+  fundido) se resuelve como un cruce centrado en el corte, usando las colas del material, igual que
+  en un editor de escritorio.
+- **Respetan la edición del clip.** Durante la transición, cada plano se ve con su color y sus
+  efectos aplicados, no con la imagen original. Antes se veía el material sin editar y saltaba de
+  golpe a como estaba corregido al terminar el cruce.
+- **Nueva transición «Desenfoque de movimiento».** Un barrido de cámara direccional: la imagen se
+  estira en un sentido y de esa estela pasa al siguiente plano. La dirección (izquierda, derecha,
+  arriba o abajo) se elige en los ajustes.
+- **Sin parpadeos en los bordes.** Se quitaron los destellos de un fotograma (negro al empezar,
+  blanco al terminar) que asomaban al entrar y salir de la ventana de la transición.
+- **Galería con marca de puesta.** Un clic aplica la transición y volver a pulsarla la quita, con
+  su check, igual que en los efectos. Separar dos clips borra la transición que tenían en la junta.
+
+### Efectos
+
+- **Panel reorganizado.** El panel de Efectos enseña solo lo que mueve o texturiza el cuadro; el
+  color vive en Ajustar colores.
+- **Diecisiete texturas animadas** que se pintan por fotograma y se hornean igual en el visor y en
+  el archivo: grano de película, cine viejo, cine mudo, proyector viejo, polvo y arañazos, VHS,
+  monitor CRT, Cámara 2000, estática de TV, glitch digital, interferencia, neón 80, destellos de
+  luz, fugas de color, luces bokeh, nieve y lluvia. Cada una con su intensidad.
+- **Nuevo efecto «Cromático»** (aberración cromática): separa los canales de color para el aire
+  «3D» de lente barata, con el corrimiento regulable.
+- **Cámara de acción con la curvatura corregida:** ahora la imagen se dobla como una lente de
+  verdad (barril radial), arqueando las líneas hacia el medio en lugar de subir el borde de arriba.
+- **Imagen de arrastre más pequeña** al soltar un efecto, una transición o un impacto desde su
+  galería, para que no tape media pantalla.
+
+### Ajustar colores
+
+- **Nitidez** como un ajuste más del tono, de -100 (más suave) a 100 (más nítida), que se ve igual
+  en el visor y en la exportación.
+- **Panel ordenado:** tinte rápido, estilos de color, ruedas, los deslizadores y las curvas.
+- El tinte rápido ya no se pierde al bajar su fuerza a cero: el color se conserva y solo el botón
+  «Quitar» lo saca.
+
+### Impactos
+
+- **«Flash» unificado.** Antes había flash a negro y flash a blanco por separado; ahora es un solo
+  Flash con el color a elegir, negro por defecto.
+- **Impacto «Movimiento»:** un golpe de sacudida de cámara con desenfoque, con su dirección y su
+  fuerza.
+- **Impacto «Manchas»:** unos blobs que vagan por el cuadro e invierten el color de lo que tapan
+  (modo diferencia), con el color y la fuerza que decidas. Como todos los impactos, se puede
+  estirar de un clip al siguiente.
+
+### Línea de tiempo y reproducción
+
+- **Selección múltiple más fluida:** al arrastrar varios bloques a la vez ya no van con retraso ni
+  parecen separarse; siguen al cursor a la par y conservan su distancia. Los bloques marcados
+  llevan además un borde bien visible.
+- **Vista previa al recortar:** mientras se arrastra el borde de un clip, el visor muestra el
+  fotograma exacto desde donde se recorta (con toda su edición), y al soltar vuelve al cabezal.
+- **Cortes fluidos:** se corrigió el tirón que a veces repetía el último fotograma al pasar de un
+  clip al siguiente.
+
+### Audio
+
+- **Audio por clip de video** en el panel de Audio: volumen, fundido de entrada, fundido de salida
+  y silencio del propio clip, no solo de los audios sueltos.
+
+### Correcciones de interfaz
+
+- Se arreglaron controles que quedaban invisibles (tiradores, aros y cabeceras que usaban un color
+  de tema inexistente), el segundo del cursor sobre la regla en modo claro y el cierre de algunos
+  menús al pulsar fuera. Los textos de los paneles se pueden seleccionar con el cursor.
+
+## 2.33.1 (2026-07-30)
+
+- Cuando el archivo de un medio ya no está en el equipo, el clip avisa «no encontrado» en el visor
+  en lugar de dejar el lienzo en negro y llenar la consola de errores de red.
+
+## 2.33.0 (2026-07-30)
+
+- Exportación rápida con WebCodecs, impactos que se pegan al objeto y una tanda de arreglos.
+
+## 2.32.0 (2026-07-28)
+
+- Muchas mejoras del editor: transiciones, censura, duplicado de clips y efectos.
+
+## 2.31.0 (2026-07-26)
+
+- Ronda de pulidos del editor y correcciones (las muestras de color y de efectos parten del
+  fotograma que se ve en el visor, arreglo del cierre del panel de color, y varios detalles del
+  volumen de la vista previa).
+
 ## 2.30.0 (2026-07-25)
 
 Esta versión hace el editor manejable con el dedo, pule la disposición de los

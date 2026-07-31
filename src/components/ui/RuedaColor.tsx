@@ -90,7 +90,7 @@ export default function RuedaColor({
         title="Arrastra para corregir. Shift afina el movimiento y el doble clic la devuelve al centro"
         className={[
           'relative rounded-full transition-shadow duration-200',
-          arrastrando ? 'cursor-grabbing shadow-[0_0_0_2px_rgb(var(--brand))]' : 'cursor-grab',
+          arrastrando ? 'cursor-grabbing shadow-[0_0_0_2px_rgb(24_97_255)]' : 'cursor-grab',
         ].join(' ')}
         style={{
           width: diametro,

@@ -25,6 +25,10 @@ interface EstadoProyecto {
   // marca un medio como no encontrado (su archivo ya no se puede leer). la interfaz lo
   // pinta como tal y deja de intentar cargarlo
   marcarFaltante: (id: string) => void
+  // rehace la dirección temporal de un medio a partir de su archivo. sirve cuando el
+  // blob anterior se murió (se revocó o el navegador perdió su copia) pero el archivo
+  // sigue siendo legible: se crea una url nueva y el video vuelve a verse, sin faltante
+  refrescarUrl: (id: string) => void
   limpiar: () => void
 }
 
@@ -76,6 +80,20 @@ export const useProjectStore = create<EstadoProyecto>((set) => ({
     }),
   marcarFaltante: (id) =>
     set((s) => ({ medios: s.medios.map((m) => (m.id === id ? { ...m, faltante: true } : m)) })),
+  refrescarUrl: (id) =>
+    set((s) => ({
+      medios: s.medios.map((m) => {
+        if (m.id !== id) return m
+        // la anterior se libera para no dejar memoria colgando; la nueva apunta al
+        // mismo archivo, que sí se pudo leer, y se limpia la marca de faltante
+        try {
+          URL.revokeObjectURL(m.url)
+        } catch {
+          // si ya estaba revocada, da igual
+        }
+        return { ...m, url: URL.createObjectURL(m.file), faltante: false }
+      }),
+    })),
   limpiar: () =>
     set((s) => {
       s.medios.forEach((m) => URL.revokeObjectURL(m.url))

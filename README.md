@@ -71,15 +71,15 @@ Está pensado para quien tiene un video concreto entre manos y quiere resolverlo
 
 ### Transiciones
 
-Hay **veintiuna transiciones**, repartidas en cinco familias y descritas como datos en un único catálogo. Eso es lo que garantiza que lo que ves al editar sea idéntico a lo que sale exportado, porque el visor y el compositor ejecutan el mismo motor.
+Hay **treinta transiciones**, repartidas en seis familias y descritas como datos en un único catálogo. Eso es lo que garantiza que lo que ves al editar sea idéntico a lo que sale exportado, porque el visor y el compositor ejecutan el mismo motor.
 
-- **Sin transición.** El corte seco, un plano entra justo donde acaba el anterior.
 - **Atenuaciones.** Fundido con el plano anterior, fundido a negro y fundido a blanco.
-- **Barridos.** A la derecha, a la izquierda, hacia arriba, hacia abajo y en diagonal, con el borde del recorte ligeramente difuminado para que no se vea barato.
+- **Barridos.** A la derecha, a la izquierda, hacia arriba, hacia abajo, en diagonal y cuatro redondeados por esquina, con el borde del recorte ligeramente difuminado para que no se vea barato.
 - **Formas y aperturas.** Persianas, puertas horizontales, puertas verticales, barrido circular, rombo y tercios.
 - **Zooms y empujes.** Empujar en las cuatro direcciones, acercar y alejar.
+- **Desenfoque y destellos.** Desenfoque, destello suave, flash de luz, flash de cámara, golpe de zoom y un desenfoque de movimiento (barrido de cámara) con la dirección a elegir.
 
-La galería lleva buscador propio, que ignora mayúsculas y tildes, y cada muestra ejecuta la transición al pasar el cursor por encima. La duración va de 0,2 a 2 segundos y también se ajusta tirando del borde de la transición en la propia línea de tiempo.
+Entre dos clips pegados, la transición es un cruce centrado en el corte: usa las colas del material y se ve con el color y los efectos de cada plano ya aplicados, como en un editor de escritorio. La galería lleva buscador propio, que ignora mayúsculas y tildes, y cada muestra ejecuta la transición al pasar el cursor por encima. Un clic la aplica y volver a pulsarla la quita. La duración se ajusta tirando del borde de la transición en la propia línea de tiempo.
 
 La misma galería no es solo para los clips. Un texto, una figura, una imagen o un dibujo también entran con la transición que elijas, con su duración y su cuña visible en la línea de tiempo. Y en un clip de video, la corrección de color y los efectos pueden aparecer poco a poco durante los primeros segundos en lugar de estar a pleno desde el primer fotograma.
 
@@ -87,13 +87,27 @@ La misma galería no es solo para los clips. Un texto, una figura, una imagen o 
 
 - **Ruedas por zona tonal.** Tres ruedas independientes para sombras, medios y luces. Arrastras hacia el color que quieras dar a cada zona, con Shift afinas el movimiento y con doble clic la rueda vuelve al centro.
 - **Curvas por canal.** Cuatro curvas editables, una maestra de luz y una por cada canal de rojo, verde y azul. Se añaden puntos con un clic, se doblan arrastrando y se quitan con doble clic.
-- **Ajustes de tono.** Exposición, contraste, saturación, temperatura y tinte, todos de -100 a 100.
+- **Ajustes de tono.** Exposición, contraste, saturación, temperatura, tinte y nitidez, todos de -100 a 100. La nitidez negativa ablanda y la positiva afila.
+- **Tinte rápido.** Un baño de color de un clic: se elige un tono y toda la imagen vira hacia él sin oscurecerse, con su fuerza regulable y removible.
+- **Estilos de color.** Presets de un clic (básicos, cálidos, fríos, cine, blanco y negro) que rellenan los ajustes de abajo para seguir afinando a mano.
 
 Todo se aplica en vivo sobre el visor y llega igual al archivo exportado, porque las ruedas viajan como curva por canal en lugar de recalcularse aparte. La corrección de color funciona tanto en los clips de video como en las imágenes superpuestas.
 
 ### Efectos
 
-- **Desenfoque de movimiento** aplicado al clip, con la posibilidad de sumar y ajustar efectos sobre el video. El catálogo se irá ampliando en próximas versiones.
+Los efectos mueven o texturizan el cuadro (el color vive en Ajustar colores). Se pueden apilar varios en un clip, cada uno con su intensidad, y se ven igual en el visor y en el archivo exportado.
+
+- **Desenfoques y realce.** Desenfoque de foco, desenfoque de movimiento direccional, nítido y brilloso, resplandor, cámara de acción (curvatura de lente tipo GoPro) y cromático (aberración cromática, la separación de canales de color).
+- **Diecisiete texturas animadas** que se pintan por fotograma: grano de película, cine viejo, cine mudo, proyector viejo, polvo y arañazos, VHS, monitor CRT, Cámara 2000, estática de TV, glitch digital, interferencia, neón 80, destellos de luz, fugas de color, luces bokeh, nieve y lluvia.
+- **Filtros de color** de reserva (luz, color, época, ambiente y cine), que se mantienen para no romper proyectos guardados aunque el color ahora se hace en Ajustar colores.
+
+### Impactos
+
+Efectos momentáneos que ocurren dentro de un clip, colocados como una bolita en la línea de tiempo. Afectan a todo lo que se ve en ese instante y se pueden estirar de un clip al siguiente, con su duración, su fuerza y, según el tipo, su color, dirección o suavidad.
+
+- **De cámara.** Rebote, acercamiento, sacudida, latido, movimiento (sacudida veloz con desenfoque), flash (del color que elijas, negro por defecto), destello y parpadeo.
+- **De neón y volumen.** Contorno de neón, líneas 3D, rayos y manchas, estas últimas unos blobs que vagan por el cuadro e invierten el color de lo que tapan.
+- Cada bolita muestra una vista previa animada en la paleta, y su efecto se ve idéntico en el visor y en el archivo.
 
 ### Censura en movimiento
 
@@ -118,6 +132,7 @@ Cada capa se mueve y se redimensiona con ocho tiradores en el visor, manteniendo
 
 - **Volumen general** del proyecto, de 0 a 200 %, con un botón de silencio que recuerda el nivel anterior.
 - **Franjas de volumen.** Añades un tramo, lo colocas y lo recortas en la línea de tiempo, y le das su propia ganancia entre 0 y 200 %. Sirve para bajar la música justo donde alguien habla, o para silenciar solo un fragmento.
+- **Audio por clip de video.** Al elegir un clip, el panel de Audio deja ajustar su volumen, sus fundidos de entrada y salida y su silencio, no solo el sonido general o los audios sueltos.
 - **Separar el audio de un video.** El sonido de un clip se extrae a su propia pista, enlazado al video de origen, para moverlo, recortarlo o darle su propio volumen por separado.
 
 ### Lienzo
@@ -148,7 +163,7 @@ Cada capa se mueve y se redimensiona con ocho tiradores en el visor, manteniendo
 
 La aplicación no arranca en el editor, sino en un sitio que explica lo que hace y deja probarlo antes de importar nada.
 
-- **Portada con demostraciones interactivas.** Las ruedas de color, ocho de las veintiuna transiciones, la censura con su recuadro arrastrable, los controles del visor y el cambio de proporción del lienzo. No son videos grabados, ejecutan el mismo motor que el editor.
+- **Portada con demostraciones interactivas.** Las ruedas de color, ocho de las transiciones, la censura con su recuadro arrastrable, los controles del visor y el cambio de proporción del lienzo. No son videos grabados, ejecutan el mismo motor que el editor.
 - **Recorrido por las herramientas,** que van pasando solas hasta que tocas una, con el montaje y la exportación representados en maquetas animadas.
 - **Preguntas frecuentes** y el paso a paso de cómo se monta un video de principio a fin.
 - **Manual de uso** en su propia página, con el montaje, el color, las capas, la censura, el guardado y la exportación explicados paso a paso, además de la tabla de atajos.

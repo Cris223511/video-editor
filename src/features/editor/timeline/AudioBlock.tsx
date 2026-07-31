@@ -177,6 +177,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
   const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
   const moverBloques = useEditorStore((s) => s.moverBloques)
   const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(region.id))
+  const arrastreBloques = useEditorStore((s) => s.arrastreBloques)
 
   // mientras dura un gesto propio el bloque sigue al cursor sin suavizado; en
   // reposo se anima su posición para que se deslice al acomodarse en vez de saltar
@@ -199,6 +200,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
     const st = useEditorStore.getState()
     const enGrupo = st.bloquesSeleccionados.includes(region.id) && st.bloquesSeleccionados.length > 1
     const grupo = enGrupo ? [...st.bloquesSeleccionados] : []
+    if (enGrupo) st.setArrastreBloques(true)
     // con alt la copia nace al empezar a mover, no al pulsar: así alt y clic seco
     // sirve para sumar el bloque al conjunto sin duplicar nada
     const conAlt = e.altKey
@@ -264,6 +266,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
       useEditorStore.getState().setArrastreVivo(null)
       useEditorStore.getState().setInsercionAudio(null)
       useEditorStore.getState().setFilaAudioResaltada(null)
+      if (enGrupo) useEditorStore.getState().setArrastreBloques(false)
       // alt y clic seco: el bloque entra o sale del conjunto
       if (!movido && conAlt) alternarBloque(region.id)
       setGuiaImantado(null)
@@ -342,16 +345,16 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
         seleccionado
           ? 'border-emerald-400'
           : enConjunto
-            ? 'border-brand/70'
+            ? 'border-brand ring-2 ring-inset ring-brand/80'
             : 'border-transparent hover:border-white/30',
       ].join(' ')}
       style={{
         left: region.inicio * pxPorSegundo,
         width: ancho,
         backgroundColor: 'rgba(16, 185, 129, 0.25)',
-        // suavizado de la posición en reposo; se apaga durante el arrastre para
-        // seguir al cursor sin retraso
-        transition: interactuando ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+        // suavizado de la posición en reposo; se apaga durante el arrastre propio o del conjunto
+        // para seguir al cursor sin retraso
+        transition: interactuando || (arrastreBloques && enConjunto) ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       {/* la onda ocupa el fondo del bloque; encima va el porcentaje de ganancia.

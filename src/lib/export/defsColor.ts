@@ -1,9 +1,10 @@
 import { Clip } from '../../types/timeline'
 import { Capa } from '../../types/layers'
-import { usaMatriz, matrizTono, tablasColor, stdDeviationsDesenfoque } from '../color/tono'
+import { usaMatriz, usaNitidez, nodosNitidez, matrizTono, tablasColor, stdDeviationsDesenfoque } from '../color/tono'
 import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../color/mezcla'
 import { paramsNB, nodosFiltroNB, NodoFiltro } from '../efectos/nitidezBrillo'
 import { paramsGoPro, nodosFiltroGoPro } from '../efectos/goPro'
+import { paramsCromatico, nodosFiltroCromatico } from '../efectos/cromatico'
 
 const NS = 'http://www.w3.org/2000/svg'
 
@@ -16,25 +17,30 @@ export interface DefsColor {
 }
 
 function filtroTono(id: string, tono: Clip['tono']): SVGFilterElement | null {
-  if (!usaMatriz(tono)) return null
+  // el filtro de tono se monta si hay color con matriz/tablas o si hay nitidez que aplicar
+  if (!usaMatriz(tono) && !usaNitidez(tono)) return null
   const filtro = document.createElementNS(NS, 'filter')
   filtro.setAttribute('id', id)
   filtro.setAttribute('color-interpolation-filters', 'sRGB')
-  const fe = document.createElementNS(NS, 'feColorMatrix')
-  fe.setAttribute('type', 'matrix')
-  fe.setAttribute('values', matrizTono(tono))
-  filtro.appendChild(fe)
-  const tablas = tablasColor(tono)
-  if (tablas) {
-    const trans = document.createElementNS(NS, 'feComponentTransfer')
-    ;(['feFuncR', 'feFuncG', 'feFuncB'] as const).forEach((nombre, i) => {
-      const fn = document.createElementNS(NS, nombre)
-      fn.setAttribute('type', 'table')
-      fn.setAttribute('tableValues', tablas[i])
-      trans.appendChild(fn)
-    })
-    filtro.appendChild(trans)
+  if (usaMatriz(tono)) {
+    const fe = document.createElementNS(NS, 'feColorMatrix')
+    fe.setAttribute('type', 'matrix')
+    fe.setAttribute('values', matrizTono(tono))
+    filtro.appendChild(fe)
+    const tablas = tablasColor(tono)
+    if (tablas) {
+      const trans = document.createElementNS(NS, 'feComponentTransfer')
+      ;(['feFuncR', 'feFuncG', 'feFuncB'] as const).forEach((nombre, i) => {
+        const fn = document.createElementNS(NS, nombre)
+        fn.setAttribute('type', 'table')
+        fn.setAttribute('tableValues', tablas[i])
+        trans.appendChild(fn)
+      })
+      filtro.appendChild(trans)
+    }
   }
+  // la nitidez cierra la cadena, sobre lo que traiga el color anterior (o SourceGraphic si no hay)
+  nodosNitidez(tono).forEach((n) => filtro.appendChild(nodoNB(n)))
   return filtro
 }
 
@@ -80,6 +86,17 @@ function filtroGoPro(id: string, efectos: Clip['efectos']): SVGFilterElement | n
   return f
 }
 
+function filtroCromatico(id: string, efectos: Clip['efectos']): SVGFilterElement | null {
+  const p = paramsCromatico(efectos ?? [])
+  if (!p) return null
+  const f = document.createElementNS(NS, 'filter')
+  f.setAttribute('id', id)
+  f.setAttribute('primitiveUnits', 'objectBoundingBox')
+  f.setAttribute('color-interpolation-filters', 'sRGB')
+  nodosFiltroCromatico(p).forEach((n) => f.appendChild(nodoNB(n)))
+  return f
+}
+
 // monta en el dom los filtros svg que el compositor referencia por id, la misma receta
 // que usa la exportación clásica. así el archivo sale con el mismo color y los mismos
 // efectos. quien llama se encarga de refrescar en cada cuadro y de quitar el nodo al fin
@@ -97,6 +114,8 @@ export function montarDefsColor(clips: Clip[], capas: Capa[]): DefsColor {
     if (fNB) defs.appendChild(fNB)
     const fGP = filtroGoPro(`goproexp-${c.id}`, c.efectos)
     if (fGP) defs.appendChild(fGP)
+    const fCr = filtroCromatico(`cromaticoexp-${c.id}`, c.efectos)
+    if (fCr) defs.appendChild(fCr)
   })
 
   // imágenes de capa con corrección de color: su filtro por el id que espera el compositor
@@ -113,7 +132,7 @@ export function montarDefsColor(clips: Clip[], capas: Capa[]): DefsColor {
   const refrescar = (t: number) => {
     for (const c of progresivos) {
       const mix = mixEntradaEfecto(c.inicio, c.transicionEfecto, t)
-      ;['tonoexp', 'blurexp', 'nbexp', 'goproexp'].forEach((p) => defs.querySelector(`#${p}-${c.id}`)?.remove())
+      ;['tonoexp', 'blurexp', 'nbexp', 'goproexp', 'cromaticoexp'].forEach((p) => defs.querySelector(`#${p}-${c.id}`)?.remove())
       const tono = mezclarTono(c.tono, mix)
       const efectos = mezclarEfectos(c.efectos ?? [], mix)
       const fTono = filtroTono(`tonoexp-${c.id}`, tono)
@@ -124,6 +143,8 @@ export function montarDefsColor(clips: Clip[], capas: Capa[]): DefsColor {
       if (fNB) defs.appendChild(fNB)
       const fGP = filtroGoPro(`goproexp-${c.id}`, efectos)
       if (fGP) defs.appendChild(fGP)
+      const fCr = filtroCromatico(`cromaticoexp-${c.id}`, efectos)
+      if (fCr) defs.appendChild(fCr)
     }
   }
 

@@ -6,12 +6,23 @@ export interface AjusteTono {
   saturacion: number
   temperatura: number
   tinte: number
+  // nitidez de la imagen, de -100 (más suave) a 100 (más nítida); 0 es neutro. se resuelve en
+  // el mismo filtro svg del tono (realce por máscara de desenfoque al afilar, o un desenfoque
+  // leve al ablandar), así se ve igual en el visor y en la exportación. opcional para no alterar
+  // los proyectos guardados sin este ajuste
+  nitidez?: number
   // corrección por zonas tonales. queda sin definir mientras no se toquen las
   // ruedas, para no arrastrar datos de más en clips sin corregir
   ruedas?: import('../lib/color/ruedas').Ruedas
   // curvas por canal y maestra, también sin definir mientras sigan siendo la
   // diagonal que no cambia nada
   curvas?: import('../lib/color/curvas').Curvas
+  // tinte rápido: un color hacia el que se vira toda la imagen, como un gel de
+  // color delante del lente. guarda el color en hex (#rrggbb) y la fuerza de 0 a
+  // 100; sin color o con fuerza cero no tiñe nada. es un atajo aparte de las
+  // ruedas y las curvas, pensado para dar un baño de color de un clic
+  tinteColor?: string
+  tinteFuerza?: number
 }
 
 // efecto de desenfoque de movimiento. la intensidad va de 0 a 100 y el ángulo
@@ -45,6 +56,10 @@ export interface EfectoNitidezBrillo {
   tipo: 'nitidez-brillo'
   nitidez: number // 0 a 100
   brillo: number // 0 a 100
+  // el resplandor usa este mismo motor (aislar luces, difuminar y sumar) pero es una
+  // muestra aparte en el catálogo. la marca sirve solo para la interfaz: distingue las
+  // dos entradas para que marcar una no encienda la otra. el dibujo no la mira
+  variante?: 'resplandor'
 }
 
 // aspecto de cámara de acción: curva la imagen como una lente de ojo de pez, con el
@@ -56,11 +71,23 @@ export interface EfectoGoPro {
   curvatura: number // 0 a 100
 }
 
+// aberración cromática: separa los canales de color (rojo/azul) para el aire "3D" de lente
+// barata o glitch. la intensidad de 0 a 100 manda cuánto se corren. se resuelve con un filtro
+// svg, igual que la curvatura, así que el visor y el archivo exportado salen idénticos
+export interface EfectoCromatico {
+  tipo: 'cromatico'
+  intensidad: number // 0 a 100
+}
+
+// la textura animada (grano, cine viejo, vhs, destellos) se define junto a su motor de
+// dibujo en lib/efectos/animados y se referencia aquí para cerrar la unión
 export type EfectoClip = { id: string } & (
   | EfectoDesenfoque
   | EfectoFiltro
   | EfectoNitidezBrillo
   | EfectoGoPro
+  | EfectoCromatico
+  | import('../lib/efectos/animados').EfectoAnimado
 )
 
 // encuadre del clip dentro del lienzo. x e y son el centro del video en
@@ -95,6 +122,9 @@ export interface Transicion {
   // grosor del borde suave del corte, en fracción del lado menor (0 = corte duro).
   // sin definir manda el valor por defecto de la transición del catálogo
   grosor?: number
+  // dirección del barrido en el desenfoque de movimiento (whip): hacia dónde se va la
+  // estela. sin definir manda la de la entrada del catálogo. solo la mira esa transición
+  direccion?: 'izq' | 'der' | 'arr' | 'aba'
 }
 
 // modelo de la línea de tiempo. un clip apunta a un medio importado y define

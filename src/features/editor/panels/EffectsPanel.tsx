@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useClickFuera } from '../../../lib/ui/useClickFuera'
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import SinSeleccion from '../../../components/ui/SinSeleccion'
 import Icon from '../../../components/ui/Icon'
@@ -10,10 +11,9 @@ import { Campo, Deslizador, Segmentado } from '../../../components/ui/Controls'
 import { useProjectStore } from '../../../store/useProjectStore'
 import { useFrameEnTiempo } from '../../../lib/media/useFrameEnTiempo'
 import { EfectoClip } from '../../../types/timeline'
+import { imagenArrastreReducida } from '../../../lib/ui/arrastre'
 import {
   CATEGORIAS_EFECTO,
-  GrupoEfecto,
-  NOMBRES_GRUPO_EFECTO,
   buscarEfecto,
   esFiltro,
   claveEfecto,
@@ -29,8 +29,10 @@ const TIPO_ORDEN_EFECTO = 'application/x-ve-orden-efecto'
 
 // nombre visible de un efecto ya puesto, para la etiqueta de su fila
 function nombreEfecto(e: EfectoClip): string {
-  if (e.tipo === 'nitidez-brillo') return 'Nítido y brilloso'
+  if (e.tipo === 'nitidez-brillo') return e.variante === 'resplandor' ? 'Resplandor' : 'Nítido y brilloso'
   if (e.tipo === 'gopro') return 'Cámara de acción'
+  if (e.tipo === 'cromatico') return 'Cromático'
+  if (e.tipo === 'animado') return buscarEfecto(e.animado)?.nombre ?? 'Efecto animado'
   if (esFiltro(e)) return buscarEfecto(e.filtro)?.nombre ?? 'Efecto'
   return 'Desenfoque de movimiento'
 }
@@ -334,6 +336,12 @@ function FilaEfecto({
   // avisar de que al soltar se reemplaza su efecto
   const [arrastreEncima, setArrastreEncima] = useState(false)
 
+  // la burbuja de ajustes se recoge al pulsar fuera de la fila. el ref envuelve tanto la
+  // burbuja como la fila, así que un clic en el propio botón de ajustes no cuenta como
+  // "fuera" y sigue funcionando como alternador
+  const contenedorRef = useRef<HTMLDivElement>(null)
+  useClickFuera(contenedorRef, onAbrir, abierto)
+
   // la línea celeste de inserción, igual que la de la línea de tiempo, arriba o abajo
   // de la fila según de qué lado caiga el reorden
   const lineaOrden = (arriba: boolean) => (
@@ -350,6 +358,7 @@ function FilaEfecto({
 
   return (
     <motion.div
+      ref={contenedorRef}
       layout
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: atenuado ? 0.4 : 1, y: 0 }}
@@ -505,6 +514,7 @@ function MandosEfecto({
   }
 
   if (efecto.tipo === 'gopro') {
+    // una sola cosa que ajustar: cuánto se abomba la imagen hacia adelante
     return (
       <Campo etiqueta={`Curvatura (${Math.round(efecto.curvatura)})`}>
         <Deslizador valor={efecto.curvatura} min={0} max={100} onChange={(v) => onCambiar({ curvatura: v })} />
@@ -517,6 +527,14 @@ function MandosEfecto({
       <Campo etiqueta="Nivel" valor={efecto.intensidad}>
         <Deslizador valor={efecto.intensidad} min={0} max={100} onChange={(v) => onCambiar({ intensidad: v })} />
       </Campo>
+
+      {/* la Cámara 2000 lleva un mando de ruido aparte del nivel, para regular el grano por su
+          cuenta sin tocar cuánto se ve el resto del filtro */}
+      {efecto.tipo === 'animado' && efecto.animado === 'cam2000' && (
+        <Campo etiqueta="Ruido" valor={efecto.ruido ?? 40}>
+          <Deslizador valor={efecto.ruido ?? 40} min={0} max={100} onChange={(v) => onCambiar({ ruido: v })} />
+        </Campo>
+      )}
 
       {/* la dirección y el ángulo solo tienen sentido en el desenfoque */}
       {efecto.tipo === 'desenfoque-movimiento' && (
@@ -572,20 +590,13 @@ function Catalogo({
   onCancelarAgregar: () => void
   onElegir: (id: string) => void
 }) {
-  // dos familias de arriba del todo: los EFECTOS (movimiento y textura) y los FILTROS
-  // (solo color y tono). el selector cambia entre ellas y, con él, las subcategorías
-  const [grupo, setGrupo] = useState<GrupoEfecto>('efecto')
-  const cats = CATEGORIAS_EFECTO.filter((c) => c.grupo === grupo)
+  // el panel de efectos es solo para lo que mueve o texturiza el cuadro (desenfoques,
+  // realce, texturas animadas). el color y el tono viven en "Ajustar colores", así que
+  // los filtros de color ya no salen aquí para no duplicar lo mismo en dos sitios
+  const cats = CATEGORIAS_EFECTO.filter((c) => c.grupo === 'efecto')
   const [categoria, setCategoria] = useState(cats[0].id)
   const [encima, setEncima] = useState<string | null>(null)
   const actual = cats.find((c) => c.id === categoria) ?? cats[0]
-  // al cambiar de familia, la subcategoría vuelve a la primera de esa familia, para no
-  // quedar señalando una que ya no está en la lista
-  const cambiarGrupo = (g: GrupoEfecto) => {
-    setGrupo(g)
-    const primera = CATEGORIAS_EFECTO.find((c) => c.grupo === g)
-    if (primera) setCategoria(primera.id)
-  }
   const fondo = miniatura
     ? { backgroundImage: `url(${miniatura})`, backgroundSize: 'cover', backgroundPosition: 'center' }
     : cargando
@@ -611,24 +622,6 @@ function Catalogo({
       ) : (
         <span className="text-xs font-medium text-[color:var(--muted)]">Catálogo de efectos</span>
       )}
-
-      {/* selector de familia: Efectos (movimiento y textura) o Filtros (color y tono) */}
-      <div className="flex gap-1 rounded-xl p-1" style={{ background: 'rgb(var(--border) / 0.07)' }}>
-        {(['efecto', 'filtro'] as GrupoEfecto[]).map((g) => (
-          <button
-            key={g}
-            onClick={() => cambiarGrupo(g)}
-            className={[
-              'flex-1 whitespace-nowrap rounded-lg py-1.5 text-[12px] transition-colors duration-100',
-              grupo === g
-                ? 'bg-brand text-white shadow-sm'
-                : 'text-[color:var(--muted)] hover:text-[color:var(--text)]',
-            ].join(' ')}
-          >
-            {NOMBRES_GRUPO_EFECTO[g]}
-          </button>
-        ))}
-      </div>
 
       <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
         {cats.map((c) => (
@@ -657,6 +650,7 @@ function Catalogo({
               onDragStart={(ev) => {
                 ev.dataTransfer.setData(TIPO_EFECTO, e.id)
                 ev.dataTransfer.effectAllowed = 'copy'
+                imagenArrastreReducida(ev)
               }}
               onClick={() => onElegir(e.id)}
               onMouseEnter={() => setEncima(e.id)}

@@ -97,8 +97,19 @@ function volcarNeon(
   ctx.drawImage(linea, rect.dx, rect.dy, rect.dw, rect.dh)
 }
 
-// máscara de revelado direccional aplicada al lienzo de líneas: las líneas se encienden
-// recorriendo el plano en la dirección elegida durante la primera mitad del impacto
+// interpolación suave (smoothstep) entre a y b: 0 por debajo de a, 1 por encima de b y
+// una transición sin aristas en medio. sirve para los bordes blandos de los barridos
+function suave(a: number, b: number, x: number): number {
+  if (a === b) return x < a ? 0 : 1
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)))
+  return t * t * (3 - 2 * t)
+}
+
+// máscara de revelado direccional aplicada al lienzo de líneas. las líneas entran
+// barriendo el plano en la dirección elegida durante la primera parte, y salen barriendo
+// en esa MISMA dirección durante la última: si aparecieron de izquierda a derecha, se
+// borran también empezando por la izquierda, como una cortina que abre y luego cierra por
+// el mismo lado. un frente de entrada y otro de salida, ambos avanzando por el mismo eje
 function revelar(
   lctx: CanvasRenderingContext2D,
   w: number,
@@ -106,26 +117,35 @@ function revelar(
   direccion: DireccionImpacto,
   p: number,
 ) {
-  const frente = Math.min(1.15, p * 2.3)
   const banda = 0.16
+  // el frente de entrada recorre 0→1 en la primera parte; el de salida arranca más tarde
+  // y recorre 0→1 hasta el final. una línea está encendida si el frente de entrada ya la
+  // pasó y el de salida todavía no
+  const entra = Math.min(1 + banda, p * 2.6)
+  const sale = Math.max(0, (p - 0.6) * 2.6)
+  const alfa = (v: number) => {
+    const encendida = 1 - suave(entra - banda, entra, v) // 1 antes del frente de entrada
+    const sinBorrar = suave(sale, sale + banda, v) // 0 detrás del frente de salida
+    return Math.max(0, Math.min(1, encendida * sinBorrar))
+  }
   const horizontal = direccion === 'izq' || direccion === 'der'
   const invertido = direccion === 'izq' || direccion === 'arr'
-  const g = horizontal ? lctx.createLinearGradient(0, 0, w, 0) : lctx.createLinearGradient(0, 0, 0, h)
-  const cl = (x: number) => Math.max(0, Math.min(1, x))
-  const paradas: [number, number][] = invertido
-    ? [
-        [0, 0],
-        [cl(1 - frente - banda), 0],
-        [cl(1 - frente), 1],
-        [1, 1],
-      ]
-    : [
-        [0, 1],
-        [cl(frente), 1],
-        [cl(frente + banda), 0],
-        [1, 0],
-      ]
-  for (const [pos, a] of paradas) g.addColorStop(pos, `rgba(255,255,255,${a})`)
+  // el eje del gradiente va en el sentido del barrido; si la dirección es invertida se
+  // crea al revés, así v=0 cae en el lado por el que debe empezar
+  const [x0, y0, x1, y1] = horizontal
+    ? invertido
+      ? [w, 0, 0, 0]
+      : [0, 0, w, 0]
+    : invertido
+      ? [0, h, 0, 0]
+      : [0, 0, 0, h]
+  const g = lctx.createLinearGradient(x0, y0, x1, y1)
+  // se muestrea la visibilidad en varios puntos del eje para que las bandas blandas de los
+  // dos frentes salgan bien, no solo cuatro paradas fijas
+  for (let i = 0; i <= 10; i++) {
+    const v = i / 10
+    g.addColorStop(v, `rgba(255,255,255,${alfa(v).toFixed(3)})`)
+  }
   lctx.globalCompositeOperation = 'destination-in'
   lctx.fillStyle = g
   lctx.fillRect(0, 0, w, h)
@@ -212,8 +232,13 @@ export function dibujarLineas3d(
   trans: Trans = {},
 ) {
   if (vw <= 0 || vh <= 0) return
-  const env = envolvente(p, suavidad)
-  if (env <= 0) return
+  // el alfa de las líneas 3D solo sube al arrancar y se mantiene: la desaparición ya no es
+  // un desvanecido global sino el barrido de salida de `revelar`, que borra en la misma
+  // dirección en que aparecieron. así entra y sale por el mismo lado
+  if (p <= 0 || p >= 1) return
+  const rampa = 0.04 + Math.max(0, Math.min(1, suavidad)) * 0.42
+  const sube = Math.min(1, p / rampa)
+  const env = sube * sube * (3 - 2 * sube)
   const info = luminancia(video, vw, vh, lz)
   if (!info) return
   const { w, h, lum, rctx } = info

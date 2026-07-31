@@ -34,6 +34,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
   const moverBloques = useEditorStore((s) => s.moverBloques)
   const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(capa.id))
+  const arrastreBloques = useEditorStore((s) => s.arrastreBloques)
   // las figuras y las imágenes viven ahora en las pistas de video, así que su
   // arrastre vertical usa el mismo sistema que los clips, no el de las filas de
   // texto. el resto de capas (texto, dibujo, censura) sigue en el carril de texto
@@ -89,6 +90,8 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
     const st = useEditorStore.getState()
     const enGrupo = st.bloquesSeleccionados.includes(capa.id) && st.bloquesSeleccionados.length > 1
     const grupo = enGrupo ? [...st.bloquesSeleccionados] : []
+    // arrastrando un conjunto: todos los bloques del grupo apagan su suavizado para ir a la par
+    if (enGrupo) st.setArrastreBloques(true)
     // con alt la copia nace al empezar a mover, no al pulsar: así alt y clic seco
     // sirve para sumar el bloque al conjunto sin duplicar nada
     const conAlt = e.altKey
@@ -202,6 +205,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       useEditorStore.getState().setArrastreVivo(null)
       useEditorStore.getState().setInsercionTexto(null)
       useEditorStore.getState().setFilaTextoResaltada(null)
+      if (enGrupo) useEditorStore.getState().setArrastreBloques(false)
       // alt y clic seco: el bloque entra o sale del conjunto
       if (!movido && conAlt) alternarBloque(capa.id)
       setGuiaImantado(null)
@@ -294,7 +298,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
 
   return (
     <motion.div
-      layout={interactuando || congelarLayout ? false : 'position'}
+      layout={interactuando || (arrastreBloques && enConjunto) || congelarLayout ? false : 'position'}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={capa.nivel ?? 0}
       data-bloque-id={capa.id}
@@ -321,16 +325,16 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
         seleccionado
           ? esImagen ? 'border-sky-400' : 'border-amber-400'
           : enConjunto
-            ? 'border-brand/70'
+            ? 'border-brand ring-2 ring-inset ring-brand/80'
             : 'border-transparent hover:border-white/30',
       ].join(' ')}
       style={{
         left: capa.inicio * pxPorSegundo,
         width: Math.max(capa.duracion * pxPorSegundo, 8),
         backgroundColor: esImagen ? 'rgba(10, 12, 20, 0.72)' : 'rgba(245, 158, 11, 0.25)',
-        // en reposo la posición se anima con una curva suave; durante el arrastre
-        // el suavizado se apaga para que el bloque no vaya por detrás del cursor
-        transition: interactuando ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+        // en reposo la posición se anima con una curva suave; durante el arrastre propio o de todo
+        // el conjunto el suavizado se apaga para que el bloque no vaya por detrás del cursor
+        transition: interactuando || (arrastreBloques && enConjunto) ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       {esImagen ? (

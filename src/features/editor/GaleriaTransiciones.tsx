@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search } from 'lucide-react'
+import { Check, Search } from 'lucide-react'
 import { TipoTransicion } from '../../types/timeline'
 import {
   CATALOGO,
@@ -9,6 +9,7 @@ import {
   Transicion,
 } from '../../lib/transiciones/catalogo'
 import { pintarTransicion } from '../../lib/transiciones/pintar'
+import { imagenArrastreReducida } from '../../lib/ui/arrastre'
 import { Clip } from '../../types/timeline'
 
 // las mismas dos fotos en todas las muestras: así lo único que cambia entre una
@@ -162,7 +163,9 @@ export default function GaleriaTransiciones({
     })
   }, [])
 
-  const resultados = useMemo(() => filtrar(busqueda), [busqueda])
+  // el "corte" (sin transición, id 'ninguna') ya no se elige aquí: quitar una transición se
+  // hace desde el resumen o el botón "Quitar", así que no se muestra como una tarjeta más
+  const resultados = useMemo(() => filtrar(busqueda).filter((t) => t.id !== 'ninguna'), [busqueda])
   const grupos = useMemo(() => {
     const mapa = new Map<Grupo, Transicion[]>()
     for (const t of resultados) {
@@ -210,23 +213,35 @@ export default function GaleriaTransiciones({
               return (
                 <button
                   key={t.id}
-                  onClick={() => onElegir(t.id)}
-                  // además de aplicarse con un clic, la transición se puede
-                  // arrastrar y soltar sobre un clip de la línea de tiempo
+                  // un clic la aplica; volver a pulsar la que ya está puesta la quita (queda
+                  // en 'ninguna'), igual que en el panel de efectos. si la transición era una
+                  // junta con otro clip, quitarla la borra para los dos
+                  onClick={() => onElegir(elegida ? ('ninguna' as TipoTransicion) : t.id)}
+                  // además de con un clic, la transición se puede arrastrar y soltar sobre un
+                  // clip de la línea de tiempo
                   draggable
                   onDragStart={(e) => {
                     e.dataTransfer.setData(TIPO_TRANSICION, t.id)
                     e.dataTransfer.effectAllowed = 'copy'
+                    imagenArrastreReducida(e)
                   }}
                   className={[
-                    'group/muestra flex cursor-grab flex-col gap-1.5 rounded-xl p-1.5 text-left transition-all duration-200 active:cursor-grabbing',
+                    'group/muestra relative flex cursor-grab flex-col gap-1.5 rounded-xl p-1.5 text-left transition-all duration-200 active:cursor-grabbing',
                     elegida
                       ? 'ring-2 ring-brand'
                       : 'ring-1 ring-black/10 hover:ring-brand/50 dark:ring-white/10',
                   ].join(' ')}
                   style={{ background: 'rgb(var(--border) / 0.05)' }}
                 >
-                  <Demo t={t} imagenes={imagenes} listo={listo} />
+                  <span className="relative block">
+                    <Demo t={t} imagenes={imagenes} listo={listo} />
+                    {/* la marca de puesta, como en efectos: al volver a pulsarla se quita */}
+                    {elegida && (
+                      <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-brand text-white shadow">
+                        <Check size={12} />
+                      </span>
+                    )}
+                  </span>
                   <span
                     className={[
                       'truncate px-0.5 text-[13px] font-medium',
@@ -243,7 +258,9 @@ export default function GaleriaTransiciones({
       ))}
 
       <p className="text-[13px] text-[color:var(--muted)]">
-        {CATALOGO.length} transiciones disponibles. Pasa el cursor por una muestra para verla en
+        {/* el catálogo incluye el "Corte" (id 'ninguna'), que no es una transición elegible aquí:
+            se descuenta para que el número coincida con las tarjetas que se ven */}
+        {CATALOGO.length - 1} transiciones disponibles. Pasa el cursor por una muestra para verla en
         movimiento.
       </p>
     </div>

@@ -22,6 +22,34 @@
   user-select: text;
   -webkit-user-select: text;
 }
+/* los textos de lectura (rótulos, nombres, descripciones de los paneles) SÍ se pueden
+   seleccionar con el cursor, que es lo que se pidió: leer y copiar una etiqueta no debería
+   estar bloqueado. solo se deja fuera lo que de verdad se arrastra, más abajo */
+.editor-noselect p,
+.editor-noselect span,
+.editor-noselect label,
+.editor-noselect li,
+.editor-noselect h1,
+.editor-noselect h2,
+.editor-noselect h3,
+.editor-noselect h4,
+.editor-noselect h5,
+.editor-noselect h6 {
+  user-select: text;
+  -webkit-user-select: text;
+}
+/* pero lo que se arrastra (bloques de la línea de tiempo y las tarjetas arrastrables de las
+   galerías de efectos, transiciones e impactos) vuelve a no seleccionarse: así moverlos no pinta
+   el resalte azul del texto ni interfiere con el arrastre */
+.editor-noselect [data-bloque-id],
+.editor-noselect [data-bloque-id] *,
+.editor-noselect [data-arrastrable],
+.editor-noselect [data-arrastrable] *,
+.editor-noselect [draggable='true'],
+.editor-noselect [draggable='true'] * {
+  user-select: none;
+  -webkit-user-select: none;
+}
 
 /* los elementos que se arrastran con el dedo (bloques de la línea de tiempo,
    capas del visor, tiradores y manijas) desactivan los gestos táctiles del

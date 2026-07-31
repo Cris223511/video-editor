@@ -10,6 +10,7 @@ import MedioNoDisponible from '../../../components/ui/MedioNoDisponible'
 import PropiedadesClip from './PropiedadesClip'
 import TransicionBlock from './TransicionBlock'
 import { TIPO_TRANSICION } from '../GaleriaTransiciones'
+import { anterior, posterior } from '../../../lib/transiciones/pintar'
 import { TIPO_EFECTO, crearEfecto } from '../../../lib/efectos/catalogo'
 import { TIPO_IMPACTO } from '../../../lib/impactos/catalogo'
 import { TipoImpacto } from '../../../types/impacto'
@@ -24,6 +25,13 @@ interface Props {
   altoPista?: number
   pxPorSegundo: number
   puntos: number[] // instantes a los que imantar el clip al moverlo
+  // cuando la transición de entrada es una disolución con el clip anterior, la dibuja el
+  // bloque de cruce del carril (que monta sobre los dos), así que aquí se omite su cuña
+  sinCuñaEntrada?: boolean
+  // avisa al carril de que se está arrastrando una transición sobre una junta con un clip
+  // pegado, con el instante del corte, para pintar la sombra centrada que monta sobre los
+  // dos. null cuando el arrastre ya no cae en una junta
+  onResaltarJunta?: (corte: number | null) => void
 }
 
 // separación vertical entre niveles; debe coincidir con la que usa la línea de
@@ -39,9 +47,12 @@ export default function ClipBlock({
   altoPista = 64,
   pxPorSegundo,
   puntos,
+  sinCuñaEntrada = false,
+  onResaltarJunta,
 }: Props) {
   const seleccionado = useEditorStore((s) => s.clipSeleccionado === clip.id)
   const congelarLayout = useEditorStore((s) => s.congelarLayout)
+  const arrastreBloques = useEditorStore((s) => s.arrastreBloques)
   const alternarSilencioClip = useEditorStore((s) => s.alternarSilencioClip)
   const alternarBloque = useEditorStore((s) => s.alternarBloque)
   const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
@@ -66,6 +77,7 @@ export default function ClipBlock({
   const insertarPistaEn = useEditorStore((s) => s.insertarPistaEn)
   const setInsercionPista = useEditorStore((s) => s.setInsercionPista)
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
+  const setPrevisualizacion = useEditorStore((s) => s.setPrevisualizacion)
   const finGesto = useEditorStore((s) => s.finGesto)
   // un clip de un nivel bloqueado no se puede arrastrar ni recortar; solo
   // seleccionar. la comprobación se hace por su pista
@@ -111,6 +123,12 @@ export default function ClipBlock({
 
   const ancho = Math.max(clip.duracion * pxPorSegundo, 8)
 
+  // se apaga el suavizado de posición cuando este bloque está en un gesto propio (mover o
+  // recortar) O cuando forma parte de un conjunto que se está arrastrando. sin lo segundo, solo el
+  // clip que iniciaba el arrastre seguía al cursor al instante y los demás del grupo iban por
+  // detrás con la animación, dando la sensación de que se separaban y se volvían a juntar
+  const sinSuavizado = interactuando || (arrastreBloques && enConjunto)
+
   function iniciarMover(e: ReactPointerEvent) {
     // solo el botón izquierdo arrastra. el derecho abre el menú, y si de paso
     // arrancaba un gesto de movimiento el bloque se iba con el cursor
@@ -130,6 +148,9 @@ export default function ClipBlock({
     // si el clip forma parte de un conjunto de varios, el arrastre los lleva a todos
     const enGrupo = st.bloquesSeleccionados.includes(clip.id) && st.bloquesSeleccionados.length > 1
     const grupo = enGrupo ? [...st.bloquesSeleccionados] : []
+    // arrastrando un conjunto: se avisa para que TODOS los bloques del grupo apaguen su suavizado
+    // de posición y sigan al cursor a la par (se apaga al soltar)
+    if (enGrupo) st.setArrastreBloques(true)
     // con alt la copia ya no nace al pulsar sino al empezar a mover. así un alt y
     // clic seco, sin arrastrar, sirve para sumar el clip al conjunto sin duplicar nada
     const conAlt = e.altKey && !bloqueada
@@ -266,6 +287,8 @@ export default function ClipBlock({
     }
     const soltar = () => {
       useEditorStore.getState().setArrastreVivo(null)
+      // se acabó el gesto del conjunto: los bloques vuelven a su suavizado normal
+      if (enGrupo) useEditorStore.getState().setArrastreBloques(false)
       // alt y clic seco, sin llegar a arrastrar: el clip entra o sale del conjunto
       if (!movido && conAlt) alternarBloque(clip.id)
       // alt con arrastre: la copia recién nace ahora, en el sitio del fantasma, y solo
@@ -322,6 +345,15 @@ export default function ClipBlock({
     const propios = [base.inicio, base.inicio + base.duracion]
     setInteractuando(true)
     setEstirandoVelocidad(e.altKey)
+    // deja en el visor el fotograma del borde que se está arrastrando (con toda su edición), para
+    // ver desde dónde se recorta. es el primer fotograma del clip si se arrastra el inicio, o el
+    // último si se arrastra el final. se lee el clip ya actualizado del store
+    const mostrarBorde = () => {
+      const c = useEditorStore.getState().pista.clips.find((x) => x.id === clip.id)
+      if (!c) return
+      const t = lado === 'inicio' ? c.inicio + 0.0005 : c.inicio + c.duracion - 0.0005
+      setPrevisualizacion(Math.max(0, t))
+    }
     const mover = (ev: globalThis.PointerEvent) => {
       const delta = (ev.clientX - inicioX) / pxPorSegundo
       // con alt el gesto deja de recortar y pasa a repartir el mismo trozo de
@@ -347,11 +379,14 @@ export default function ClipBlock({
         setGuiaImantado(enganche ? enganche.guia : null)
         recortarClip(clip.id, lado, d, base)
       }
+      mostrarBorde()
     }
     const soltar = () => {
       setEstirandoVelocidad(false)
       setGuiaImantado(null)
       setInteractuando(false)
+      // se acabó el recorte: el visor vuelve a mostrar lo que hay en el cabezal
+      setPrevisualizacion(null)
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)
     }
@@ -366,9 +401,39 @@ export default function ClipBlock({
     return e.clientX - rect.left < rect.width / 2 ? 'entrada' : 'salida'
   }
 
-  // al soltar una transición arrastrada desde la galería, se aplica en el borde sobre
-  // el que se soltó: en la mitad izquierda como transición de entrada (su unión con el
-  // clip anterior) y en la derecha como transición de salida
+  // el clip que va justo pegado después de este (su inicio coincide con el fin de este,
+  // sin hueco). solo entonces el borde derecho es una junta con cruce; si hay un hueco, el
+  // borde es la salida de este clip contra el fondo
+  function siguientePegado(): Clip | null {
+    const sig = posterior(clip, useEditorStore.getState().pista.clips)
+    if (sig && Math.abs(sig.inicio - (clip.inicio + clip.duracion)) < 0.05) return sig
+    return null
+  }
+
+  // el clip que va justo pegado antes de este (su fin coincide con el inicio de este)
+  function anteriorPegado(): Clip | null {
+    const ant = anterior(clip, useEditorStore.getState().pista.clips)
+    if (ant && Math.abs(clip.inicio - (ant.inicio + ant.duracion)) < 0.05) return ant
+    return null
+  }
+
+  // instante del corte de la junta bajo el cursor durante un arrastre de transición, o
+  // null si el borde no cae en una junta (es una salida o entrada contra el fondo). la
+  // mitad izquierda mira la junta con el anterior; la derecha, con el siguiente
+  function juntaBajoCursor(e: React.DragEvent): number | null {
+    if (ladoDe(e) === 'entrada') return anteriorPegado() ? clip.inicio : null
+    return siguientePegado() ? clip.inicio + clip.duracion : null
+  }
+
+  // al soltar una transición arrastrada desde la galería se aplica sobre el corte más
+  // cercano al cursor. la idea es que una transición entre dos clips sea SIEMPRE una sola,
+  // guardada como la entrada del que releva (el corte vive en su inicio), sin importar por
+  // qué mitad se soltó:
+  // - mitad izquierda: el cruce con el clip anterior, o si es el primero, su apertura contra
+  //   el fondo. ambos son la entrada de ESTE clip
+  // - mitad derecha con un clip pegado después: el cruce con él, que se guarda como la
+  //   entrada de ese siguiente (una sola transición en la junta, no la salida de este)
+  // - mitad derecha sin nada después: la salida de este clip, que cierra contra el fondo
   function alSoltarTransicion(e: React.DragEvent) {
     const tipo = e.dataTransfer.getData(TIPO_TRANSICION)
     if (!tipo) return
@@ -376,9 +441,23 @@ export default function ClipBlock({
     e.stopPropagation()
     const lado = ladoDe(e)
     setLadoTrans(null)
-    if (lado === 'salida') setTransicionSalida(clip.id, { tipo })
-    else setTransicion(clip.id, { tipo })
-    seleccionar(clip.id)
+    onResaltarJunta?.(null)
+    if (lado === 'entrada') {
+      setTransicion(clip.id, { tipo })
+      seleccionar(clip.id)
+      return
+    }
+    // mitad derecha: si hay un clip PEGADO justo después, la junta entre los dos es un solo
+    // cruce, guardado como la entrada de ese siguiente. si el de después está separado (o no
+    // hay ninguno), el borde derecho es la salida de este clip contra el fondo
+    const sig = siguientePegado()
+    if (sig) {
+      setTransicion(sig.id, { tipo })
+      seleccionar(sig.id)
+    } else {
+      setTransicionSalida(clip.id, { tipo })
+      seleccionar(clip.id)
+    }
   }
 
   // se sueltan dos cosas distintas sobre el clip: una transición de la galería o una
@@ -414,7 +493,7 @@ export default function ClipBlock({
 
   return (
     <motion.div
-      layout={interactuando || congelarLayout ? false : 'position'}
+      layout={sinSuavizado || congelarLayout ? false : 'position'}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={clip.pista}
       data-bloque-id={clip.id}
@@ -428,8 +507,18 @@ export default function ClipBlock({
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes(TIPO_TRANSICION)) {
           e.preventDefault()
-          const lado = ladoDe(e)
-          if (lado !== ladoTrans) setLadoTrans(lado)
+          // si el borde bajo el cursor es una junta con un clip pegado, la sombra la pinta
+          // el carril centrada sobre el corte (abarca los dos clips) y aquí no se muestra la
+          // banda del borde; si no es junta, va la banda de entrada o salida como siempre
+          const junta = juntaBajoCursor(e)
+          if (junta !== null) {
+            if (ladoTrans) setLadoTrans(null)
+            onResaltarJunta?.(junta)
+          } else {
+            onResaltarJunta?.(null)
+            const lado = ladoDe(e)
+            if (lado !== ladoTrans) setLadoTrans(lado)
+          }
         } else if (e.dataTransfer.types.includes(TIPO_EFECTO)) {
           e.preventDefault()
           if (!efectoEncima) setEfectoEncima(true)
@@ -441,6 +530,7 @@ export default function ClipBlock({
       onDragLeave={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node)) {
           setLadoTrans(null)
+          onResaltarJunta?.(null)
           setEfectoEncima(false)
           setImpactoEncima(false)
         }
@@ -449,10 +539,12 @@ export default function ClipBlock({
       className={[
         'group absolute top-0 flex h-full touch-none items-end overflow-hidden rounded-lg border transition-[border-color]',
         bloqueada ? 'cursor-default' : 'cursor-grab',
+        // seleccionado suelto: borde brand. en un conjunto: además un aro interior bien visible,
+        // para que se note de un vistazo qué bloques están marcados al seleccionar varios
         seleccionado
-          ? 'border-brand'
+          ? 'border-brand ring-2 ring-inset ring-brand/45'
           : enConjunto
-            ? 'border-brand/70'
+            ? 'border-brand ring-2 ring-inset ring-brand/80'
             : 'border-transparent hover:border-white/30',
       ].join(' ')}
       style={{
@@ -460,8 +552,8 @@ export default function ClipBlock({
         width: ancho,
         // en reposo la posición se anima con una curva suave, de modo que al
         // cerrar un hueco los clips se deslizan hasta su nuevo sitio; durante un
-        // arrastre propio el suavizado se apaga para no ir por detrás del cursor
-        transition: interactuando ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+        // arrastre propio o de todo el conjunto el suavizado se apaga para no ir por detrás del cursor
+        transition: sinSuavizado ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
         // mientras la tira se extrae, el clip descansa sobre un azul sólido tenue,
         // sin la miniatura estirada que antes se veía borrosa y rota hasta que
         // llegaban los fotogramas de verdad
@@ -492,7 +584,7 @@ export default function ClipBlock({
         </div>
       )}
 
-      <TransicionBlock clip={clip} pxPorSegundo={pxPorSegundo} />
+      {!sinCuñaEntrada && <TransicionBlock clip={clip} pxPorSegundo={pxPorSegundo} />}
       <TransicionBlock clip={clip} pxPorSegundo={pxPorSegundo} lado="salida" />
 
       {/* las bolitas de impacto que caen sobre este clip, encima de todo */}

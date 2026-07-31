@@ -63,15 +63,15 @@ It is meant for anyone with one specific video to sort out the same day: a trim 
 
 ### Transitions
 
-There are **twenty-one transitions**, grouped into five families and described as data in a single catalog. That is what guarantees that what you see while editing is identical to what comes out exported, because the preview and the compositor run the same engine.
+There are **thirty transitions**, grouped into six families and described as data in a single catalog. That is what guarantees that what you see while editing is identical to what comes out exported, because the preview and the compositor run the same engine.
 
-- **No transition:** the hard cut, one shot starting right where the previous one ends.
 - **Fades:** cross fade with the previous shot, fade to black and fade to white.
-- **Wipes:** right, left, up, down and diagonal, with the edge of the cut slightly softened so it does not look cheap.
+- **Wipes:** right, left, up, down, diagonal and four rounded ones by corner, with the edge of the cut slightly softened so it does not look cheap.
 - **Shapes and openings:** blinds, horizontal doors, vertical doors, circular wipe, diamond and thirds.
 - **Zooms and pushes:** push in all four directions, zoom in and zoom out.
+- **Blur and flashes:** blur, soft glow, light flash, camera flash, zoom punch and a motion blur (camera whip) with the direction you choose.
 
-The gallery has its own search, which ignores case and accents, and each sample runs the real transition when you hover over it. The duration goes from 0.2 to 2 seconds and can also be set by pulling the edge of the transition on the timeline itself.
+Between two adjacent clips the transition is a centered cross over the cut, using the tails of the footage and shown with each shot's color and effects already applied, like a desktop editor. The gallery has its own search, which ignores case and accents, and each sample runs the real transition when you hover over it. One click applies it and clicking again removes it. The duration can be set by pulling the edge of the transition on the timeline itself.
 
 The same gallery is not only for clips. A text, a shape, an image or a drawing also enters with the transition you pick, with its own duration and its wedge on the timeline. And on a video clip, the color grade and the effects can fade in over the first seconds instead of being full from the first frame.
 
@@ -79,9 +79,26 @@ The same gallery is not only for clips. A text, a shape, an image or a drawing a
 
 - **Wheels per tonal range:** three independent wheels for shadows, midtones and highlights. You drag toward the color you want to give each range, **Shift** fine-tunes the movement and a double click returns the wheel to the center.
 - **Curves per channel:** four editable curves, a master one for luminance and one each for the red, green and blue channels. Points are added with a click, bent by dragging and removed with a double click.
-- **Tone adjustments:** exposure, contrast, saturation, temperature and tint, all from -100 to 100.
+- **Tone adjustments:** exposure, contrast, saturation, temperature, tint and sharpness, all from -100 to 100. Negative sharpness softens and positive sharpens.
+- **Quick tint:** a one-click color wash: you pick a hue and the whole image leans toward it without darkening, with adjustable strength and removable.
+- **Color styles:** one-click presets (basic, warm, cool, cinema, black and white) that fill in the sliders below so you can keep tweaking by hand.
 
 Everything is applied live on the preview and reaches the exported file unchanged, because the wheels travel as a per-channel curve instead of being recomputed separately.
+
+### Effects
+
+Effects move or texture the frame (color lives in Color grading). You can stack several on a clip, each with its own intensity, and they look the same in the preview and in the exported file.
+
+- **Blurs and enhancement:** focus blur, directional motion blur, sharp and glowing, glow, action camera (GoPro-style lens curvature) and chromatic (chromatic aberration, the color-channel split).
+- **Seventeen animated textures** painted per frame: film grain, old cinema, silent film, old projector, dust and scratches, VHS, CRT monitor, Camera 2000, TV static, digital glitch, interference, 80s neon, light leaks, color leaks, bokeh lights, snow and rain.
+- **Fallback color filters** (light, color, era, ambiance and cinema), kept so saved projects don't break even though color is now done in Color grading.
+
+### Impacts
+
+Momentary effects inside a clip, placed as a dot on the timeline. They affect everything on screen at that instant and can be stretched from one clip into the next, with their duration, strength and, depending on the type, their color, direction or smoothness.
+
+- **Camera:** bounce, zoom, shake, heartbeat, movement (fast camera shake with blur), flash (in the color you pick, black by default), flare and blink.
+- **Neon and volume:** neon outline, 3D lines, rays and stains, the last one soft blobs that wander across the frame and invert the color of whatever they cover.
 
 ### Motion censorship
 
@@ -105,6 +122,7 @@ Every layer is moved and resized with eight handles in the preview, keeping its 
 ### Audio
 
 - **Overall volume** for the project, from 0 to 200 %, with a mute button that remembers the previous level.
+- **Per-clip audio:** when you pick a video clip, the Audio panel lets you set its volume, its fade in and fade out and its mute, not just the overall sound or the standalone audios.
 - **Volume regions:** you add a stretch, place it and trim it on the timeline, and give it its own gain between 0 and 200 %. Handy for dropping the music right where somebody speaks, or for muting just one fragment.
 
 ### Canvas
@@ -135,7 +153,7 @@ Every layer is moved and resized with eight handles in the preview, keeping its 
 
 The application does not start in the editor, but on a site that explains what it does and lets you try it before importing anything.
 
-- **Home page with demos that really work:** the color wheels, eight of the twenty-one transitions, the censorship with its draggable box, the preview controls and the canvas ratio change. These are not recorded videos, they run the same engine as the editor.
+- **Home page with demos that really work:** the color wheels, eight of the transitions, the censorship with its draggable box, the preview controls and the canvas ratio change. These are not recorded videos, they run the same engine as the editor.
 - **A tour of the tools,** which advances on its own until you touch one, with the editing and export represented in animated mockups.
 - **Frequently asked questions** and a step-by-step of how a video is built from start to finish.
 - **User manual** on its own page, covering editing, color, layers, censorship, saving and exporting step by step, plus the shortcut table.

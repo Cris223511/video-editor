@@ -35,6 +35,7 @@ function Lineas({ alturas, color }: { alturas: number[]; color: string }) {
 export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: Props) {
   const seleccionado = useEditorStore((s) => s.regionSeleccionada === audio.id)
   const congelarLayout = useEditorStore((s) => s.congelarLayout)
+  const arrastreBloques = useEditorStore((s) => s.arrastreBloques)
   const seleccionarRegion = useEditorStore((s) => s.seleccionarRegion)
   const moverAudio = useEditorStore((s) => s.moverAudio)
   const moverAudioNivel = useEditorStore((s) => s.moverAudioNivel)
@@ -101,6 +102,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
     const st = useEditorStore.getState()
     const enGrupo = st.bloquesSeleccionados.includes(audio.id) && st.bloquesSeleccionados.length > 1
     const grupo = enGrupo ? [...st.bloquesSeleccionados] : []
+    if (enGrupo) st.setArrastreBloques(true)
     // con alt la copia nace al empezar a mover, no al pulsar: así alt y clic seco
     // sirve para sumar el bloque al conjunto sin duplicar nada
     const conAlt = e.altKey
@@ -172,6 +174,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
       useEditorStore.getState().setArrastreVivo(null)
       useEditorStore.getState().setInsercionAudio(null)
       useEditorStore.getState().setFilaAudioResaltada(null)
+      if (enGrupo) useEditorStore.getState().setArrastreBloques(false)
       // alt y clic seco: el bloque entra o sale del conjunto
       if (!movido && conAlt) alternarBloque(audio.id)
       setGuiaImantado(null)
@@ -237,7 +240,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
 
   return (
     <motion.div
-      layout={interactuando || congelarLayout ? false : 'position'}
+      layout={interactuando || (arrastreBloques && enConjunto) || congelarLayout ? false : 'position'}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={audio.nivel ?? 0}
       data-bloque-id={audio.id}
@@ -253,14 +256,14 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
         seleccionado
           ? 'border-sky-400'
           : enConjunto
-            ? 'border-brand/70'
+            ? 'border-brand ring-2 ring-inset ring-brand/80'
             : 'border-transparent hover:border-white/30',
       ].join(' ')}
       style={{
         left: audio.inicio * pxPorSegundo,
         width: ancho,
         backgroundColor: 'rgba(56, 189, 248, 0.22)',
-        transition: interactuando ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+        transition: interactuando || (arrastreBloques && enConjunto) ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
     >
       {asset?.faltante ? (

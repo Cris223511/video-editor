@@ -4,7 +4,7 @@ import { claveEfecto } from '../lib/efectos/catalogo'
 import { MediaAsset } from '../types/media'
 import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto, CapaTrazo, KeyframePos } from '../types/layers'
 import { Impacto, TipoImpacto } from '../types/impacto'
-import { COLOR_IMPACTO_DEF, DUR_IMPACTO_DEF, FUERZA_IMPACTO_DEF } from '../lib/impactos/catalogo'
+import { colorPorDefectoImpacto, DUR_IMPACTO_DEF, FUERZA_IMPACTO_DEF } from '../lib/impactos/catalogo'
 import { RegionAudio, ClipAudio } from '../types/audio'
 import { Marco } from '../types/marco'
 import { tonoNeutro } from '../lib/color/tono'
@@ -379,6 +379,16 @@ interface EstadoEditor {
   // con suavizado detrás del cursor en vez de pegarse al ancho nuevo al instante
   congelarLayout: boolean
   setCongelarLayout: (v: boolean) => void
+  // se enciende mientras se arrastra un CONJUNTO de bloques a la vez: durante ese gesto todos
+  // los bloques seleccionados apagan su suavizado de posición, para que sigan al cursor a la par
+  // y no parezca que se separan y se vuelven a juntar (solo el que iniciaba el gesto lo apagaba)
+  arrastreBloques: boolean
+  setArrastreBloques: (v: boolean) => void
+  // instante que el visor muestra por encima del cabezal mientras se recorta un clip: así se ve
+  // el fotograma del borde que se está arrastrando (con toda su edición) para saber desde dónde se
+  // recorta. null cuando no se está recortando, y entonces manda el cabezal como siempre
+  previsualizacion: number | null
+  setPrevisualizacion: (t: number | null) => void
   // silueta fantasma de la copia mientras se arrastra un clip con Alt: dónde caería
   // (pista y segundo), cuánto mide y si el sitio está libre. la copia no se crea hasta
   // soltar en un hueco válido, así que hasta entonces esto es solo una vista previa
@@ -1145,6 +1155,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   insercionPista: null,
   arrastreVivo: null,
   congelarLayout: false,
+  arrastreBloques: false,
+  previsualizacion: null,
   fantasmaDup: null,
   guiaImantado: null,
   portapapeles: null,
@@ -1447,7 +1459,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         duracion: DUR_IMPACTO_DEF,
         tipo,
         intensidad: FUERZA_IMPACTO_DEF,
-        color: COLOR_IMPACTO_DEF,
+        color: colorPorDefectoImpacto(tipo),
       }
       return {
         impactos: [...s.impactos, impacto],
@@ -1724,10 +1736,50 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       if (ajustado === null) return {}
       const inicio = ajustado
       const delta = inicio - clip.inicio
+      // al pegar este clip contra un vecino que antes estaba separado se forma una junta
+      // nueva. las transiciones que había en esos bordes eran contra el fondo (fundido de
+      // salida del de la izquierda o de entrada del de la derecha), y al juntarse ya no
+      // aplican, así que se borran las dos: queda un corte limpio y desde ahí se puede
+      // poner un cruce si se quiere
+      const iniViejo = clip.inicio
+      const finViejo = clip.inicio + clip.duracion
+      const fin = inicio + clip.duracion
+      const pegado = (a: number, b: number) => Math.abs(a - b) < 0.05
+      // vecinos pegados en la posición NUEVA
+      const izq = otros.find((c) => pegado(c.inicio + c.duracion, inicio))
+      const der = otros.find((c) => pegado(c.inicio, fin))
+      // junta NUEVA: antes este clip no estaba pegado a ese vecino
+      const juntaIzq = izq && !pegado(izq.inicio + izq.duracion, iniViejo) ? izq.id : null
+      const juntaDer = der && !pegado(der.inicio, finViejo) ? der.id : null
+      // vecinos que estaban pegados en la posición VIEJA. si tras mover ya NO quedan pegados a
+      // este clip, la junta se ROMPIÓ y su cruce (guardado en la entrada del que relevaba) deja
+      // de tener sentido: se borra. la junta de la izquierda era la ENTRADA de este clip; la de
+      // la derecha, la entrada del vecino de la derecha
+      const izqViejo = otros.find((c) => pegado(c.inicio + c.duracion, iniViejo))
+      const derViejo = otros.find((c) => pegado(c.inicio, finViejo))
+      const rotaIzq = !!izqViejo && !pegado(izqViejo.inicio + izqViejo.duracion, inicio)
+      const rotaDer = !!derViejo && !pegado(derViejo.inicio, fin)
+      const sinEntrada = (c: typeof clip) => ({ ...c, transicion: { tipo: 'ninguna' as const, duracion: c.transicion.duracion } })
+      const sinSalida = (c: typeof clip) => ({ ...c, transicionSalida: undefined })
       return {
         pista: {
           ...s.pista,
-          clips: s.pista.clips.map((c) => (c.id === id ? { ...c, inicio } : c)),
+          clips: s.pista.clips.map((c) => {
+            let nc = c
+            if (c.id === id) {
+              nc = { ...nc, inicio }
+              // su entrada se limpia si la junta de la izquierda cambió (se formó una nueva o
+              // se rompió la que tenía); su salida, si se formó una junta nueva por la derecha
+              if (juntaIzq || rotaIzq) nc = sinEntrada(nc)
+              if (juntaDer) nc = sinSalida(nc)
+            }
+            // juntas NUEVAS: el vecino de la izquierda pierde su salida; el de la derecha, su entrada
+            if (juntaIzq && c.id === juntaIzq) nc = sinSalida(nc)
+            if (juntaDer && c.id === juntaDer) nc = sinEntrada(nc)
+            // junta ROTA por la derecha: el vecino viejo de la derecha pierde su entrada (era el cruce)
+            if (rotaDer && derViejo && c.id === derViejo.id) nc = sinEntrada(nc)
+            return nc
+          }),
         },
         // el audio separado de este clip se desplaza lo mismo, para que no se
         // despegue del video con el que va acoplado
@@ -2251,6 +2303,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   setArrastreVivo: (a) => set({ arrastreVivo: a }),
   setCongelarLayout: (v) => set({ congelarLayout: v }),
+  setArrastreBloques: (v) => set({ arrastreBloques: v }),
+  setPrevisualizacion: (t) => set({ previsualizacion: t }),
   setFantasmaDup: (f) => set({ fantasmaDup: f }),
 
   duplicarClipEn: (id, inicio, pista) => {

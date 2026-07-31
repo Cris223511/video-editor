@@ -72,12 +72,12 @@ const EFECTOS: Paso[] = [
   {
     clave: 'Ajusta el tono',
     texto:
-      'con los controles de exposición, contraste, saturación, temperatura y tinte, que se aplican en vivo sobre el visor.',
+      'con los controles de exposición, contraste, saturación, temperatura, tinte y nitidez, más las ruedas por zona tonal, las curvas por canal y un tinte rápido de un clic, todo en vivo sobre el visor.',
   },
   {
     clave: 'Elige la transición',
     texto:
-      'de entrada de cada clip, con veintiuna para elegir entre fundidos, barridos direccionales, persianas, puertas, círculo, rombo, empujes y zooms. La misma galería sirve para cualquier elemento: un texto, una figura, una imagen o un dibujo también entran con la transición y la duración que decidas, y su cuña se ve y se estira en la línea de tiempo.',
+      'de entrada de cada clip, con treinta para elegir entre fundidos, barridos direccionales y redondeados, persianas, puertas, círculo, rombo, empujes, zooms, desenfoques, flashes y un desenfoque de movimiento con la dirección que quieras. Entre dos clips pegados la transición es un cruce centrado en el corte. La misma galería sirve para cualquier elemento: un texto, una figura, una imagen o un dibujo también entran con la transición y la duración que decidas, y su cuña se ve y se estira en la línea de tiempo.',
   },
   {
     clave: 'Haz que el color aparezca',
@@ -97,7 +97,7 @@ const EFECTOS: Paso[] = [
   {
     clave: 'Aplica efectos',
     texto:
-      'sobre el clip, como el desenfoque de movimiento, con la intensidad que decidas.',
+      'sobre el clip, cada uno con su intensidad: desenfoques, realce y curvatura de cámara de acción, cromático, y diecisiete texturas animadas como grano, cine viejo, VHS, glitch o neón. También puedes poner impactos, efectos momentáneos dentro del clip como sacudidas, flashes o manchas que invierten el color.',
   },
 ]
 

@@ -60,13 +60,20 @@ async function calcularPortada(): Promise<string> {
       marco: ed.marco,
       ocultas,
     }
-    const url = (assetId: string) => medios.find((m) => m.id === assetId)?.url
+    // un medio marcado como faltante no se intenta cargar: su blob apunta a un archivo
+    // que el navegador ya no puede leer, y pedirlo solo llenaría la consola de errores de
+    // red en cada autoguardado. devolver undefined hace que el compositor lo salte
+    const url = (assetId: string) => {
+      const m = medios.find((x) => x.id === assetId)
+      return m && !m.faltante ? m.url : undefined
+    }
     const compuesta = await frameCompuesto(escena, t, url)
     if (compuesta) return compuesta
 
-    // el compositor no pudo: como mínimo, el fotograma crudo del clip de esa mitad
+    // el compositor no pudo: como mínimo, el fotograma crudo del clip de esa mitad, salvo
+    // que su medio esté faltante, en cuyo caso tampoco tiene sentido pedir el blob roto
     const activo = clipEnTiempo(ordenados, t) ?? ordenados[0]
-    const medio = medios.find((m) => m.id === activo.assetId)
+    const medio = medios.find((m) => m.id === activo.assetId && !m.faltante)
     if (medio) {
       const segundoFuente = activo.recorteInicio + (t - activo.inicio) * activo.velocidad
       const frame = await frameDeVideo(medio.url, segundoFuente)
@@ -74,7 +81,8 @@ async function calcularPortada(): Promise<string> {
     }
   }
 
-  return medios[0]?.miniatura ?? ''
+  // como último recurso, la miniatura de un medio que sí exista; un faltante no tiene
+  return medios.find((m) => !m.faltante)?.miniatura ?? ''
 }
 
 // recoge el estado vivo del editor y lo deja listo para guardar. el id se pasa
@@ -240,6 +248,8 @@ export async function abrirSesion(id: string): Promise<boolean> {
 // simplemente no se toca nada
 function regenerarMiniaturas(medios: MediaAsset[]): void {
   for (const medio of medios) {
+    // un medio faltante no se toca: su blob está roto y leerlo solo ensuciaría la consola
+    if (medio.faltante) continue
     const segundo = (medio.duracion || 0) / 2
     frameDeVideo(medio.url, segundo).then((frame) => {
       if (!frame) return
