@@ -377,7 +377,15 @@ export default function ExportDialog() {
                 className="grid w-full place-items-center overflow-hidden rounded-xl bg-black"
                 style={{ aspectRatio: `${ancho} / ${alto}`, maxHeight: '34vh' }}
               />
-              <p className="mb-2 mt-3 text-sm font-medium">Exportando… {Math.round(progreso * 100)}%</p>
+              {/* el título de abajo dice el PASO en curso (Leyendo el video, Decodificando…), no un
+                  genérico "Exportando", y la barra avanza con el total; así se ve en todo momento
+                  qué se está haciendo y cuánto falta */}
+              <p className="mb-2 mt-3 text-sm font-medium">
+                {progreso >= 1 ? 'Listo' : `${PASOS_EXPORT[idxPaso]?.etiqueta ?? 'Exportando'}…`}{' '}
+                {progreso < 1 && (
+                  <span className="text-[color:var(--muted)]">{Math.round(progreso * 100)}%</span>
+                )}
+              </p>
               <div className="h-3 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                 <div
                   className="relative h-full min-w-[0.75rem] rounded-full"

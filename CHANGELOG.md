@@ -4,6 +4,13 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.34.5 (2026-07-31)
+
+- **El progreso de exportación dice qué paso va.** En lugar de un genérico "Exportando", el título
+  muestra el paso en curso (Leyendo el video, Decodificando y codificando, Añadiendo el audio,
+  Empaquetando) con su porcentaje, y la barra avanza con el total. Así se ve en todo momento qué está
+  haciendo y cuánto falta.
+
 ## 2.34.4 (2026-07-31)
 
 Arreglo del que colgaba la exportación, un diálogo de exportación mucho más claro con el paso a paso,
