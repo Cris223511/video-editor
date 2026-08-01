@@ -84,13 +84,19 @@ export const useProjectStore = create<EstadoProyecto>((set) => ({
     set((s) => ({
       medios: s.medios.map((m) => {
         if (m.id !== id) return m
-        // la anterior se libera para no dejar memoria colgando; la nueva apunta al
-        // mismo archivo, que sí se pudo leer, y se limpia la marca de faltante
-        try {
-          URL.revokeObjectURL(m.url)
-        } catch {
-          // si ya estaba revocada, da igual
-        }
+        // la nueva apunta al mismo archivo (que sí se pudo leer) y se limpia la marca de
+        // faltante. la ANTERIOR no se revoca en el acto: varios <video> del visor comparten
+        // esa dirección y, al revocarla de golpe, fallaban un instante antes de re-renderizar
+        // con la nueva, y ese parpadeo llenaba la consola de ERR_FILE_NOT_FOUND. se libera unos
+        // segundos después, cuando ya todos pasaron a la nueva
+        const vieja = m.url
+        window.setTimeout(() => {
+          try {
+            URL.revokeObjectURL(vieja)
+          } catch {
+            // si ya estaba revocada, da igual
+          }
+        }, 4000)
         return { ...m, url: URL.createObjectURL(m.file), faltante: false }
       }),
     })),

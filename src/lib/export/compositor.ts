@@ -44,6 +44,33 @@ export interface Escena {
 }
 
 
+// filtro svg del barrido direccional del impacto de Movimiento: un feGaussianBlur en un solo eje,
+// referenciado desde ctx.filter con url(#...). se crea una vez en el documento y se reajusta su
+// desviación por fotograma; así el export deja la misma estela que el visor, no un blur redondo
+let feBarridoImpacto: Element | null = null
+function filtroBarridoImpacto(sx: number, sy: number): string {
+  if (!feBarridoImpacto) {
+    const NS = 'http://www.w3.org/2000/svg'
+    const svg = document.createElementNS(NS, 'svg')
+    svg.setAttribute('style', 'position:absolute;width:0;height:0')
+    const f = document.createElementNS(NS, 'filter')
+    f.setAttribute('id', 'impacto-mov-exp')
+    f.setAttribute('x', '-15%')
+    f.setAttribute('y', '-15%')
+    f.setAttribute('width', '130%')
+    f.setAttribute('height', '130%')
+    f.setAttribute('color-interpolation-filters', 'sRGB')
+    const b = document.createElementNS(NS, 'feGaussianBlur')
+    b.setAttribute('edgeMode', 'duplicate')
+    f.appendChild(b)
+    svg.appendChild(f)
+    document.body.appendChild(svg)
+    feBarridoImpacto = b
+  }
+  feBarridoImpacto.setAttribute('stdDeviation', `${sx.toFixed(2)} ${sy.toFixed(2)}`)
+  return 'url(#impacto-mov-exp)'
+}
+
 // lienzo auxiliar reutilizado para el desenfoque de movimiento. el video se
 // pinta primero aquí con su color y luego se vuelca al lienzo final aplicando
 // solo el desenfoque, porque combinar funciones nativas con un filtro svg de
@@ -599,7 +626,8 @@ export function dibujarFotograma(
   // impacto no debe deformar las bandas de fondo: cuando lo hay y el relleno es borroso,
   // ese relleno se pinta en su propio lienzo (fondoCtx) y se recompone quieto por detrás
   const imp = estadoImpactosEn(escena.impactos ?? [], t)
-  const hayImpacto = imp.escala !== 1 || imp.desenfoque > 0 || imp.x !== 0 || imp.y !== 0
+  const hayImpacto =
+    imp.escala !== 1 || imp.desenfoque > 0 || imp.desenfoqueX > 0 || imp.desenfoqueY > 0 || imp.x !== 0 || imp.y !== 0
   const separarFondo = fondo === 'desenfoque' && hayImpacto
   let fondoCtx: CanvasRenderingContext2D | null = null
   if (separarFondo) {
@@ -990,7 +1018,15 @@ export function dibujarFotograma(
       // el relleno borroso, quieto, va detrás del contenido que el impacto sí deforma
       if (separarFondo) ctx.drawImage(auxFondo(ancho, alto), 0, 0)
       ctx.save()
-      ctx.filter = imp.desenfoque > 0 ? `blur(${(imp.desenfoque * alto).toFixed(2)}px)` : 'none'
+      // barrido direccional (impacto Movimiento) por filtro svg en un eje; si no, el blur redondo
+      const impBX = imp.desenfoqueX * alto
+      const impBY = imp.desenfoqueY * alto
+      ctx.filter =
+        impBX > 0.1 || impBY > 0.1
+          ? filtroBarridoImpacto(impBX, impBY)
+          : imp.desenfoque > 0
+            ? `blur(${(imp.desenfoque * alto).toFixed(2)}px)`
+            : 'none'
       ctx.translate(ancho / 2 + imp.x * alto, alto / 2 + imp.y * alto)
       ctx.scale(imp.escala, imp.escala)
       ctx.translate(-ancho / 2, -alto / 2)

@@ -160,6 +160,60 @@ export default function Preview() {
   // acercamiento manual del visor. arranca en 1, que es el lienzo entero, y de ahí
   // solo sube: alejarse más allá del lienzo no aporta nada
   const [zoomVisor, setZoomVisor] = useState({ z: 1, x: 0, y: 0 })
+  // estado del pellizco de dos dedos en curso: la separación inicial y el zoom de arranque
+  const pellizco = useRef<{ dist: number; z: number } | null>(null)
+  // aplica un factor de acercamiento anclando el punto (clientX, clientY) de la pantalla, para que
+  // eso que hay bajo el cursor o el centro del pellizco no se mueva mientras el resto crece. el
+  // rango es 1 (encaje, no se aleja más) a 8; al volver a 1 se olvida el desplazamiento
+  const anclar = (objetivo: number, clientX: number, clientY: number, caja: DOMRect) =>
+    setZoomVisor((prev) => {
+      const z = Math.min(8, Math.max(1, objetivo))
+      if (z === prev.z) return prev
+      const cx = clientX - caja.left - caja.width / 2
+      const cy = clientY - caja.top - caja.height / 2
+      const k = z / prev.z
+      const x = cx - (cx - prev.x) * k
+      const y = cy - (cy - prev.y) * k
+      return z === 1 ? { z: 1, x: 0, y: 0 } : { z, x, y }
+    })
+  // la rueda multiplica el zoom actual por un factor; el pellizco fija un objetivo absoluto
+  const acercarVisor = (factor: number, clientX: number, clientY: number, caja: DOMRect) =>
+    setZoomVisor((prev) => {
+      const z = Math.min(8, Math.max(1, prev.z * factor))
+      if (z === prev.z) return prev
+      const cx = clientX - caja.left - caja.width / 2
+      const cy = clientY - caja.top - caja.height / 2
+      const k = z / prev.z
+      const x = cx - (cx - prev.x) * k
+      const y = cy - (cy - prev.y) * k
+      return z === 1 ? { z: 1, x: 0, y: 0 } : { z, x, y }
+    })
+
+  // la rueda y el pellizco van por listeners NO pasivos (React los pone pasivos y ahí
+  // preventDefault falla y ensucia la consola). así el zoom no arrastra además la página
+  useEffect(() => {
+    const el = visorRef.current
+    if (!el) return
+    const alRodar = (e: WheelEvent) => {
+      e.preventDefault()
+      acercarVisor(e.deltaY < 0 ? 1.12 : 1 / 1.12, e.clientX, e.clientY, el.getBoundingClientRect())
+    }
+    const alMoverDedos = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || !pellizco.current) return
+      e.preventDefault()
+      const [a, b] = [e.touches[0], e.touches[1]]
+      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+      const objetivo = pellizco.current.z * (dist / pellizco.current.dist)
+      anclar(objetivo, (a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2, el.getBoundingClientRect())
+    }
+    el.addEventListener('wheel', alRodar, { passive: false })
+    el.addEventListener('touchmove', alMoverDedos, { passive: false })
+    return () => {
+      el.removeEventListener('wheel', alRodar)
+      el.removeEventListener('touchmove', alMoverDedos)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
 
   // arrastrar desde una zona vacía dibuja un recuadro azul; al soltar, se
@@ -1474,11 +1528,20 @@ export default function Preview() {
   // entero (clip y lo que tenga delante) y puede echarle un velo. va en tiempo
   // real, sin suavizado, para que el golpe se sienta seco
   const imp = estadoImpactosEn(impactos, phVista)
-  const impactoActivo = imp.escala !== 1 || imp.desenfoque > 0 || imp.x !== 0 || imp.y !== 0
+  // desenfoque direccional (barrido) del impacto de Movimiento, en píxeles del lienzo. si lo hay,
+  // el filtro pasa a ser un feGaussianBlur SOLO en ese eje (estela), no el blur redondo de siempre
+  const impBlurX = imp.desenfoqueX * lienzoRect.h
+  const impBlurY = imp.desenfoqueY * lienzoRect.h
+  const impDireccional = impBlurX > 0.1 || impBlurY > 0.1
+  const impactoActivo = imp.escala !== 1 || imp.desenfoque > 0 || impDireccional || imp.x !== 0 || imp.y !== 0
   const impactoTransform = impactoActivo
     ? `scale(${imp.escala}) translate(${imp.x * lienzoRect.h}px, ${imp.y * lienzoRect.h}px)`
     : ''
-  const impactoFiltro = imp.desenfoque > 0 ? `blur(${(imp.desenfoque * lienzoRect.h).toFixed(2)}px)` : undefined
+  const impactoFiltro = impDireccional
+    ? 'url(#ve-imp-mov)'
+    : imp.desenfoque > 0
+      ? `blur(${(imp.desenfoque * lienzoRect.h).toFixed(2)}px)`
+      : undefined
 
   return (
     // el fondo oscuro solo tiene sentido cuando hay video: rodear la imagen de
@@ -1505,27 +1568,16 @@ export default function Preview() {
       // lienzo y las capas cortan la propagación, así que esto solo salta fuera de
       // la imagen
       onMouseDown={iniciarMarquee}
-      // con control pulsado la rueda acerca la imagen tomando como ancla el punto
-      // donde está el cursor, igual que en cualquier visor de fotos. sirve para
-      // afinar la colocación de una censura o un texto pequeño
-      onWheel={(e) => {
-        if (!e.ctrlKey && !e.metaKey) return
-        e.preventDefault()
-        const caja = visorRef.current?.getBoundingClientRect()
-        if (!caja) return
-        setZoomVisor((prev) => {
-          const z = Math.min(8, Math.max(1, prev.z * (e.deltaY < 0 ? 1.12 : 1 / 1.12)))
-          if (z === prev.z) return prev
-          // el punto bajo el cursor se queda quieto mientras el resto crece
-          const cx = e.clientX - caja.left - caja.width / 2
-          const cy = e.clientY - caja.top - caja.height / 2
-          const k = z / prev.z
-          const x = cx - (cx - prev.x) * k
-          const y = cy - (cy - prev.y) * k
-          // al volver al lienzo completo el desplazamiento se olvida, así nunca
-          // queda la imagen encajada fuera de sitio
-          return z === 1 ? { z: 1, x: 0, y: 0 } : { z, x, y }
-        })
+      // el acercar con la rueda y con el pellizco va por listeners no pasivos (arriba). aquí solo
+      // se apunta el arranque del pellizco de dos dedos: la separación inicial y el zoom de partida
+      onTouchStart={(e) => {
+        if (e.touches.length === 2) {
+          const [a, b] = [e.touches[0], e.touches[1]]
+          pellizco.current = { dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), z: zoomVisor.z }
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.touches.length < 2) pellizco.current = null
       }}
     >
       {/* recuadro azul de selección múltiple */}
@@ -1540,6 +1592,20 @@ export default function Preview() {
             background: 'rgb(24 97 255 / 0.14)',
           }}
         />
+      )}
+
+      {/* lupa del visor: cuando hay acercamiento, muestra el nivel y, al pulsarla, vuelve al encaje
+          (100%). así se sabe que se está con zoom y hay una salida a un clic. el acercar es con la
+          rueda o el pellizco de dos dedos */}
+      {hayContenido && zoomVisor.z > 1.01 && (
+        <button
+          type="button"
+          onClick={() => setZoomVisor({ z: 1, x: 0, y: 0 })}
+          title="Volver al tamaño que encaja"
+          className="absolute right-3 top-3 z-50 inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur transition-colors hover:bg-black/75"
+        >
+          <Icon name="zoomMas" size={13} /> {Math.round(zoomVisor.z * 100)}%
+        </button>
       )}
       {!hayContenido ? (
         <div className="w-full max-w-sm">
@@ -1642,6 +1708,16 @@ export default function Preview() {
                   )
                 })}
             </div>
+            {/* filtro de barrido del impacto de Movimiento: un desenfoque gaussiano SOLO en el eje
+                elegido, que deja estelas en el sentido del movimiento (no un blur redondo). la
+                desviación se calcula por fotograma y se aplica al envoltorio de abajo por su id */}
+            {impDireccional && (
+              <svg width="0" height="0" className="pointer-events-none absolute" aria-hidden>
+                <filter id="ve-imp-mov" x="-15%" y="-15%" width="130%" height="130%" colorInterpolationFilters="sRGB">
+                  <feGaussianBlur stdDeviation={`${impBlurX.toFixed(2)} ${impBlurY.toFixed(2)}`} edgeMode="duplicate" />
+                </filter>
+              </svg>
+            )}
             {/* envoltorio del impacto: aquí va lo que el impacto SÍ debe deformar (el
                 video y lo que lleva delante: censura, texto, figuras). el relleno borroso
                 de las bandas quedó en la capa de arriba, fuera de este transform, para que

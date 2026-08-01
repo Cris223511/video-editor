@@ -36,6 +36,9 @@ const CLIP: Categoria[] = [
   { id: 'efectos', icono: 'efectos', etiqueta: 'Efectos', panel: <EffectsPanel /> },
   { id: 'impactos', icono: 'impacto', etiqueta: 'Impactos', panel: <ImpactosPanel /> },
   { id: 'velocidad', icono: 'velocidad', etiqueta: 'Velocidad', panel: <SpeedPanel /> },
+  // el audio del propio clip (volumen, fundidos, silencio) también entre sus opciones, que un
+  // video también tiene sonido y es de lo que uno viene a tocar al elegirlo
+  { id: 'audio', icono: 'audio', etiqueta: 'Audio', panel: <MultiAudioPanel /> },
   { id: 'recortar', icono: 'recortar', etiqueta: 'Recortar', panel: <RecortarPanel /> },
   { id: 'transformar', icono: 'transformar', etiqueta: 'Transformar', panel: <TransformarPanel /> },
 ]

@@ -1,4 +1,4 @@
-import { DatosExport, ControlExport, bitrateVideo } from './exportar'
+import { DatosExport, ControlExport, bitrateVideo, OnProgreso, relojExport } from './exportar'
 import { Escena, dibujarFotograma } from './compositor'
 import { clipEnTiempo, duracionProyecto } from '../timeline/clips'
 import { anterior, posterior } from '../transiciones/pintar'
@@ -23,7 +23,7 @@ function cargarImagen(src: string): Promise<HTMLImageElement> {
 // muxer, sin pasar por <video> ni MediaRecorder. el resultado es el mismo archivo que la
 // ruta clásica, pero en una fracción del tiempo. de momento solo escribe el video; el
 // audio se añade en el siguiente paso
-export function exportarRapido(datos: DatosExport, onProgreso: (v: number) => void): ControlExport {
+export function exportarRapido(datos: DatosExport, onProgreso: OnProgreso): ControlExport {
   const { ancho, alto, fps } = datos
   // el lienzo se crea ya para devolverlo enseguida: el diálogo lo enseña como vista del
   // avance, igual que en la ruta clásica
@@ -46,6 +46,7 @@ export function exportarRapido(datos: DatosExport, onProgreso: (v: number) => vo
   })
   const total = duracionProyecto(clips, datos.capas, datos.audios, datos.audioRegiones)
   if (total <= 0) throw new Error('No hay nada que exportar.')
+  onProgreso(0, 'Preparando el video…')
 
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('No se pudo preparar el lienzo.')
@@ -74,11 +75,15 @@ export function exportarRapido(datos: DatosExport, onProgreso: (v: number) => vo
     // porque cada uno va por un instante distinto)
     const demuxCache = new Map<string, VideoDemux>()
     for (const c of clips) {
-      const url = datos.urlDeAsset(c.assetId)
-      if (!url) continue
+      // el archivo real, tomado DIRECTO del medio; nada de fetch a una object URL que puede
+      // estar revocada (era la causa del ERR_FILE_NOT_FOUND que dejaba la exportación clavada)
+      const blob = datos.fileDeAsset(c.assetId)
+      if (!blob) continue
       let dem = demuxCache.get(c.assetId)
       if (!dem) {
-        const blob = await (await fetch(url)).blob()
+        // leer y desarmar el archivo es lo que más tarda antes de arrancar, sobre todo con
+        // videos pesados; se avisa para que el 0% no parezca colgado mientras tanto
+        onProgreso(0, 'Leyendo el video…')
         dem = await demuxVideo(blob)
         demuxCache.set(c.assetId, dem)
       }
@@ -146,16 +151,22 @@ export function exportarRapido(datos: DatosExport, onProgreso: (v: number) => vo
       defs.refrescar(t)
       dibujarFotograma(ctx, escena(), t, videoDe, imagenDe, off)
       await escritor.agregar(canvas, (f / fps) * 1_000_000)
-      onProgreso(Math.min(0.97, f / totalFrames))
+      onProgreso(
+        Math.min(0.97, f / totalFrames),
+        `Codificando · ${relojExport(t)} / ${relojExport(total)} · cuadro ${f + 1} de ${totalFrames}`,
+      )
     }
 
     // el audio ya mezclado se codifica al final; el muxer ordena video y audio por su
     // timestamp al empaquetar
-    if (mezclaAudio) await escritor.escribirAudio(mezclaAudio)
-    onProgreso(0.99)
+    if (mezclaAudio) {
+      onProgreso(0.98, 'Añadiendo el audio…')
+      await escritor.escribirAudio(mezclaAudio)
+    }
+    onProgreso(0.99, 'Empaquetando el archivo…')
 
     const blob = await escritor.finalizar()
-    onProgreso(1)
+    onProgreso(1, 'Listo')
     return blob
   } finally {
     limpiar()

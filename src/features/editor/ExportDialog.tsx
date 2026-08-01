@@ -7,7 +7,7 @@ import { useProjectStore } from '../../store/useProjectStore'
 import { duracionProyecto } from '../../lib/timeline/clips'
 import { formatearDuracion } from '../../lib/format/duracion'
 import { formatearBytes } from '../../lib/format/bytes'
-import { exportarProyecto, ControlExport, elegirMime, bitrateVideo, DatosExport } from '../../lib/export/exportar'
+import { exportarProyecto, ControlExport, elegirMime, bitrateVideo, DatosExport, OnProgreso } from '../../lib/export/exportar'
 import { exportarRapido } from '../../lib/export/exportarRapido'
 import { haiWebCodecs } from '../../lib/export/decode'
 
@@ -17,6 +17,24 @@ type Fase = 'inicio' | 'exportando' | 'listo' | 'error'
 // grabadora, así que se toma un valor corriente de 128 kbps para que el peso
 // mostrado no ignore la pista de sonido
 const BITRATE_AUDIO = 128_000
+
+// pasos que recorre la exportación por dentro, en orden. el diálogo los muestra como una lista y va
+// marcando cuál está en curso, para que el usuario entienda qué hace (leer, codificar, audio, cerrar)
+const PASOS_EXPORT = [
+  { id: 'leer', etiqueta: 'Leyendo el video' },
+  { id: 'codificar', etiqueta: 'Decodificando y codificando' },
+  { id: 'audio', etiqueta: 'Añadiendo el audio' },
+  { id: 'empaquetar', etiqueta: 'Empaquetando el archivo' },
+] as const
+
+// deduce en qué paso va la exportación a partir de la nota de avance en curso
+function pasoDeExport(detalle: string, progreso: number): number {
+  if (progreso >= 1) return PASOS_EXPORT.length
+  if (/empaquet/i.test(detalle)) return 3
+  if (/audio/i.test(detalle)) return 2
+  if (/codificando|grabando/i.test(detalle)) return 1
+  return 0 // leyendo / preparando
+}
 
 // fila de dato con etiqueta a la izquierda y valor a la derecha, la misma
 // disposición ordenada que usa la ficha de un medio
@@ -32,6 +50,16 @@ function Dato({ nombre, valor }: { nombre: string; valor: string }) {
   )
 }
 
+// fila compacta etiqueta-valor para la ficha de datos del panel de proceso
+function FilaInfo({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-[color:var(--muted)]">{etiqueta}</span>
+      <span className="truncate text-right font-medium tabular-nums text-[color:var(--text)]">{valor}</span>
+    </div>
+  )
+}
+
 // diálogo de exportación. se apoya en el Modal compartido para heredar el
 // desenfoque de fondo que cubre toda la pantalla (barra superior incluida), la
 // aparición y el cierre suaves y el centrado. muestra los datos de la salida,
@@ -42,7 +70,11 @@ export default function ExportDialog() {
 
   const [fase, setFase] = useState<Fase>('inicio')
   const [progreso, setProgreso] = useState(0)
+  // nota de qué está haciendo la exportación ahora mismo (leyendo, codificando tal segundo,
+  // añadiendo el audio…), para que el avance se vea vivo y con contexto, no solo un porcentaje
+  const [detalle, setDetalle] = useState('')
   const [error, setError] = useState('')
+  const pedirConfirmacion = useEditorStore((s) => s.pedirConfirmacion)
   const [urlSalida, setUrlSalida] = useState('')
   const [extension, setExtension] = useState('mp4')
   // 30 es el valor corriente para material de pantalla; 60 se nota en el
@@ -82,9 +114,25 @@ export default function ExportDialog() {
     if (urlSalida) URL.revokeObjectURL(urlSalida)
     setFase('inicio')
     setProgreso(0)
+    setDetalle('')
     setError('')
     setUrlSalida('')
     cerrarExport()
+  }
+
+  // cerrar o cancelar mientras se exporta tira todo el avance, así que primero se confirma con
+  // el modal de siempre; en las otras fases (configurar, listo, error) cierra directo
+  function pedirCierre() {
+    if (fase === 'exportando') {
+      pedirConfirmacion({
+        titulo: 'Cancelar exportación',
+        mensaje: '¿Seguro que quieres cancelar? Se perderá todo el avance de la exportación.',
+        aceptar: 'Sí, cancelar',
+        onAceptar: cerrarTodo,
+      })
+      return
+    }
+    cerrarTodo()
   }
 
   // cuelga el lienzo de una exportación en el diálogo para ver por dónde va
@@ -102,6 +150,7 @@ export default function ExportDialog() {
     useEditorStore.getState().pausar()
     setFase('exportando')
     setProgreso(0)
+    setDetalle('Preparando…')
     setError('')
 
     const datos: DatosExport = {
@@ -121,11 +170,15 @@ export default function ExportDialog() {
       volumenGlobal: estado.volumenGlobal,
       pistasMeta: estado.pistasMeta,
       urlDeAsset: (id) => medios.find((m) => m.id === id)?.url,
+      fileDeAsset: (id) => medios.find((m) => m.id === id)?.file,
     }
 
     // lanza una exportación con el motor que se le pase y espera su resultado
-    const correr = async (motor: (d: DatosExport, p: (v: number) => void) => ControlExport) => {
-      const control = motor(datos, (v) => setProgreso(v))
+    const correr = async (motor: (d: DatosExport, p: OnProgreso) => ControlExport) => {
+      const control = motor(datos, (v, det) => {
+        setProgreso(v)
+        if (det !== undefined) setDetalle(det)
+      })
       controlRef.current = control
       colgarLienzo(control)
       return control.promesa
@@ -137,18 +190,19 @@ export default function ExportDialog() {
     // sin llegar nunca a probar la ruta clásica. si no avanza nada en un buen rato, se cancela y
     // se rechaza para poder caer al motor clásico
     const correrVigilado = (
-      motor: (d: DatosExport, p: (v: number) => void) => ControlExport,
+      motor: (d: DatosExport, p: OnProgreso) => ControlExport,
       topeSinAvance = 25000,
     ) =>
       new Promise<Blob>((resolve, reject) => {
         let ultimo = -1
         let marca = performance.now()
-        const control = motor(datos, (v) => {
+        const control = motor(datos, (v, det) => {
           if (v > ultimo + 0.0005) {
             ultimo = v
             marca = performance.now()
           }
           setProgreso(v)
+          if (det !== undefined) setDetalle(det)
         })
         controlRef.current = control
         colgarLienzo(control)
@@ -205,13 +259,21 @@ export default function ExportDialog() {
     }
   }
 
+  const idxPaso = pasoDeExport(detalle, progreso)
+  // cuadros totales del archivo, para mostrar por cuál va (dato real, no solo el porcentaje)
+  const cuadrosTotales = Math.max(1, Math.round(total * fps))
+
   return (
     <Modal
       titulo="Exportar video"
-      descripcion="Elige los cuadros por segundo y descarga el resultado ya montado."
+      descripcion="Ajusta la calidad y descarga tu video ya montado en un archivo."
       abierto={abierto}
-      onCerrar={cerrarTodo}
-      ancho="max-w-lg"
+      onCerrar={pedirCierre}
+      // solo la fase de progreso necesita las dos columnas (vista previa + proceso); la de
+      // configurar y las de listo/error se quedan angostas, que es lo que pega para su contenido.
+      // el ancho de progreso es un punto medio: ni apretado ni tan ancho que la vista previa
+      // salga enorme (el dueño lo quería un pelín más chica)
+      ancho={fase === 'exportando' ? 'max-w-[47rem]' : 'max-w-lg'}
     >
       {fase === 'inicio' && (
         <>
@@ -307,59 +369,118 @@ export default function ExportDialog() {
 
       {fase === 'exportando' && (
         <>
-          {/* el mismo lienzo en el que se está dibujando cada fotograma, para ver
-              por dónde va sin esperar al archivo. va mudo: el sonido viaja aparte
-              hacia la grabadora y este lienzo solo tiene imagen */}
-          <div
-            ref={cajaVista}
-            className="mb-3 grid w-full place-items-center overflow-hidden rounded-xl bg-black"
-            style={{ aspectRatio: `${ancho} / ${alto}`, maxHeight: '38vh' }}
-          />
-          <p className="mb-3 text-sm">Exportando… {Math.round(progreso * 100)}%</p>
-          {/* riel de fondo tenue con un relleno de marca bien contrastado. el ancho se
-              ata directamente a progreso (0 a 1). va SIN transición de ancho a propósito:
-              con la exportación rápida el progreso avanza a saltos veloces y una
-              transición dejaba la barra siempre 300 ms por detrás del porcentaje; así el
-              relleno queda pegado al número. el brillo que lo recorre da sensación de
-              trabajo en curso */}
-          <div className="mb-5 h-3 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-            <div
-              className="relative h-full min-w-[0.75rem] rounded-full bg-brand"
-              style={{
-                width: `${Math.max(0, Math.min(1, progreso)) * 100}%`,
-                // colores literales del azul de marca: el tema no expone --brand
-                // como variable, así que un var() aquí dejaría el degradado sin pintar
-                backgroundImage: 'linear-gradient(90deg, #1861ff, #4b83ff)',
-              }}
-            >
-              {/* franja clara que se desplaza en bucle sobre el relleno; queda
-                  recortada por el redondeo del riel gracias al overflow oculto */}
-              <span
-                className="absolute inset-0 rounded-full opacity-60"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)',
-                  backgroundSize: '40% 100%',
-                  backgroundRepeat: 'no-repeat',
-                  animation: 'export-shine 1.4s linear infinite',
-                }}
+          <div className="mb-4 flex flex-col gap-4 sm:flex-row">
+            {/* izquierda: la vista previa (el lienzo donde se dibuja cada cuadro) y la barra */}
+            <div className="sm:flex-1">
+              <div
+                ref={cajaVista}
+                className="grid w-full place-items-center overflow-hidden rounded-xl bg-black"
+                style={{ aspectRatio: `${ancho} / ${alto}`, maxHeight: '34vh' }}
               />
+              <p className="mb-2 mt-3 text-sm font-medium">Exportando… {Math.round(progreso * 100)}%</p>
+              <div className="h-3 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                <div
+                  className="relative h-full min-w-[0.75rem] rounded-full"
+                  style={{
+                    width: `${Math.max(0, Math.min(1, progreso)) * 100}%`,
+                    backgroundImage: 'linear-gradient(90deg, #1861ff, #4b83ff)',
+                  }}
+                >
+                  <span
+                    className="absolute inset-0 rounded-full opacity-60"
+                    style={{
+                      backgroundImage: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)',
+                      backgroundSize: '40% 100%',
+                      backgroundRepeat: 'no-repeat',
+                      animation: 'export-shine 1.4s linear infinite',
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* derecha: los pasos del proceso, marcando check el hecho, un girito el que va y
+                apagado lo que falta. así se entiende qué hace por dentro (leer, decodificar y
+                codificar, mezclar audio, empaquetar), no solo un porcentaje suelto */}
+            <div
+              className="flex shrink-0 flex-col rounded-xl p-3.5 sm:w-64"
+              style={{ background: 'rgb(var(--border) / 0.06)' }}
+            >
+              <h3 className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--muted)]">
+                Proceso
+              </h3>
+              <ol className="flex flex-col gap-2.5">
+                {PASOS_EXPORT.map((paso, i) => {
+                  const hecho = progreso >= 1 || i < idxPaso
+                  const activo = progreso < 1 && i === idxPaso
+                  return (
+                    <li key={paso.id} className="flex items-start gap-2.5">
+                      <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center">
+                        {hecho ? (
+                          <Icon name="check" size={15} className="text-emerald-500" />
+                        ) : activo ? (
+                          <span
+                            className="block h-3.5 w-3.5 rounded-full border-2 border-brand border-t-transparent"
+                            style={{ animation: 'export-spin 0.7s linear infinite' }}
+                          />
+                        ) : (
+                          <span className="block h-1.5 w-1.5 rounded-full bg-[color:var(--muted)] opacity-40" />
+                        )}
+                      </span>
+                      <span className="min-w-0">
+                        <span
+                          className={[
+                            'block text-[12.5px] leading-tight',
+                            hecho || activo ? 'font-medium text-[color:var(--text)]' : 'text-[color:var(--muted)]',
+                          ].join(' ')}
+                        >
+                          {paso.etiqueta}
+                        </span>
+                        {/* bajo el paso en curso se muestra el dato en vivo: el segundo y el cuadro */}
+                        {activo && detalle && (
+                          <span className="mt-0.5 block truncate text-[11px] text-[color:var(--muted)]">
+                            {detalle}
+                          </span>
+                        )}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ol>
+
+              {/* ficha de datos reales del archivo que se está armando, para que la columna diga
+                  algo más que los pasos: resolución, calidad, ritmo, formato y por qué cuadro va */}
+              <div
+                className="mt-4 flex flex-col gap-1.5 border-t pt-3 text-[11.5px]"
+                style={{ borderColor: 'rgb(var(--border) / 0.12)' }}
+              >
+                <FilaInfo etiqueta="Resolución" valor={`${ancho} × ${alto}`} />
+                <FilaInfo etiqueta="Calidad" valor={`${calidad}p`} />
+                <FilaInfo etiqueta="Ritmo" valor={`${fps} fps`} />
+                <FilaInfo etiqueta="Formato" valor={formatoSalida} />
+                <FilaInfo
+                  etiqueta="Fotograma"
+                  valor={`${Math.min(cuadrosTotales, Math.round(progreso * cuadrosTotales))} / ${cuadrosTotales}`}
+                />
+              </div>
             </div>
           </div>
-          {/* animación local del brillo; recorre el relleno de izquierda a derecha
-              de forma continua mientras dura la exportación */}
+
           <style>{`
-            @keyframes export-shine {
-              0% { background-position: -40% 0; }
-              100% { background-position: 140% 0; }
-            }
+            @keyframes export-shine { 0% { background-position: -40% 0; } 100% { background-position: 140% 0; } }
+            @keyframes export-spin { to { transform: rotate(360deg); } }
           `}</style>
-          <button
-            onClick={cerrarTodo}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/10 py-2.5 text-sm font-medium transition-colors duration-200 hover:border-rose-500 hover:text-rose-500 dark:border-white/10"
-          >
-            Cancelar
-          </button>
+          {/* el "Cancelar" va en rojo sólido, igual que el botón de peligro de los modales de
+              confirmación (mismo fondo de alerta, texto blanco, mismo tamaño), alineado a la derecha */}
+          <div className="flex justify-end">
+            <button
+              onClick={pedirCierre}
+              className="rounded-lg px-4 py-2 text-[13px] font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0"
+              style={{ background: 'rgb(var(--alerta))' }}
+            >
+              Cancelar
+            </button>
+          </div>
         </>
       )}
 

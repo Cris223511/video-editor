@@ -148,9 +148,26 @@ export async function guardarSesion(id: string, creado: number): Promise<void> {
   }
 }
 
+// evita abrir el MISMO proyecto dos veces a la vez. en desarrollo React StrictMode monta cada
+// efecto dos veces, así que abrirSesion se disparaba doble: la segunda llamada hacía limpiar()
+// (que revoca las object URLs de los medios que la primera acababa de crear) y dejaba a los
+// <video> del visor pidiendo direcciones ya muertas, llenando la consola de ERR_FILE_NOT_FOUND.
+// con esta guarda la segunda llamada se descarta y las direcciones creadas siguen vivas
+let abriendoId: string | null = null
+
 // deja el editor exactamente como estaba al guardar. las direcciones temporales
 // de los medios se rehacen aquí, porque las de la sesión anterior ya no valen
 export async function abrirSesion(id: string): Promise<boolean> {
+  if (abriendoId === id) return true
+  abriendoId = id
+  try {
+    return await abrirSesionInterno(id)
+  } finally {
+    abriendoId = null
+  }
+}
+
+async function abrirSesionInterno(id: string): Promise<boolean> {
   const p = await leerProyecto(id)
   if (!p) return false
   // el proyecto queda montado en memoria: a partir de aquí es la sesión viva

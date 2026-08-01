@@ -30,14 +30,15 @@ export const IMPACTOS: DefImpacto[] = [
   { tipo: 'zoom', nombre: 'Acercamiento', categoria: 'camara', descripcion: 'Se acerca y vuelve, suave.' },
   { tipo: 'sacudida', nombre: 'Sacudida', categoria: 'camara', descripcion: 'Tiembla un momento, como un golpe.' },
   { tipo: 'latido', nombre: 'Latido', categoria: 'camara', descripcion: 'Un par de pulsos rápidos.' },
-  { tipo: 'movimiento', nombre: 'Movimiento', categoria: 'camara', descripcion: 'Un golpe de movimiento con desenfoque, como una sacudida rápida de cámara. La dirección se elige.' },
+  { tipo: 'movimiento', nombre: 'Movimiento', categoria: 'camara', descripcion: 'Barrido de cámara: la imagen se desenfoca con estelas en el sentido del movimiento, como cuando mueves la cámara rápido. La dirección se elige.' },
   { tipo: 'flashColor', nombre: 'Flash', categoria: 'camara', descripcion: 'Un destello del color que elijas. Por defecto, negro.' },
   { tipo: 'destello', nombre: 'Destello', categoria: 'camara', descripcion: 'Un fogonazo de luz seco.' },
   { tipo: 'parpadeo', nombre: 'Parpadeo', categoria: 'camara', descripcion: 'Parpadea a negro varias veces.' },
   { tipo: 'contorno', nombre: 'Contorno de neón', categoria: 'neon', descripcion: 'Enciende los bordes como líneas de neón.' },
   { tipo: 'lineas3d', nombre: 'Líneas 3D', categoria: 'neon', descripcion: 'Malla de curvas que envuelve la forma del objeto.' },
   { tipo: 'rayosObjeto', nombre: 'Rayos', categoria: 'neon', descripcion: 'Resplandor con destellos que emana del objeto.' },
-  { tipo: 'manchas', nombre: 'Manchas', categoria: 'neon', descripcion: 'Manchas que vagan por el cuadro e invierten el color de lo que tapan. El color y la fuerza se eligen.' },
+  // el impacto "Manchas" se retiró del catálogo a pedido del dueño. el tipo y su dibujo siguen en
+  // el código por si un proyecto viejo lo trae, pero ya no se puede añadir uno nuevo
   // se quedan solo para no romper proyectos viejos: ya no salen en la paleta, ahora todo es el
   // "Flash" de arriba con su color (negro para imitar el de a negro, blanco para el de a blanco)
   { tipo: 'flashNegro', nombre: 'Flash a negro', categoria: 'camara', descripcion: 'Se oscurece un instante y vuelve.', oculto: true },
@@ -82,14 +83,18 @@ export interface EstadoImpacto {
   // desplazamiento en fracción del alto del cuadro, para las sacudidas
   x: number
   y: number
-  // desenfoque en fracción del alto del cuadro (0 = nítido)
+  // desenfoque isotrópico en fracción del alto del cuadro (0 = nítido)
   desenfoque: number
+  // desenfoque DIRECCIONAL: estela solo en un eje, para el barrido de una cámara que se mueve
+  // rápido (no un blur redondo). en fracción del alto; x borra en horizontal, y en vertical
+  desenfoqueX: number
+  desenfoqueY: number
   // velo de color por encima de todo y su opacidad de 0 a 1
   veloColor: string
   veloOpacidad: number
 }
 
-const NEUTRO: EstadoImpacto = { escala: 1, x: 0, y: 0, desenfoque: 0, veloColor: '#000000', veloOpacidad: 0 }
+const NEUTRO: EstadoImpacto = { escala: 1, x: 0, y: 0, desenfoque: 0, desenfoqueX: 0, desenfoqueY: 0, veloColor: '#000000', veloOpacidad: 0 }
 
 // pseudoaleatorio estable a partir de un número: la misma p siempre da el mismo
 // temblor, así el efecto no baila distinto entre el visor y la exportación
@@ -135,19 +140,23 @@ export function estadoImpacto(
       return { ...NEUTRO, escala: 1 + 0.22 * amp * f, desenfoque: 0.01 * amp * f }
     }
     case 'movimiento': {
-      // el cuadro se lanza hacia el lado elegido y regresa amortiguado (un resorte), con el
-      // desenfoque más fuerte en el golpe inicial, que es donde más rápido se mueve: se lee
-      // como una sacudida veloz de cámara. la dirección decide el eje; por defecto, horizontal
+      // barrido de cámara: el cuadro se lanza hacia el lado elegido y regresa amortiguado (un
+      // resorte), y sobre todo se DESENFOCA EN ESE EJE, dejando estelas en el sentido del
+      // movimiento, como cuando mueves la cámara rápido. no es un blur redondo: la dirección
+      // decide si la estela va horizontal o vertical. es fuerte en el golpe inicial, que es
+      // donde la cámara "va más rápido", y se limpia enseguida
       const dir = direccion ?? 'der'
       const ux = dir === 'der' ? 1 : dir === 'izq' ? -1 : 0
       const uy = dir === 'aba' ? 1 : dir === 'arr' ? -1 : 0
       const resorte = Math.exp(-4.5 * p) * Math.cos(7 * p)
+      const golpe = Math.exp(-6 * p)
       return {
         ...NEUTRO,
         x: 0.16 * amp * resorte * ux,
         y: 0.16 * amp * resorte * uy,
-        escala: 1 + 0.03 * amp * Math.exp(-6 * p),
-        desenfoque: 0.05 * amp * Math.exp(-6 * p),
+        escala: 1 + 0.03 * amp * golpe,
+        desenfoqueX: Math.abs(ux) * 0.1 * amp * golpe,
+        desenfoqueY: Math.abs(uy) * 0.1 * amp * golpe,
       }
     }
     case 'flashNegro':
@@ -180,6 +189,8 @@ export function estadoImpactosEn(
   let x = 0
   let y = 0
   let desenfoque = 0
+  let desenfoqueX = 0
+  let desenfoqueY = 0
   let veloColor = '#000000'
   let veloOpacidad = 0
   for (const im of impactos) {
@@ -191,10 +202,12 @@ export function estadoImpactosEn(
     x += e.x
     y += e.y
     desenfoque += e.desenfoque
+    desenfoqueX += e.desenfoqueX
+    desenfoqueY += e.desenfoqueY
     if (e.veloOpacidad > veloOpacidad) {
       veloOpacidad = e.veloOpacidad
       veloColor = e.veloColor
     }
   }
-  return { escala, x, y, desenfoque, veloColor, veloOpacidad }
+  return { escala, x, y, desenfoque, desenfoqueX, desenfoqueY, veloColor, veloOpacidad }
 }

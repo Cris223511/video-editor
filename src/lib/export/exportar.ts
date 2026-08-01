@@ -31,6 +31,22 @@ export interface DatosExport {
   // visible y para callar los silenciados en la mezcla
   pistasMeta: PistaMeta[]
   urlDeAsset: (assetId: string) => string | undefined
+  // el archivo real (File) de cada medio. la exportación lo usa DIRECTO, sin pasar por la
+  // object URL: esa URL puede quedar revocada mientras la app sigue viva (el <video> del visor
+  // guarda su propia referencia y sigue reproduciendo, pero un fetch de la URL da
+  // ERR_FILE_NOT_FOUND y colgaba la exportación en "leyendo el video"). el File nunca caduca
+  fileDeAsset: (assetId: string) => Blob | undefined
+}
+
+// aviso de avance de la exportación: la fracción hecha (0 a 1) y, opcionalmente, una nota de
+// qué se está haciendo en ese momento (preparando, codificando tal segundo, añadiendo el audio…),
+// para que el diálogo no solo muestre un porcentaje seco sino algo vivo y con contexto
+export type OnProgreso = (v: number, detalle?: string) => void
+
+// formatea un instante en segundos a m:ss, para las notas de avance
+export function relojExport(s: number): string {
+  const t = Math.max(0, Math.floor(s))
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`
 }
 
 export interface ControlExport {
@@ -100,7 +116,7 @@ function cargarAudio(src: string): Promise<HTMLAudioElement> {
 // exporta el proyecto a un archivo de video. reproduce la línea de tiempo en
 // tiempo real dibujando cada fotograma en un canvas a la resolución del
 // proyecto, mezcla el audio con Web Audio y lo graba todo junto
-export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => void): ControlExport {
+export function exportarProyecto(datos: DatosExport, onProgreso: OnProgreso): ControlExport {
   let cancelado = false
   let raf = 0
   const limpiezas: (() => void)[] = []
@@ -294,11 +310,26 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
             }),
         )
 
+        // una object URL FRESCA a partir del archivo real de cada medio, en vez de la que
+        // guarda el proyecto (que puede estar revocada y da ERR_FILE_NOT_FOUND). se crean aquí
+        // y se revocan al terminar para no filtrar memoria. si no hubiera archivo, cae a la url
+        const urlsCreadas: string[] = []
+        const urlFresca = (assetId: string): string | undefined => {
+          const f = datos.fileDeAsset(assetId)
+          if (f) {
+            const u = URL.createObjectURL(f)
+            urlsCreadas.push(u)
+            return u
+          }
+          return datos.urlDeAsset(assetId)
+        }
+        limpiezas.push(() => urlsCreadas.forEach((u) => URL.revokeObjectURL(u)))
+
         // un video independiente por clip para poder buscar sin interferencias
         const videos = new Map<string, HTMLVideoElement>()
         await Promise.all(
           clips.map(async (c) => {
-            const url = datos.urlDeAsset(c.assetId)
+            const url = urlFresca(c.assetId)
             if (url) videos.set(c.id, await cargarVideo(url))
           }),
         )
@@ -321,7 +352,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
         // de ser fijo: el fundido lo cambia en cada fotograma
         const gananciasAudio = new Map<string, GainNode>()
         for (const a of datos.audios) {
-          const url = datos.urlDeAsset(a.assetId)
+          const url = urlFresca(a.assetId)
           if (!url) continue
           try {
             const el = await cargarAudio(url)
@@ -454,7 +485,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: (v: number) => 
           // corrección aparece progresivamente, para el instante actual
           if (clipsConEntradaEfecto.length) refrescarDefsEfecto(phRef.t)
           dibujarFotograma(ctx, escena(), phRef.t, (id) => videos.get(id) ?? null, (id) => imagenes.get(id), off)
-          onProgreso(Math.min(0.999, phRef.t / total))
+          onProgreso(Math.min(0.999, phRef.t / total), `Grabando · ${relojExport(phRef.t)} / ${relojExport(total)}`)
           raf = requestAnimationFrame(paso)
         }
 

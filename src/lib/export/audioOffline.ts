@@ -26,8 +26,9 @@ export async function mezclarAudio(datos: DatosExport, total: number): Promise<A
   const cache = new Map<string, AudioBuffer | null>()
   const bufferDe = async (assetId: string): Promise<AudioBuffer | null> => {
     if (cache.has(assetId)) return cache.get(assetId) ?? null
-    const url = datos.urlDeAsset(assetId)
-    const buf = url ? await decodificar(ctx, await (await fetch(url)).blob()) : null
+    // el archivo real, sin fetch a la object URL (que puede estar revocada y fallar)
+    const blob = datos.fileDeAsset(assetId)
+    const buf = blob ? await decodificar(ctx, blob) : null
     cache.set(assetId, buf)
     return buf
   }

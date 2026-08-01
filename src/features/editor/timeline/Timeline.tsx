@@ -797,13 +797,13 @@ export default function Timeline({
               </motion.div>
             ))}
 
-            {/* tirador del borde derecho: arrastrándolo se ensancha o estrecha la
-                columna de cabeceras, para que quepan los nombres largos */}
+            {/* tirador del borde derecho: arrastrándolo se ensancha o estrecha la columna de
+                cabeceras. es invisible a propósito (el dueño no quería ver la línea azul al pasar
+                el cursor); solo se nota por el cursor de redimensionar y sigue funcionando igual */}
             <div
               onPointerDown={estirarCabeceras}
               title="Arrastra para cambiar el ancho"
-              className="absolute inset-y-0 right-0 z-50 w-1.5 cursor-ew-resize opacity-0 transition-opacity duration-200 hover:opacity-100 group-hover/cols:opacity-60"
-              style={{ background: 'rgb(24 97 255 / 0.8)' }}
+              className="absolute inset-y-0 right-0 z-50 w-1.5 cursor-ew-resize"
             />
           </div>
 

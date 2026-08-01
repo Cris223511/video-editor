@@ -4,6 +4,39 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.34.4 (2026-07-31)
+
+Arreglo del que colgaba la exportación, un diálogo de exportación mucho más claro con el paso a paso,
+un impacto de barrido de cámara, más audio a mano y un visor con lupa.
+
+### Exportación
+
+- **Ya no se cuelga al exportar.** Con algunos proyectos la exportación se quedaba clavada en 0% o
+  caía al motor lento. La causa era una dirección interna del video que caducaba; ahora se lee el
+  archivo directo y arranca siempre. Se probó con proyectos que antes se pegaban y exportan en
+  segundos.
+- **Diálogo de exportación renovado.** Mientras exporta se ve, a un lado, la vista previa y la barra,
+  y al otro el proceso paso a paso (leyendo, decodificando y codificando, añadiendo el audio,
+  empaquetando) marcando con un check lo hecho y un girito lo que va, con el segundo y el cuadro en
+  curso, además de una ficha con la resolución, la calidad, el ritmo, el formato y por qué fotograma
+  va. Si algo no responde, cae solo al motor de respaldo en vez de quedarse esperando.
+- **Confirmación al cancelar.** Cancelar mientras exporta pregunta antes, para no perder el avance sin
+  querer.
+
+### Impactos
+
+- **Movimiento ahora es un barrido de cámara.** Deja estelas en el sentido del movimiento (como cuando
+  mueves la cámara rápido), en lugar de un desenfoque redondo. La dirección se elige.
+- **Se retiró el impacto Manchas.**
+
+### Línea de tiempo y visor
+
+- **Audio del clip a un clic.** Al elegir un video, entre sus opciones aparece Audio, con volumen,
+  fundidos y silencio; y con varios clips marcados, el volumen y el silencio caen sobre todos.
+- **Zoom del visor con lupa.** La rueda del ratón acerca la imagen sobre el punto donde apuntas (sin
+  teclas), y en móvil se acerca con dos dedos. Una lupa muestra el nivel y, al pulsarla, vuelve al
+  tamaño que encaja. No se puede alejar más allá de lo que ya se ve entero.
+
 ## 2.34.3 (2026-07-31)
 
 Una tanda de arreglos de la línea de tiempo, del visor y del sonido, el impacto de Manchas rehecho,
