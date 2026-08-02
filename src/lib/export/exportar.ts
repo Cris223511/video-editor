@@ -97,11 +97,26 @@ function bppDeNivel(nivel: NivelCompresion): number {
   return 0.08 // equilibrada
 }
 
-// bits por segundo de video (para el modo por bitrate y para ESTIMAR el peso en el diálogo). sube
-// con los píxeles y con los fps, pero ahora arranca de una densidad sana según la compresión
-// elegida, no de la vieja fórmula que pedía el triple de lo necesario. se topa en 40 Mbps
+// bits por segundo de video para el modo por bitrate (VBR, respaldo cuando no hay calidad constante).
+// sube con los píxeles y con los fps, con una densidad sana según la compresión. se topa en 40 Mbps
 export function bitrateVideo(ancho: number, alto: number, fps = 30, nivel: NivelCompresion = 'equilibrada'): number {
   return Math.min(40_000_000, Math.round(ancho * alto * fps * bppDeNivel(nivel)))
+}
+
+// densidad para ESTIMAR el peso en el diálogo. va bastante por debajo del bitrate del respaldo porque
+// casi siempre se codifica por calidad constante (QP), que gasta muchísimos menos bits que un VBR a
+// tope: un video corriente a QP equilibrado ronda estos valores. sigue siendo aproximado (el tamaño
+// real depende del movimiento: uno muy quieto pesa aún menos), pero ya no dispara un número enorme
+function bppEstimado(nivel: NivelCompresion): number {
+  if (nivel === 'alta') return 0.08
+  if (nivel === 'comprimida') return 0.018
+  return 0.035 // equilibrada
+}
+
+// peso estimado en bits por segundo, pensado para el número que muestra el diálogo. usa la densidad
+// de la codificación por calidad constante, que es como se exporta de verdad casi siempre
+export function bitrateEstimado(ancho: number, alto: number, fps = 30, nivel: NivelCompresion = 'equilibrada'): number {
+  return Math.round(ancho * alto * fps * bppEstimado(nivel))
 }
 
 function cargarImagen(src: string): Promise<HTMLImageElement> {

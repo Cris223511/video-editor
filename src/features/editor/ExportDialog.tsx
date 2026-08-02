@@ -7,7 +7,7 @@ import { useProjectStore } from '../../store/useProjectStore'
 import { duracionProyecto } from '../../lib/timeline/clips'
 import { formatearDuracion } from '../../lib/format/duracion'
 import { formatearBytes } from '../../lib/format/bytes'
-import { exportarProyecto, ControlExport, elegirMime, bitrateVideo, DatosExport, OnProgreso, NivelCompresion } from '../../lib/export/exportar'
+import { exportarProyecto, ControlExport, elegirMime, bitrateEstimado, DatosExport, OnProgreso, NivelCompresion } from '../../lib/export/exportar'
 import { exportarRapido } from '../../lib/export/exportarRapido'
 import { haiWebCodecs } from '../../lib/export/decode'
 
@@ -142,7 +142,7 @@ export default function ExportDialog() {
   // tamaño exacto, porque la grabadora ajusta la calidad según el movimiento. al
   // depender del fps, el peso cambia al elegir 24, 30 o 60
   const bytesEstimados =
-    total > 0 ? ((bitrateVideo(ancho, alto, fps, compresion) + BITRATE_AUDIO) * total) / 8 : 0
+    total > 0 ? ((bitrateEstimado(ancho, alto, fps, compresion) + BITRATE_AUDIO) * total) / 8 : 0
 
   function cerrarTodo() {
     controlRef.current?.cancelar()
@@ -296,20 +296,17 @@ export default function ExportDialog() {
       let blob: Blob | null = null
       if (haiWebCodecs()) {
         try {
-          blob = await correrVigilado(exportarRapido)
+          // se va DIRECTO por software. la decodificación por hardware se cuelga en algunos equipos
+          // (solo dejan un decodificador y una transición necesita dos, así que el segundo se traba):
+          // antes se intentaba hardware, se procesaba casi todo, se clavaba cerca del final y volvía a
+          // empezar de cero por software, y el usuario veía "Procesando el video" dos veces. yendo por
+          // software desde el arranque la exportación es de corrido, sin ese doble procesado. sigue
+          // siendo WebCodecs (mucho más rápido que la ruta clásica a tiempo real)
+          blob = await correrVigilado((d, p) => exportarRapido(d, p, { preferirSoftware: true }))
         } catch (e) {
           if (e instanceof Error && e.message.includes('cancelada')) throw e
-          // la ruta rápida por hardware se estancó o falló. antes de rendirse con la clásica
-          // (lenta, a tiempo real) se reintenta la MISMA ruta rápida pero forzando decodificación
-          // por software: hay equipos que solo permiten un decodificador por hardware y en una
-          // transición corren dos, y el segundo se cuelga. por software eso no pasa
+          // si aun así falla (un códec que WebCodecs no soporta), cae a la ruta clásica
           setProgreso(0)
-          try {
-            blob = await correrVigilado((d, p) => exportarRapido(d, p, { preferirSoftware: true }))
-          } catch (e2) {
-            if (e2 instanceof Error && e2.message.includes('cancelada')) throw e2
-            setProgreso(0)
-          }
         }
       }
       if (!blob) blob = await correr(exportarProyecto)
@@ -660,7 +657,7 @@ export default function ExportDialog() {
                 className="mt-1 rounded-full px-3 py-1 text-[12.5px] font-semibold tabular-nums"
                 style={{ background: 'rgb(16 185 129 / 0.14)', color: 'rgb(16 185 129)' }}
               >
-                Pesa {formatearBytes(tamanoFinal)}
+                Peso: {formatearBytes(tamanoFinal)}
               </span>
             )}
           </div>
