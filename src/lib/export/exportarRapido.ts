@@ -1,4 +1,4 @@
-import { DatosExport, ControlExport, bitrateVideo, OnProgreso, relojExport } from './exportar'
+import { DatosExport, ControlExport, bitrateVideo, OnProgreso, relojExport, qpDeNivel } from './exportar'
 import { Escena, dibujarFotograma } from './compositor'
 import { clipEnTiempo, duracionProyecto } from '../timeline/clips'
 import { anterior, posterior } from '../transiciones/pintar'
@@ -23,7 +23,12 @@ function cargarImagen(src: string): Promise<HTMLImageElement> {
 // muxer, sin pasar por <video> ni MediaRecorder. el resultado es el mismo archivo que la
 // ruta clásica, pero en una fracción del tiempo. de momento solo escribe el video; el
 // audio se añade en el siguiente paso
-export function exportarRapido(datos: DatosExport, onProgreso: OnProgreso): ControlExport {
+export function exportarRapido(
+  datos: DatosExport,
+  onProgreso: OnProgreso,
+  opciones?: { preferirSoftware?: boolean },
+): ControlExport {
+  const preferirSoftware = opciones?.preferirSoftware ?? false
   const { ancho, alto, fps } = datos
   // el lienzo se crea ya para devolverlo enseguida: el diálogo lo enseña como vista del
   // avance, igual que en la ruta clásica
@@ -70,38 +75,8 @@ export function exportarRapido(datos: DatosExport, onProgreso: OnProgreso): Cont
         }),
     )
 
-    // un proveedor de cuadros por clip. cada asset se desarma una sola vez y sus paquetes
-    // se comparten entre los clips del mismo medio (cada clip con su propio decodificador,
-    // porque cada uno va por un instante distinto)
-    const demuxCache = new Map<string, VideoDemux>()
-    for (const c of clips) {
-      // el archivo real, tomado DIRECTO del medio; nada de fetch a una object URL que puede
-      // estar revocada (era la causa del ERR_FILE_NOT_FOUND que dejaba la exportación clavada)
-      const blob = datos.fileDeAsset(c.assetId)
-      if (!blob) continue
-      let dem = demuxCache.get(c.assetId)
-      if (!dem) {
-        // leer y desarmar el archivo es lo que más tarda antes de arrancar, sobre todo con
-        // videos pesados; se avisa para que el 0% no parezca colgado mientras tanto
-        onProgreso(0, 'Leyendo el video…')
-        dem = await demuxVideo(blob)
-        demuxCache.set(c.assetId, dem)
-      }
-      fuentes.set(c.id, new FuenteDecodificada(dem.config, dem.chunks))
-    }
-
-    // se mezcla todo el audio del proyecto en un solo buffer (rápido, con
-    // OfflineAudioContext) antes de armar el escritor, que necesita saber si hay pista de
-    // sonido para configurar el muxer
-    const mezclaAudio = await mezclarAudio(datos, total)
-    const escritor = await EscritorVideo.crear(
-      ancho,
-      alto,
-      fps,
-      bitrateVideo(ancho, alto, fps),
-      mezclaAudio ? { sampleRate: mezclaAudio.sampleRate, canales: mezclaAudio.numberOfChannels } : null,
-    )
-
+    // helpers de composición, definidos ya para poder pintar el primer fotograma antes de
+    // terminar de leer todos los videos (la lectura es el paso lento)
     const escena = (): Escena => ({
       ancho,
       alto,
@@ -121,6 +96,66 @@ export function exportarRapido(datos: DatosExport, onProgreso: OnProgreso): Cont
     const videoDe = (id: string) =>
       (fuentes.get(id)?.lienzo ?? null) as unknown as HTMLVideoElement | null
     const imagenDe = (id: string) => imagenes.get(id)
+
+    // un proveedor de cuadros por clip. cada asset se desarma una sola vez y sus paquetes
+    // se comparten entre los clips del mismo medio (cada clip con su propio decodificador,
+    // porque cada uno va por un instante distinto). ya preparado no se rehace, así el primer
+    // vistazo y el bucle no decodifican dos veces el mismo clip
+    const demuxCache = new Map<string, VideoDemux>()
+    const prepararFuente = async (c: Clip) => {
+      if (fuentes.has(c.id)) return
+      // el archivo real, tomado DIRECTO del medio; nada de fetch a una object URL que puede
+      // estar revocada (era la causa del ERR_FILE_NOT_FOUND que dejaba la exportación clavada)
+      const blob = datos.fileDeAsset(c.assetId)
+      if (!blob) return
+      let dem = demuxCache.get(c.assetId)
+      if (!dem) {
+        // leer y desarmar el archivo es lo que más tarda antes de arrancar, sobre todo con
+        // videos pesados; se avisa para que el 0% no parezca colgado mientras tanto
+        onProgreso(0, 'Leyendo el video…')
+        dem = await demuxVideo(blob)
+        demuxCache.set(c.assetId, dem)
+      }
+      fuentes.set(c.id, new FuenteDecodificada(dem.config, dem.chunks, preferirSoftware))
+    }
+
+    // primer vistazo: en cuanto el primer clip está listo se compone su fotograma inicial y se
+    // deja pintado en el lienzo, para que la vista previa del diálogo muestre ese frame EDITADO
+    // (con su color, capas y textos) en vez de un negro mientras se leen el resto de los videos.
+    // si el vistazo falla por lo que sea, se salta sin tocar el resto de la exportación
+    try {
+      const clip0 = clipEnTiempo(clips, 0, ocultas) ?? clips[0]
+      if (clip0) {
+        await prepararFuente(clip0)
+        const fu0 = fuentes.get(clip0.id)
+        if (fu0) {
+          await fu0.irAlSegundo(clip0.recorteInicio)
+          defs.refrescar(0)
+          dibujarFotograma(ctx, escena(), 0, videoDe, imagenDe, off)
+        }
+      }
+    } catch {
+      // el vistazo es solo cosmético; que no impida exportar
+    }
+
+    // el resto de los clips (y el primero, si el vistazo no pudo con él) se preparan aquí
+    for (const c of clips) await prepararFuente(c)
+
+    // se mezcla todo el audio del proyecto en un solo buffer (rápido, con
+    // OfflineAudioContext) antes de armar el escritor, que necesita saber si hay pista de
+    // sonido para configurar el muxer
+    const mezclaAudio = await mezclarAudio(datos, total)
+    // nivel de compresión elegido: fija el QP (calidad constante) y, de respaldo, el bitrate. sin él
+    // se asume el equilibrado, que ya pesa mucho menos que la fórmula vieja
+    const nivel = datos.compresion ?? 'equilibrada'
+    const escritor = await EscritorVideo.crear(
+      ancho,
+      alto,
+      fps,
+      bitrateVideo(ancho, alto, fps, nivel),
+      mezclaAudio ? { sampleRate: mezclaAudio.sampleRate, canales: mezclaAudio.numberOfChannels } : null,
+      qpDeNivel(nivel),
+    )
 
     const totalFrames = Math.max(1, Math.round(total * fps))
     for (let f = 0; f < totalFrames; f++) {

@@ -57,6 +57,15 @@ const MULTI: Categoria[] = [
   { id: 'audio', icono: 'audio', etiqueta: 'Audio', panel: <MultiAudioPanel /> },
 ]
 
+// lo que se ARRASTRA a un clip (transiciones, efectos, impactos) no necesita que haya un clip
+// elegido: se arrastra desde aquí a cualquiera. por eso el panel muestra estos catálogos por
+// defecto, aunque no haya nada seleccionado, para tenerlos siempre a mano
+const DRAGGABLES: Categoria[] = [
+  { id: 'transiciones', icono: 'transiciones', etiqueta: 'Transiciones', panel: <Transiciones /> },
+  { id: 'efectos', icono: 'efectos', etiqueta: 'Efectos', panel: <EffectsPanel /> },
+  { id: 'impactos', icono: 'impacto', etiqueta: 'Impactos', panel: <ImpactosPanel /> },
+]
+
 // según el tipo de la capa elegida, sus propias categorías. el estilo del
 // elemento va primero, luego lo compartido (transición de entrada y transformar)
 function categoriasCapa(tipo: string): Categoria[] {
@@ -122,7 +131,7 @@ export default function PanelClip() {
             ? [{ id: 'audio', icono: 'audio', etiqueta: 'Audio', panel: <AudioPanel /> }]
             : esMulti
               ? MULTI
-              : []
+              : DRAGGABLES
 
   const hayAlgo = categorias.length > 0
   // la categoría abierta vive en el store para que los overlays del visor (el

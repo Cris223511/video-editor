@@ -222,6 +222,30 @@ export default function Preview() {
   function iniciarMarquee(e: ReactMouseEvent) {
     const cont = visorRef.current
     if (!cont) return
+    // con el visor acercado, arrastrar MUEVE el encuadre (paneo), no hace recuadro ni selecciona:
+    // así se lleva el zoom a donde se quiera. se limita para que la imagen no se salga del marco
+    if (zoomVisor.z > 1) {
+      const px0 = e.clientX
+      const py0 = e.clientY
+      const base = { x: zoomVisor.x, y: zoomVisor.y }
+      const maxX = (lienzoRect.w * (zoomVisor.z - 1)) / 2
+      const maxY = (lienzoRect.h * (zoomVisor.z - 1)) / 2
+      const panear = (ev: globalThis.MouseEvent) =>
+        setZoomVisor((p) => ({
+          ...p,
+          x: Math.max(-maxX, Math.min(maxX, base.x + (ev.clientX - px0))),
+          y: Math.max(-maxY, Math.min(maxY, base.y + (ev.clientY - py0))),
+        }))
+      const soltarPan = () => {
+        window.removeEventListener('mousemove', panear)
+        window.removeEventListener('mouseup', soltarPan)
+        document.body.style.cursor = ''
+      }
+      document.body.style.cursor = 'grabbing'
+      window.addEventListener('mousemove', panear)
+      window.addEventListener('mouseup', soltarPan)
+      return
+    }
     const r = cont.getBoundingClientRect()
     const x0 = e.clientX
     const y0 = e.clientY
@@ -1339,6 +1363,9 @@ export default function Preview() {
     const lienzo = transRef.current
     const ctx = lienzo?.getContext('2d')
     if (!lienzo || !ctx) return
+    // referencia al lienzo real del visor. pintar() suele componer aquí, pero puede recibir un
+    // lienzo aparte (la estela de movimiento compone el clip una vez y repite copias baratas)
+    const ctxVisor = ctx
 
     let raf = 0
     const paso = () => {
@@ -1361,7 +1388,10 @@ export default function Preview() {
       ctx.fillStyle = colorFondo
       ctx.fillRect(0, 0, lienzo.width, lienzo.height)
 
-      const pintar = (clip: Clip, alfa: number) => {
+      const pintar = (clip: Clip, alfa: number, destino?: CanvasRenderingContext2D) => {
+        // por defecto compone en el lienzo del visor; un destino aparte lo usa la estela de
+        // movimiento, que compone el clip una vez y luego repite copias baratas
+        const ctx = destino ?? ctxVisor
         const v = videosRef.current.get(clip.id)
         if (!v || !v.videoWidth) return
         // durante una transición geométrica el video también respeta su encuadre,
@@ -1592,6 +1622,14 @@ export default function Preview() {
             background: 'rgb(24 97 255 / 0.14)',
           }}
         />
+      )}
+
+      {/* con el visor acercado, esta capa se pone por encima de todo y se queda con el arrastre para
+          PANEAR el encuadre (mover el zoom a donde se quiera), desactivando cualquier otra acción de
+          arrastre (mover un texto, un recuadro de selección...). la rueda y el pellizco siguen
+          funcionando porque burbujean al contenedor; la lupa va por encima de esta capa */}
+      {hayContenido && zoomVisor.z > 1.01 && (
+        <div className="absolute inset-0 z-40" style={{ cursor: 'grab' }} onMouseDown={iniciarMarquee} />
       )}
 
       {/* lupa del visor: cuando hay acercamiento, muestra el nivel y, al pulsarla, vuelve al encaje

@@ -112,11 +112,12 @@ export default function Modal({
                       cuerpo rueda por debajo. el shrink-0 evita que el flex la
                       comprima cuando el contenido pide más alto del disponible */}
                   <div className="flex shrink-0 items-start justify-between gap-3 px-5 pb-4 pt-5">
-                    <div className="min-w-0">
-                      {/* el título no pasa de dos líneas y se corta con puntos
-                          suspensivos: un nombre de proyecto largo estiraba la
-                          cabecera y empujaba el contenido hacia abajo */}
-                      <Dialog.Title className="line-clamp-2 font-display text-[17px] font-bold leading-snug">
+                    <div className="min-w-0 flex-1">
+                      {/* el título ocupa TODO el ancho disponible (flex-1) hasta el botón de
+                          cerrar; si el nombre es largo, parte de palabra (break-words) y no pasa
+                          de dos líneas, con los puntos suspensivos ya en la segunda línea. sin el
+                          flex-1 el bloque se quedaba a su ancho natural y cortaba antes de tiempo */}
+                      <Dialog.Title className="line-clamp-2 break-words font-display text-[17px] font-bold leading-snug">
                         {titulo}
                       </Dialog.Title>
                       {descripcion && (
@@ -125,10 +126,13 @@ export default function Modal({
                         </Dialog.Description>
                       )}
                     </div>
+                    {/* cerrar: solo el aspa, SIN fondo (nada de rojo). al pasar el cursor se aclara
+                        (blanca en oscuro, oscura en claro, siempre con contraste) y se levanta un
+                        pelo. igual en todos los modales de la app */}
                     <Dialog.Close asChild>
                       <button
                         aria-label="Cerrar"
-                        className="interactivo -mr-1 -mt-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[color:var(--muted)]"
+                        className="-mr-1 -mt-1 grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-lg text-[color:var(--muted)] transition-all duration-200 hover:-translate-y-0.5 hover:text-[color:var(--text)] active:translate-y-0"
                       >
                         <Icon name="cerrar" size={16} />
                       </button>

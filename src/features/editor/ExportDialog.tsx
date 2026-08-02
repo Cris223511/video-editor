@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Icon from '../../components/ui/Icon'
 import Modal from '../../components/ui/Modal'
 import { useAppStore } from '../../store/useAppStore'
@@ -7,7 +7,7 @@ import { useProjectStore } from '../../store/useProjectStore'
 import { duracionProyecto } from '../../lib/timeline/clips'
 import { formatearDuracion } from '../../lib/format/duracion'
 import { formatearBytes } from '../../lib/format/bytes'
-import { exportarProyecto, ControlExport, elegirMime, bitrateVideo, DatosExport, OnProgreso } from '../../lib/export/exportar'
+import { exportarProyecto, ControlExport, elegirMime, bitrateVideo, DatosExport, OnProgreso, NivelCompresion } from '../../lib/export/exportar'
 import { exportarRapido } from '../../lib/export/exportarRapido'
 import { haiWebCodecs } from '../../lib/export/decode'
 
@@ -22,7 +22,7 @@ const BITRATE_AUDIO = 128_000
 // marcando cuál está en curso, para que el usuario entienda qué hace (leer, codificar, audio, cerrar)
 const PASOS_EXPORT = [
   { id: 'leer', etiqueta: 'Leyendo el video' },
-  { id: 'codificar', etiqueta: 'Decodificando y codificando' },
+  { id: 'codificar', etiqueta: 'Procesando el video' },
   { id: 'audio', etiqueta: 'Añadiendo el audio' },
   { id: 'empaquetar', etiqueta: 'Empaquetando el archivo' },
 ] as const
@@ -60,6 +60,20 @@ function FilaInfo({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   )
 }
 
+// nombre de archivo válido en cualquier sistema a partir del título del proyecto: se quitan
+// las tildes y todo lo que no sea letra, número, espacio o guion, y los espacios pasan a guiones.
+// si queda vacío se cae a un nombre por defecto para no descargar un archivo sin nombre
+function limpiarNombre(titulo: string): string {
+  const base = titulo
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9 _-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .toLowerCase()
+  return base || 'video-editor'
+}
+
 // diálogo de exportación. se apoya en el Modal compartido para heredar el
 // desenfoque de fondo que cubre toda la pantalla (barra superior incluida), la
 // aparición y el cierre suaves y el centrado. muestra los datos de la salida,
@@ -70,6 +84,17 @@ export default function ExportDialog() {
 
   const [fase, setFase] = useState<Fase>('inicio')
   const [progreso, setProgreso] = useState(0)
+  // barra SUAVIZADA: la que se muestra. el progreso real de la lectura/desarmado del video no da
+  // avances (es una espera), así que la barra se quedaba en 0 y luego pegaba un salto. con esto la
+  // barra trepa despacio hacia un tope mientras se lee y, en cuanto el progreso real avanza, lo
+  // sigue; nunca retrocede. así el usuario ve movimiento continuo, sin brusquedad
+  const [barra, setBarra] = useState(0)
+  const progresoRef = useRef(0)
+  progresoRef.current = progreso
+  // instante en que arrancó la exportación, para estimar cuánto falta (ETA)
+  const inicioRef = useRef(0)
+  // bucle que copia el lienzo de trabajo a la vista, a ritmo pausado (para que no salte)
+  const vistaRafRef = useRef<number | null>(null)
   // nota de qué está haciendo la exportación ahora mismo (leyendo, codificando tal segundo,
   // añadiendo el audio…), para que el avance se vea vivo y con contexto, no solo un porcentaje
   const [detalle, setDetalle] = useState('')
@@ -83,12 +108,21 @@ export default function ExportDialog() {
   // calidad = a cuántos píxeles se limita el lado menor del video. 1080 es el tope; se
   // puede bajar a 720 para un archivo más liviano y una exportación algo más rápida
   const [calidad, setCalidad] = useState(1080)
+  // compresión = cuántos bits se gastan por la MISMA imagen (no cambia la resolución). el
+  // equilibrado pesa mucho menos que antes viéndose igual; comprimida deja archivos mínimos
+  const [compresion, setCompresion] = useState<NivelCompresion>('equilibrada')
+  // peso REAL del archivo terminado, para mostrarlo al final (no el estimado)
+  const [tamanoFinal, setTamanoFinal] = useState(0)
   const controlRef = useRef<ControlExport | null>(null)
   // contenedor donde se cuelga el lienzo de la exportación mientras dura
   const cajaVista = useRef<HTMLDivElement>(null)
 
   const estado = useEditorStore.getState()
   const medios = useProjectStore.getState().medios
+  // el título del proyecto, en vivo: es el nombre con el que se descargará el archivo y también
+  // el nombre del proyecto. se edita desde el propio diálogo mientras se exporta, así que se lee
+  // reactivo (no un snapshot) para reflejar cada tecla, y al descargar se toma el último valor
+  const titulo = useProjectStore((s) => s.titulo)
   const total = duracionProyecto(estado.pista.clips, estado.capas, estado.audios, estado.audioRegiones)
   // resolución de salida: la del proyecto, pero con el lado menor limitado a la calidad
   // elegida (1080 como tope). así un proyecto en 4K sale en 1080p y a 1080p es idéntico
@@ -107,10 +141,11 @@ export default function ExportDialog() {
   // tamaño exacto, porque la grabadora ajusta la calidad según el movimiento. al
   // depender del fps, el peso cambia al elegir 24, 30 o 60
   const bytesEstimados =
-    total > 0 ? ((bitrateVideo(ancho, alto, fps) + BITRATE_AUDIO) * total) / 8 : 0
+    total > 0 ? ((bitrateVideo(ancho, alto, fps, compresion) + BITRATE_AUDIO) * total) / 8 : 0
 
   function cerrarTodo() {
     controlRef.current?.cancelar()
+    if (vistaRafRef.current) cancelAnimationFrame(vistaRafRef.current)
     if (urlSalida) URL.revokeObjectURL(urlSalida)
     setFase('inicio')
     setProgreso(0)
@@ -135,13 +170,37 @@ export default function ExportDialog() {
     cerrarTodo()
   }
 
-  // cuelga el lienzo de una exportación en el diálogo para ver por dónde va
+  // cuelga en el diálogo una vista del avance de la exportación. NO se muestra el lienzo de trabajo
+  // directo: la ruta rápida lo redibuja cientos de veces por segundo y la vista saltaba y "retrocedía"
+  // de golpe. en su lugar se pinta un lienzo PROPIO al que se copia el de trabajo a un ritmo pausado
+  // (~14/seg), así el avance se ve fluido y sin tirones
   function colgarLienzo(control: ControlExport) {
+    if (vistaRafRef.current) cancelAnimationFrame(vistaRafRef.current)
     requestAnimationFrame(() => {
       const caja = cajaVista.current
-      if (!caja || !control.lienzo) return
-      control.lienzo.className = 'h-full w-full object-contain'
-      caja.replaceChildren(control.lienzo)
+      const fuente = control.lienzo
+      if (!caja || !fuente) return
+      const vista = document.createElement('canvas')
+      vista.width = fuente.width || 16
+      vista.height = fuente.height || 9
+      vista.className = 'h-full w-full object-contain'
+      caja.replaceChildren(vista)
+      const vctx = vista.getContext('2d')
+      let ultimo = 0
+      const copiar = (ts: number) => {
+        if (vctx && fuente.width > 0 && ts - ultimo > 70) {
+          ultimo = ts
+          if (vista.width !== fuente.width) vista.width = fuente.width
+          if (vista.height !== fuente.height) vista.height = fuente.height
+          try {
+            vctx.drawImage(fuente, 0, 0)
+          } catch {
+            // el lienzo de trabajo puede estar entre redibujos; se ignora y se reintenta
+          }
+        }
+        vistaRafRef.current = requestAnimationFrame(copiar)
+      }
+      vistaRafRef.current = requestAnimationFrame(copiar)
     })
   }
 
@@ -150,13 +209,16 @@ export default function ExportDialog() {
     useEditorStore.getState().pausar()
     setFase('exportando')
     setProgreso(0)
+    setBarra(0)
     setDetalle('Preparando…')
     setError('')
+    inicioRef.current = performance.now()
 
     const datos: DatosExport = {
       ancho,
       alto,
       fps,
+      compresion,
       colorFondo: estado.colorFondo,
       fondo: estado.fondo,
       desenfoqueFondo: estado.desenfoqueFondo,
@@ -235,38 +297,91 @@ export default function ExportDialog() {
         try {
           blob = await correrVigilado(exportarRapido)
         } catch (e) {
-          // la ruta rápida no pudo (error o cuelgue); se sigue con la clásica más abajo. si el
-          // usuario canceló a mano, sí se corta de verdad
           if (e instanceof Error && e.message.includes('cancelada')) throw e
+          // la ruta rápida por hardware se estancó o falló. antes de rendirse con la clásica
+          // (lenta, a tiempo real) se reintenta la MISMA ruta rápida pero forzando decodificación
+          // por software: hay equipos que solo permiten un decodificador por hardware y en una
+          // transición corren dos, y el segundo se cuelga. por software eso no pasa
           setProgreso(0)
+          try {
+            blob = await correrVigilado((d, p) => exportarRapido(d, p, { preferirSoftware: true }))
+          } catch (e2) {
+            if (e2 instanceof Error && e2.message.includes('cancelada')) throw e2
+            setProgreso(0)
+          }
         }
       }
       if (!blob) blob = await correr(exportarProyecto)
 
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm'
       setExtension(ext)
+      setTamanoFinal(blob.size)
       const url = URL.createObjectURL(blob)
       setUrlSalida(url)
       setFase('listo')
       // descarga automática
       const a = document.createElement('a')
       a.href = url
-      a.download = `video-editor.${ext}`
+      // el nombre sale del título del proyecto tal como quedó al terminar (el usuario pudo
+      // seguir escribiéndolo mientras exportaba); se lee ahora, no al abrir el diálogo
+      a.download = `${limpiarNombre(useProjectStore.getState().titulo)}.${ext}`
       a.click()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo exportar.')
       setFase('error')
+    } finally {
+      // se corta el bucle que copiaba el lienzo de trabajo a la vista: ya no hace falta
+      if (vistaRafRef.current) cancelAnimationFrame(vistaRafRef.current)
     }
   }
 
   const idxPaso = pasoDeExport(detalle, progreso)
   // cuadros totales del archivo, para mostrar por cuál va (dato real, no solo el porcentaje)
   const cuadrosTotales = Math.max(1, Math.round(total * fps))
+  // estimación de lo que falta: a partir de lo que se lleva hecho y el tiempo transcurrido. es una
+  // aproximación (el ritmo no es constante), así que se marca con "~". se usa la barra suavizada
+  const transcurrido = fase === 'exportando' ? (performance.now() - inicioRef.current) / 1000 : 0
+  const eta = barra > 0.03 && barra < 1 ? Math.max(0, Math.round((transcurrido * (1 - barra)) / barra)) : null
+  const restante = eta === null ? '—' : eta >= 60 ? `~${Math.round(eta / 60)} min` : `~${eta} s`
+  // tamaño aproximado que se lleva escrito, sobre la estimación total del archivo
+  const pesoParcial = bytesEstimados > 0 ? formatearBytes(bytesEstimados * Math.min(1, barra)) : '—'
+
+  // anima la barra suavizada mientras dura la exportación: se acerca al progreso real un poquito
+  // por fotograma (movimiento continuo, sin saltos), y si el real está casi parado —la lectura del
+  // video— trepa asintóticamente hasta un tope discreto para que no se vea colgada en 0
+  useEffect(() => {
+    if (fase !== 'exportando') {
+      setBarra(0)
+      return
+    }
+    let raf = 0
+    const tick = () => {
+      setBarra((b) => {
+        const real = progresoRef.current
+        // la cola de la exportación (terminar de codificar, escribir el audio y empaquetar) deja el
+        // progreso real clavado un rato en ~0.97, y la barra se veía congelada. cuando ya está muy
+        // avanzada pero sin terminar, la barra sigue trepando SOLA hacia el tope, despacio, para que
+        // nunca se vea parada; el progreso real, cuando pega un salto, igual la empuja por encima
+        const enCola = real >= 0.9 && real < 1
+        const objetivo = real < 0.03 ? 0.12 : enCola ? 0.995 : real
+        const nb = b + (objetivo - b) * (enCola ? 0.012 : 0.06)
+        // nunca retrocede; el progreso real manda en cuanto lo supera; tope 0.995 hasta el final
+        return Math.min(0.995, Math.max(b, real, nb))
+      })
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [fase])
+  // al terminar de verdad, la barra llega al 100 sin quedarse en el tope
+  const barraMostrada = progreso >= 1 ? 1 : barra
 
   return (
     <Modal
       titulo="Exportar video"
-      descripcion="Ajusta la calidad y descarga tu video ya montado en un archivo."
+      // el subtítulo solo tiene sentido al configurar; mientras se exporta estorba y el dueño lo
+      // quería fuera, así que a partir de esa fase no se muestra
+      descripcion={fase === 'inicio' ? 'Ajusta la calidad y descarga tu video ya montado en un archivo.' : undefined}
       abierto={abierto}
       onCerrar={pedirCierre}
       // solo la fase de progreso necesita las dos columnas (vista previa + proceso); la de
@@ -347,6 +462,38 @@ export default function ExportDialog() {
             </div>
           </div>
 
+          <div className="mb-4">
+            <span className="mb-2 block text-[13px] font-medium text-[color:var(--muted)]">
+              Compresión
+            </span>
+            <div className="flex gap-1 rounded-xl p-1" style={{ background: 'rgb(var(--border) / 0.12)' }}>
+              {[
+                { v: 'alta' as NivelCompresion, txt: 'Alta', nota: 'Más fiel' },
+                { v: 'equilibrada' as NivelCompresion, txt: 'Equilibrada', nota: 'Recomendada' },
+                { v: 'comprimida' as NivelCompresion, txt: 'Comprimida', nota: 'Más liviana' },
+              ].map(({ v, txt, nota }) => {
+                const activo = compresion === v
+                return (
+                  <button
+                    key={v}
+                    onClick={() => setCompresion(v)}
+                    className={[
+                      'flex-1 rounded-lg py-2 text-[13px] font-semibold transition-all duration-200',
+                      activo ? 'bg-brand text-white shadow-sm' : 'text-[color:var(--muted)] hover:text-[color:var(--text)]',
+                    ].join(' ')}
+                  >
+                    {txt}
+                    <span className="ml-1 hidden text-[11px] font-normal opacity-70 sm:inline">{nota}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-[color:var(--muted)]">
+              No cambia la resolución, solo cuánto pesa el archivo. La recomendada se ve igual que el
+              original ocupando mucho menos; "Comprimida" deja el archivo aún más liviano.
+            </p>
+          </div>
+
           {fps === 60 && (
             <p className="mb-4 text-xs italic leading-relaxed text-[color:var(--muted)]">
               A 60 imágenes por segundo el movimiento se ve más suave, pero el archivo pesa
@@ -369,13 +516,35 @@ export default function ExportDialog() {
 
       {fase === 'exportando' && (
         <>
+          {/* nombre del archivo, editable mientras se exporta. es el mismo título del proyecto:
+              lo que se escriba aquí lo renombra en vivo, y al terminar la descarga usa el último
+              valor. se ve como texto normal y al pasar el cursor o enfocarlo se marca como campo,
+              con el ".mp4" (o ".webm") FUERA del campo para dejar claro qué se le concatena */}
+          <div className="mb-4">
+            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[color:var(--muted)]">
+              Nombre del archivo
+            </span>
+            <div className="flex items-center gap-2">
+              <input
+                value={titulo}
+                onChange={(e) => useProjectStore.setState({ titulo: e.target.value })}
+                placeholder="Nombre del video"
+                spellCheck={false}
+                className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-3 py-2 text-sm font-medium outline-none transition-colors duration-150 hover:border-[rgb(var(--border)/0.45)] hover:bg-[rgb(var(--border)/0.06)] focus:border-brand focus:bg-[rgb(var(--border)/0.09)]"
+              />
+              <span className="shrink-0 text-sm font-semibold text-[color:var(--muted)]">
+                .{formatoSalida === 'MP4' ? 'mp4' : 'webm'}
+              </span>
+            </div>
+          </div>
+
           <div className="mb-4 flex flex-col gap-4 sm:flex-row">
             {/* izquierda: la vista previa (el lienzo donde se dibuja cada cuadro) y la barra */}
             <div className="sm:flex-1">
               <div
                 ref={cajaVista}
                 className="grid w-full place-items-center overflow-hidden rounded-xl bg-black"
-                style={{ aspectRatio: `${ancho} / ${alto}`, maxHeight: '34vh' }}
+                style={{ aspectRatio: `${ancho} / ${alto}`, maxHeight: '30vh' }}
               />
               {/* el título de abajo dice el PASO en curso (Leyendo el video, Decodificando…), no un
                   genérico "Exportando", y la barra avanza con el total; así se ve en todo momento
@@ -383,14 +552,14 @@ export default function ExportDialog() {
               <p className="mb-2 mt-3 text-sm font-medium">
                 {progreso >= 1 ? 'Listo' : `${PASOS_EXPORT[idxPaso]?.etiqueta ?? 'Exportando'}…`}{' '}
                 {progreso < 1 && (
-                  <span className="text-[color:var(--muted)]">{Math.round(progreso * 100)}%</span>
+                  <span className="text-[color:var(--muted)]">{Math.round(barraMostrada * 100)}%</span>
                 )}
               </p>
               <div className="h-3 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                 <div
                   className="relative h-full min-w-[0.75rem] rounded-full"
                   style={{
-                    width: `${Math.max(0, Math.min(1, progreso)) * 100}%`,
+                    width: `${Math.max(0, Math.min(1, barraMostrada)) * 100}%`,
                     backgroundImage: 'linear-gradient(90deg, #1861ff, #4b83ff)',
                   }}
                 >
@@ -411,7 +580,7 @@ export default function ExportDialog() {
                 apagado lo que falta. así se entiende qué hace por dentro (leer, decodificar y
                 codificar, mezclar audio, empaquetar), no solo un porcentaje suelto */}
             <div
-              className="flex shrink-0 flex-col rounded-xl p-3.5 sm:w-64"
+              className="flex shrink-0 flex-col rounded-xl p-3.5 sm:w-80"
               style={{ background: 'rgb(var(--border) / 0.06)' }}
             >
               <h3 className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--muted)]">
@@ -470,6 +639,8 @@ export default function ExportDialog() {
                   etiqueta="Fotograma"
                   valor={`${Math.min(cuadrosTotales, Math.round(progreso * cuadrosTotales))} / ${cuadrosTotales}`}
                 />
+                <FilaInfo etiqueta="Tamaño" valor={pesoParcial} />
+                <FilaInfo etiqueta="Falta" valor={restante} />
               </div>
             </div>
           </div>
@@ -494,20 +665,86 @@ export default function ExportDialog() {
 
       {fase === 'listo' && (
         <div className="flex flex-col items-center gap-4 py-2 text-center">
-          <span className="grid h-12 w-12 place-items-center rounded-full bg-emerald-500/15 text-emerald-500">
-            <Icon name="check" size={26} />
-          </span>
-          <p className="text-sm">La descarga empezó. Si no, usa el botón.</p>
+          {/* check de éxito animado: el aro aparece con un rebote corto, el visto se DIBUJA solo
+              (la línea se traza) y a su alrededor salta un estallido de rayitas suaves que se abren
+              y se desvanecen, para que terminar de exportar se sienta como un logro y no un aviso seco */}
+          <div className="relative grid h-[76px] w-[76px] place-items-center">
+            <span className="exito-chispas" aria-hidden="true">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <i key={i} style={{ ['--r' as string]: `${i * 45}deg` }} />
+              ))}
+            </span>
+            <svg viewBox="0 0 76 76" className="h-[76px] w-[76px]">
+              <circle className="exito-aro" cx="38" cy="38" r="34" />
+              <path className="exito-tic" d="M24 39.5 l9.5 9.5 L53 28.5" />
+            </svg>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <h3 className="font-display text-[16px] font-bold">¡Tu video está listo!</h3>
+            <p className="text-[13px] leading-relaxed text-[color:var(--muted)]">
+              Ya se armó el archivo y la descarga empezó sola. Si tu navegador no la mostró, guárdalo
+              con el botón de abajo.
+            </p>
+            {/* peso REAL del archivo terminado, para que se vea cuánto ocupó de verdad */}
+            {tamanoFinal > 0 && (
+              <span
+                className="mt-1 rounded-full px-3 py-1 text-[12.5px] font-semibold tabular-nums"
+                style={{ background: 'rgb(16 185 129 / 0.14)', color: 'rgb(16 185 129)' }}
+              >
+                Pesa {formatearBytes(tamanoFinal)}
+              </span>
+            )}
+          </div>
           <a
             href={urlSalida}
-            download={`video-editor.${extension}`}
+            download={`${limpiarNombre(titulo)}.${extension}`}
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-medium text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-lg active:translate-y-0 active:scale-95"
           >
             <Icon name="exportar" size={18} /> Descargar de nuevo
           </a>
-          <button onClick={cerrarTodo} className="text-sm text-[color:var(--muted)] transition-colors duration-200 hover:text-[color:var(--text)]">
-            Cerrar
-          </button>
+          {/* sin botón "Cerrar" aparte: para cerrar está la X roja de arriba a la derecha */}
+          <style>{`
+            .exito-aro {
+              fill: rgb(16 185 129 / 0.14);
+              stroke: rgb(16 185 129);
+              stroke-width: 2.5;
+              transform-origin: center;
+              animation: exito-pop 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+            .exito-tic {
+              fill: none;
+              stroke: rgb(16 185 129);
+              stroke-width: 4.2;
+              stroke-linecap: round;
+              stroke-linejoin: round;
+              stroke-dasharray: 44;
+              stroke-dashoffset: 44;
+              animation: exito-trazo 0.5s 0.24s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+            }
+            .exito-chispas { position: absolute; inset: 0; }
+            .exito-chispas i {
+              position: absolute;
+              left: 50%; top: 50%;
+              width: 2.5px; height: 10px;
+              margin: -5px 0 0 -1.25px;
+              border-radius: 3px;
+              background: rgb(16 185 129 / 0.85);
+              transform: rotate(var(--r)) translateY(-8px) scaleY(0.4);
+              opacity: 0;
+              animation: exito-chispa 0.62s 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            }
+            @keyframes exito-pop {
+              0% { transform: scale(0.5); opacity: 0; }
+              60% { transform: scale(1.08); }
+              100% { transform: scale(1); opacity: 1; }
+            }
+            @keyframes exito-trazo { to { stroke-dashoffset: 0; } }
+            @keyframes exito-chispa {
+              0% { transform: rotate(var(--r)) translateY(-8px) scaleY(0.4); opacity: 0; }
+              35% { opacity: 1; }
+              100% { transform: rotate(var(--r)) translateY(-34px) scaleY(1); opacity: 0; }
+            }
+          `}</style>
         </div>
       )}
 

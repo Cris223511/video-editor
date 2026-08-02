@@ -31,6 +31,11 @@ export class EscritorVideo {
   private fps: number
   private n = 0
   private error: unknown = null
+  // si es true, se codifica por CALIDAD CONSTANTE (se pasa un QP por cuadro, como un CRF); si no,
+  // por bitrate (VBR). el QP es el cuantizador: menor = mejor y más pesado, con keyframes más finos
+  private usaQP: boolean
+  private qp: number
+  private qpKey: number
 
   private constructor(
     ancho: number,
@@ -39,8 +44,13 @@ export class EscritorVideo {
     bitrate: number,
     codec: string,
     audio: InfoAudio | null,
+    usaQP: boolean,
+    qp: { qp: number; qpKey: number },
   ) {
     this.fps = fps
+    this.usaQP = usaQP
+    this.qp = qp.qp
+    this.qpKey = qp.qpKey
     this.muxer = new Muxer({
       target: new ArrayBufferTarget(),
       video: { codec: 'avc', width: ancho, height: alto },
@@ -53,7 +63,13 @@ export class EscritorVideo {
         this.error = e
       },
     })
-    this.encoder.configure({ codec, width: ancho, height: alto, bitrate, framerate: fps })
+    // en modo calidad constante no se fija bitrate: manda el QP que se pasa por cuadro. en modo VBR
+    // se fija el bitrate objetivo. el cast es porque 'quantizer' es más nuevo que los tipos del DOM
+    this.encoder.configure(
+      (usaQP
+        ? { codec, width: ancho, height: alto, framerate: fps, bitrateMode: 'quantizer' }
+        : { codec, width: ancho, height: alto, bitrate, framerate: fps, bitrateMode: 'variable' }) as VideoEncoderConfig,
+    )
     if (audio) {
       this.audioEncoder = new AudioEncoder({
         output: (chunk, meta) => this.muxer.addAudioChunk(chunk, meta),
@@ -76,9 +92,28 @@ export class EscritorVideo {
     fps: number,
     bitrate: number,
     audio: InfoAudio | null = null,
+    qp: { qp: number; qpKey: number } = { qp: 29, qpKey: 25 },
   ): Promise<EscritorVideo> {
-    const codec = await codecAvcSoportado(ancho, alto, fps, bitrate)
-    return new EscritorVideo(ancho, alto, fps, bitrate, codec, audio)
+    // se prueba primero la CALIDAD CONSTANTE (quantizer): es lo que hace un compresor CRF y deja el
+    // archivo mucho más liviano a la misma vista. si ningún perfil la soporta, se usa VBR por bitrate
+    let usaQP = false
+    let codec = ''
+    for (const c of ['avc1.640028', 'avc1.4d0028', 'avc1.640020', 'avc1.42E01F', 'avc1.42001f']) {
+      try {
+        const s = await VideoEncoder.isConfigSupported(
+          { codec: c, width: ancho, height: alto, framerate: fps, bitrateMode: 'quantizer' } as VideoEncoderConfig,
+        )
+        if (s.supported) {
+          codec = c
+          usaQP = true
+          break
+        }
+      } catch {
+        // ese perfil no admite quantizer; se prueba el siguiente
+      }
+    }
+    if (!usaQP) codec = await codecAvcSoportado(ancho, alto, fps, bitrate)
+    return new EscritorVideo(ancho, alto, fps, bitrate, codec, audio, usaQP, qp)
   }
 
   // mete la mezcla de audio ya hecha (un AudioBuffer). se trocea en bloques y se codifica
@@ -121,7 +156,14 @@ export class EscritorVideo {
       if (this.error) throw new Error('Fallo al codificar: ' + this.error)
     }
     const frame = new VideoFrame(fuente, { timestamp: Math.round(tMicros) })
-    this.encoder.encode(frame, { keyFrame: this.n % (this.fps * 2) === 0 })
+    // un keyframe cada dos segundos para poder saltar sin descargar todo. en modo calidad constante
+    // se manda además el QP por cuadro (los keyframes con uno más fino); el `avc.quantizer` es más
+    // nuevo que los tipos del DOM, por eso el cast
+    const esKey = this.n % (this.fps * 2) === 0
+    const opciones = this.usaQP
+      ? { keyFrame: esKey, avc: { quantizer: esKey ? this.qpKey : this.qp } }
+      : { keyFrame: esKey }
+    this.encoder.encode(frame, opciones as VideoEncoderEncodeOptions)
     frame.close()
     this.n++
   }

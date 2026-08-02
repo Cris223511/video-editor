@@ -25,7 +25,7 @@ export class FuenteDecodificada {
   private esperas: (() => void)[] = []
   readonly lienzo: LienzoComoVideo
 
-  constructor(config: VideoDecoderConfig, chunks: EncodedVideoChunk[]) {
+  constructor(config: VideoDecoderConfig, chunks: EncodedVideoChunk[], preferirSoftware = false) {
     this.chunks = chunks
     this.lienzo = document.createElement('canvas') as LienzoComoVideo
     this.lienzo.videoWidth = config.codedWidth ?? 0
@@ -41,7 +41,11 @@ export class FuenteDecodificada {
         this.esperas.splice(0).forEach((w) => w())
       },
     })
-    this.decoder.configure(config)
+    // por defecto el navegador elige (normalmente hardware, más rápido). el modo software se
+    // usa como reintento cuando el hardware se estanca: hay sistemas que solo permiten un
+    // decodificador por hardware y en una transición corren dos, así que el segundo se cuelga.
+    // por software no hay ese límite (a cambio de ir más lento)
+    this.decoder.configure(preferirSoftware ? { ...config, hardwareAcceleration: 'prefer-software' } : config)
   }
 
   // espera a que el decodificador emita el siguiente cuadro, con una red de seguridad por
@@ -69,6 +73,12 @@ export class FuenteDecodificada {
     const MARGEN = 3
     const porDelante = () => this.listas.filter((f) => f.timestamp > sMicros).length
 
+    // si el decodificador deja de entregar cuadros y tampoco consume paquetes durante varias
+    // esperas seguidas, es que se quedó mudo (un caso típico: el sistema solo deja un
+    // decodificador por hardware y en una transición corren dos a la vez, así que el segundo
+    // no arranca y no lanza ningún error). en vez de girar en timeouts de 5 s para siempre
+    // (la exportación "colgada"), se corta con un error para que el diálogo caiga al otro motor
+    let estancado = 0
     while (porDelante() < MARGEN && this.siguiente < this.chunks.length) {
       if (this.errorDecode) throw new Error('Fallo al decodificar el video: ' + this.errorDecode)
       // el decodificador se mantiene alimentado sin pasarse, para que trabaje en paralelo
@@ -76,7 +86,18 @@ export class FuenteDecodificada {
         this.decoder.decode(this.chunks[this.siguiente++])
       }
       if (this.siguiente >= this.chunks.length && this.decoder.decodeQueueSize === 0) break
+      const cuadrosAntes = this.listas.length
+      const colaAntes = this.decoder.decodeQueueSize
       await this.esperarSalida()
+      // tras esperar: ni salió un cuadro nuevo ni bajó la cola de decodificación
+      if (this.listas.length === cuadrosAntes && this.decoder.decodeQueueSize >= colaAntes) {
+        estancado++
+        if (estancado >= 3) {
+          throw new Error('El decodificador de video se detuvo (posible límite de decodificadores del sistema).')
+        }
+      } else {
+        estancado = 0
+      }
     }
     // al agotarse los paquetes se drena una vez para que salgan los últimos cuadros
     if (this.siguiente >= this.chunks.length && !this.drenado) {

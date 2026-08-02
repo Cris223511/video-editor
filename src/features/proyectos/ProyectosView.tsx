@@ -394,9 +394,11 @@ export default function ProyectosView() {
             </div>
 
             <div className="flex flex-1 flex-col gap-1 p-3.5">
-              {/* el título no pasa de dos líneas y se corta con puntos suspensivos:
-                  a una sola línea, cualquier nombre medianamente largo se perdía */}
-              <h2 className="line-clamp-2 font-display text-[18px] font-bold leading-snug">
+              {/* el título usa todo el ancho de la tarjeta y no pasa de dos líneas: si el nombre
+                  es largo y no trae espacios, parte de palabra (break-words) para llenar las dos
+                  líneas y recién ahí corta con puntos suspensivos. sin el break-words un token
+                  largo se salía y se cortaba en la primera línea sin aprovechar el ancho */}
+              <h2 className="line-clamp-2 break-words font-display text-[18px] font-bold leading-snug">
                 {p.titulo}
               </h2>
 

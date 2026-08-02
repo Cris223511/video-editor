@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import SinSeleccion from '../../../components/ui/SinSeleccion'
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
@@ -102,7 +102,13 @@ export default function TonePanel() {
   // reproducción del hover continúe desde el mismo frame que se está viendo
   const medioClip = clip ? medios.find((m) => m.id === clip.assetId) : undefined
   const videoUrl = medioClip?.clase === 'video' ? medioClip.url : undefined
-  const tiempoFrame = clip ? Math.max(0, clip.recorteInicio + (playhead - clip.inicio) * clip.velocidad) : 0
+  // el instante de la muestra NO se recaptura mientras se reproduce (parecería animarse sola): se
+  // congela en reproducción y solo se pone al día en pausa o al arrastrar el cabezal
+  const reproduciendo = useEditorStore((s) => s.reproduciendo)
+  const tiempoVivo = clip ? Math.max(0, clip.recorteInicio + (playhead - clip.inicio) * clip.velocidad) : 0
+  const tiempoRef = useRef(tiempoVivo)
+  if (!reproduciendo) tiempoRef.current = tiempoVivo
+  const tiempoFrame = tiempoRef.current
   const frameActual = useFrameEnTiempo(videoUrl, tiempoFrame)
 
   if (!tono) {

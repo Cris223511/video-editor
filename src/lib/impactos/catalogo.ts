@@ -140,23 +140,26 @@ export function estadoImpacto(
       return { ...NEUTRO, escala: 1 + 0.22 * amp * f, desenfoque: 0.01 * amp * f }
     }
     case 'movimiento': {
-      // barrido de cámara: el cuadro se lanza hacia el lado elegido y regresa amortiguado (un
-      // resorte), y sobre todo se DESENFOCA EN ESE EJE, dejando estelas en el sentido del
-      // movimiento, como cuando mueves la cámara rápido. no es un blur redondo: la dirección
-      // decide si la estela va horizontal o vertical. es fuerte en el golpe inicial, que es
-      // donde la cámara "va más rápido", y se limpia enseguida
+      // desenfoque de MOVIMIENTO (paneo de cámara): la imagen se estira en estelas a lo largo del
+      // eje elegido, como cuando mueves la cámara rápido siguiendo algo. NO es un blur redondo: es
+      // un desenfoque SOLO en una dirección. la estela está presente durante todo el impacto, con
+      // una envolvente suave (sube, se mantiene fuerte, baja), no un flash al inicio, para que se
+      // lea como un barrido sostenido y no como un parpadeo
       const dir = direccion ?? 'der'
       const ux = dir === 'der' ? 1 : dir === 'izq' ? -1 : 0
       const uy = dir === 'aba' ? 1 : dir === 'arr' ? -1 : 0
+      // meseta suave: casi plena en el medio y con bordes redondeados; ^0.5 la ensancha para que
+      // el desenfoque dure casi todo el tramo en vez de un pico fino
+      const env = Math.pow(Math.sin(Math.PI * Math.max(0, Math.min(1, p))), 0.5)
       const resorte = Math.exp(-4.5 * p) * Math.cos(7 * p)
-      const golpe = Math.exp(-6 * p)
       return {
         ...NEUTRO,
-        x: 0.16 * amp * resorte * ux,
-        y: 0.16 * amp * resorte * uy,
-        escala: 1 + 0.03 * amp * golpe,
-        desenfoqueX: Math.abs(ux) * 0.1 * amp * golpe,
-        desenfoqueY: Math.abs(uy) * 0.1 * amp * golpe,
+        // un empujón leve en la dirección, para reforzar la sensación de que la cámara se mueve
+        x: 0.09 * amp * resorte * ux,
+        y: 0.09 * amp * resorte * uy,
+        // la estela: bastante marcada (hasta ~0.22 del alto en un eje) y sostenida por la meseta
+        desenfoqueX: Math.abs(ux) * 0.22 * amp * env,
+        desenfoqueY: Math.abs(uy) * 0.22 * amp * env,
       }
     }
     case 'flashNegro':

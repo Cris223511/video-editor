@@ -36,6 +36,7 @@ function Lineas({ alturas, color }: { alturas: number[]; color: string }) {
 export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: Props) {
   const seleccionado = useEditorStore((s) => s.regionSeleccionada === audio.id)
   const congelarLayout = useEditorStore((s) => s.congelarLayout)
+  const reproduciendo = useEditorStore((s) => s.reproduciendo)
   const arrastreBloques = useEditorStore((s) => s.arrastreBloques)
   const seleccionarRegion = useEditorStore((s) => s.seleccionarRegion)
   const moverAudio = useEditorStore((s) => s.moverAudio)
@@ -244,7 +245,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
 
   return (
     <motion.div
-      layout={interactuando || (arrastreBloques && enConjunto) || congelarLayout ? false : 'position'}
+      layout={interactuando || (arrastreBloques && enConjunto) || congelarLayout || reproduciendo ? false : 'position'}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={audio.nivel ?? 0}
       data-bloque-id={audio.id}
@@ -258,7 +259,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
       className={[
         'group/bloque absolute top-0 flex h-full cursor-grab items-center overflow-hidden rounded-lg border px-2 transition-[border-color]',
         seleccionado
-          ? 'border-sky-400'
+          ? 'border-sky-400 ring-2 ring-inset ring-sky-400/80'
           : enConjunto
             ? 'border-brand ring-2 ring-inset ring-brand/80'
             : 'border-transparent hover:border-white/30',

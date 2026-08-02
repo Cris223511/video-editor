@@ -744,7 +744,7 @@ export default function Timeline({
             {ordenCarriles.map((carril, i) => (
               <motion.div
                 key={carril}
-                layout={congelarLayout ? false : 'position'}
+                layout={congelarLayout || reproduciendo ? false : 'position'}
                 transition={DESLIZA}
                 className="relative"
                 style={{ marginTop: i === 0 ? 8 : SEP_SECCION }}
@@ -758,7 +758,7 @@ export default function Timeline({
                 {carril === 'video' && (
                   <div className="relative flex flex-col" style={{ gap: HUECO_PISTA }}>
                     {filas.map((p) => (
-                      <motion.div key={pistasMeta[p]?.id ?? p} layout={congelarLayout ? false : 'position'} transition={DESLIZA}>
+                      <motion.div key={pistasMeta[p]?.id ?? p} layout={congelarLayout || reproduciendo ? false : 'position'} transition={DESLIZA}>
                         <PistaHeader indice={p} alto={altosPista[p]} />
                       </motion.div>
                     ))}
@@ -825,7 +825,7 @@ export default function Timeline({
           {/* las filas siguen el mismo orden que la columna de cabeceras, para que
               cada sección quede enfrente de su rótulo pase lo que pase */}
           {ordenCarriles.map((carril, i) => (
-            <motion.div key={carril} layout={congelarLayout ? false : 'position'} transition={DESLIZA} style={{ marginTop: i === 0 ? 8 : SEP_SECCION }}>
+            <motion.div key={carril} layout={congelarLayout || reproduciendo ? false : 'position'} transition={DESLIZA} style={{ marginTop: i === 0 ? 8 : SEP_SECCION }}>
               {carril === 'video' && (
                 <>
               {/* niveles de video, del más alto al más bajo */}
@@ -852,7 +852,7 @@ export default function Timeline({
                   return (
                     <motion.div
                       key={pistasMeta[p]?.id ?? p}
-                      layout={congelarLayout ? false : 'position'}
+                      layout={congelarLayout || reproduciendo ? false : 'position'}
                       transition={DESLIZA}
                       data-fila-pista={p}
                       onContextMenu={(e) => {

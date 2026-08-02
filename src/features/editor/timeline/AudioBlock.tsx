@@ -348,7 +348,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
       className={[
         'group/bloque absolute top-0 flex h-full cursor-grab items-center overflow-hidden rounded-lg border px-2 transition-[border-color]',
         seleccionado
-          ? 'border-emerald-400'
+          ? 'border-emerald-400 ring-2 ring-inset ring-emerald-400/80'
           : enConjunto
             ? 'border-brand ring-2 ring-inset ring-brand/80'
             : 'border-transparent hover:border-white/30',

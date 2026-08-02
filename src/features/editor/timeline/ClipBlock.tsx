@@ -53,6 +53,7 @@ export default function ClipBlock({
 }: Props) {
   const seleccionado = useEditorStore((s) => s.clipSeleccionado === clip.id)
   const congelarLayout = useEditorStore((s) => s.congelarLayout)
+  const reproduciendo = useEditorStore((s) => s.reproduciendo)
   const arrastreBloques = useEditorStore((s) => s.arrastreBloques)
   const alternarSilencioClip = useEditorStore((s) => s.alternarSilencioClip)
   const alternarBloque = useEditorStore((s) => s.alternarBloque)
@@ -499,7 +500,7 @@ export default function ClipBlock({
 
   return (
     <motion.div
-      layout={sinSuavizado || congelarLayout ? false : 'position'}
+      layout={sinSuavizado || congelarLayout || reproduciendo ? false : 'position'}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={clip.pista}
       data-bloque-id={clip.id}
@@ -550,7 +551,7 @@ export default function ClipBlock({
         // hacía verse distinto. en un conjunto sí lleva el aro interior bien visible, para notar de
         // un vistazo qué bloques están marcados al seleccionar varios
         seleccionado
-          ? 'border-brand'
+          ? 'border-brand ring-2 ring-inset ring-brand/80'
           : enConjunto
             ? 'border-brand ring-2 ring-inset ring-brand/80'
             : 'border-transparent hover:border-white/30',

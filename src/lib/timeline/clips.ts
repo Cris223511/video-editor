@@ -13,6 +13,20 @@ export function clipEnTiempo(clips: Clip[], t: number, ocultas?: Set<number>): C
     if (t < c.inicio || t >= c.inicio + c.duracion) continue
     if (!visible || c.pista > visible.pista) visible = c
   }
+  if (visible) return visible
+  // el rango es medio-abierto [inicio, fin): en el instante exacto del corte final
+  // (t === fin) ningún clip lo cubre y el visor se iba a negro. es justo donde queda
+  // el cabezal al soltar un recorte, así que en vez de fondo vacío se muestra el
+  // último frame del clip que termina ahí. solo entra cuando nada más cubre t, de modo
+  // que dos clips pegados siguen dando el que empieza (el corte pertenece al siguiente)
+  // y un hueco real más adentro sigue en negro. la tolerancia mínima absorbe el redondeo
+  const eps = 1e-3
+  for (const c of clips) {
+    if (ocultas?.has(c.pista)) continue
+    const fin = c.inicio + c.duracion
+    if (t < c.inicio - eps || t > fin + eps) continue
+    if (!visible || c.pista > visible.pista) visible = c
+  }
   return visible
 }
 

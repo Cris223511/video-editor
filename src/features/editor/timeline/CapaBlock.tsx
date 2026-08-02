@@ -21,6 +21,7 @@ interface Props {
 export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   const seleccionado = useEditorStore((s) => s.capaSeleccionada === capa.id)
   const congelarLayout = useEditorStore((s) => s.congelarLayout)
+  const reproduciendo = useEditorStore((s) => s.reproduciendo)
   const seleccionarCapa = useEditorStore((s) => s.seleccionarCapa)
   const actualizarCapa = useEditorStore((s) => s.actualizarCapa)
   const moverCapaTiempo = useEditorStore((s) => s.moverCapaTiempo)
@@ -303,7 +304,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
 
   return (
     <motion.div
-      layout={interactuando || (arrastreBloques && enConjunto) || congelarLayout ? false : 'position'}
+      layout={interactuando || (arrastreBloques && enConjunto) || congelarLayout || reproduciendo ? false : 'position'}
       transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       layoutDependency={capa.nivel ?? 0}
       data-bloque-id={capa.id}
@@ -328,7 +329,9 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       className={[
         'group/bloque absolute top-0 flex h-full cursor-grab items-center overflow-hidden rounded-md border px-2 transition-[border-color]',
         seleccionado
-          ? esImagen ? 'border-sky-400' : 'border-amber-400'
+          ? esImagen
+            ? 'border-sky-400 ring-2 ring-inset ring-sky-400/80'
+            : 'border-amber-400 ring-2 ring-inset ring-amber-400/80'
           : enConjunto
             ? 'border-brand ring-2 ring-inset ring-brand/80'
             : 'border-transparent hover:border-white/30',

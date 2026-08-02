@@ -618,6 +618,9 @@ export function dibujarFotograma(
 ) {
   const { ancho, alto, colorFondo, fondo, desenfoqueFondo = 45, fondoGiro = 0, clips, capas, marco } = escena
   const escala = alto / 1080
+  // referencia al lienzo real de salida. pintar() suele componer aquí, pero puede recibir un
+  // lienzo aparte (una transición con estela lo aprovecha para componer el clip una sola vez)
+  const ctxPrincipal = ctx
 
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.clearRect(0, 0, ancho, alto)
@@ -680,7 +683,11 @@ export function dibujarFotograma(
     veloTransCol = vE >= vS ? entG?.veloColor ?? '#000' : salG?.veloColor ?? '#000'
     blurTransG = (entG?.blur ?? 0) + (salG?.blur ?? 0)
 
-    const pintar = (clip: Clip, alfa: number) => {
+    const pintar = (clip: Clip, alfa: number, destino?: CanvasRenderingContext2D) => {
+      // por defecto se compone en el lienzo principal; una transición con estela puede pedir
+      // que el clip se componga en un lienzo aparte, para luego blitear muchas copias baratas
+      // en lugar de repetir toda la maquinaria de pintado (color, nitidez, relleno) por copia
+      const ctx = destino ?? ctxPrincipal
       const video = videoDe(clip.id)
       if (!video || !video.videoWidth) return
       // el rect donde va el video sale del encuadre del clip; sin encuadre queda
@@ -904,6 +911,13 @@ export function dibujarFotograma(
       pintar(activo, 1)
     } else if (q < 1 && activo.transicionSalida) {
       pintarTransicion(ctx, ancho, alto, posterior(activo, clips), activo, q, pintar, activo.transicionSalida.tipo)
+    } else if (saliente && activo.transicion && activo.transicion.tipo !== 'ninguna' && activo.transicion.tipo !== 'corte') {
+      // la entrada de este clip es un CRUCE CENTRADO (tiene plano anterior y una transición real):
+      // toda su coreografía ya la cubre la ventana del cruce, arriba. la ventana de `progreso` va de
+      // inicio a inicio+duración, más larga que la del cruce (centrada, mitad y mitad), así que fuera
+      // del cruce `progreso` seguía < 1 y esta rama volvía a pintar la entrada: la transición
+      // "reaparecía" un instante después de haber terminado. ya pasado el cruce el clip va limpio
+      pintar(activo, 1)
     } else {
       pintarTransicion(ctx, ancho, alto, activo, saliente, p, pintar)
     }

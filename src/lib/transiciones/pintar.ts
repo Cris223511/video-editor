@@ -143,8 +143,20 @@ export function efectoGlobalTrans(
 export interface Pintor {
   // dibuja un clip cubriendo el lienzo, con su tono ya aplicado. el llamante lo
   // aporta porque el visor y la exportación obtienen el fotograma de sitios
-  // distintos, pero la coreografía de la transición es la misma
-  (clip: Clip, alfa: number): void
+  // distintos, pero la coreografía de la transición es la misma. el destino opcional
+  // permite componer el clip en un lienzo aparte (lo usa la estela de movimiento, que
+  // compone una vez y luego repite el resultado en copias baratas)
+  (clip: Clip, alfa: number, destino?: CanvasRenderingContext2D): void
+}
+
+// lienzo reutilizable donde la estela de movimiento compone el clip una sola vez antes de
+// blitear sus copias. se guarda a nivel de módulo para no crear un canvas por cuadro
+let _lienzoEstela: HTMLCanvasElement | null = null
+function lienzoEstela(ancho: number, alto: number): HTMLCanvasElement {
+  if (!_lienzoEstela) _lienzoEstela = document.createElement('canvas')
+  if (_lienzoEstela.width !== ancho) _lienzoEstela.width = ancho
+  if (_lienzoEstela.height !== alto) _lienzoEstela.height = alto
+  return _lienzoEstela
 }
 
 // dibuja un clip con un filtro css (desenfoque, brillo...) y, si hace falta, un
@@ -467,15 +479,34 @@ export function pintarTransicion(
           pintar(clip, 1)
           return
         }
-        const largo = lado * 0.55 * k // longitud de la estela en píxeles
-        const corr = lado * 0.22 * k * signo // corrimiento general hacia el lado (el whoosh)
+        const largo = lado * 0.5 * k // longitud de la estela en píxeles
+        const corr = lado * 0.13 * k * signo // corrimiento general hacia el lado (el whoosh)
         const sep = largo / COPIAS // separación entre copias contiguas
         const fundir = Math.max(0.6, sep * 0.9) // desenfoque que funde las copias en algo continuo
+        // el clip se compone una SOLA vez en un lienzo aparte y de ahí se blitean las 22 copias.
+        // antes cada copia repetía pintar() entero (color, nitidez, curvatura, relleno borroso...),
+        // o sea 22 composiciones completas por cuadro: en la transición eso se arrastraba durante
+        // minutos y la exportación parecía colgada. componiendo una vez y repitiendo ese mapa de bits
+        // la estela sale idéntica y el coste cae a la vigésima parte
+        const tmp = lienzoEstela(ancho, alto)
+        const tctx = tmp.getContext('2d')
+        if (!tctx) {
+          // sin un segundo lienzo 2d (entorno muy limitado) se cae al camino directo, más lento
+          pintar(clip, 1)
+          return
+        }
+        tctx.setTransform(1, 0, 0, 1, 0, 0)
+        tctx.clearRect(0, 0, ancho, alto)
+        pintar(clip, 1, tctx)
         ctx.save()
         // se amplía para que la estela, el corrimiento y el fundido no descubran el borde del
-        // lienzo (las orillas se cubren con la propia imagen estirada)
+        // lienzo. la escala se calcula del desplazamiento MÁXIMO de las copias (corrimiento + media
+        // estela) para que SIEMPRE lo cubra: antes era un 1.4 fijo que se quedaba corto y dejaba una
+        // banda estirada del borde (sobre todo en vertical, en videos verticales)
+        const maxDesp = Math.abs(corr) + largo / 2
+        const escala = 1 + (2 * maxDesp) / lado + 0.06
         ctx.translate(ancho / 2, alto / 2)
-        ctx.scale(1.4, 1.4)
+        ctx.scale(escala, escala)
         ctx.translate(-ancho / 2, -alto / 2)
         ctx.filter = `blur(${fundir.toFixed(2)}px)`
         for (let i = 0; i < COPIAS; i++) {
@@ -485,9 +516,10 @@ export function pintarTransicion(
           // alfa decreciente: el conjunto es la media de las copias, no la última tapando al resto
           ctx.globalAlpha = 1 / (i + 1)
           ctx.translate(ux * (off + corr), uy * (off + corr))
-          pintar(clip, 1)
+          ctx.drawImage(tmp, 0, 0)
           ctx.restore()
         }
+        ctx.filter = 'none'
         ctx.restore()
       }
       if (soloUno) {

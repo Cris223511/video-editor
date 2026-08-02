@@ -15,6 +15,9 @@ export interface DatosExport {
   ancho: number
   alto: number
   fps: number // imágenes por segundo del archivo final
+  // cuánto se comprime el video. no toca la resolución, solo cuántos bits se gastan por la misma
+  // imagen. si no viene, se asume 'equilibrada'
+  compresion?: NivelCompresion
   colorFondo: string
   fondo?: 'color' | 'desenfoque'
   desenfoqueFondo?: number
@@ -72,14 +75,33 @@ export function elegirMime(): string {
   return 'video/webm'
 }
 
-// bits por segundo de video que se le pide a la grabadora. sube con la cantidad
-// de píxeles y también con los fps: más cuadros por segundo necesitan más datos
-// para mantener la misma calidad por fotograma, así que el bitrate crece en
-// proporción al fps (tomando 30 como referencia). se topa en 40 Mbps para no
-// disparar el archivo en resoluciones altas. vive suelta acá para que el diálogo
-// estime el peso con el mismo número que se usa al grabar, sin copiarlo a mano
-export function bitrateVideo(ancho: number, alto: number, fps = 30): number {
-  return Math.min(40_000_000, Math.round(((ancho * alto * 8) / 30) * fps))
+// nivel de compresión que elige el usuario. no cambia la resolución (eso es "calidad"): cambia
+// cuántos bits se gastan por la MISMA imagen. menos compresión = más fiel y más pesado
+export type NivelCompresion = 'alta' | 'equilibrada' | 'comprimida'
+
+// QP (cuantizador) para el modo de CALIDAD CONSTANTE de WebCodecs, que es lo que hace un compresor
+// tipo CRF: en vez de fijar un bitrate, fija una calidad y gasta bits solo donde hacen falta, así el
+// archivo pesa mucho menos a la misma vista. menor QP = mejor calidad y más peso. los keyframes van
+// con un QP algo menor para anclar mejor la imagen. rango del H.264: 0 (sin pérdida) a 51 (mínimo)
+export function qpDeNivel(nivel: NivelCompresion): { qp: number; qpKey: number } {
+  if (nivel === 'alta') return { qp: 28, qpKey: 24 }
+  if (nivel === 'comprimida') return { qp: 38, qpKey: 32 }
+  return { qp: 33, qpKey: 28 } // equilibrada
+}
+
+// bits por píxel de respaldo cuando el navegador NO soporta calidad constante: se usa un VBR con
+// esta densidad. son valores muy por debajo del 0.27 de antes, que era el que inflaba el archivo
+function bppDeNivel(nivel: NivelCompresion): number {
+  if (nivel === 'alta') return 0.14
+  if (nivel === 'comprimida') return 0.045
+  return 0.08 // equilibrada
+}
+
+// bits por segundo de video (para el modo por bitrate y para ESTIMAR el peso en el diálogo). sube
+// con los píxeles y con los fps, pero ahora arranca de una densidad sana según la compresión
+// elegida, no de la vieja fórmula que pedía el triple de lo necesario. se topa en 40 Mbps
+export function bitrateVideo(ancho: number, alto: number, fps = 30, nivel: NivelCompresion = 'equilibrada'): number {
+  return Math.min(40_000_000, Math.round(ancho * alto * fps * bppDeNivel(nivel)))
 }
 
 function cargarImagen(src: string): Promise<HTMLImageElement> {
@@ -378,7 +400,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: OnProgreso): Co
         const mime = elegirMime()
         const grabadora = new MediaRecorder(stream, {
           mimeType: mime,
-          videoBitsPerSecond: bitrateVideo(ancho, alto, datos.fps),
+          videoBitsPerSecond: bitrateVideo(ancho, alto, datos.fps, datos.compresion),
         })
         const trozos: BlobPart[] = []
         grabadora.ondataavailable = (e) => {
