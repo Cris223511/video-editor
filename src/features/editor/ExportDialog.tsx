@@ -108,9 +108,10 @@ export default function ExportDialog() {
   // calidad = a cuántos píxeles se limita el lado menor del video. 1080 es el tope; se
   // puede bajar a 720 para un archivo más liviano y una exportación algo más rápida
   const [calidad, setCalidad] = useState(1080)
-  // compresión = cuántos bits se gastan por la MISMA imagen (no cambia la resolución). el
-  // equilibrado pesa mucho menos que antes viéndose igual; comprimida deja archivos mínimos
-  const [compresion, setCompresion] = useState<NivelCompresion>('equilibrada')
+  // compresión = cuántos bits se gastan por la MISMA imagen (no cambia la resolución). el usuario
+  // no la elige: siempre se usa el nivel que se ve IGUAL al original pesando mucho menos, para no
+  // perder nada de calidad y a la vez bajar bastante el peso
+  const compresion: NivelCompresion = 'equilibrada'
   // peso REAL del archivo terminado, para mostrarlo al final (no el estimado)
   const [tamanoFinal, setTamanoFinal] = useState(0)
   const controlRef = useRef<ControlExport | null>(null)
@@ -460,38 +461,6 @@ export default function ExportDialog() {
                 )
               })}
             </div>
-          </div>
-
-          <div className="mb-4">
-            <span className="mb-2 block text-[13px] font-medium text-[color:var(--muted)]">
-              Compresión
-            </span>
-            <div className="flex gap-1 rounded-xl p-1" style={{ background: 'rgb(var(--border) / 0.12)' }}>
-              {[
-                { v: 'alta' as NivelCompresion, txt: 'Alta', nota: 'Más fiel' },
-                { v: 'equilibrada' as NivelCompresion, txt: 'Equilibrada', nota: 'Recomendada' },
-                { v: 'comprimida' as NivelCompresion, txt: 'Comprimida', nota: 'Más liviana' },
-              ].map(({ v, txt, nota }) => {
-                const activo = compresion === v
-                return (
-                  <button
-                    key={v}
-                    onClick={() => setCompresion(v)}
-                    className={[
-                      'flex-1 rounded-lg py-2 text-[13px] font-semibold transition-all duration-200',
-                      activo ? 'bg-brand text-white shadow-sm' : 'text-[color:var(--muted)] hover:text-[color:var(--text)]',
-                    ].join(' ')}
-                  >
-                    {txt}
-                    <span className="ml-1 hidden text-[11px] font-normal opacity-70 sm:inline">{nota}</span>
-                  </button>
-                )
-              })}
-            </div>
-            <p className="mt-2 text-xs leading-relaxed text-[color:var(--muted)]">
-              No cambia la resolución, solo cuánto pesa el archivo. La recomendada se ve igual que el
-              original ocupando mucho menos; "Comprimida" deja el archivo aún más liviano.
-            </p>
           </div>
 
           {fps === 60 && (
