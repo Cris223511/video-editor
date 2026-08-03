@@ -1,4 +1,4 @@
-import { DatosExport, ControlExport, bitrateVideo, OnProgreso, relojExport, qpDeNivel } from './exportar'
+import { DatosExport, ControlExport, bitrateVideo, OnProgreso, relojExport } from './exportar'
 import { Escena, dibujarFotograma } from './compositor'
 import { clipEnTiempo, duracionProyecto } from '../timeline/clips'
 import { anterior, posterior } from '../transiciones/pintar'
@@ -145,16 +145,14 @@ export function exportarRapido(
     // OfflineAudioContext) antes de armar el escritor, que necesita saber si hay pista de
     // sonido para configurar el muxer
     const mezclaAudio = await mezclarAudio(datos, total)
-    // nivel de compresión elegido: fija el QP (calidad constante) y, de respaldo, el bitrate. sin él
-    // se asume el equilibrado, que ya pesa mucho menos que la fórmula vieja
-    const nivel = datos.compresion ?? 'equilibrada'
+    // bitrate objetivo igualado a la fuente (viene calculado desde el diálogo); si no llega, se cae a
+    // una densidad por resolución. así el video sale con la misma calidad que el material original
     const escritor = await EscritorVideo.crear(
       ancho,
       alto,
       fps,
-      bitrateVideo(ancho, alto, fps, nivel),
+      datos.bitrateObjetivo ?? bitrateVideo(ancho, alto, fps),
       mezclaAudio ? { sampleRate: mezclaAudio.sampleRate, canales: mezclaAudio.numberOfChannels } : null,
-      qpDeNivel(nivel),
     )
 
     const totalFrames = Math.max(1, Math.round(total * fps))

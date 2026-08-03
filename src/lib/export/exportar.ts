@@ -15,9 +15,9 @@ export interface DatosExport {
   ancho: number
   alto: number
   fps: number // imágenes por segundo del archivo final
-  // cuánto se comprime el video. no toca la resolución, solo cuántos bits se gastan por la misma
-  // imagen. si no viene, se asume 'equilibrada'
-  compresion?: NivelCompresion
+  // bitrate objetivo del video, en bits por segundo. se calcula igualando el del material original
+  // para que salga tal cual. si no viene, cada motor cae a una fórmula por resolución
+  bitrateObjetivo?: number
   colorFondo: string
   fondo?: 'color' | 'desenfoque'
   desenfoqueFondo?: number
@@ -75,48 +75,36 @@ export function elegirMime(): string {
   return 'video/webm'
 }
 
-// nivel de compresión que elige el usuario. no cambia la resolución (eso es "calidad"): cambia
-// cuántos bits se gastan por la MISMA imagen. menos compresión = más fiel y más pesado
-export type NivelCompresion = 'alta' | 'equilibrada' | 'comprimida'
-
-// QP (cuantizador) para el modo de CALIDAD CONSTANTE de WebCodecs, que es lo que hace un compresor
-// tipo CRF: en vez de fijar un bitrate, fija una calidad y gasta bits solo donde hacen falta, así el
-// archivo pesa mucho menos a la misma vista. menor QP = mejor calidad y más peso. los keyframes van
-// con un QP algo menor para anclar mejor la imagen. rango del H.264: 0 (sin pérdida) a 51 (mínimo)
-export function qpDeNivel(nivel: NivelCompresion): { qp: number; qpKey: number } {
-  if (nivel === 'alta') return { qp: 28, qpKey: 24 }
-  if (nivel === 'comprimida') return { qp: 38, qpKey: 32 }
-  return { qp: 33, qpKey: 28 } // equilibrada
+// bits por segundo de respaldo por resolución, para cuando no se puede medir la fuente (por ejemplo
+// un proyecto sin video, solo capas). densidad sana, ni inflada ni escasa. se topa en 40 Mbps
+export function bitrateVideo(ancho: number, alto: number, fps = 30): number {
+  return Math.min(40_000_000, Math.round(ancho * alto * fps * 0.09))
 }
 
-// bits por píxel de respaldo cuando el navegador NO soporta calidad constante: se usa un VBR con
-// esta densidad. son valores muy por debajo del 0.27 de antes, que era el que inflaba el archivo
-function bppDeNivel(nivel: NivelCompresion): number {
-  if (nivel === 'alta') return 0.14
-  if (nivel === 'comprimida') return 0.045
-  return 0.08 // equilibrada
-}
-
-// bits por segundo de video para el modo por bitrate (VBR, respaldo cuando no hay calidad constante).
-// sube con los píxeles y con los fps, con una densidad sana según la compresión. se topa en 40 Mbps
-export function bitrateVideo(ancho: number, alto: number, fps = 30, nivel: NivelCompresion = 'equilibrada'): number {
-  return Math.min(40_000_000, Math.round(ancho * alto * fps * bppDeNivel(nivel)))
-}
-
-// densidad para ESTIMAR el peso en el diálogo. va bastante por debajo del bitrate del respaldo porque
-// casi siempre se codifica por calidad constante (QP), que gasta muchísimos menos bits que un VBR a
-// tope: un video corriente a QP equilibrado ronda estos valores. sigue siendo aproximado (el tamaño
-// real depende del movimiento: uno muy quieto pesa aún menos), pero ya no dispara un número enorme
-function bppEstimado(nivel: NivelCompresion): number {
-  if (nivel === 'alta') return 0.08
-  if (nivel === 'comprimida') return 0.018
-  return 0.035 // equilibrada
-}
-
-// peso estimado en bits por segundo, pensado para el número que muestra el diálogo. usa la densidad
-// de la codificación por calidad constante, que es como se exporta de verdad casi siempre
-export function bitrateEstimado(ancho: number, alto: number, fps = 30, nivel: NivelCompresion = 'equilibrada'): number {
-  return Math.round(ancho * alto * fps * bppEstimado(nivel))
+// bitrate objetivo para que el video salga TAL CUAL al material original: se IGUALA al bitrate de la
+// fuente (su tamaño entre su duración). si la resolución de salida es menor que la del clip, se baja
+// en proporción; nunca se sube por encima de la fuente (ampliar no añade detalle). se toma el medio
+// de mayor densidad para no perjudicar al mejor, con un pequeño margen para que el recomprimido no
+// pierda nada. sin ningún video que medir, cae a la fórmula por resolución. así el archivo no queda
+// ni inflado (gastando de más) ni borroso (gastando de menos): pesa lo mismo que la fuente y se ve igual
+export function bitrateSegunMedios(
+  medios: { clase: string; tamano: number; duracion: number; ancho: number; alto: number }[],
+  ancho: number,
+  alto: number,
+  fps = 30,
+): number {
+  let bps = 0
+  for (const m of medios) {
+    if (m.clase !== 'video' || !m.duracion || !m.tamano) continue
+    const srcBps = (m.tamano * 8) / m.duracion
+    const srcPx = (m.ancho || ancho) * (m.alto || alto)
+    const ratio = srcPx > 0 ? Math.min(1, (ancho * alto) / srcPx) : 1
+    bps = Math.max(bps, srcBps * ratio)
+  }
+  if (!bps) return bitrateVideo(ancho, alto, fps)
+  // el tamaño de la fuente incluye su audio, así que ya trae algo de holgura; un 10% extra asegura
+  // que no se pierda detalle al recomprimir. tope de 40 Mbps
+  return Math.min(40_000_000, Math.round(bps * 1.1))
 }
 
 function cargarImagen(src: string): Promise<HTMLImageElement> {
@@ -415,7 +403,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: OnProgreso): Co
         const mime = elegirMime()
         const grabadora = new MediaRecorder(stream, {
           mimeType: mime,
-          videoBitsPerSecond: bitrateVideo(ancho, alto, datos.fps, datos.compresion),
+          videoBitsPerSecond: datos.bitrateObjetivo ?? bitrateVideo(ancho, alto, datos.fps),
         })
         const trozos: BlobPart[] = []
         grabadora.ondataavailable = (e) => {

@@ -269,6 +269,14 @@ interface EstadoEditor {
   // marca de golpe un conjunto de bloques, reemplazando lo que hubiera. la usa el
   // recuadro de arrastre de la línea de tiempo al soltar
   marcarBloques: (ids: string[]) => void
+  // grupos fijos: unen varios bloques para moverlos juntos con un solo arrastre y verlos con un
+  // color común. sobreviven al guardado. agrupar arma uno con lo que esté marcado; grupoDe dice a
+  // qué grupo pertenece un bloque (o null); el color se puede cambiar
+  grupos: import('../types/timeline').Grupo[]
+  grupoDe: (id: string) => import('../types/timeline').Grupo | null
+  agrupar: () => void
+  desagrupar: (grupoId: string) => void
+  setColorGrupo: (grupoId: string, color: string) => void
   // menú que sale al pulsar con el botón derecho sobre un bloque de la línea de
   // tiempo. guarda dónde se pulsó y sobre qué, y de ahí sale lo que se ofrece
   menuContextual: { x: number; y: number; tipo: 'clip' | 'capa' | 'audio' | 'region' | 'pista' | 'carril-audio' | 'carril-texto'; id: string } | null
@@ -851,6 +859,10 @@ const MAX_PISTAS = 6
 // tope de filas para los carriles de texto y de audio. seis basta de sobra para
 // repartir bloques solapados sin que la línea de tiempo crezca de forma absurda
 const MAX_NIVELES = 6
+
+// colores para sombrear los grupos de bloques. al armar un grupo se toma el primero que no esté en
+// uso, así dos grupos distintos no se confunden; el usuario luego lo puede cambiar por cualquiera
+const COLORES_GRUPO = ['#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#ef4444', '#84cc16', '#3b82f6']
 const ALTO_PISTA_BASE = 64
 const ALTO_FILA_MAX = 120
 // altura con la que nace cada carril, que además es su mínimo: se puede agrandar
@@ -1141,6 +1153,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   capaSeleccionada: null,
   capasSeleccionadas: [],
   bloquesSeleccionados: [],
+  grupos: [],
   borradorFiltro: 'todo',
   borradorGrosor: 24,
   menuContextual: null,
@@ -1457,6 +1470,28 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     })),
 
   limpiarBloques: () => set({ bloquesSeleccionados: [] }),
+
+  grupoDe: (id) => get().grupos.find((g) => g.miembros.includes(id)) ?? null,
+
+  // arma un grupo con los bloques marcados (hacen falta al menos dos). los que ya estaban en otro
+  // grupo se sacan de ahí para no quedar en dos a la vez; un grupo que quede con menos de dos se
+  // disuelve. se le da el primer color libre para distinguirlo de los demás
+  agrupar: () =>
+    set((s) => {
+      const miembros = [...new Set(s.bloquesSeleccionados)]
+      if (miembros.length < 2) return {}
+      const grupos = s.grupos
+        .map((g) => ({ ...g, miembros: g.miembros.filter((m) => !miembros.includes(m)) }))
+        .filter((g) => g.miembros.length >= 2)
+      const usados = new Set(grupos.map((g) => g.color))
+      const color = COLORES_GRUPO.find((c) => !usados.has(c)) ?? COLORES_GRUPO[grupos.length % COLORES_GRUPO.length]
+      return { grupos: [...grupos, { id: crypto.randomUUID(), miembros, color }] }
+    }),
+
+  desagrupar: (grupoId) => set((s) => ({ grupos: s.grupos.filter((g) => g.id !== grupoId) })),
+
+  setColorGrupo: (grupoId, color) =>
+    set((s) => ({ grupos: s.grupos.map((g) => (g.id === grupoId ? { ...g, color } : g)) })),
 
   marcarBloques: (ids) =>
     set((s) => {

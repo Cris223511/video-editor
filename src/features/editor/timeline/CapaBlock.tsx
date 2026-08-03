@@ -36,6 +36,7 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
   const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
   const moverBloquesDesde = useEditorStore((s) => s.moverBloquesDesde)
   const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(capa.id))
+  const colorGrupo = useEditorStore((s) => s.grupos.find((g) => g.miembros.includes(capa.id))?.color)
   const arrastreBloques = useEditorStore((s) => s.arrastreBloques)
   // las figuras y las imágenes viven ahora en las pistas de video, así que su
   // arrastre vertical usa el mismo sistema que los clips, no el de las filas de
@@ -90,8 +91,14 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       return
     }
     const st = useEditorStore.getState()
-    const enGrupo = st.bloquesSeleccionados.includes(capa.id) && st.bloquesSeleccionados.length > 1
-    const grupo = enGrupo ? [...st.bloquesSeleccionados] : []
+    // grupos fijos: al presionar un miembro se marca todo el grupo para moverlo junto de un arrastre
+    const grupoFijo = st.grupoDe(capa.id)
+    if (grupoFijo && !grupoFijo.miembros.every((m) => st.bloquesSeleccionados.includes(m))) {
+      st.marcarBloques(grupoFijo.miembros)
+    }
+    const bsel = grupoFijo ? grupoFijo.miembros : st.bloquesSeleccionados
+    const enGrupo = bsel.includes(capa.id) && bsel.length > 1
+    const grupo = enGrupo ? [...bsel] : []
     const origenesGrupo = origenesDe(st, grupo)
     // arrastrando un conjunto: todos los bloques del grupo apagan su suavizado para ir a la par
     if (enGrupo) st.setArrastreBloques(true)
@@ -343,6 +350,8 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
         // en reposo la posición se anima con una curva suave; durante el arrastre propio o de todo
         // el conjunto el suavizado se apaga para que el bloque no vaya por detrás del cursor
         transition: interactuando || (arrastreBloques && enConjunto) || congelarLayout ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+        outline: colorGrupo ? `2px solid ${colorGrupo}` : undefined,
+        outlineOffset: '-2px',
       }}
     >
       {esImagen ? (

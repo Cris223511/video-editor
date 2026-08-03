@@ -9,6 +9,7 @@ import { imantarMover, imantarBorde, UMBRAL_IMAN_PX } from '../../../lib/timelin
 import { origenesDe } from '../../../lib/timeline/bloques'
 import { nivelBajoCursor, separacionBajoCursor, porDebajoDelUltimo } from './nivelCursor'
 import MedioNoDisponible from '../../../components/ui/MedioNoDisponible'
+import FundidoAudioBlock from './FundidoAudioBlock'
 
 interface Props {
   audio: ClipAudio
@@ -43,12 +44,15 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
   const moverAudioNivel = useEditorStore((s) => s.moverAudioNivel)
   const recortarAudio = useEditorStore((s) => s.recortarAudio)
   const duplicarAudio = useEditorStore((s) => s.duplicarAudio)
+  const setFundidoAudio = useEditorStore((s) => s.setFundidoAudio)
+  const setHerramienta = useEditorStore((s) => s.setHerramienta)
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
   const alternarBloque = useEditorStore((s) => s.alternarBloque)
   const insertarNivelAudio = useEditorStore((s) => s.insertarNivelAudio)
   const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
   const moverBloquesDesde = useEditorStore((s) => s.moverBloquesDesde)
   const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(audio.id))
+  const colorGrupo = useEditorStore((s) => s.grupos.find((g) => g.miembros.includes(audio.id))?.color)
 
   const ancho = Math.max(audio.duracion * pxPorSegundo, 8)
   const barras = Math.max(12, Math.min(600, Math.floor(ancho / 2)))
@@ -102,8 +106,14 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
       return
     }
     const st = useEditorStore.getState()
-    const enGrupo = st.bloquesSeleccionados.includes(audio.id) && st.bloquesSeleccionados.length > 1
-    const grupo = enGrupo ? [...st.bloquesSeleccionados] : []
+    // grupos fijos: al presionar un miembro se marca todo el grupo para moverlo junto de un arrastre
+    const grupoFijo = st.grupoDe(audio.id)
+    if (grupoFijo && !grupoFijo.miembros.every((m) => st.bloquesSeleccionados.includes(m))) {
+      st.marcarBloques(grupoFijo.miembros)
+    }
+    const bsel = grupoFijo ? grupoFijo.miembros : st.bloquesSeleccionados
+    const enGrupo = bsel.includes(audio.id) && bsel.length > 1
+    const grupo = enGrupo ? [...bsel] : []
     const origenesGrupo = origenesDe(st, grupo)
     if (enGrupo) st.setArrastreBloques(true)
     // con alt la copia nace al empezar a mover, no al pulsar: así alt y clic seco
@@ -269,6 +279,8 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
         width: ancho,
         backgroundColor: 'rgba(56, 189, 248, 0.22)',
         transition: interactuando || (arrastreBloques && enConjunto) || congelarLayout ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+        outline: colorGrupo ? `2px solid ${colorGrupo}` : undefined,
+        outlineOffset: '-2px',
       }}
     >
       {asset?.faltante ? (
@@ -290,17 +302,49 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
       >
         {asset?.nombre ?? 'audio'}
       </span>
+      {/* fundidos de audio como cuñas VERDES arrastrables (verde = sonido, para no confundir con el
+          azul de las transiciones de imagen). se ven y se estiran desde el propio bloque */}
+      {!asset?.faltante && (
+        <>
+          <FundidoAudioBlock
+            pxPorSegundo={pxPorSegundo}
+            lado="entrada"
+            duracion={audio.duracion}
+            fundidoEntrada={audio.fundidoEntrada}
+            fundidoSalida={audio.fundidoSalida}
+            onSetFundido={(l, s) => setFundidoAudio(audio.id, l === 'entrada' ? { fundidoEntrada: s } : { fundidoSalida: s })}
+            onSetAmbos={(s) => setFundidoAudio(audio.id, { fundidoEntrada: s, fundidoSalida: s })}
+            onSeleccionar={() => {
+              seleccionarRegion(audio.id)
+              setHerramienta('audio')
+            }}
+          />
+          <FundidoAudioBlock
+            pxPorSegundo={pxPorSegundo}
+            lado="salida"
+            duracion={audio.duracion}
+            fundidoEntrada={audio.fundidoEntrada}
+            fundidoSalida={audio.fundidoSalida}
+            onSetFundido={(l, s) => setFundidoAudio(audio.id, l === 'entrada' ? { fundidoEntrada: s } : { fundidoSalida: s })}
+            onSetAmbos={(s) => setFundidoAudio(audio.id, { fundidoEntrada: s, fundidoSalida: s })}
+            onSeleccionar={() => {
+              seleccionarRegion(audio.id)
+              setHerramienta('audio')
+            }}
+          />
+        </>
+      )}
       <div
         onPointerDown={(e) => iniciarRecorte(e, 'inicio')}
         className={[
-          'absolute left-0 top-0 h-full w-2 cursor-ew-resize bg-sky-400/80 transition-opacity',
+          'absolute left-0 top-0 z-20 h-full w-2 cursor-ew-resize bg-sky-400/80 transition-opacity',
           seleccionado ? 'opacity-100' : 'opacity-0 group-hover/bloque:opacity-100',
         ].join(' ')}
       />
       <div
         onPointerDown={(e) => iniciarRecorte(e, 'fin')}
         className={[
-          'absolute right-0 top-0 h-full w-2 cursor-ew-resize bg-sky-400/80 transition-opacity',
+          'absolute right-0 top-0 z-20 h-full w-2 cursor-ew-resize bg-sky-400/80 transition-opacity',
           seleccionado ? 'opacity-100' : 'opacity-0 group-hover/bloque:opacity-100',
         ].join(' ')}
       />

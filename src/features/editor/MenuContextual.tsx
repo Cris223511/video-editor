@@ -15,6 +15,9 @@ import {
   Volume2,
   VolumeX,
   Waves,
+  Group,
+  Ungroup,
+  Palette,
 } from 'lucide-react'
 import { useEditorStore, Herramienta } from '../../store/useEditorStore'
 import { useSepararAudio } from './useSepararAudio'
@@ -215,10 +218,37 @@ export default function MenuContextual() {
     )
   }
 
-  // con varios bloques marcados se ofrece además borrarlos todos de golpe. esto y
-  // el «más opciones» de abajo son cosa de los bloques, no de las filas
+  // si el bloque pulsado ya está en un grupo fijo: se puede deshacer el grupo o cambiarle el color
+  // (cicla por la paleta). va antes que las de conjunto para tenerlas siempre a mano
+  const grupoBloque = !esFila ? st.grupoDe(menu.id) : null
+  if (grupoBloque) {
+    const PALETA = ['#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4', '#ef4444', '#84cc16', '#3b82f6']
+    opciones.push(
+      {
+        id: 'color-grupo',
+        etiqueta: 'Cambiar el color del grupo',
+        icono: <Palette size={15} />,
+        separadorAntes: true,
+        onElegir: con(() => {
+          const i = PALETA.indexOf(grupoBloque.color)
+          st.setColorGrupo(grupoBloque.id, PALETA[(i + 1) % PALETA.length])
+        }),
+      },
+      { id: 'desagrupar', etiqueta: 'Deshacer el grupo', icono: <Ungroup size={15} />, onElegir: con(() => st.desagrupar(grupoBloque.id)) },
+    )
+  }
+
+  // con varios bloques marcados se ofrece agruparlos (moverlos juntos) y borrarlos todos de golpe.
+  // esto y el «más opciones» de abajo son cosa de los bloques, no de las filas
   if (!esFila && st.bloquesSeleccionados.length > 1) {
     const n = st.bloquesSeleccionados.length
+    opciones.push({
+      id: 'agrupar',
+      etiqueta: `Agrupar los ${n}`,
+      icono: <Group size={15} />,
+      separadorAntes: true,
+      onElegir: con(() => st.agrupar()),
+    })
     opciones.push({
       id: 'borrar-conjunto',
       etiqueta: `Borrar los ${n} marcados`,

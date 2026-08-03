@@ -22,10 +22,15 @@ export default function TransicionBlock({
 }) {
   const setTransicion = useEditorStore((s) => s.setTransicion)
   const setTransicionSalida = useEditorStore((s) => s.setTransicionSalida)
+  const seleccionar = useEditorStore((s) => s.seleccionar)
+  const setHerramienta = useEditorStore((s) => s.setHerramienta)
   const esSalida = lado === 'salida'
   const tr = esSalida ? clip.transicionSalida : clip.transicion
   const tipo = tr?.tipo ?? 'ninguna'
   const duracion = tr?.duracion ?? 0
+  // duración de la transición del OTRO lado (solo si es una de verdad), para que esta no la cruce
+  const otroTr = esSalida ? clip.transicion : clip.transicionSalida
+  const otroDur = otroTr && otroTr.tipo !== 'ninguna' && otroTr.tipo !== 'corte' ? otroTr.duracion : 0
   // panel de ajustes del borde, que se abre con el engranaje de la cuña
   const [ajustes, setAjustes] = useState(false)
   const cajaRef = useRef<HTMLDivElement>(null)
@@ -60,7 +65,12 @@ export default function TransicionBlock({
   // aquí, para que su tirador quede separado del tirador de recorte del clip y se pueda
   // volver a agarrar y agrandar sin confundirlos
   const ancho = Math.max(duracion * pxPorSegundo, 14)
-  const maximo = clip.duracion / 2
+  // tope fijo de 10 s; si el clip dura menos, manda el clip. además esta transición no puede pasar de
+  // lo que deja libre la del otro lado, para que la de inicio y la de final no se crucen. al igualar
+  // ambas con shift, el tope es la mitad del clip (las dos juntas caben sin cruzarse)
+  const MAX = 10
+  const maxIndividual = Math.min(MAX, clip.duracion - otroDur)
+  const maxIgual = Math.min(MAX, clip.duracion / 2)
 
   function aplicar(cambios: Partial<{ duracion: number; grosor: number }>) {
     if (esSalida) setTransicionSalida(clip.id, cambios)
@@ -73,16 +83,27 @@ export default function TransicionBlock({
   function estirar(e: ReactPointerEvent) {
     e.stopPropagation()
     e.preventDefault()
+    // al agarrar el tirador se selecciona el clip y se abre el panel de transiciones, aunque sea con shift
+    seleccionar(clip.id)
+    setHerramienta('transiciones')
     const inicioX = e.clientX
     const original = duracion
 
     const mover = (ev: globalThis.PointerEvent) => {
       // la de salida se estira hacia la izquierda, así que su delta va al revés
       const delta = ((ev.clientX - inicioX) / pxPorSegundo) * (esSalida ? -1 : 1)
-      // entre un mínimo visible y la mitad del clip, para que la transición
-      // nunca se coma el plano entero
-      const nueva = Math.min(maximo, Math.max(0.1, original + delta))
-      aplicar({ duracion: Number(nueva.toFixed(2)) })
+      // el shift se mira EN VIVO: se puede empezar a arrastrar normal y, al presionar shift a mitad,
+      // pasa a igualar ambos lados desde ese momento. manda la que se agarró y la otra la iguala
+      const igualar = ev.shiftKey
+      const tope = igualar ? maxIgual : maxIndividual
+      const nueva = Math.min(tope, Math.max(0.1, original + delta))
+      const d = Number(nueva.toFixed(2))
+      if (igualar) {
+        setTransicion(clip.id, { duracion: d })
+        setTransicionSalida(clip.id, { duracion: d })
+      } else {
+        aplicar({ duracion: d })
+      }
     }
     const soltar = () => {
       window.removeEventListener('pointermove', mover)

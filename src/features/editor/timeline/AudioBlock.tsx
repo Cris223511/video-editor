@@ -178,6 +178,7 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
   const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
   const moverBloquesDesde = useEditorStore((s) => s.moverBloquesDesde)
   const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(region.id))
+  const colorGrupo = useEditorStore((s) => s.grupos.find((g) => g.miembros.includes(region.id))?.color)
   const arrastreBloques = useEditorStore((s) => s.arrastreBloques)
   const congelarLayout = useEditorStore((s) => s.congelarLayout)
 
@@ -200,8 +201,14 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
       return
     }
     const st = useEditorStore.getState()
-    const enGrupo = st.bloquesSeleccionados.includes(region.id) && st.bloquesSeleccionados.length > 1
-    const grupo = enGrupo ? [...st.bloquesSeleccionados] : []
+    // grupos fijos: al presionar un miembro se marca todo el grupo para moverlo junto de un arrastre
+    const grupoFijo = st.grupoDe(region.id)
+    if (grupoFijo && !grupoFijo.miembros.every((m) => st.bloquesSeleccionados.includes(m))) {
+      st.marcarBloques(grupoFijo.miembros)
+    }
+    const bsel = grupoFijo ? grupoFijo.miembros : st.bloquesSeleccionados
+    const enGrupo = bsel.includes(region.id) && bsel.length > 1
+    const grupo = enGrupo ? [...bsel] : []
     const origenesGrupo = origenesDe(st, grupo)
     if (enGrupo) st.setArrastreBloques(true)
     // con alt la copia nace al empezar a mover, no al pulsar: así alt y clic seco
@@ -360,6 +367,8 @@ export default function AudioBlock({ region, pxPorSegundo, puntos }: Props) {
         // suavizado de la posición en reposo; se apaga durante el arrastre propio o del conjunto
         // para seguir al cursor sin retraso
         transition: interactuando || (arrastreBloques && enConjunto) || congelarLayout ? 'none' : 'left 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+        outline: colorGrupo ? `2px solid ${colorGrupo}` : undefined,
+        outlineOffset: '-2px',
       }}
     >
       {/* la onda ocupa el fondo del bloque; encima va el porcentaje de ganancia. una franja de

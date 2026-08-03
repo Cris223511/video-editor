@@ -12,6 +12,7 @@ import { useProjectStore } from '../../../store/useProjectStore'
 import { useFrameEnTiempo } from '../../../lib/media/useFrameEnTiempo'
 import { EfectoClip } from '../../../types/timeline'
 import { imagenArrastreReducida } from '../../../lib/ui/arrastre'
+import { useToast } from '../../../components/ui/ToastProvider'
 import {
   CATEGORIAS_EFECTO,
   buscarEfecto,
@@ -616,6 +617,7 @@ function Catalogo({
   const cats = CATEGORIAS_EFECTO.filter((c) => c.grupo === 'efecto')
   const [categoria, setCategoria] = useState(cats[0].id)
   const [encima, setEncima] = useState<string | null>(null)
+  const { mostrar } = useToast()
   const actual = cats.find((c) => c.id === categoria) ?? cats[0]
   const fondo = miniatura
     ? { backgroundImage: `url(${miniatura})`, backgroundSize: 'cover', backgroundPosition: 'center' }
@@ -671,6 +673,13 @@ function Catalogo({
                 ev.dataTransfer.setData(TIPO_EFECTO, e.id)
                 ev.dataTransfer.effectAllowed = 'copy'
                 imagenArrastreReducida(ev)
+              }}
+              // los efectos solo se aplican a clips de video; si se suelta en el vacío, en un texto o
+              // una figura, el navegador no acepta el drop (dropEffect 'none') y se avisa en rojo
+              onDragEnd={(ev) => {
+                if (ev.dataTransfer.dropEffect === 'none') {
+                  mostrar('error', 'Los efectos solo se aplican a clips de video.')
+                }
               }}
               onClick={() => onElegir(e.id)}
               onMouseEnter={() => setEncima(e.id)}

@@ -11,6 +11,7 @@ import {
 import { pintarTransicion } from '../../lib/transiciones/pintar'
 import { imagenArrastreReducida } from '../../lib/ui/arrastre'
 import { Clip } from '../../types/timeline'
+import { useToast } from '../../components/ui/ToastProvider'
 
 // las mismas dos fotos en todas las muestras: así lo único que cambia entre una
 // tarjeta y otra es la transición, y se pueden comparar de verdad. son las mismas
@@ -140,6 +141,7 @@ export default function GaleriaTransiciones({
   const [busqueda, setBusqueda] = useState('')
   const imagenes = useRef<HTMLImageElement[]>([])
   const [listo, setListo] = useState(false)
+  const { mostrar } = useToast()
 
   // las dos fotos se cargan una sola vez y las comparten todas las muestras. van
   // en un ref porque el motor las lee al vuelo al pintar; el estado listo solo
@@ -224,6 +226,14 @@ export default function GaleriaTransiciones({
                     e.dataTransfer.setData(TIPO_TRANSICION, t.id)
                     e.dataTransfer.effectAllowed = 'copy'
                     imagenArrastreReducida(e)
+                  }}
+                  // si se suelta donde no se puede (el vacío, un texto o figura, la regla), el
+                  // navegador deja dropEffect en 'none': ahí se avisa con un toast rojo de que solo
+                  // va sobre un clip, en vez de no hacer nada sin explicación
+                  onDragEnd={(e) => {
+                    if (e.dataTransfer.dropEffect === 'none') {
+                      mostrar('error', 'Suéltala sobre un clip de la línea de tiempo.')
+                    }
                   }}
                   className={[
                     'group/muestra relative flex cursor-grab flex-col gap-1.5 rounded-xl p-1.5 text-left transition-all duration-200 active:cursor-grabbing',

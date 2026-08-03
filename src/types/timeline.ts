@@ -209,3 +209,12 @@ export interface PistaMeta {
   oculta: boolean
   bloqueada: boolean
 }
+
+// un grupo une varios bloques de la línea de tiempo (clips, capas, audios, franjas) para moverlos
+// juntos con un solo arrastre. cada grupo tiene un color propio, con el que se sombrean sus miembros
+// para reconocerlos de un vistazo; el usuario lo puede cambiar
+export interface Grupo {
+  id: string
+  miembros: string[]
+  color: string
+}

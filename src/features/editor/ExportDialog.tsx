@@ -7,7 +7,7 @@ import { useProjectStore } from '../../store/useProjectStore'
 import { duracionProyecto } from '../../lib/timeline/clips'
 import { formatearDuracion } from '../../lib/format/duracion'
 import { formatearBytes } from '../../lib/format/bytes'
-import { exportarProyecto, ControlExport, elegirMime, bitrateEstimado, DatosExport, OnProgreso, NivelCompresion } from '../../lib/export/exportar'
+import { exportarProyecto, ControlExport, elegirMime, bitrateSegunMedios, DatosExport, OnProgreso } from '../../lib/export/exportar'
 import { exportarRapido } from '../../lib/export/exportarRapido'
 import { haiWebCodecs } from '../../lib/export/decode'
 
@@ -108,10 +108,6 @@ export default function ExportDialog() {
   // calidad = a cuántos píxeles se limita el lado menor del video. 1080 es el tope; se
   // puede bajar a 720 para un archivo más liviano y una exportación algo más rápida
   const [calidad, setCalidad] = useState(1080)
-  // compresión = cuántos bits se gastan por la MISMA imagen (no cambia la resolución). el usuario
-  // no la elige: siempre se usa el nivel que se ve IGUAL al original pesando mucho menos, para no
-  // perder nada de calidad y a la vez bajar bastante el peso
-  const compresion: NivelCompresion = 'equilibrada'
   // peso REAL del archivo terminado, para mostrarlo al final (no el estimado)
   const [tamanoFinal, setTamanoFinal] = useState(0)
   const controlRef = useRef<ControlExport | null>(null)
@@ -141,8 +137,10 @@ export default function ExportDialog() {
   // elegido) por la duración, más el margen del audio. es una estimación, no un
   // tamaño exacto, porque la grabadora ajusta la calidad según el movimiento. al
   // depender del fps, el peso cambia al elegir 24, 30 o 60
-  const bytesEstimados =
-    total > 0 ? ((bitrateEstimado(ancho, alto, fps, compresion) + BITRATE_AUDIO) * total) / 8 : 0
+  // bitrate objetivo: igualado al del material original para que el video salga tal cual. sirve para
+  // el peso estimado y se le pasa a los motores de exportación
+  const bitrateObjetivo = bitrateSegunMedios(medios, ancho, alto, fps)
+  const bytesEstimados = total > 0 ? ((bitrateObjetivo + BITRATE_AUDIO) * total) / 8 : 0
 
   function cerrarTodo() {
     controlRef.current?.cancelar()
@@ -219,7 +217,7 @@ export default function ExportDialog() {
       ancho,
       alto,
       fps,
-      compresion,
+      bitrateObjetivo,
       colorFondo: estado.colorFondo,
       fondo: estado.fondo,
       desenfoqueFondo: estado.desenfoqueFondo,

@@ -51,7 +51,7 @@ export default function AudioPanel() {
                 <Deslizador
                   valor={Math.round((clip.fundidoEntrada ?? 0) * 10)}
                   min={0}
-                  max={Math.max(1, Math.round((clip.duracion / 2) * 10))}
+                  max={Math.max(1, Math.round(Math.min(10, clip.duracion - (clip.fundidoSalida ?? 0)) * 10))}
                   onChange={(v) => setFundido(clip.id, 'entrada', v / 10)}
                 />
               </Campo>
@@ -59,7 +59,7 @@ export default function AudioPanel() {
                 <Deslizador
                   valor={Math.round((clip.fundidoSalida ?? 0) * 10)}
                   min={0}
-                  max={Math.max(1, Math.round((clip.duracion / 2) * 10))}
+                  max={Math.max(1, Math.round(Math.min(10, clip.duracion - (clip.fundidoEntrada ?? 0)) * 10))}
                   onChange={(v) => setFundido(clip.id, 'salida', v / 10)}
                 />
               </Campo>

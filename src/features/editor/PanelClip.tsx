@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import Icon, { NombreIcono } from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
 import { useEditorStore } from '../../store/useEditorStore'
+import { useProjectStore } from '../../store/useProjectStore'
 import { Transiciones } from './OptionsPanel'
 import TonePanel from './panels/TonePanel'
 import EffectsPanel from './panels/EffectsPanel'
@@ -106,7 +107,15 @@ export default function PanelClip() {
   const clips = useEditorStore((s) => s.pista.clips)
   const bloquesSeleccionados = useEditorStore((s) => s.bloquesSeleccionados)
 
+  const medios = useProjectStore((s) => s.medios)
   const capa = capas.find((c) => c.id === capaSeleccionada)
+  // un clip de video "tiene audio" si NO se le separó el sonido (mudo) y su archivo trae pista de
+  // audio. ojo: muteado o con el volumen bajo SÍ tiene sonido (solo está bajito), así que eso no
+  // cuenta. sin audio, la opción "Audio" del clip (volumen, fundidos, silencio) no aparece
+  const clipSel = clips.find((c) => c.id === clipSeleccionado)
+  const clipConAudio =
+    !!clipSel && !clipSel.mudo && !medios.find((m) => m.id === clipSel.assetId)?.sinAudio
+  const catsClip = clipConAudio ? CLIP : CLIP.filter((c) => c.id !== 'audio')
   // la selección de audio comparte campo entre un clip de audio importado o
   // separado y una franja de ganancia; se distinguen mirando en qué lista está
   const esClipAudio = regionSeleccionada && audios.some((a) => a.id === regionSeleccionada)
@@ -122,7 +131,7 @@ export default function PanelClip() {
   const categorias: Categoria[] = impactoSeleccionado
     ? IMPACTO_EDITOR
     : clipSeleccionado
-      ? CLIP
+      ? catsClip
       : capa
         ? categoriasCapa(capa.tipo)
         : esClipAudio

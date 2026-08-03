@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useToast } from '../../../components/ui/ToastProvider'
 import {
   IMPACTOS,
   TIPO_IMPACTO,
@@ -104,6 +105,7 @@ function TarjetaImpacto({
   const [p, setP] = useState(REPOSO)
   const raf = useRef(0)
   const esNeon = NEON.has(im.tipo)
+  const { mostrar } = useToast()
 
   const activar = () => {
     if (esNeon) return
@@ -130,6 +132,13 @@ function TarjetaImpacto({
         ev.dataTransfer.setData(TIPO_IMPACTO, im.tipo)
         ev.dataTransfer.effectAllowed = 'copy'
         imagenArrastreReducida(ev)
+      }}
+      // los impactos solo van sobre clips de video; soltarlos en otro sitio no hace nada, así que
+      // se avisa en rojo en vez de dejar al usuario sin saber por qué no pasó nada
+      onDragEnd={(ev) => {
+        if (ev.dataTransfer.dropEffect === 'none') {
+          mostrar('error', 'Los impactos solo se aplican a clips de video.')
+        }
       }}
       onMouseEnter={activar}
       onMouseLeave={desactivar}

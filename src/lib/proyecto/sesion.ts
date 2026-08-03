@@ -121,6 +121,7 @@ export function capturarProyecto(id: string, creado: number, portada: string): P
       impactos: ed.impactos,
       audioRegiones: ed.audioRegiones,
       audios: ed.audios,
+      grupos: ed.grupos,
       volumenGlobal: ed.volumenGlobal,
       pxPorSegundo: ed.pxPorSegundo,
       resolucion: ed.resolucion,
@@ -230,6 +231,7 @@ async function abrirSesionInterno(id: string): Promise<boolean> {
     impactos: e.impactos ?? [],
     audioRegiones: e.audioRegiones ?? [],
     audios: e.audios ?? [],
+    grupos: e.grupos ?? [],
     volumenGlobal: e.volumenGlobal ?? 1,
     // si el proyecto se guardó sin zoom (versión vieja), se deja el que haya
     ...(e.pxPorSegundo ? { pxPorSegundo: e.pxPorSegundo } : {}),

@@ -45,11 +45,13 @@ export default function MultiAudioPanel() {
               cuando hay uno solo elegido */}
           {!multi && (
             <>
+              {/* tope de cada fundido: 10 s, o lo que deje libre el otro lado para que no se crucen
+                  (o el clip si dura menos) */}
               <Campo etiqueta={`Fundido de entrada (${(lider.fundidoEntrada ?? 0).toFixed(1)} s)`}>
                 <Deslizador
                   valor={Math.round((lider.fundidoEntrada ?? 0) * 10)}
                   min={0}
-                  max={Math.max(1, Math.round((lider.duracion / 2) * 10))}
+                  max={Math.max(1, Math.round(Math.min(10, lider.duracion - (lider.fundidoSalida ?? 0)) * 10))}
                   onChange={(v) => setFundido(lider.id, 'entrada', v / 10)}
                 />
               </Campo>
@@ -57,7 +59,7 @@ export default function MultiAudioPanel() {
                 <Deslizador
                   valor={Math.round((lider.fundidoSalida ?? 0) * 10)}
                   min={0}
-                  max={Math.max(1, Math.round((lider.duracion / 2) * 10))}
+                  max={Math.max(1, Math.round(Math.min(10, lider.duracion - (lider.fundidoEntrada ?? 0)) * 10))}
                   onChange={(v) => setFundido(lider.id, 'salida', v / 10)}
                 />
               </Campo>

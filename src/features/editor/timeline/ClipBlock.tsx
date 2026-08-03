@@ -9,6 +9,7 @@ import Tooltip from '../../../components/ui/Tooltip'
 import MedioNoDisponible from '../../../components/ui/MedioNoDisponible'
 import PropiedadesClip from './PropiedadesClip'
 import TransicionBlock from './TransicionBlock'
+import FundidoAudioBlock from './FundidoAudioBlock'
 import { TIPO_TRANSICION } from '../GaleriaTransiciones'
 import { anterior, posterior } from '../../../lib/transiciones/pintar'
 import { TIPO_EFECTO, crearEfecto } from '../../../lib/efectos/catalogo'
@@ -60,7 +61,10 @@ export default function ClipBlock({
   const abrirMenuContextual = useEditorStore((s) => s.abrirMenuContextual)
   const moverBloquesDesde = useEditorStore((s) => s.moverBloquesDesde)
   const enConjunto = useEditorStore((s) => s.bloquesSeleccionados.includes(clip.id))
+  const colorGrupo = useEditorStore((s) => s.grupos.find((g) => g.miembros.includes(clip.id))?.color)
   const seleccionar = useEditorStore((s) => s.seleccionar)
+  const setFundido = useEditorStore((s) => s.setFundido)
+  const setHerramienta = useEditorStore((s) => s.setHerramienta)
   const setTransicion = useEditorStore((s) => s.setTransicion)
   const setTransicionSalida = useEditorStore((s) => s.setTransicionSalida)
   const ponerEfectoEncima = useEditorStore((s) => s.ponerEfectoEncima)
@@ -147,9 +151,16 @@ export default function ClipBlock({
       return
     }
     const st = useEditorStore.getState()
+    // grupos fijos: al presionar un miembro se marca TODO el grupo, para arrastrarlo junto con un
+    // solo gesto sin tener que reseleccionar. si no está en un grupo, vale la selección múltiple normal
+    const grupoFijo = st.grupoDe(clip.id)
+    if (grupoFijo && !grupoFijo.miembros.every((m) => st.bloquesSeleccionados.includes(m))) {
+      st.marcarBloques(grupoFijo.miembros)
+    }
+    const bsel = grupoFijo ? grupoFijo.miembros : st.bloquesSeleccionados
     // si el clip forma parte de un conjunto de varios, el arrastre los lleva a todos
-    const enGrupo = st.bloquesSeleccionados.includes(clip.id) && st.bloquesSeleccionados.length > 1
-    const grupo = enGrupo ? [...st.bloquesSeleccionados] : []
+    const enGrupo = bsel.includes(clip.id) && bsel.length > 1
+    const grupo = enGrupo ? [...bsel] : []
     // posiciones ORIGINALES de cada bloque del conjunto al empezar el gesto: el arrastre las usa
     // para colocar cada uno en origen + desplazamiento, sin acumular fotograma a fotograma
     const origenesGrupo = origenesDe(st, grupo)
@@ -569,6 +580,9 @@ export default function ClipBlock({
         // sin la miniatura estirada que antes se veía borrosa y rota hasta que
         // llegaban los fotogramas de verdad
         backgroundColor: 'rgb(24 97 255 / 0.22)',
+        // borde del color de su grupo, para reconocer de un vistazo qué bloques se mueven juntos
+        outline: colorGrupo ? `2px solid ${colorGrupo}` : undefined,
+        outlineOffset: '-2px',
       }}
     >
       {/* sin dirección de medio, el archivo se perdió: se avisa en el propio
@@ -597,6 +611,46 @@ export default function ClipBlock({
 
       {!sinCuñaEntrada && <TransicionBlock clip={clip} pxPorSegundo={pxPorSegundo} />}
       <TransicionBlock clip={clip} pxPorSegundo={pxPorSegundo} lado="salida" />
+
+      {/* fundidos del SONIDO del clip, como cuñas verdes en la franja de abajo (verde = sonido, para
+          no confundir con el azul de las transiciones de imagen). solo si el clip conserva su audio:
+          con el sonido separado (mudo) el video ya no suena, así que no tiene fundido que ajustar */}
+      {!clip.mudo && (
+        <>
+          <FundidoAudioBlock
+            pxPorSegundo={pxPorSegundo}
+            lado="entrada"
+            duracion={clip.duracion}
+            fundidoEntrada={clip.fundidoEntrada}
+            fundidoSalida={clip.fundidoSalida}
+            onSetFundido={(l, s) => setFundido(clip.id, l, s)}
+            onSetAmbos={(s) => {
+              setFundido(clip.id, 'entrada', s)
+              setFundido(clip.id, 'salida', s)
+            }}
+            onSeleccionar={() => {
+              seleccionar(clip.id)
+              setHerramienta('audio')
+            }}
+          />
+          <FundidoAudioBlock
+            pxPorSegundo={pxPorSegundo}
+            lado="salida"
+            duracion={clip.duracion}
+            fundidoEntrada={clip.fundidoEntrada}
+            fundidoSalida={clip.fundidoSalida}
+            onSetFundido={(l, s) => setFundido(clip.id, l, s)}
+            onSetAmbos={(s) => {
+              setFundido(clip.id, 'entrada', s)
+              setFundido(clip.id, 'salida', s)
+            }}
+            onSeleccionar={() => {
+              seleccionar(clip.id)
+              setHerramienta('audio')
+            }}
+          />
+        </>
+      )}
 
       {/* las bolitas de impacto que caen sobre este clip, encima de todo */}
       {impactosDelClip.map((im) => (

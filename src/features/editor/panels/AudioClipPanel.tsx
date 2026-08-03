@@ -15,11 +15,14 @@ export default function AudioClipPanel() {
   const audio = audios.find((a) => a.id === regionSeleccionada)
   if (!audio) return null
 
-  // el fundido no puede pasar de la mitad del clip, para que entrada y salida no se
-  // pisen; se acota al mostrar y al guardar
-  const tope = audio.duracion / 2
-  const ent = Math.min(audio.fundidoEntrada ?? 0, tope)
-  const sal = Math.min(audio.fundidoSalida ?? 0, tope)
+  // cada fundido llega hasta 10 s; si el clip dura menos, manda el clip; y no pasa de lo que deja
+  // libre el otro lado, para que aparecer y desaparecer no se pisen
+  const ent0 = audio.fundidoEntrada ?? 0
+  const sal0 = audio.fundidoSalida ?? 0
+  const topeEnt = Math.min(10, audio.duracion - sal0)
+  const topeSal = Math.min(10, audio.duracion - ent0)
+  const ent = Math.min(ent0, topeEnt)
+  const sal = Math.min(sal0, topeSal)
 
   return (
     <div className="flex flex-col gap-4">
@@ -38,7 +41,7 @@ export default function AudioClipPanel() {
           <Deslizador
             valor={Math.round(ent * 10)}
             min={0}
-            max={Math.max(0, Math.round(tope * 10))}
+            max={Math.max(0, Math.round(topeEnt * 10))}
             onChange={(v) => setFundidoAudio(audio.id, { fundidoEntrada: v / 10 })}
           />
         </Campo>
@@ -46,7 +49,7 @@ export default function AudioClipPanel() {
           <Deslizador
             valor={Math.round(sal * 10)}
             min={0}
-            max={Math.max(0, Math.round(tope * 10))}
+            max={Math.max(0, Math.round(topeSal * 10))}
             onChange={(v) => setFundidoAudio(audio.id, { fundidoSalida: v / 10 })}
           />
         </Campo>

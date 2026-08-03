@@ -23,4 +23,8 @@ export interface MediaAsset {
   // pero se muestra como "no encontrado" y no se intenta cargar para no llenar la
   // consola de errores ni dejar el visor en negro
   faltante?: boolean
+  // el archivo de video no trae pista de sonido. cuando es así, un clip suyo no muestra las opciones
+  // de audio (volumen, fundidos, silencio), porque no hay nada que sonar. detectarlo sin reproducir
+  // el video no es fiable en el navegador, así que se marca solo cuando se puede saber con certeza
+  sinAudio?: boolean
 }

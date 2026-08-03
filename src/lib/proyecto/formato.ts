@@ -69,6 +69,9 @@ export interface ProyectoGuardado {
     impactos?: Impacto[]
     audioRegiones: RegionAudio[]
     audios?: ClipAudio[]
+    // grupos fijos de bloques (para moverlos juntos y sombrearlos por color). opcional para que un
+    // proyecto guardado antes de existir se abra sin ninguno
+    grupos?: import('../../types/timeline').Grupo[]
     volumenGlobal: number
     // zoom de la línea de tiempo (píxeles por segundo), para reabrir el proyecto
     // con el mismo acercamiento con que se dejó

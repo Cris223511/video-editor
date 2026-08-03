@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import GaleriaTransiciones from './GaleriaTransiciones'
 import SinSeleccion from '../../components/ui/SinSeleccion'
 import Icon from '../../components/ui/Icon'
@@ -157,7 +157,17 @@ function TransicionCapa() {
 // pegado), cada una con su botón para quitarla. una junta entre dos clips se guarda en la
 // entrada del que releva, así que quitarla desde aquí borra esa única transición para los
 // dos. reemplaza a la vieja tarjeta de "corte" para poner una transición en nada
-function ResumenTransicionesClip({ clip, clips }: { clip: Clip; clips: Clip[] }) {
+function ResumenTransicionesClip({
+  clip,
+  clips,
+  lado,
+  setLado,
+}: {
+  clip: Clip
+  clips: Clip[]
+  lado: 'inicio' | 'final'
+  setLado: (l: 'inicio' | 'final') => void
+}) {
   const setTransicion = useEditorStore((s) => s.setTransicion)
   const setTransicionSalida = useEditorStore((s) => s.setTransicionSalida)
   const real = (t?: string) => !!t && t !== 'ninguna' && t !== 'corte'
@@ -167,28 +177,55 @@ function ResumenTransicionesClip({ clip, clips }: { clip: Clip; clips: Clip[] })
   const sig = posterior(clip, clips)
   const sigPegado = !!sig && Math.abs(sig.inicio - (clip.inicio + clip.duracion)) < 0.05
 
-  const items: { clave: string; etiqueta: string; nombre: string; quitar: () => void }[] = []
+  // cada transición del clip con su duración editable ahí mismo, a qué lado pertenece y su tope.
+  // el tope es la MITAD del clip (igual que el tirador de la línea de tiempo): así la de inicio y la
+  // de final nunca se cruzan (cada una ocupa como mucho media cola) ni se comen el clip entero. un
+  // cruce con el vecino se acota a la mitad del más corto de los dos
+  const items: {
+    clave: string
+    lado: 'inicio' | 'final'
+    etiqueta: string
+    nombre: string
+    dur: number
+    maxSeg: number
+    setDur: (d: number) => void
+    quitar: () => void
+  }[] = []
   if (real(clip.transicion.tipo)) {
     items.push({
       clave: 'entrada',
+      lado: 'inicio',
       etiqueta: antPegado ? 'Cruce con el clip anterior' : 'Al inicio',
       nombre: buscarTransicion(clip.transicion.tipo).nombre,
+      dur: clip.transicion.duracion,
+      maxSeg: antPegado && ant
+        ? Math.min(10, Math.min(clip.duracion, ant.duracion))
+        : Math.min(10, clip.duracion - (real(clip.transicionSalida?.tipo) ? clip.transicionSalida!.duracion : 0)),
+      setDur: (d) => setTransicion(clip.id, { duracion: d }),
       quitar: () => setTransicion(clip.id, { tipo: 'ninguna' }),
     })
   }
   if (sigPegado && sig && real(sig.transicion.tipo)) {
     items.push({
       clave: 'juntaSig',
+      lado: 'final',
       etiqueta: 'Cruce con el clip siguiente',
       nombre: buscarTransicion(sig.transicion.tipo).nombre,
+      dur: sig.transicion.duracion,
+      maxSeg: Math.min(10, Math.min(clip.duracion, sig.duracion)),
+      setDur: (d) => setTransicion(sig.id, { duracion: d }),
       quitar: () => setTransicion(sig.id, { tipo: 'ninguna' }),
     })
   }
   if (real(clip.transicionSalida?.tipo)) {
     items.push({
       clave: 'salida',
+      lado: 'final',
       etiqueta: 'Al final',
       nombre: buscarTransicion(clip.transicionSalida!.tipo).nombre,
+      dur: clip.transicionSalida!.duracion,
+      maxSeg: Math.min(10, clip.duracion - (real(clip.transicion.tipo) ? clip.transicion.duracion : 0)),
+      setDur: (d) => setTransicionSalida(clip.id, { duracion: d }),
       quitar: () => setTransicionSalida(clip.id, { tipo: 'ninguna' }),
     })
   }
@@ -202,26 +239,53 @@ function ResumenTransicionesClip({ clip, clips }: { clip: Clip; clips: Clip[] })
         </p>
       ) : (
         <div className="flex flex-col gap-1.5">
-          {items.map((it) => (
-            <div
-              key={it.clave}
-              className="flex items-center gap-2 rounded-lg border border-black/10 p-2 dark:border-white/10"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-medium">{it.nombre}</p>
-                <p className="truncate text-[11px] text-[color:var(--muted)]">{it.etiqueta}</p>
+          {items.map((it) => {
+            const activa = lado === it.lado
+            return (
+              <div
+                key={it.clave}
+                // al pulsar la fila se salta a ese lado abajo (la galería muestra esa transición). la
+                // fila del lado activo queda marcada, para saber cuál se está tocando
+                onClick={() => setLado(it.lado)}
+                className={[
+                  'flex cursor-pointer flex-col gap-2 rounded-lg border p-2 transition-colors',
+                  activa ? 'border-brand bg-brand/5' : 'border-black/10 dark:border-white/10',
+                ].join(' ')}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-medium">{it.nombre}</p>
+                    <p className="truncate text-[11px] text-[color:var(--muted)]">{it.etiqueta}</p>
+                  </div>
+                  <Tooltip texto="Quitar esta transición" lado="arriba">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        it.quitar()
+                      }}
+                      aria-label="Quitar la transición"
+                      className="interactivo grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[color:var(--muted)] transition-colors hover:text-rose-500"
+                    >
+                      <Icon name="papelera" size={15} />
+                    </button>
+                  </Tooltip>
+                </div>
+                {/* la duración de ESTA transición, editable acá mismo: así se puede darle un tiempo a
+                    la de inicio y otro a la de final sin cambiar de pestaña */}
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <span className="w-14 shrink-0 text-[11px] text-[color:var(--muted)]">
+                    {it.dur.toFixed(1)} s
+                  </span>
+                  <Deslizador
+                    valor={Math.round(it.dur * 10)}
+                    min={2}
+                    max={Math.max(2, Math.round(it.maxSeg * 10))}
+                    onChange={(v) => it.setDur(v / 10)}
+                  />
+                </div>
               </div>
-              <Tooltip texto="Quitar esta transición" lado="arriba">
-                <button
-                  onClick={it.quitar}
-                  aria-label="Quitar la transición"
-                  className="interactivo grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[color:var(--muted)] transition-colors hover:text-rose-500"
-                >
-                  <Icon name="papelera" size={15} />
-                </button>
-              </Tooltip>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
@@ -239,6 +303,24 @@ export function Transiciones() {
   const [lado, setLado] = useState<'inicio' | 'final'>('inicio')
 
   const clip = clips.find((c) => c.id === clipSeleccionado) ?? null
+
+  // si un fundido guardado excede la mitad del clip (por ejemplo puestos antes de este tope, cuando la
+  // de inicio y la de final llegaban a cruzarse), se recorta solo al seleccionar el clip. corre una
+  // vez por clip y no se dispara de nuevo tras recortar, porque depende solo de su id
+  const real = (t?: string) => !!t && t !== 'ninguna' && t !== 'corte'
+  useEffect(() => {
+    if (!clip) return
+    // tope seguro: 10 s o la mitad del clip, lo que sea menor. así ningún fundido guardado antes
+    // pasa de 10 s ni se cruza con el del otro lado
+    const tope = Math.min(10, clip.duracion / 2)
+    if (real(clip.transicion.tipo) && clip.transicion.duracion > tope) {
+      setTransicion(clip.id, { duracion: Number(tope.toFixed(2)) })
+    }
+    if (real(clip.transicionSalida?.tipo) && (clip.transicionSalida?.duracion ?? 0) > tope) {
+      setTransicionSalida(clip.id, { duracion: Number(tope.toFixed(2)) })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clip?.id])
 
   if (!clip) {
     // sin clip pero con una capa elegida, esta misma sección gobierna su entrada
@@ -287,11 +369,12 @@ export function Transiciones() {
 
   return (
     <div className="flex flex-col gap-4">
-      <ResumenTransicionesClip clip={clip} clips={clips} />
+      <ResumenTransicionesClip clip={clip} clips={clips} lado={lado} setLado={setLado} />
 
       <div className="flex flex-col gap-3 border-t border-black/10 pt-3 dark:border-white/10">
         {/* una transición a la vez: al inicio o al final. la pestaña elige dónde, y abajo se
-            muestra solo la galería de ese lado, en vez de dos apiladas */}
+            muestra solo la galería de ese lado, en vez de dos apiladas. la duración de cada una ya
+            se edita arriba, en su fila del resumen */}
         <div className="flex gap-1 rounded-xl p-1" style={{ background: 'rgb(var(--border) / 0.07)' }}>
           {(['inicio', 'final'] as const).map((s) => (
             <button
@@ -309,21 +392,11 @@ export function Transiciones() {
         <p className="text-[13px] leading-relaxed text-[color:var(--muted)]">{activo.ayuda}</p>
         <GaleriaTransiciones actual={activo.trans.tipo} onElegir={(t) => activo.poner({ tipo: t })} />
         {activo.trans.tipo !== 'ninguna' && activo.trans.tipo !== 'corte' && (
-          <>
-            <Campo etiqueta={`Duración (${activo.trans.duracion.toFixed(1)} s)`}>
-              <Deslizador
-                valor={Math.round(activo.trans.duracion * 10)}
-                min={2}
-                max={20}
-                onChange={(v) => activo.poner({ duracion: v / 10 })}
-              />
-            </Campo>
-            <DireccionBarrido
-              tipo={activo.trans.tipo}
-              direccion={activo.trans.direccion}
-              onDir={(d) => activo.poner({ direccion: d })}
-            />
-          </>
+          <DireccionBarrido
+            tipo={activo.trans.tipo}
+            direccion={activo.trans.direccion}
+            onDir={(d) => activo.poner({ direccion: d })}
+          />
         )}
       </div>
     </div>
