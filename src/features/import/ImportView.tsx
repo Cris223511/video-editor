@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import Dropzone from './Dropzone'
 import { useImportarMedios } from './useImportarMedios'
+import ModalNuevoProyecto from './ModalNuevoProyecto'
 import { useProjectStore } from '../../store/useProjectStore'
 import { Link, useNavigate } from 'react-router-dom'
 import { FolderOpen } from 'lucide-react'
@@ -15,6 +17,9 @@ export default function ImportView() {
   const { procesar, ocupado } = useImportarMedios()
   const navegar = useNavigate()
   const preparando = useProjectStore((s) => s.preparando)
+  // al importar los primeros medios se abre un modal para confirmar el nombre del proyecto (propuesto
+  // por el primer video), la descripción y la lista de medios, antes de entrar al editor
+  const [modalNuevo, setModalNuevo] = useState(false)
 
   // en cuanto se importa algo, el editor se abre solo, sin lista intermedia ni
   // botón de confirmar. el cargador se enciende ANTES de procesar y se mantiene
@@ -26,19 +31,31 @@ export default function ImportView() {
     useProjectStore.setState({ preparando: true })
     await procesar(files)
     const despues = useProjectStore.getState().medios.length
+    useProjectStore.setState({ preparando: false })
     if (despues > antes) {
-      // el editor recoge el testigo del cargador y lo apaga al tener el video listo.
-      // se entra a la dirección del proyecto actual, que es su token
-      navegar(RUTAS.editorProyecto(useProjectStore.getState().idProyecto))
-    } else {
-      // no entró nada (todo falló la validación): se apaga y se queda en esta vista
-      useProjectStore.setState({ preparando: false })
+      // en vez de entrar directo al editor, primero se confirma el nombre y los medios en el modal
+      setModalNuevo(true)
     }
+  }
+
+  // al aceptar el modal (con el nombre y los medios ya listos) se entra al editor. el cargador se
+  // enciende otra vez para cubrir el montaje del editor con el primer video
+  function alContinuar() {
+    setModalNuevo(false)
+    useProjectStore.setState({ preparando: true })
+    navegar(RUTAS.editorProyecto(useProjectStore.getState().idProyecto))
+  }
+
+  // cancelar descarta los medios recién traídos y se queda en esta pantalla
+  function alCancelar() {
+    setModalNuevo(false)
+    useProjectStore.getState().limpiar()
   }
 
   return (
     <>
     {preparando && <Loader texto="Preparando tu proyecto..." />}
+    <ModalNuevoProyecto abierto={modalNuevo} onContinuar={alContinuar} onCancelar={alCancelar} />
     <div className={`mx-auto w-full ${ANCHO_CONTENIDO} ${RELLENO} py-10 sm:py-14`}>
       <div className="mb-8">
         <h1 className="font-display text-titulo-lg">Empieza tu proyecto</h1>

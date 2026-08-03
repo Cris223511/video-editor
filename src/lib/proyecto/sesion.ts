@@ -97,6 +97,7 @@ export function capturarProyecto(id: string, creado: number, portada: string): P
     version: VERSION_FORMATO,
     id,
     titulo: pr.titulo,
+    descripcion: pr.descripcion || undefined,
     creado,
     modificado: Date.now(),
     portada,
@@ -185,7 +186,7 @@ async function abrirSesionInterno(id: string): Promise<boolean> {
   const medios = (p.medios ?? []).map(guardadoAMedio)
   // al abrir se adopta la identidad del proyecto guardado, para que los
   // siguientes guardados actualicen este mismo y no creen uno nuevo
-  useProjectStore.setState({ idProyecto: p.id, creado: p.creado, titulo: p.titulo, medios })
+  useProjectStore.setState({ idProyecto: p.id, creado: p.creado, titulo: p.titulo, descripcion: p.descripcion ?? '', medios })
   // en segundo plano se revisa que cada archivo se pueda leer. algunos navegadores
   // guardan una referencia al fichero del disco en vez de una copia, así que si el
   // usuario lo borró de su explorador, el medio deja de existir. leer un byte falla con
@@ -318,6 +319,7 @@ export function nuevoProyecto(): void {
     idProyecto: id,
     creado: Date.now(),
     titulo: 'Proyecto sin título',
+    descripcion: '',
     guardadoEn: null,
     sinGuardar: false,
     guardando: false,

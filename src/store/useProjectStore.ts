@@ -18,10 +18,16 @@ interface EstadoProyecto {
   // completa, para que uno no vea el editor a medio montar con un video pesado
   preparando: boolean
   titulo: string
+  // nota libre del proyecto, la misma que se ve en la lista de proyectos. vive aquí para poder
+  // fijarla desde el modal de un proyecto nuevo y que se guarde con él
+  descripcion: string
   medios: MediaAsset[]
   renombrar: (titulo: string) => void
+  setDescripcion: (descripcion: string) => void
   agregar: (medio: MediaAsset) => void
   quitar: (id: string) => void
+  // reordena los medios según la lista de ids dada. la usa el modal del proyecto nuevo al arrastrar
+  reordenarMedios: (ids: string[]) => void
   // marca un medio como no encontrado (su archivo ya no se puede leer). la interfaz lo
   // pinta como tal y deja de intentar cargarlo
   marcarFaltante: (id: string) => void
@@ -66,12 +72,18 @@ export const useProjectStore = create<EstadoProyecto>((set) => ({
   guardando: false,
   preparando: false,
   titulo: 'Proyecto sin título',
+  descripcion: '',
   medios: [],
   // mientras se escribe se admite cualquier valor, incluido el vacío, para poder
   // borrar todo y volver a teclear. el relleno con el nombre por defecto se hace
   // recién al salir del foco, no en cada pulsación
   renombrar: (titulo) => set({ titulo }),
+  setDescripcion: (descripcion) => set({ descripcion }),
   agregar: (medio) => set((s) => ({ medios: [...s.medios, medio] })),
+  reordenarMedios: (ids) =>
+    set((s) => ({
+      medios: ids.map((id) => s.medios.find((m) => m.id === id)).filter((m): m is MediaAsset => !!m),
+    })),
   quitar: (id) =>
     set((s) => {
       const objetivo = s.medios.find((m) => m.id === id)
