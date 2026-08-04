@@ -10,6 +10,7 @@ import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../color/mezcla'
 import { paramsNB, nodosFiltroNB, NodoFiltro } from '../efectos/nitidezBrillo'
 import { paramsGoPro, nodosFiltroGoPro } from '../efectos/goPro'
 import { dibujarFotograma, Escena } from './compositor'
+import { FiltrosExport, hayFiltrosExport, montarFiltrosExport, fuerzaSuavizado, dentroDelTramo } from './filtrosExport'
 
 export interface DatosExport {
   ancho: number
@@ -39,6 +40,13 @@ export interface DatosExport {
   // guarda su propia referencia y sigue reproduciendo, pero un fetch de la URL da
   // ERR_FILE_NOT_FOUND y colgaba la exportación en "leyendo el video"). el File nunca caduca
   fileDeAsset: (assetId: string) => Blob | undefined
+  // contenedor y códec de salida elegidos en lo avanzado. si no vienen (o son mp4 + h264), se usa el
+  // camino de siempre (mp4-muxer), intacto. los demás combos los arma mediabunny en la ruta rápida
+  formato?: 'mp4' | 'webm' | 'mkv'
+  codecVideo?: 'h264' | 'h265' | 'vp9'
+  // mejoras que se aplican al cuadro ya compuesto antes de codificar (nitidez, etc.). opcionales: sin
+  // ellas la imagen sale igual que siempre
+  filtros?: FiltrosExport
 }
 
 // aviso de avance de la exportación: la fracción hecha (0 a 1) y, opcionalmente, una nota de
@@ -180,6 +188,35 @@ export function exportarProyecto(datos: DatosExport, onProgreso: OnProgreso): Co
         return
       }
       const off = document.createElement('canvas')
+      // lienzo aparte para las pasadas de mejoras (nitidez, etc.), para no pisar el que usa el compositor.
+      // las mejoras se montan una vez y se aplican sobre cada cuadro ya compuesto, antes de grabarlo
+      const offFx = document.createElement('canvas')
+      const fx = hayFiltrosExport(datos.filtros) ? montarFiltrosExport(datos.filtros!) : null
+      if (fx) limpiezas.push(fx.quitar)
+      // suavizado de movimiento por mezcla temporal: se guarda el cuadro anterior y se pinta una parte
+      // sobre el actual, dejando una estela que reduce el salto entre cuadros
+      const suav = fuerzaSuavizado(datos.filtros?.suavizar ?? 0)
+      const frameAnterior = suav > 0 ? document.createElement('canvas') : null
+      const antCtx = frameAnterior?.getContext('2d') ?? null
+      let hayAnterior = false
+      const tramo = datos.filtros?.tramo
+      // aplica todas las mejoras de imagen (filtros svg + suavizado temporal) al cuadro actual, solo si
+      // el instante cae dentro del tramo elegido (o siempre, si no se acotó ninguno)
+      const aplicarMejoras = (tt: number) => {
+        if (!dentroDelTramo(tramo, tt)) return
+        fx?.aplicar(ctx, canvas, offFx)
+        if (!frameAnterior || !antCtx) return
+        if (hayAnterior) {
+          ctx.globalAlpha = suav
+          ctx.drawImage(frameAnterior, 0, 0)
+          ctx.globalAlpha = 1
+        }
+        if (frameAnterior.width !== canvas.width) frameAnterior.width = canvas.width
+        if (frameAnterior.height !== canvas.height) frameAnterior.height = canvas.height
+        antCtx.clearRect(0, 0, frameAnterior.width, frameAnterior.height)
+        antCtx.drawImage(canvas, 0, 0)
+        hayAnterior = true
+      }
 
 
       // arma (o rearma) el filtro de color de un clip a partir de un tono. se usa
@@ -459,6 +496,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: OnProgreso): Co
           sincronizarAudios(t)
           if (t >= total) {
             dibujarFotograma(ctx, escena(), Math.max(0, total - 0.001), (id) => videos.get(id) ?? null, (id) => imagenes.get(id), off)
+            aplicarMejoras(Math.max(0, total - 0.001))
             onProgreso(1)
             grabadora.stop()
             return
@@ -467,6 +505,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: OnProgreso): Co
           if (!act) {
             phRef.t = Math.min(t + 0.033, total)
             dibujarFotograma(ctx, escena(), t, (id) => videos.get(id) ?? null, (id) => imagenes.get(id), off)
+            aplicarMejoras(t)
             raf = requestAnimationFrame(paso)
             return
           }
@@ -510,6 +549,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: OnProgreso): Co
           // corrección aparece progresivamente, para el instante actual
           if (clipsConEntradaEfecto.length) refrescarDefsEfecto(phRef.t)
           dibujarFotograma(ctx, escena(), phRef.t, (id) => videos.get(id) ?? null, (id) => imagenes.get(id), off)
+          aplicarMejoras(phRef.t)
           onProgreso(Math.min(0.999, phRef.t / total), `Grabando · ${relojExport(phRef.t)} / ${relojExport(total)}`)
           raf = requestAnimationFrame(paso)
         }

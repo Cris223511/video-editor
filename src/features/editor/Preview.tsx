@@ -1629,7 +1629,14 @@ export default function Preview() {
           arrastre (mover un texto, un recuadro de selección...). la rueda y el pellizco siguen
           funcionando porque burbujean al contenedor; la lupa va por encima de esta capa */}
       {hayContenido && zoomVisor.z > 1.01 && (
-        <div className="absolute inset-0 z-40" style={{ cursor: 'grab' }} onMouseDown={iniciarMarquee} />
+        <div
+          className="absolute inset-0 z-40"
+          style={{ cursor: 'grab' }}
+          onMouseDown={iniciarMarquee}
+          // doble clic sobre el visor acercado vuelve al tamaño que encaja, la misma salida que la lupa.
+          // esta capa solo existe con zoom, así que no pisa el doble clic que edita un texto sin acercar
+          onDoubleClick={() => setZoomVisor({ z: 1, x: 0, y: 0 })}
+        />
       )}
 
       {/* lupa del visor: cuando hay acercamiento, muestra el nivel y, al pulsarla, vuelve al encaje

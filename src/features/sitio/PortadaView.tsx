@@ -119,7 +119,7 @@ const HERRAMIENTAS = [
     icono: <Gauge size={17} />,
     titulo: 'Velocidad del clip',
     texto:
-      'Lleva un clip de 0,25x a 4x. Lo que ocupa en la pista se recalcula solo y el sonido acompaña al cambio.',
+      'Ajusta la velocidad de reproducción de un clip entre 0,25x y 4x, para lograr desde una cámara lenta suave hasta un acelerado marcado. Su duración en la línea de tiempo se recalcula de forma automática y el sonido se adapta al nuevo ritmo sin desincronizarse.',
   },
   {
     id: 'lienzo',
@@ -293,7 +293,7 @@ export default function PortadaView() {
                   nombre: 'Color',
                   icono: <Palette size={15} />,
                   descripcion:
-                    'Tres ruedas para sombras, medios y luces. Al arrastrar, el cursor se oculta y el movimiento se afina para elegir el tono con precisión.',
+                    'Un corrector de color por ruedas para sombras, medios y luces, que ajusta el tono de cada rango de la imagen de forma independiente y deja el resultado tal cual en el archivo exportado.',
                   contenido: <DemoColor />,
                 },
                 {
@@ -368,8 +368,9 @@ export default function PortadaView() {
             </div>
             <div className="mt-6">
               <Aviso titulo="Nadie te pide nada a cambio">
-                Entras y montas. La herramienta no guarda quién eres, no mide lo que haces con ella
-                y no tiene funciones reservadas a quien pague.
+                No necesitas registrarte ni iniciar sesión para empezar a trabajar, y todas las
+                funciones están disponibles desde el primer momento. El editor no guarda tu identidad
+                ni analiza el uso que le das, y no reserva ninguna herramienta para quien pague.
               </Aviso>
             </div>
           </Aparece>
@@ -385,8 +386,9 @@ export default function PortadaView() {
               Lo que encuentras <Subrayado>dentro del editor</Subrayado>
             </Titulo>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-[color:var(--muted)]">
-              Cada herramienta se demuestra funcionando, no con una captura. Elige una de la lista
-              para verla en marcha; si no tocas ninguna, van pasando solas.
+              Un recorrido por las herramientas principales del editor, desde el recorte y la censura
+              en movimiento hasta el color, la velocidad y el audio. Cada una resume, con una
+              demostración animada, lo que permite hacer sobre el material de tu proyecto.
             </p>
           </Aparece>
           <Aparece retraso={0.1} className="mt-8">

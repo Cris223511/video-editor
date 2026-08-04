@@ -10,6 +10,7 @@ import {
   Grid2x2,
   HardDrive,
   Hash,
+  MonitorPlay,
   Play,
   RectangleHorizontal,
   Ruler,
@@ -36,6 +37,13 @@ function proporcion(ancho: number, alto: number): string {
 function orientacion(ancho: number, alto: number): string {
   if (ancho === alto) return 'Cuadrado'
   return ancho > alto ? 'Horizontal' : 'Vertical'
+}
+
+// la resolución en la forma que la gente reconoce (720p, 1080p): se nombra por el lado menor, así un
+// video vertical de 720 por 1280 es 720p, igual que su versión horizontal de 1280 por 720
+function resolucion(ancho: number, alto: number): string {
+  if (!ancho || !alto) return 'No disponible'
+  return `${Math.min(ancho, alto)}p`
 }
 
 function Dato({
@@ -250,6 +258,9 @@ export default function FichaMedio({
               línea, que es como se lee una ficha de un vistazo */}
           <dl className="flex flex-col self-start">
             <Dato icono={<Ruler size={14} />} nombre="Dimensiones" valor={`${medio.ancho} × ${medio.alto} px`} />
+            {medio.ancho > 0 && medio.alto > 0 && (
+              <Dato icono={<MonitorPlay size={14} />} nombre="Resolución" valor={resolucion(medio.ancho, medio.alto)} />
+            )}
             <Dato icono={<RectangleHorizontal size={14} />} nombre="Proporción" valor={proporcion(medio.ancho, medio.alto)} />
             <Dato icono={<Compass size={14} />} nombre="Orientación" valor={orientacion(medio.ancho, medio.alto)} />
             <Dato icono={<Clock size={14} />} nombre="Duración" valor={formatearDuracion(medio.duracion)} />

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Info, Plus } from 'lucide-react'
 import Icon from '../../components/ui/Icon'
@@ -27,6 +27,40 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
   const medios = useProjectStore((s) => s.medios)
   const quitar = useProjectStore((s) => s.quitar)
   const quitarUsosDeAsset = useEditorStore((s) => s.quitarUsosDeAsset)
+
+  // qué medio corresponde a lo que está seleccionado en la línea de tiempo, para resaltarlo aquí y saber
+  // de un vistazo de dónde salió el clip. se leen primitivas de la selección (no el estado entero) para
+  // no repintar en cada fotograma de la reproducción. con selección múltiple no se resalta nada
+  const clipSeleccionado = useEditorStore((s) => s.clipSeleccionado)
+  const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
+  const regionSeleccionada = useEditorStore((s) => s.regionSeleccionada)
+  const nBloques = useEditorStore((s) => s.bloquesSeleccionados.length)
+  const nCapas = useEditorStore((s) => s.capasSeleccionadas.length)
+  const clips = useEditorStore((s) => s.pista.clips)
+  const capas = useEditorStore((s) => s.capas)
+  const audios = useEditorStore((s) => s.audios)
+  const assetActivo = useMemo(() => {
+    // varias cosas a la vez: no se resalta ningún medio
+    if (nBloques > 1 || nCapas > 1) return null
+    // un clip de video seleccionado apunta a su medio por assetId
+    if (clipSeleccionado) return clips.find((c) => c.id === clipSeleccionado)?.assetId ?? null
+    // los audios importados se seleccionan por regionSeleccionada y también llevan su assetId
+    if (regionSeleccionada) return audios.find((a) => a.id === regionSeleccionada)?.assetId ?? null
+    // una capa de imagen guarda la url del medio en src; se busca el medio con esa url
+    if (capaSeleccionada) {
+      const capa = capas.find((c) => c.id === capaSeleccionada)
+      if (capa && capa.tipo === 'imagen') return medios.find((m) => m.url === capa.src)?.id ?? null
+    }
+    return null
+  }, [clipSeleccionado, capaSeleccionada, regionSeleccionada, nBloques, nCapas, clips, capas, audios, medios])
+
+  // la tarjeta resaltada se lleva a la vista con un desplazamiento suave, para que no aparezca de golpe
+  const activoRef = useRef<HTMLLIElement | null>(null)
+  useEffect(() => {
+    if (assetActivo && activoRef.current) {
+      activoRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [assetActivo])
   const { procesar, ocupado } = useImportarMedios()
   const [encima, setEncima] = useState(false)
   // igual que en el panel de opciones: el ancho se congela durante el plegado
@@ -115,8 +149,10 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
       <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-2.5">
         {medios.length > 0 && (
           <ul className="mb-2.5 grid grid-cols-2 gap-2">
-            {medios.map((m) => (
-              <li key={m.id}>
+            {medios.map((m) => {
+              const activo = assetActivo === m.id
+              return (
+              <li key={m.id} ref={activo ? activoRef : undefined}>
                 <div
                   draggable
                   onDragStart={(e) => {
@@ -230,9 +266,25 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
                       </button>
                     </Tooltip>
                   </div>
+
+                  {/* sombreado azul de selección, el MISMO diseño que el del clip en la línea de tiempo
+                      (fondo tenue de marca + borde interior). entra y sale con un fundido para que el
+                      borde se dibuje suave, sin brusquedad */}
+                  <AnimatePresence>
+                    {activo && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                        className="pointer-events-none absolute inset-0 z-20 rounded-lg bg-brand/15 ring-2 ring-inset ring-brand"
+                      />
+                    )}
+                  </AnimatePresence>
                 </div>
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
 

@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { AnimatePresence, motion } from 'framer-motion'
-import { CalendarPlus, ChevronDown, Download, PencilLine, Play, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { CalendarPlus, PencilLine, Play } from 'lucide-react'
 import Modal from '../../components/ui/Modal'
 import Loader from '../../components/ui/Loader'
+import FichaMedio from '../editor/FichaMedio'
+import { MediaAsset } from '../../types/media'
 import { leerProyecto } from '../../lib/proyecto/almacen'
 import { ProyectoGuardado, MedioGuardado } from '../../lib/proyecto/formato'
 import { frameDeVideo } from '../../lib/media/probeVideo'
@@ -27,9 +27,11 @@ function proporcion(ancho: number, alto: number): string {
   return `${w}:${h}`
 }
 
-function orientacion(ancho: number, alto: number): string {
-  if (ancho === alto) return 'Cuadrado'
-  return ancho > alto ? 'Horizontal' : 'Vertical'
+// la resolución en la forma reconocible (720p, 1080p), nombrada por el lado menor: así un video
+// vertical de 720 por 1280 es 720p, igual que su equivalente horizontal
+function resolucion(ancho: number, alto: number): string {
+  if (!ancho || !alto) return 'No disponible'
+  return `${Math.min(ancho, alto)}p`
 }
 
 // fecha escrita en largo, con el mes en palabra y la hora en formato de doce
@@ -59,127 +61,28 @@ function Dato({ nombre, valor }: { nombre: string; valor: string }) {
   )
 }
 
-// vista previa a pantalla de un archivo del proyecto. detrás va el mismo video
-// muy ampliado y borroso, para que el fondo acompañe a lo que se reproduce en
-// lugar de un negro plano. la apertura y el cierre los anima Framer Motion
-function Reproductor({
-  url,
-  nombre,
-  ancho,
-  alto,
-  onCerrar,
-}: {
-  url: string
-  nombre: string
-  ancho: number
-  alto: number
-  onCerrar: () => void
-}) {
-  // solo cierra un clic que nace y termina en el fondo, no un arrastre desde dentro
-  const abajoEnFondo = useRef(false)
-
-  // esc cierra sin tener que apuntar a la equis, como en cualquier visor
-  useEffect(() => {
-    const alPulsar = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCerrar()
-    }
-    window.addEventListener('keydown', alPulsar)
-    return () => window.removeEventListener('keydown', alPulsar)
-  }, [onCerrar])
-
-  return createPortal(
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="fixed inset-0 z-[70] flex items-center justify-center p-6"
-      style={{ pointerEvents: 'auto' }}
-      onMouseDown={() => {
-        abajoEnFondo.current = true
-      }}
-      onClick={() => {
-        if (abajoEnFondo.current) onCerrar()
-      }}
-    >
-      {/* el mismo material de fondo, agrandado y difuminado, oscurecido para que
-          el video de delante y los controles resalten */}
-      <video
-        src={url}
-        muted
-        autoPlay
-        loop
-        playsInline
-        className="absolute inset-0 h-full w-full scale-110 object-cover"
-        style={{ filter: 'blur(42px) brightness(0.5)' }}
-      />
-      <div className="absolute inset-0 bg-black/40" />
-
-      <motion.div
-        initial={{ opacity: 0, scale: 0.94, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 8 }}
-        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 w-full max-w-3xl"
-        onMouseDown={(e) => {
-          abajoEnFondo.current = false
-          e.stopPropagation()
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-3 flex items-center justify-end gap-2">
-          <a
-            href={url}
-            download={nombre}
-            aria-label="Descargar"
-            className="grid h-10 w-10 place-items-center rounded-full bg-white/12 text-white backdrop-blur transition-colors hover:bg-white/25"
-          >
-            <Download size={18} />
-          </a>
-          <button
-            onClick={onCerrar}
-            aria-label="Cerrar"
-            className="grid h-10 w-10 place-items-center rounded-full bg-white/12 text-white backdrop-blur transition-colors hover:bg-white/25"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <video
-          src={url}
-          controls
-          autoPlay
-          playsInline
-          className="max-h-[78vh] w-full rounded-2xl bg-black shadow-2xl"
-          style={{ aspectRatio: `${ancho} / ${alto}` }}
-        />
-        <p className="mt-3 truncate text-center text-[13px] text-white/80">{nombre}</p>
-      </motion.div>
-    </motion.div>,
-    document.body,
-  )
-}
-
-// una fila de archivo dentro de la ficha del proyecto. va plegada de entrada,
-// con su borde punteado; al pulsar el bloque se despliegan los datos técnicos, y
-// la portada abre la vista previa a pantalla. la miniatura se rehace desde la
-// mitad del propio archivo, para que no dependa de una guardada que saliera negra
+// una fila de archivo dentro de la ficha del proyecto. al pulsarla se abre la ficha completa del medio
+// (la misma que usa la biblioteca del editor) por encima de este modal, con su vista previa y todos sus
+// datos. antes desplegaba los datos en línea; ahora reutiliza esa ficha para tener todo con el mismo
+// diseño. la miniatura se rehace desde la mitad del propio archivo, para que no dependa de una guardada
+// que saliera negra
 function FilaArchivo({ m }: { m: MedioGuardado }) {
-  const [abierto, setAbierto] = useState(false)
-  const [reproduciendo, setReproduciendo] = useState(false)
+  const [verDetalle, setVerDetalle] = useState(false)
   const [portada, setPortada] = useState(m.miniatura)
 
-  // url viva del archivo, para previsualizarlo y para sacarle un fotograma. se crea y se
-  // revoca dentro del MISMO efecto a propósito: si se creara en un useMemo y se revocara
-  // en un efecto aparte, el doble montaje de StrictMode (en desarrollo) la revocaba sin
-  // volver a crearla, y el <video> se quedaba con una url muerta (ERR_FILE_NOT_FOUND),
-  // todo en negro. además el blob se envuelve en un File con su tipo por si vuelve de
-  // IndexedDB sin el tipo MIME, que también dejaría al <video> sin poder decodificar
+  // el archivo real y su url viva, para previsualizar y para sacarle un fotograma. se crea y se
+  // revoca dentro del MISMO efecto a propósito: si se creara en un useMemo y se revocara en un efecto
+  // aparte, el doble montaje de StrictMode (en desarrollo) la revocaba sin volver a crearla, y el
+  // <video> se quedaba con una url muerta (ERR_FILE_NOT_FOUND). el blob se envuelve en un File con su
+  // tipo por si vuelve de IndexedDB sin el tipo MIME, que también dejaría al <video> sin decodificar
   const [url, setUrl] = useState('')
+  const [archivo, setArchivo] = useState<File | null>(null)
   useEffect(() => {
     const f =
       m.archivo instanceof File
         ? m.archivo
         : new File([m.archivo], m.nombre, { type: m.tipo || m.archivo.type })
+    setArchivo(f)
     const u = URL.createObjectURL(f)
     setUrl(u)
     return () => URL.revokeObjectURL(u)
@@ -198,85 +101,53 @@ function FilaArchivo({ m }: { m: MedioGuardado }) {
     }
   }, [url, m.duracion])
 
-  const pixeles = m.ancho * m.alto
-  const formato = m.nombre.includes('.') ? m.nombre.split('.').pop()!.toUpperCase() : 'Desconocido'
+  // el medio guardado se adapta a un MediaAsset para poder pasárselo tal cual a la ficha del editor
+  const asset: MediaAsset | null =
+    url && archivo
+      ? {
+          id: m.id,
+          clase: 'video',
+          file: archivo,
+          nombre: m.nombre,
+          tamano: m.tamano,
+          tipo: m.tipo,
+          duracion: m.duracion,
+          ancho: m.ancho,
+          alto: m.alto,
+          url,
+          miniatura: portada,
+        }
+      : null
 
   return (
-    <div className="rounded-xl" style={{ border: '1px dashed rgb(var(--border) / 0.35)' }}>
-      <div className="flex items-center gap-3 p-2.5">
-        {/* la portada hace de disparador de la vista previa: al pasar el cursor se
-            oscurece y aparece el botón de reproducir en el centro */}
-        <button
-          onClick={() => setReproduciendo(true)}
-          className="group relative h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-black/40"
-          aria-label="Ver vista previa"
-        >
+    <>
+      <button
+        onClick={() => setVerDetalle(true)}
+        className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-colors hover:bg-[rgb(var(--border)/0.06)]"
+        style={{ border: '1px dashed rgb(var(--border) / 0.35)' }}
+      >
+        {/* la portada, con el botón de reproducir sobrepuesto como pista de que el archivo se puede ver */}
+        <span className="group relative h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-black/40">
           <img src={portada} alt="" className="h-full w-full object-cover" />
           <span className="absolute inset-0 grid place-items-center bg-black/25 transition-colors duration-200 group-hover:bg-black/45">
             <span className="grid h-8 w-8 place-items-center rounded-full bg-white/90 text-[#13233d] shadow transition-transform duration-200 group-hover:scale-110">
               <Play size={15} className="ml-0.5" fill="currentColor" />
             </span>
           </span>
-        </button>
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-semibold" title={m.nombre}>
+            {m.nombre}
+          </span>
+          <span className="mt-0.5 block text-[12px] text-[color:var(--muted)]">
+            {formatearDuracion(m.duracion)} · {formatearBytes(m.tamano)}
+          </span>
+        </span>
+      </button>
 
-        {/* el resto de la fila pliega y despliega los datos del archivo */}
-        <button
-          onClick={() => setAbierto((v) => !v)}
-          aria-expanded={abierto}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
-        >
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-semibold" title={m.nombre}>
-              {m.nombre}
-            </p>
-            <p className="mt-0.5 text-[12px] text-[color:var(--muted)]">
-              {formatearDuracion(m.duracion)} · {formatearBytes(m.tamano)}
-            </p>
-          </div>
-          <ChevronDown
-            size={16}
-            className="shrink-0 text-[color:var(--muted)] transition-transform duration-300"
-            style={{ transform: abierto ? 'rotate(180deg)' : 'none' }}
-          />
-        </button>
-      </div>
-
-      <AnimatePresence initial={false}>
-        {abierto && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            className="overflow-hidden"
-          >
-            <dl className="px-3 pb-3">
-              <Dato nombre="Dimensiones" valor={`${m.ancho} × ${m.alto} px`} />
-              <Dato nombre="Proporción" valor={proporcion(m.ancho, m.alto)} />
-              <Dato nombre="Orientación" valor={orientacion(m.ancho, m.alto)} />
-              <Dato nombre="Duración" valor={formatearDuracion(m.duracion)} />
-              <Dato nombre="Tamaño" valor={formatearBytes(m.tamano)} />
-              <Dato nombre="Formato" valor={formato} />
-              <Dato nombre="Tipo MIME" valor={m.tipo || 'Desconocido'} />
-              <Dato nombre="Megapíxeles" valor={`${(pixeles / 1_000_000).toFixed(2)} MP`} />
-              <Dato nombre="Píxeles totales" valor={pixeles.toLocaleString('es')} />
-            </dl>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {reproduciendo && (
-          <Reproductor
-            url={url}
-            nombre={m.nombre}
-            ancho={m.ancho}
-            alto={m.alto}
-            onCerrar={() => setReproduciendo(false)}
-          />
-        )}
-      </AnimatePresence>
-    </div>
+      {/* la ficha del medio se monta por encima de este modal; al cerrarla se vuelve al del proyecto */}
+      <FichaMedio medio={verDetalle ? asset : null} onCerrar={() => setVerDetalle(false)} />
+    </>
   )
 }
 
@@ -314,7 +185,6 @@ export default function FichaProyecto({
   return (
     <Modal
       titulo={proyecto?.titulo ?? 'Detalles del proyecto'}
-      descripcion="Todo lo que se sabe de este proyecto y de sus archivos."
       abierto={id !== null}
       onCerrar={onCerrar}
       ancho="max-w-xl"
@@ -351,7 +221,7 @@ export default function FichaProyecto({
               <Dato nombre="Capas" valor={String(proyecto.edicion.capas.length)} />
               <Dato
                 nombre="Resolución de salida"
-                valor={`${proyecto.edicion.resolucion.ancho} × ${proyecto.edicion.resolucion.alto} px`}
+                valor={`${resolucion(proyecto.edicion.resolucion.ancho, proyecto.edicion.resolucion.alto)} · ${proyecto.edicion.resolucion.ancho} × ${proyecto.edicion.resolucion.alto} px`}
               />
               <Dato
                 nombre="Proporción de salida"
@@ -365,8 +235,7 @@ export default function FichaProyecto({
             <h3 className="mb-3 text-[14px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
               Archivos ({proyecto.medios.length})
             </h3>
-            {/* cada archivo va plegado, con su borde punteado; se despliega al
-                pulsarlo y su portada abre la vista previa */}
+            {/* cada archivo abre su ficha completa al pulsarlo, por encima de este modal */}
             <div className="flex flex-col gap-2">
               {proyecto.medios.map((m) => (
                 <FilaArchivo key={m.id} m={m} />

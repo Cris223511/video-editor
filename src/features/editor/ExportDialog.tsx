@@ -7,10 +7,14 @@ import { useProjectStore } from '../../store/useProjectStore'
 import { duracionProyecto } from '../../lib/timeline/clips'
 import { formatearDuracion } from '../../lib/format/duracion'
 import { formatearBytes } from '../../lib/format/bytes'
-import { exportarProyecto, ControlExport, elegirMime, bitrateSegunMedios, DatosExport, OnProgreso } from '../../lib/export/exportar'
+import { exportarProyecto, ControlExport, bitrateSegunMedios, DatosExport, OnProgreso } from '../../lib/export/exportar'
 import { exportarRapido } from '../../lib/export/exportarRapido'
 import { haiWebCodecs } from '../../lib/export/decode'
+import { soportaH265, type Contenedor, type CodecVideo } from '../../lib/export/muxMedios'
+import { FORMATOS_EXOTICOS, RECOMPRIME, esExotico, type FormatoExotico } from '../../lib/export/formatos'
 import { sinExtensionMedia } from '../../lib/proyecto/nombre'
+import AyudaExport from './AyudaExport'
+import { ChevronDown } from 'lucide-react'
 
 type Fase = 'inicio' | 'exportando' | 'listo' | 'error'
 
@@ -61,6 +65,100 @@ function FilaInfo({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   )
 }
 
+// una mejora regulable (nitidez, ruido, grano): etiqueta con su ayuda, el valor a la derecha y un
+// deslizador de 0 a 100. en 0 muestra "Desactivada" para dejar claro que no aplica nada
+function SliderMejora({
+  label,
+  ayuda,
+  valor,
+  onChange,
+}: {
+  label: string
+  ayuda: string
+  valor: number
+  onChange: (v: number) => void
+}) {
+  return (
+    <div className="mb-3">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 text-[13px] font-medium text-[color:var(--muted)]">
+          {label}
+          <AyudaExport texto={ayuda} />
+        </span>
+        <span className="text-[13px] font-semibold tabular-nums">
+          {valor === 0 ? 'Desactivada' : `${valor}%`}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={5}
+        value={valor}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full cursor-pointer"
+        style={{ accentColor: '#1861ff' }}
+      />
+    </div>
+  )
+}
+
+// una mejora de encender o apagar (desentrelazar, mejorar webcam): etiqueta con su ayuda y un
+// interruptor deslizante que se pinta de color de marca cuando está activo
+function ToggleMejora({
+  label,
+  ayuda,
+  activo,
+  onToggle,
+}: {
+  label: string
+  ayuda: string
+  activo: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="flex items-center gap-1.5 text-[13px] font-medium text-[color:var(--muted)]">
+        {label}
+        <AyudaExport texto={ayuda} />
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={activo}
+        onClick={onToggle}
+        className="relative h-5 w-9 shrink-0 rounded-full transition-colors duration-200"
+        style={{ background: activo ? '#1861ff' : 'rgb(var(--border) / 0.35)' }}
+      >
+        <span
+          className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all duration-200"
+          style={{ left: activo ? '1.125rem' : '0.125rem' }}
+        />
+      </button>
+    </div>
+  )
+}
+
+// escalera de resoluciones que se ofrecen, medidas por el lado menor. de estas solo se muestran
+// las que el material de verdad da (nunca más de lo que trae la fuente) y con tope duro en 1080p
+const ESCALERA_RES = [144, 240, 360, 480, 720, 1080]
+
+// nombre legible del nivel de compresión, para que el número por sí solo no diga nada. 100 = tal cual
+// el original (sin perder calidad); por debajo, cada tramo pesa menos a cambio de algo de calidad
+function nombreCompresion(p: number): string {
+  if (p >= 100) return 'Original'
+  if (p >= 80) return 'Muy alta'
+  if (p >= 60) return 'Alta'
+  if (p >= 40) return 'Media'
+  if (p >= 20) return 'Baja'
+  return 'Mínima'
+}
+
+// tasa de bits en un texto corto, en megabits por segundo, como la muestran los compresores conocidos
+function formatearTasa(bps: number): string {
+  return `${(bps / 1_000_000).toFixed(2)} Mbit/s`
+}
+
 // nombre de archivo válido en cualquier sistema a partir del título del proyecto: se quitan
 // las tildes y todo lo que no sea letra, número, espacio o guion, y los espacios pasan a guiones.
 // si queda vacío se cae a un nombre por defecto para no descargar un archivo sin nombre
@@ -106,9 +204,33 @@ export default function ExportDialog() {
   // 30 es el valor corriente para material de pantalla; 60 se nota en el
   // movimiento rápido a cambio de un archivo bastante más pesado
   const [fps, setFps] = useState(30)
-  // calidad = a cuántos píxeles se limita el lado menor del video. 1080 es el tope; se
-  // puede bajar a 720 para un archivo más liviano y una exportación algo más rápida
+  // calidad = a cuántos píxeles se limita el lado menor del video. arranca en el tope real del
+  // material (se ajusta al abrir el diálogo). nunca sube por encima de lo que da la fuente
   const [calidad, setCalidad] = useState(1080)
+  // nivel de compresión, de 10 a 100. en 100 el archivo sale igual que el original (bitrate
+  // igualado a la fuente); por debajo, se aprieta más y pesa menos a cambio de algo de calidad
+  const [compresion, setCompresion] = useState(100)
+  // el bloque de ajustes avanzados arranca plegado: quien no lo abra exporta igual que siempre
+  const [avanzado, setAvanzado] = useState(false)
+  // contenedor y códec de salida. por defecto mp4 + h264, que es el camino de siempre. webm y mkv, y
+  // el códec h265, son opcionales dentro de lo avanzado
+  const [formato, setFormato] = useState<Contenedor | FormatoExotico>('mp4')
+  const [codecVideo, setCodecVideo] = useState<CodecVideo>('h264')
+  // si el equipo puede codificar h265 (no todos traen el codificador); se consulta al abrir
+  const [hevcOk, setHevcOk] = useState(false)
+  // mejoras opcionales sobre el cuadro, todas apagadas por defecto. los sliders van de 0 a 100 y en 0 no
+  // aplican nada; los interruptores arrancan en falso
+  const [nitidez, setNitidez] = useState(0)
+  const [ruido, setRuido] = useState(0)
+  const [grano, setGrano] = useState(0)
+  const [desentrelazar, setDesentrelazar] = useState(false)
+  const [webcam, setWebcam] = useState(false)
+  const [audioRuido, setAudioRuido] = useState(false)
+  const [suavizar, setSuavizar] = useState(0)
+  // aplicar las mejoras de imagen solo a un tramo del video, en segundos. apagado por defecto (a todo)
+  const [tramoActivo, setTramoActivo] = useState(false)
+  const [tramoInicio, setTramoInicio] = useState(0)
+  const [tramoFin, setTramoFin] = useState(0)
   // peso REAL del archivo terminado, para mostrarlo al final (no el estimado)
   const [tamanoFinal, setTamanoFinal] = useState(0)
   const controlRef = useRef<ControlExport | null>(null)
@@ -127,21 +249,77 @@ export default function ExportDialog() {
   // a la vista previa. se redondea a par, que es lo que piden los códecs de video
   const par = (n: number) => Math.max(2, Math.round(n / 2) * 2)
   const menorProy = Math.min(estado.resolucion.ancho, estado.resolucion.alto)
-  const escalaSalida = Math.min(1, calidad / menorProy)
+  // tope real de calidad: lo que da el material, sin pasar de 1080p (nada de 1440p ni 4K a propósito).
+  // de la escalera solo se ofrecen los peldaños por debajo del tope, más el propio tope como "Máxima".
+  // así un proyecto de 480p ofrece hasta 480p y uno de 4K se corta en 1080p
+  const topeCalidad = Math.min(1080, menorProy)
+  const opcionesCalidad = [...ESCALERA_RES.filter((v) => v < topeCalidad), topeCalidad]
+  // la calidad elegida nunca pasa del tope (por si venía de un proyecto anterior más grande)
+  const calidadReal = Math.min(calidad, topeCalidad)
+  const escalaSalida = Math.min(1, calidadReal / menorProy)
   const ancho = par(estado.resolucion.ancho * escalaSalida)
   const alto = par(estado.resolucion.alto * escalaSalida)
 
-  // formato probable de salida, deducido del mismo mime que elegirá la grabadora
-  const formatoSalida = elegirMime().includes('mp4') ? 'MP4' : 'WebM'
+  // los formatos exóticos (mov, avi, wmv, flv, 3gp) no los arma el navegador: se exporta primero un mp4
+  // con h264 por el camino de siempre y después ffmpeg.wasm lo reempaqueta al envase pedido. por eso, con
+  // uno de ellos elegido, el motor produce mp4/h264 y no hay elección de códec
+  const exotico = esExotico(formato)
+  const formatoMotor: Contenedor = exotico ? 'mp4' : formato
+  // códecs que ofrece el contenedor elegido: webm va con vp9 sí o sí; mp4 y mkv con h264, y h265 solo si
+  // el equipo lo puede codificar. el códec efectivo se corrige solo si el elegido no cabe en el formato
+  const codecsDisponibles: CodecVideo[] =
+    formatoMotor === 'webm' ? ['vp9'] : hevcOk ? ['h264', 'h265'] : ['h264']
+  const codecReal: CodecVideo = exotico
+    ? 'h264'
+    : codecsDisponibles.includes(codecVideo)
+      ? codecVideo
+      : codecsDisponibles[0]
+  // texto del formato para la ficha y la extensión del archivo descargado
+  const formatoTexto = formato.toUpperCase()
 
   // peso aproximado del archivo: el bitrate de video (que ahora depende del fps
   // elegido) por la duración, más el margen del audio. es una estimación, no un
   // tamaño exacto, porque la grabadora ajusta la calidad según el movimiento. al
   // depender del fps, el peso cambia al elegir 24, 30 o 60
-  // bitrate objetivo: igualado al del material original para que el video salga tal cual. sirve para
-  // el peso estimado y se le pasa a los motores de exportación
-  const bitrateObjetivo = bitrateSegunMedios(medios, ancho, alto, fps)
+  // bitrate base: igualado al del material original para que, en 100, el video salga tal cual. el nivel
+  // de compresión lo escala hacia abajo (nunca por encima, ampliar no añade detalle). sirve para el peso
+  // estimado y la tasa de bits que se muestran en vivo, y se le pasa a los motores de exportación
+  const bitrateBase = bitrateSegunMedios(medios, ancho, alto, fps)
+  const bitrateObjetivo = Math.max(100_000, Math.round((bitrateBase * compresion) / 100))
   const bytesEstimados = total > 0 ? ((bitrateObjetivo + BITRATE_AUDIO) * total) / 8 : 0
+
+  // al abrir el diálogo se parte del tope real del material (la mejor calidad que da), con la compresión
+  // en original y lo avanzado plegado. así, sin tocar nada, se exporta con la misma calidad de siempre
+  useEffect(() => {
+    if (!abierto) return
+    setCalidad(topeCalidad)
+    setCompresion(100)
+    setAvanzado(false)
+    setFormato('mp4')
+    setCodecVideo('h264')
+    setNitidez(0)
+    setRuido(0)
+    setGrano(0)
+    setDesentrelazar(false)
+    setWebcam(false)
+    setAudioRuido(false)
+    setSuavizar(0)
+    setTramoActivo(false)
+    setTramoInicio(0)
+    setTramoFin(total)
+  }, [abierto, topeCalidad])
+
+  // al abrir se consulta si el equipo puede codificar h265, para ofrecerlo solo cuando de verdad se puede
+  useEffect(() => {
+    if (!abierto) return
+    let vivo = true
+    soportaH265(ancho, alto).then((ok) => {
+      if (vivo) setHevcOk(ok)
+    })
+    return () => {
+      vivo = false
+    }
+  }, [abierto, ancho, alto])
 
   function cerrarTodo() {
     controlRef.current?.cancelar()
@@ -233,6 +411,21 @@ export default function ExportDialog() {
       pistasMeta: estado.pistasMeta,
       urlDeAsset: (id) => medios.find((m) => m.id === id)?.url,
       fileDeAsset: (id) => medios.find((m) => m.id === id)?.file,
+      // el motor siempre recibe un contenedor que sabe hacer (mp4/webm/mkv); si el usuario pidió un
+      // formato exótico, se produce mp4 y se convierte después
+      formato: formatoMotor,
+      codecVideo: codecReal,
+      // se pasan siempre; el motor no monta nada si están todas en cero o apagadas
+      filtros: {
+        nitidez,
+        ruido,
+        grano,
+        desentrelazar,
+        webcam,
+        audioRuido,
+        suavizar,
+        tramo: tramoActivo ? { inicio: tramoInicio, fin: tramoFin } : undefined,
+      },
     }
 
     // lanza una exportación con el motor que se le pase y espera su resultado
@@ -310,7 +503,24 @@ export default function ExportDialog() {
       }
       if (!blob) blob = await correr(exportarProyecto)
 
-      const ext = blob.type.includes('mp4') ? 'mp4' : 'webm'
+      // si el usuario pidió un formato exótico, el mp4 recién hecho se reempaqueta con ffmpeg.wasm, que
+      // se carga solo en este momento (import dinámico). el remux de mov/avi/flv/3gp no recomprime; wmv sí
+      if (exotico) {
+        setDetalle(RECOMPRIME[formato as FormatoExotico] ? 'Recomprimiendo a ' + formatoTexto + '…' : 'Convirtiendo a ' + formatoTexto + '…')
+        setProgreso(0.99)
+        const { transcodificar } = await import('../../lib/export/ffmpegExport')
+        blob = await transcodificar(blob, formato as FormatoExotico)
+      }
+
+      // la extensión: si es exótico, la del propio formato; si no, sale del tipo real del archivo (así
+      // vale igual para el camino de siempre y para webm/mkv; si el rápido cayó al clásico, mp4 o webm)
+      const ext = exotico
+        ? (formato as FormatoExotico)
+        : blob.type.includes('matroska')
+          ? 'mkv'
+          : blob.type.includes('webm')
+            ? 'webm'
+            : 'mp4'
       setExtension(ext)
       setTamanoFinal(blob.size)
       const url = URL.createObjectURL(blob)
@@ -389,51 +599,52 @@ export default function ExportDialog() {
     >
       {fase === 'inicio' && (
         <>
+          {/* ficha de resumen: lo que va a salir, de un vistazo. el peso se recalcula solo al mover la
+              calidad, el ritmo o la compresión, así que siempre refleja lo elegido */}
           <dl className="mb-5 flex flex-col">
             <Dato nombre="Resolución" valor={`${ancho} × ${alto} px`} />
             <Dato nombre="Duración" valor={formatearDuracion(total)} />
-            <Dato nombre="Formato de salida" valor={formatoSalida} />
+            <Dato nombre="Formato de salida" valor={formatoTexto} />
             <Dato
               nombre="Peso estimado"
               valor={bytesEstimados > 0 ? `≈ ${formatearBytes(bytesEstimados)}` : 'No disponible'}
             />
           </dl>
 
-          {/* control segmentado de imágenes por segundo: los tres valores viven
-              dentro de una misma cápsula y el activo se resalta con un chip de
-              color que se desliza con una transición suave */}
-          {/* calidad de salida: el lado menor se limita a 1080 (tope) o 720 */}
+          {/* calidad de salida: la escalera de resoluciones se arma según lo que da el material, con tope
+              en 1080p. no se ofrece más de lo que trae la fuente, porque ampliar no mejora, solo emborrona */}
           <div className="mb-4">
-            <span className="mb-2 block text-[13px] font-medium text-[color:var(--muted)]">
-              Calidad
-            </span>
+            <div className="mb-2 flex items-center gap-1.5">
+              <span className="text-[13px] font-medium text-[color:var(--muted)]">Calidad</span>
+              <AyudaExport texto="La resolución del video final. A mayor resolución, más nitidez en la imagen y más peso en el archivo. Solo se ofrece hasta la que ya tiene tu video." />
+            </div>
             <div className="flex gap-1 rounded-xl p-1" style={{ background: 'rgb(var(--border) / 0.12)' }}>
-              {[
-                { v: 1080, txt: '1080p', nota: 'Máxima' },
-                { v: 720, txt: '720p', nota: 'Más liviano' },
-              ].map(({ v, txt, nota }) => {
-                const activo = calidad === v
+              {opcionesCalidad.map((v) => {
+                const activo = calidadReal === v
+                const esMax = v === topeCalidad
                 return (
                   <button
                     key={v}
                     onClick={() => setCalidad(v)}
                     className={[
-                      'flex-1 rounded-lg py-2 text-sm font-semibold transition-all duration-200',
+                      'flex-1 rounded-lg py-2 text-[13px] font-semibold transition-all duration-200',
                       activo ? 'bg-brand text-white shadow-sm' : 'text-[color:var(--muted)] hover:text-[color:var(--text)]',
                     ].join(' ')}
                   >
-                    {txt}
-                    <span className="ml-1 text-[11px] font-normal opacity-70">{nota}</span>
+                    {v}p
+                    {esMax && <span className="ml-1 text-[10px] font-normal opacity-70">Máx</span>}
                   </button>
                 )
               })}
             </div>
           </div>
 
+          {/* ritmo de fotografías por segundo. el dueño prefiere "fotografías" antes que "imágenes" */}
           <div className="mb-4">
-            <span className="mb-2 block text-[13px] font-medium text-[color:var(--muted)]">
-              Imágenes por segundo
-            </span>
+            <div className="mb-2 flex items-center gap-1.5">
+              <span className="text-[13px] font-medium text-[color:var(--muted)]">Fotografías por segundo</span>
+              <AyudaExport texto="Cuántas imágenes se muestran por segundo. Un valor más alto da un movimiento más fluido y un archivo más pesado." />
+            </div>
             <div
               className="flex gap-1 rounded-xl p-1"
               style={{ background: 'rgb(var(--border) / 0.12)' }}
@@ -461,10 +672,244 @@ export default function ExportDialog() {
 
           {fps === 60 && (
             <p className="mb-4 text-xs italic leading-relaxed text-[color:var(--muted)]">
-              A 60 imágenes por segundo el movimiento se ve más suave, pero el archivo pesa
-              bastante más y la exportación tarda lo mismo que dura el video.
+              A 60 fotografías por segundo el movimiento se percibe más fluido, aunque el archivo
+              resulta bastante más pesado y la exportación tarda lo mismo que dura el video.
             </p>
           )}
+
+          {/* ajustes avanzados: plegados por defecto. quien no los abra exporta con lo de arriba, igual
+              que siempre. dentro va el nivel de compresión, con la tasa de bits y el peso en vivo */}
+          <div className="mb-5 overflow-hidden rounded-xl" style={{ border: '1px solid rgb(var(--border) / 0.14)' }}>
+            <button
+              type="button"
+              onClick={() => setAvanzado((a) => !a)}
+              aria-expanded={avanzado}
+              className="flex w-full items-center justify-between gap-2 px-3.5 py-3 text-left text-[13px] font-semibold transition-colors hover:bg-[rgb(var(--border)/0.06)]"
+            >
+              <span>Ajustes avanzados</span>
+              <ChevronDown
+                size={18}
+                className="shrink-0 text-[color:var(--muted)] transition-transform duration-200"
+                style={{ transform: avanzado ? 'rotate(180deg)' : 'none' }}
+              />
+            </button>
+
+            {avanzado && (
+              <div className="border-t px-3.5 pb-4 pt-3.5" style={{ borderColor: 'rgb(var(--border) / 0.12)' }}>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-[13px] font-medium text-[color:var(--muted)]">
+                    Nivel de compresión
+                    <AyudaExport texto="El equilibrio entre la calidad de la imagen y el peso del archivo. A mayor compresión, menor tamaño. El nivel Original mantiene la calidad de tu video." />
+                  </span>
+                  <span className="text-[13px] font-semibold tabular-nums">
+                    {nombreCompresion(compresion)}{' '}
+                    <span className="text-[color:var(--muted)]">({compresion}%)</span>
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={10}
+                  max={100}
+                  step={5}
+                  value={compresion}
+                  onChange={(e) => setCompresion(Number(e.target.value))}
+                  className="w-full cursor-pointer"
+                  style={{ accentColor: '#1861ff' }}
+                />
+                {/* lectura en vivo: la tasa de bits y el peso cambian conforme se mueve el control, igual
+                    que en los compresores conocidos, para que se vea el efecto al instante */}
+                <div
+                  className="mt-3 flex flex-col gap-1.5 rounded-lg p-2.5 text-[12px]"
+                  style={{ background: 'rgb(var(--border) / 0.08)' }}
+                >
+                  <FilaInfo etiqueta="Tasa de bits" valor={formatearTasa(bitrateObjetivo)} />
+                  <FilaInfo
+                    etiqueta="Peso estimado"
+                    valor={bytesEstimados > 0 ? `≈ ${formatearBytes(bytesEstimados)}` : '—'}
+                  />
+                </div>
+                {compresion < 100 && (
+                  <p className="mt-2.5 text-[11.5px] leading-relaxed text-[color:var(--muted)]">
+                    Estás aplicando una compresión mayor que la original. El archivo pesará menos, aunque
+                    puede perder algo de calidad. Vuelve al nivel Original para conservarla por completo.
+                  </p>
+                )}
+
+                {/* formato de salida (contenedor) y códec del video. mp4/webm/mkv los arma el navegador;
+                    mov/avi/wmv/flv/3gp se convierten desde el mp4 con ffmpeg, así que no llevan elección
+                    de códec (el remux conserva el h264, salvo wmv que recomprime) */}
+                <div className="mt-4 border-t pt-3.5" style={{ borderColor: 'rgb(var(--border) / 0.1)' }}>
+                  <div className="mb-2 flex items-center gap-1.5">
+                    <span className="text-[13px] font-medium text-[color:var(--muted)]">Formato</span>
+                    <AyudaExport texto="El tipo de archivo en el que se guarda el video. MP4 es el más compatible y los demás sirven para usos o programas concretos." />
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {(['mp4', 'webm', 'mkv', ...FORMATOS_EXOTICOS] as (Contenedor | FormatoExotico)[]).map((f) => {
+                      const activo = formato === f
+                      return (
+                        <button
+                          key={f}
+                          onClick={() => setFormato(f)}
+                          className={[
+                            'rounded-lg border py-2 text-[12.5px] font-semibold transition-all duration-200',
+                            activo
+                              ? 'border-brand bg-brand text-white shadow-sm'
+                              : 'border-transparent text-[color:var(--muted)] hover:text-[color:var(--text)]',
+                          ].join(' ')}
+                          style={activo ? undefined : { background: 'rgb(var(--border) / 0.12)' }}
+                        >
+                          {f.toUpperCase()}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {/* el códec solo se elige en los formatos nativos; los exóticos van con h264 heredado */}
+                  {!exotico && (
+                    <>
+                      <div className="mb-2 mt-4 flex items-center gap-1.5">
+                        <span className="text-[13px] font-medium text-[color:var(--muted)]">Códec</span>
+                        <AyudaExport texto="El método con el que se comprime el video. H.264 es el más compatible y H.265 pesa menos con la misma calidad." />
+                      </div>
+                      <div className="flex gap-1 rounded-xl p-1" style={{ background: 'rgb(var(--border) / 0.12)' }}>
+                        {codecsDisponibles.map((c) => {
+                          const activo = codecReal === c
+                          const txt = c === 'h264' ? 'H.264' : c === 'h265' ? 'H.265' : 'VP9'
+                          return (
+                            <button
+                              key={c}
+                              onClick={() => setCodecVideo(c)}
+                              className={[
+                                'flex-1 rounded-lg py-2 text-[13px] font-semibold transition-all duration-200',
+                                activo ? 'bg-brand text-white shadow-sm' : 'text-[color:var(--muted)] hover:text-[color:var(--text)]',
+                              ].join(' ')}
+                            >
+                              {txt}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )}
+                  {!exotico && formato === 'webm' && (
+                    <p className="mt-2 text-[11.5px] leading-relaxed text-[color:var(--muted)]">
+                      WebM usa el códec VP9. Para elegir H.264 o H.265, cambia a MP4 o MKV.
+                    </p>
+                  )}
+                  {!exotico && !hevcOk && formato !== 'webm' && (
+                    <p className="mt-2 text-[11.5px] leading-relaxed text-[color:var(--muted)]">
+                      Este equipo no puede codificar H.265, así que por ahora solo está disponible H.264.
+                    </p>
+                  )}
+                  {exotico && (
+                    <p className="mt-3 text-[11.5px] leading-relaxed text-[color:var(--muted)]">
+                      {RECOMPRIME[formato as FormatoExotico]
+                        ? `${formatoTexto} recomprime el video a su propio códec, así que puede perder algo de calidad y tarda más.`
+                        : `${formatoTexto} se genera desde un MP4 sin recomprimir, así que conserva la misma calidad.`}{' '}
+                      La primera vez descarga una herramienta de conversión, por eso puede tardar un poco más.
+                    </p>
+                  )}
+                </div>
+
+                {/* mejoras que se aplican al cuadro antes de codificar. son opcionales: en 0 o apagadas
+                    no tocan nada */}
+                <div className="mt-4 border-t pt-3.5" style={{ borderColor: 'rgb(var(--border) / 0.1)' }}>
+                  <h4 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--muted)]">
+                    Mejoras
+                  </h4>
+                  <SliderMejora
+                    label="Nitidez"
+                    ayuda="Realza los bordes y los detalles para que la imagen se vea más definida."
+                    valor={nitidez}
+                    onChange={setNitidez}
+                  />
+                  <SliderMejora
+                    label="Reducir ruido"
+                    ayuda="Atenúa el grano que aparece en los videos grabados con poca luz o con la cámara de un teléfono."
+                    valor={ruido}
+                    onChange={setRuido}
+                  />
+                  <SliderMejora
+                    label="Grano de película"
+                    ayuda="Añade una textura fina, parecida a la del cine, para darle a la imagen un aspecto más natural."
+                    valor={grano}
+                    onChange={setGrano}
+                  />
+                  <SliderMejora
+                    label="Suavizar movimiento"
+                    ayuda="Suaviza el movimiento combinando cada imagen con la anterior para reducir la sensación de saltos."
+                    valor={suavizar}
+                    onChange={setSuavizar}
+                  />
+                  <div className="mt-1 flex flex-col gap-2.5">
+                    <ToggleMejora
+                      label="Desentrelazar"
+                      ayuda="Corrige el material antiguo, como el de cintas VHS o cámaras de años atrás, que muestra líneas horizontales al haber movimiento."
+                      activo={desentrelazar}
+                      onToggle={() => setDesentrelazar((v) => !v)}
+                    />
+                    <ToggleMejora
+                      label="Mejorar webcam"
+                      ayuda="Mejora integral para las grabaciones de cámara web. Reduce el ruido, aporta nitidez y aviva el color."
+                      activo={webcam}
+                      onToggle={() => setWebcam((v) => !v)}
+                    />
+                    <ToggleMejora
+                      label="Reducir ruido de audio"
+                      ayuda="Limpia el sonido, no la imagen. Elimina el zumbido y los ruidos de fondo para que la voz se escuche más clara."
+                      activo={audioRuido}
+                      onToggle={() => setAudioRuido((v) => !v)}
+                    />
+                    <ToggleMejora
+                      label="Aplicar solo a un tramo"
+                      ayuda="Aplica las mejoras de imagen solo a la parte del video que elijas, en lugar de a todo."
+                      activo={tramoActivo}
+                      onToggle={() => setTramoActivo((v) => !v)}
+                    />
+                  </div>
+
+                  {/* deslizadores del tramo: desde y hasta, en segundos. solo salen si el tramo está activo */}
+                  {tramoActivo && total > 0 && (
+                    <div className="mt-3 flex flex-col gap-3 rounded-lg p-2.5" style={{ background: 'rgb(var(--border) / 0.08)' }}>
+                      <div>
+                        <div className="mb-1 flex items-center justify-between text-[12px]">
+                          <span className="text-[color:var(--muted)]">Desde</span>
+                          <span className="font-semibold tabular-nums">{formatearDuracion(tramoInicio)}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={total}
+                          step={0.1}
+                          value={tramoInicio}
+                          onChange={(e) => setTramoInicio(Math.min(Number(e.target.value), tramoFin - 0.2))}
+                          className="w-full cursor-pointer"
+                          style={{ accentColor: '#1861ff' }}
+                        />
+                      </div>
+                      <div>
+                        <div className="mb-1 flex items-center justify-between text-[12px]">
+                          <span className="text-[color:var(--muted)]">Hasta</span>
+                          <span className="font-semibold tabular-nums">{formatearDuracion(tramoFin)}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={total}
+                          step={0.1}
+                          value={tramoFin}
+                          onChange={(e) => setTramoFin(Math.max(Number(e.target.value), tramoInicio + 0.2))}
+                          className="w-full cursor-pointer"
+                          style={{ accentColor: '#1861ff' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <p className="mb-5 text-xs leading-relaxed text-[color:var(--muted)]">
             El peso es una estimación a partir de la resolución y la duración; el tamaño real
             varía según el movimiento del video. Mantén esta pestaña activa mientras dura.
@@ -498,7 +943,7 @@ export default function ExportDialog() {
                 className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-3 py-2 text-sm font-medium outline-none transition-colors duration-150 hover:border-[rgb(var(--border)/0.45)] hover:bg-[rgb(var(--border)/0.06)] focus:border-brand focus:bg-[rgb(var(--border)/0.09)]"
               />
               <span className="shrink-0 text-sm font-semibold text-[color:var(--muted)]">
-                .{formatoSalida === 'MP4' ? 'mp4' : 'webm'}
+                .{formato}
               </span>
             </div>
           </div>
@@ -599,7 +1044,7 @@ export default function ExportDialog() {
                 <FilaInfo etiqueta="Resolución" valor={`${ancho} × ${alto}`} />
                 <FilaInfo etiqueta="Calidad" valor={`${calidad}p`} />
                 <FilaInfo etiqueta="Ritmo" valor={`${fps} fps`} />
-                <FilaInfo etiqueta="Formato" valor={formatoSalida} />
+                <FilaInfo etiqueta="Formato" valor={formatoTexto} />
                 <FilaInfo
                   etiqueta="Fotograma"
                   valor={`${Math.min(cuadrosTotales, Math.round(progreso * cuadrosTotales))} / ${cuadrosTotales}`}

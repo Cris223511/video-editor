@@ -6,6 +6,12 @@ import react from '@vitejs/plugin-react'
 // exportar el video sin perder calidad. conviene tenerlas activas desde ahora
 export default defineConfig({
   plugins: [react()],
+  // ffmpeg.wasm crea un worker interno usando import.meta.url; si Vite lo pre-bundlea, esa url apunta al
+  // archivo empaquetado y el worker no encuentra su propio código, así que la carga se cuelga sin avisar.
+  // dejándolo fuera de la optimización se sirve tal cual y el worker resuelve bien su ruta
+  optimizeDeps: {
+    exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
+  },
   server: {
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',

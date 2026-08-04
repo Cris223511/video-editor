@@ -150,11 +150,7 @@ export default function DemoColor() {
       </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <p className="text-[11px] leading-relaxed text-[color:var(--muted)]">
-          El cursor se oculta al arrastrar y el movimiento se afina. Con <b>Shift</b> afinas más y
-          con <b>doble clic</b> vuelve al centro.
-        </p>
+      <div className="mt-3 flex items-center justify-end gap-2">
         {tocada && (
           <button
             onClick={() => {

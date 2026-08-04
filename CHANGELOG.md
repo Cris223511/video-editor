@@ -4,6 +4,64 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.35.0 (2026-08-04)
+
+Una renovación completa de la ventana de exportación, con formatos y códecs nuevos, mejoras de imagen y
+de sonido, y varios detalles del editor.
+
+### Exportación
+
+- **La ventana de exportar se rediseñó, más ordenada y con más control.** La vista sencilla mantiene lo de
+  siempre (calidad y fotografías por segundo) y ahora hay un apartado plegable de ajustes avanzados para
+  quien quiera afinar el resultado, sin estorbar a quien solo busca exportar rápido.
+- **Las resoluciones se ofrecen según tu material.** En lugar de mostrar siempre las mismas opciones, solo
+  aparecen las que tu video de verdad puede dar, desde 144p hasta su tamaño original, con un tope en 1080p.
+  Así no se elige una resolución mayor que la del video, que no lo mejoraría.
+- **Nivel de compresión con tasa de bits y peso en vivo.** Un control regula el equilibrio entre la calidad
+  y el tamaño del archivo, y al moverlo se ven al instante la tasa de bits y el peso estimado. En el nivel
+  Original el video conserva la misma calidad que tu material.
+- **Una ayuda en cada opción.** Cada ajuste lleva un signo de interrogación que, al pasar el cursor,
+  explica en pocas palabras para qué sirve.
+
+### Formatos y códecs
+
+- **WebM y MKV además de MP4.** Ya se puede elegir entre tres envases, cada uno con sus ventajas, y todos
+  se generan dentro del navegador.
+- **Elección de códec H.264 o H.265.** H.264 es el más compatible y H.265 pesa bastante menos con la misma
+  calidad. La opción de H.265 aparece cuando el equipo puede generarlo.
+- **Más formatos: MOV, AVI, WMV, FLV y 3GP.** Para casos concretos o equipos y programas más antiguos.
+  Estos se preparan a partir del MP4, así que la primera vez se descarga una herramienta de conversión y el
+  proceso tarda un poco más.
+
+### Mejoras de imagen y de sonido
+
+- **Nitidez, reducir ruido, grano de película y suavizar movimiento.** Ajustes graduables para dar más
+  definición a la imagen, limpiar el granulado de las grabaciones con poca luz, añadir una textura tipo
+  cine o hacer el movimiento más continuo.
+- **Desentrelazar y mejorar webcam.** El primero corrige el material antiguo que muestra líneas al moverse;
+  el segundo aplica de una sola vez una limpieza pensada para las grabaciones de cámara web.
+- **Reducir ruido de audio.** Limpia el sonido y elimina zumbidos y ruidos de fondo para que la voz se
+  escuche más clara.
+- **Aplicar solo a un tramo.** Permite aplicar las mejoras de imagen únicamente a la parte del video que
+  elijas, en lugar de a toda su duración.
+
+### Editor y proyectos
+
+- **El clip seleccionado se resalta en la biblioteca de medios.** Al seleccionar un clip en la línea de
+  tiempo, su archivo se resalta en el panel de medios y la lista se desplaza suavemente hasta él, para
+  saber de un vistazo de dónde salió.
+- **Doble clic para salir del zoom del visor.** Estando acercado, un doble clic devuelve la imagen al
+  tamaño que encaja, igual que la lupa.
+- **La resolución aparece en las fichas.** Tanto en el detalle de un archivo como en el de un proyecto se
+  muestra la resolución en su forma reconocible (720p, 1080p), además de las medidas en píxeles.
+- **El detalle de un archivo se abre sobre el del proyecto.** Al pulsar un archivo dentro de un proyecto se
+  abre su ficha completa, con vista previa incluida, por encima del proyecto y sin cerrarlo.
+
+### Sitio
+
+- **Textos de la portada y de las preguntas frecuentes revisados.** Se reescribieron para que expliquen
+  mejor cada sección, de forma más clara y directa, y las preguntas frecuentes quedaron más completas.
+
 ## 2.34.5 (2026-07-31)
 
 - **El progreso de exportación dice qué paso va.** En lugar de un genérico "Exportando", el título

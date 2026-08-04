@@ -6,7 +6,10 @@ import { montarDefsColor } from './defsColor'
 import { demuxVideo, VideoDemux } from './demux'
 import { FuenteDecodificada } from './fuente'
 import { EscritorVideo } from './muxRapido'
+import { EscritorMedios } from './muxMedios'
 import { mezclarAudio } from './audioOffline'
+import { hayFiltrosExport, montarFiltrosExport, fuerzaSuavizado, dentroDelTramo } from './filtrosExport'
+import { reducirRuidoAudio } from './ruidoAudio'
 import { Clip } from '../../types/timeline'
 
 function cargarImagen(src: string): Promise<HTMLImageElement> {
@@ -56,12 +59,16 @@ export function exportarRapido(
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('No se pudo preparar el lienzo.')
   const off = document.createElement('canvas')
+  // lienzo aparte para las pasadas de mejoras, para no pisar el que usa el compositor
+  const offFx = document.createElement('canvas')
+  const fx = hayFiltrosExport(datos.filtros) ? montarFiltrosExport(datos.filtros!) : null
 
   const defs = montarDefsColor(clips, datos.capas)
   const fuentes = new Map<string, FuenteDecodificada>()
   const limpiar = () => {
     defs.quitar()
     fuentes.forEach((f) => f.cerrar())
+    fx?.quitar()
   }
 
   try {
@@ -132,6 +139,7 @@ export function exportarRapido(
           await fu0.irAlSegundo(clip0.recorteInicio)
           defs.refrescar(0)
           dibujarFotograma(ctx, escena(), 0, videoDe, imagenDe, off)
+          fx?.aplicar(ctx, canvas, offFx)
         }
       }
     } catch {
@@ -144,16 +152,34 @@ export function exportarRapido(
     // se mezcla todo el audio del proyecto en un solo buffer (rápido, con
     // OfflineAudioContext) antes de armar el escritor, que necesita saber si hay pista de
     // sonido para configurar el muxer
-    const mezclaAudio = await mezclarAudio(datos, total)
+    let mezclaAudio = await mezclarAudio(datos, total)
+    // si se pidió reducir el ruido del audio, se pasa la mezcla por RNNoise antes de codificarla. la
+    // librería se carga solo aquí (import dinámico), así que no pesa nada si no se usa la mejora
+    if (datos.filtros?.audioRuido && mezclaAudio) {
+      onProgreso(0.97, 'Limpiando el audio…')
+      mezclaAudio = await reducirRuidoAudio(mezclaAudio)
+    }
     // bitrate objetivo igualado a la fuente (viene calculado desde el diálogo); si no llega, se cae a
     // una densidad por resolución. así el video sale con la misma calidad que el material original
-    const escritor = await EscritorVideo.crear(
-      ancho,
-      alto,
-      fps,
-      datos.bitrateObjetivo ?? bitrateVideo(ancho, alto, fps),
-      mezclaAudio ? { sampleRate: mezclaAudio.sampleRate, canales: mezclaAudio.numberOfChannels } : null,
-    )
+    const bitrate = datos.bitrateObjetivo ?? bitrateVideo(ancho, alto, fps)
+    const infoAudio = mezclaAudio
+      ? { sampleRate: mezclaAudio.sampleRate, canales: mezclaAudio.numberOfChannels }
+      : null
+    // el mp4 con h264 sigue por el escritor de siempre (mp4-muxer), sin tocar nada. cualquier otro
+    // contenedor (webm, mkv) o códec (h265, vp9) lo arma mediabunny, que comparte la misma interfaz
+    const contenedor = datos.formato ?? 'mp4'
+    const codec = datos.codecVideo ?? 'h264'
+    const usarMediabunny = contenedor !== 'mp4' || codec !== 'h264'
+    const escritor = usarMediabunny
+      ? await EscritorMedios.crear(canvas, ancho, alto, fps, bitrate, contenedor, codec, infoAudio)
+      : await EscritorVideo.crear(ancho, alto, fps, bitrate, infoAudio)
+
+    // suavizado de movimiento: mezcla temporal. se guarda el cuadro anterior (ya terminado) y se pinta
+    // una fracción sobre el actual, lo que deja una estela suave que reduce el salto entre cuadros
+    const suav = fuerzaSuavizado(datos.filtros?.suavizar ?? 0)
+    const frameAnterior = suav > 0 ? document.createElement('canvas') : null
+    const antCtx = frameAnterior?.getContext('2d') ?? null
+    let hayAnterior = false
 
     const totalFrames = Math.max(1, Math.round(total * fps))
     for (let f = 0; f < totalFrames; f++) {
@@ -183,6 +209,25 @@ export function exportarRapido(
 
       defs.refrescar(t)
       dibujarFotograma(ctx, escena(), t, videoDe, imagenDe, off)
+      // las mejoras de imagen solo se aplican si el instante cae dentro del tramo elegido (o siempre, si
+      // no se acotó ninguno)
+      if (dentroDelTramo(datos.filtros?.tramo, t)) {
+        // mejoras sobre el cuadro ya compuesto (nitidez, etc.), antes de codificar
+        fx?.aplicar(ctx, canvas, offFx)
+        // mezcla temporal para suavizar el movimiento: una parte del cuadro anterior sobre el actual
+        if (frameAnterior && antCtx) {
+          if (hayAnterior) {
+            ctx.globalAlpha = suav
+            ctx.drawImage(frameAnterior, 0, 0)
+            ctx.globalAlpha = 1
+          }
+          if (frameAnterior.width !== canvas.width) frameAnterior.width = canvas.width
+          if (frameAnterior.height !== canvas.height) frameAnterior.height = canvas.height
+          antCtx.clearRect(0, 0, frameAnterior.width, frameAnterior.height)
+          antCtx.drawImage(canvas, 0, 0)
+          hayAnterior = true
+        }
+      }
       await escritor.agregar(canvas, (f / fps) * 1_000_000)
       onProgreso(
         Math.min(0.97, f / totalFrames),
