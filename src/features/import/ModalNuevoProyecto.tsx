@@ -3,7 +3,9 @@ import { Reorder, useDragControls } from 'framer-motion'
 import { GripVertical, Trash2, Plus, Music, Image as ImageIcon, Film } from 'lucide-react'
 import Modal from '../../components/ui/Modal'
 import { useProjectStore } from '../../store/useProjectStore'
+import { useEditorStore } from '../../store/useEditorStore'
 import { MediaAsset } from '../../types/media'
+import { sinExtensionMedia } from '../../lib/proyecto/nombre'
 import { useImportarMedios } from './useImportarMedios'
 
 // quita la extensión del nombre del archivo para armar el nombre del proyecto: "clip.mp4" -> "clip"
@@ -80,7 +82,19 @@ export default function ModalNuevoProyecto({
   const medios = useProjectStore((s) => s.medios)
   const reordenarMedios = useProjectStore((s) => s.reordenarMedios)
   const quitar = useProjectStore((s) => s.quitar)
+  const pedirConfirmacion = useEditorStore((s) => s.pedirConfirmacion)
   const { procesar } = useImportarMedios()
+
+  // cerrar con la X, tocando fuera o con Cancelar no descarta de una: primero pregunta con el modal
+  // de confirmación reutilizable, para no perder los medios traídos por un clic sin querer
+  const pedirCerrar = () => {
+    pedirConfirmacion({
+      titulo: 'Descartar el proyecto nuevo',
+      mensaje: 'Se descartarán los medios que trajiste. Podrás volver a subirlos cuando quieras.',
+      aceptar: 'Descartar',
+      onAceptar: onCancelar,
+    })
+  }
 
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
@@ -111,14 +125,15 @@ export default function ModalNuevoProyecto({
   }, [primerId])
 
   const continuar = () => {
-    const limpio = nombre.trim() || 'Proyecto sin título'
+    // al continuar se quita la extensión que haya quedado pegada al final (".mp4", etc.)
+    const limpio = sinExtensionMedia(nombre.trim()) || 'Proyecto sin título'
     useProjectStore.getState().renombrar(limpio)
     useProjectStore.getState().setDescripcion(descripcion.trim())
     onContinuar()
   }
 
   return (
-    <Modal titulo="Tu nuevo proyecto" abierto={abierto} onCerrar={onCancelar} ancho="max-w-lg">
+    <Modal titulo="Tu nuevo proyecto" abierto={abierto} onCerrar={pedirCerrar} ancho="max-w-lg">
       <label className="mb-2 block text-[13px] font-medium text-[color:var(--muted)]">
         Nombre del proyecto:
         <span className="ml-0.5 font-semibold" style={{ color: 'rgb(var(--alerta))' }} title="Obligatorio">
@@ -159,7 +174,7 @@ export default function ModalNuevoProyecto({
         <span className="text-[13px] font-medium text-[color:var(--muted)]">
           Medios ({medios.length})
         </span>
-        <span className="text-[11px] text-[color:var(--muted)]">El primero le da el nombre al proyecto.</span>
+        <span className="text-[11px] text-[color:var(--muted)]">El primer video da el nombre.</span>
       </div>
       {/* lista reordenable: arrastrando el asa se cambia el orden con animación suave. quitar uno lo
           saca del proyecto; agregar abre el selector para sumar más */}
@@ -190,9 +205,11 @@ export default function ModalNuevoProyecto({
       </button>
 
       <div className="mt-6 flex justify-end gap-2">
+        {/* cancelar en rojo, con el mismo diseño de acción de cierre del resto de la app */}
         <button
-          onClick={onCancelar}
-          className="rounded-xl px-4 py-2 text-sm font-medium text-[color:var(--muted)] transition-colors hover:text-[color:var(--text)]"
+          onClick={pedirCerrar}
+          className="rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0"
+          style={{ background: 'rgb(var(--alerta))' }}
         >
           Cancelar
         </button>

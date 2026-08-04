@@ -21,6 +21,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         richColors
         closeButton
         duration={4000}
+        // por encima de TODO, incluidos los modales (su overlay va en z-50): así un aviso nunca
+        // queda tapado por una ventana y su botón de cerrar siempre se puede tocar
+        style={{ zIndex: 100000 }}
         // hasta cinco a la vez. los que lleguen de más esperan su turno y
         // aparecen conforme se cierran los anteriores, que es lo que hace Sonner
         // por su cuenta con este límite

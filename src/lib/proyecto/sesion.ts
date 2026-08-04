@@ -1,6 +1,7 @@
 import { useEditorStore } from '../../store/useEditorStore'
 import { useProjectStore, CLAVE_SESION } from '../../store/useProjectStore'
 import { guardarProyecto, leerProyecto } from './almacen'
+import { sinExtensionMedia } from './nombre'
 import { clipEnTiempo, duracionTotal } from '../timeline/clips'
 import { frameDeVideo } from '../media/probeVideo'
 import { frameCompuesto } from '../export/portada'
@@ -96,7 +97,8 @@ export function capturarProyecto(id: string, creado: number, portada: string): P
   return {
     version: VERSION_FORMATO,
     id,
-    titulo: pr.titulo,
+    // al guardar se quita la extensión que haya quedado pegada al final del nombre (".mp4", etc.)
+    titulo: sinExtensionMedia(pr.titulo),
     descripcion: pr.descripcion || undefined,
     creado,
     modificado: Date.now(),

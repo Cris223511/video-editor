@@ -10,6 +10,7 @@ import { formatearBytes } from '../../lib/format/bytes'
 import { exportarProyecto, ControlExport, elegirMime, bitrateSegunMedios, DatosExport, OnProgreso } from '../../lib/export/exportar'
 import { exportarRapido } from '../../lib/export/exportarRapido'
 import { haiWebCodecs } from '../../lib/export/decode'
+import { sinExtensionMedia } from '../../lib/proyecto/nombre'
 
 type Fase = 'inicio' | 'exportando' | 'listo' | 'error'
 
@@ -64,7 +65,7 @@ function FilaInfo({ etiqueta, valor }: { etiqueta: string; valor: string }) {
 // las tildes y todo lo que no sea letra, número, espacio o guion, y los espacios pasan a guiones.
 // si queda vacío se cae a un nombre por defecto para no descargar un archivo sin nombre
 function limpiarNombre(titulo: string): string {
-  const base = titulo
+  const base = sinExtensionMedia(titulo)
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-zA-Z0-9 _-]/g, '')

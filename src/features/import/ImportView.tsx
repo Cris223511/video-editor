@@ -2,7 +2,9 @@ import { useState } from 'react'
 import Dropzone from './Dropzone'
 import { useImportarMedios } from './useImportarMedios'
 import ModalNuevoProyecto from './ModalNuevoProyecto'
+import ConfirmacionGlobal from '../editor/ConfirmacionGlobal'
 import { useProjectStore } from '../../store/useProjectStore'
+import { nuevoProyecto } from '../../lib/proyecto/sesion'
 import { Link, useNavigate } from 'react-router-dom'
 import { FolderOpen } from 'lucide-react'
 import Loader from '../../components/ui/Loader'
@@ -27,12 +29,16 @@ export default function ImportView() {
   // apaga recién cuando el visor ya tiene el video cargado. así, con un archivo
   // pesado, no se ve el editor montándose a medias ni el aviso antes de tiempo
   async function alImportar(files: FileList) {
-    const antes = useProjectStore.getState().medios.length
+    // /medios ARRANCA un proyecto nuevo: se estrena una identidad limpia y en memoria antes de traer
+    // los medios. sin esto, la importación caía sobre el proyecto de la sesión anterior, y al entrar
+    // al editor se recargaba ese proyecto guardado (descartando lo recién subido). así cada creación
+    // es su propio proyecto, y como queda en memoria, entrar a él no lo recarga del almacén
+    nuevoProyecto()
     useProjectStore.setState({ preparando: true })
     await procesar(files)
     const despues = useProjectStore.getState().medios.length
     useProjectStore.setState({ preparando: false })
-    if (despues > antes) {
+    if (despues > 0) {
       // en vez de entrar directo al editor, primero se confirma el nombre y los medios en el modal
       setModalNuevo(true)
     }
@@ -56,6 +62,9 @@ export default function ImportView() {
     <>
     {preparando && <Loader texto="Preparando tu proyecto..." />}
     <ModalNuevoProyecto abierto={modalNuevo} onContinuar={alContinuar} onCancelar={alCancelar} />
+    {/* la confirmación reutilizable también tiene que vivir aquí: sin ella, cerrar el modal de proyecto
+        nuevo desde /medios no mostraba nada, porque solo estaba montada dentro del editor */}
+    <ConfirmacionGlobal />
     <div className={`mx-auto w-full ${ANCHO_CONTENIDO} ${RELLENO} py-10 sm:py-14`}>
       <div className="mb-8">
         <h1 className="font-display text-titulo-lg">Empieza tu proyecto</h1>
