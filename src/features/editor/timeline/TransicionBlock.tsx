@@ -24,6 +24,7 @@ export default function TransicionBlock({
   const setTransicionSalida = useEditorStore((s) => s.setTransicionSalida)
   const seleccionar = useEditorStore((s) => s.seleccionar)
   const setHerramienta = useEditorStore((s) => s.setHerramienta)
+  const setLadoTransicion = useEditorStore((s) => s.setLadoTransicion)
   const esSalida = lado === 'salida'
   const tr = esSalida ? clip.transicionSalida : clip.transicion
   const tipo = tr?.tipo ?? 'ninguna'
@@ -83,9 +84,11 @@ export default function TransicionBlock({
   function estirar(e: ReactPointerEvent) {
     e.stopPropagation()
     e.preventDefault()
-    // al agarrar el tirador se selecciona el clip y se abre el panel de transiciones, aunque sea con shift
+    // al agarrar el tirador se selecciona el clip y se abre el panel de transiciones, aunque sea con shift.
+    // además se le dice al panel qué lado se tocó (inicio o final), para que resalte esa misma
     seleccionar(clip.id)
     setHerramienta('transiciones')
+    setLadoTransicion(esSalida ? 'final' : 'inicio')
     const inicioX = e.clientX
     const original = duracion
 

@@ -298,9 +298,11 @@ export function Transiciones() {
   const clips = useEditorStore((s) => s.pista.clips)
   const setTransicion = useEditorStore((s) => s.setTransicion)
   const setTransicionSalida = useEditorStore((s) => s.setTransicionSalida)
-  // pestaña activa: se pone una sola transición a la vez (al inicio o al final del clip), en
-  // lugar de dos galerías apiladas, que confundían
-  const [lado, setLado] = useState<'inicio' | 'final'>('inicio')
+  // pestaña activa: se pone una sola transición a la vez (al inicio o al final del clip), en lugar de dos
+  // galerías apiladas. vive en el store para que, al agarrar una cuña en la línea de tiempo, el panel
+  // resalte el lado que de verdad se tocó y no el que quedó de la última vez
+  const lado = useEditorStore((s) => s.ladoTransicion)
+  const setLado = useEditorStore((s) => s.setLadoTransicion)
 
   const clip = clips.find((c) => c.id === clipSeleccionado) ?? null
 

@@ -4,6 +4,12 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.35.1 (2026-08-04)
+
+- **La transición que se resalta es la que agarras.** Al tomar la transición del inicio de un clip, el
+  panel de la derecha marca "Al inicio", y al tomar la del final marca "Al final". Antes podía quedar
+  resaltado el lado contrario, el que se hubiera usado la última vez.
+
 ## 2.35.0 (2026-08-04)
 
 Una renovación completa de la ventana de exportación, con formatos y códecs nuevos, mejoras de imagen y

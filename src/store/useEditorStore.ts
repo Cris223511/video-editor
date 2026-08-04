@@ -164,6 +164,9 @@ interface EstadoEditor {
   clipSeleccionado: string | null
   capaSeleccionada: string | null
   regionSeleccionada: string | null
+  // lado de la transición que el panel de transiciones muestra activo (inicio o final del clip). se
+  // sincroniza al agarrar una cuña en la línea de tiempo, para que se resalte la que de verdad se tocó
+  ladoTransicion: 'inicio' | 'final'
   herramienta: Herramienta
   // categoría abierta del panel contextual de la derecha. es de vista, no del
   // documento, pero vive en el store para que los overlays del visor (el recuadro
@@ -607,6 +610,7 @@ interface EstadoEditor {
   quitarUsosDeAsset: (assetId: string, url: string) => void
 
   setHerramienta: (h: Herramienta) => void
+  setLadoTransicion: (lado: 'inicio' | 'final') => void
   setLienzo: (ancho: number, alto: number) => void
   setLienzoAuto: () => void
   setColorFondo: (color: string) => void
@@ -1163,6 +1167,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   filaAudioResaltada: null,
   filaTextoResaltada: null,
   regionSeleccionada: null,
+  ladoTransicion: 'inicio',
   impactos: [],
   impactoSeleccionado: null,
   herramienta: 'proyecto',
@@ -3671,6 +3676,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       // gobernarse por la herramienta o la categoría elegida
       recorteRapido: false,
     })),
+
+  setLadoTransicion: (lado) => set({ ladoTransicion: lado }),
 
   setLienzo: (ancho, alto) =>
     set((s) => {
