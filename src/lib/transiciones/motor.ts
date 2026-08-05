@@ -139,11 +139,18 @@ export function desplazamiento(
   }
 }
 
-// escala de cada plano en las transiciones de acercar y alejar
-export function escalas(acercar: boolean, p: number): { entrante: number; saliente: number } {
+// escala de cada plano en las transiciones de acercar y alejar. la fuerza (0 a 1) regula
+// cuánto crece o encoge: en 0 casi no se mueve y en 1 el salto es marcado. sin definir manda
+// un valor medio que reproduce el comportamiento de siempre
+export function escalas(
+  acercar: boolean,
+  p: number,
+  fuerza = 0.6,
+): { entrante: number; saliente: number } {
+  const d = 0.66 * fuerza // distancia desde 1 a la que arranca el plano que entra
   return acercar
-    ? { entrante: 0.6 + 0.4 * p, saliente: 1 + 0.25 * p }
-    : { entrante: 1.35 - 0.35 * p, saliente: 1 - 0.2 * p }
+    ? { entrante: 1 - d + d * p, saliente: 1 + 0.6 * d * p }
+    : { entrante: 1 + d - d * p, saliente: 1 - 0.5 * d * p }
 }
 
 // opacidad de cada plano según la técnica. el negro y el blanco no mezclan los

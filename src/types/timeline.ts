@@ -125,6 +125,13 @@ export interface Transicion {
   // dirección del barrido en el desenfoque de movimiento (whip): hacia dónde se va la
   // estela. sin definir manda la de la entrada del catálogo. solo la mira esa transición
   direccion?: 'izq' | 'der' | 'arr' | 'aba'
+  // fuerza del efecto, de 0 a 1. la miran el desenfoque de movimiento (largo de la estela y
+  // cantidad de borrón) y el golpe de zoom (cuánto se acerca la cámara). sin definir manda un
+  // valor intermedio propio de cada una
+  intensidad?: number
+  // cuánto se acerca la imagen durante el desenfoque de movimiento, de 0 a 1. en cero no hay
+  // acercamiento: la estela corre sin agrandar el plano. solo la mira esa transición
+  acercamiento?: number
 }
 
 // modelo de la línea de tiempo. un clip apunta a un medio importado y define

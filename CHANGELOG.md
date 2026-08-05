@@ -4,6 +4,21 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.36.0 (2026-08-05)
+
+- **Cada transición se puede ajustar a mano.** Al elegir una transición, sus controles salen en la misma
+  tarjeta donde está la duración, sin bajar a buscarlos. Cada una muestra solo lo que le sirve: los barridos
+  y las formas (círculo, rombo, persianas, puertas, diagonal) llevan un control de suavidad del borde, para
+  pasar de un corte duro a un degradado ancho; acercar y alejar regulan cuánto crece o encoge la imagen; el
+  desenfoque y el destello ajustan la fuerza del borrón; el flash de luz y el de cámara, la fuerza del
+  fogonazo; y el golpe de zoom, el tamaño del acercón.
+- **El desenfoque de movimiento se controla mejor y ya no acerca solo.** Antes agrandaba la imagen por su
+  cuenta para tapar los bordes; eso se quitó. Ahora tiene tres ajustes: la dirección del barrido, la
+  intensidad del borrón y un acercamiento aparte que arranca en cero, para que solo acerque si tú lo pides.
+- **El borrón del desenfoque de movimiento quedó parejo.** Con mucha intensidad se veía nítido de un lado y
+  borroso del otro, porque la estela se corría hacia un costado. Ahora el desenfoque es igual en los dos
+  extremos, tanto con poca intensidad como con mucha.
+
 ## 2.35.3 (2026-08-04)
 
 - **Al juntar dos clips, su transición se comparte.** Si un clip tenía una transición al final y le pegas

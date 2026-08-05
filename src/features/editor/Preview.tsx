@@ -1542,11 +1542,11 @@ export default function Preview() {
   const ladoMenor = Math.min(lienzoRect.w, lienzoRect.h)
   const entGlobal =
     activo && !anteriorAct && pTrans < 1 && esTransicionGlobal(tecnicaActual)
-      ? efectoGlobalTrans(tecnicaActual, pTrans, true, ladoMenor)
+      ? efectoGlobalTrans(tecnicaActual, pTrans, true, ladoMenor, activo.transicion?.intensidad)
       : null
   const salGlobal =
     activo && !posteriorAct && qTrans < 1 && esTransicionGlobal(tecSal)
-      ? efectoGlobalTrans(tecSal, qTrans, false, ladoMenor)
+      ? efectoGlobalTrans(tecSal, qTrans, false, ladoMenor, activo.transicionSalida?.intensidad)
       : null
   const veloEnt = entGlobal?.veloOpacidad ?? 0
   const veloSal = salGlobal?.veloOpacidad ?? 0

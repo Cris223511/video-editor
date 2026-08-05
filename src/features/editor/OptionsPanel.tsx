@@ -63,6 +63,89 @@ function DireccionBarrido({
   )
 }
 
+// tope del suavizado del borde en las máscaras, como fracción del lado menor. 0.2 ya es un
+// degradado muy ancho, así que el 100 % del deslizador equivale a ese valor
+const MAX_SUAVIZADO = 0.2
+
+// etiqueta de la intensidad según la transición: no significa lo mismo un acercón que un fogonazo
+function rotuloIntensidad(tecnica: string): string | null {
+  switch (tecnica) {
+    case 'barrido-movimiento':
+    case 'desenfoque':
+    case 'resplandor':
+      return 'Intensidad del desenfoque'
+    case 'flash':
+    case 'flash-camara':
+      return 'Intensidad del fogonazo'
+    case 'escala':
+      return 'Intensidad del acercamiento'
+    case 'zoom-desenfoque':
+      return 'Tamaño del acercamiento'
+    default:
+      return null
+  }
+}
+
+// todos los ajustes que admite una transición, juntos. cada transición muestra solo lo que le
+// aplica: dirección del barrido, fuerza del efecto, acercamiento del desenfoque de movimiento y
+// suavidad del borde en los barridos y formas con máscara. las que no tienen nada configurable
+// (corte, fundidos, empujes) no pintan controles
+function ControlesTransicion({
+  tipo,
+  intensidad,
+  acercamiento,
+  grosor,
+  direccion,
+  onCambio,
+}: {
+  tipo: TipoTransicion
+  intensidad?: number
+  acercamiento?: number
+  grosor?: number
+  direccion?: Dir
+  onCambio: (c: { intensidad?: number; acercamiento?: number; grosor?: number; direccion?: Dir }) => void
+}) {
+  const def = buscarTransicion(tipo)
+  const tecnica = def.tecnica
+  const esBarrido = tecnica === 'barrido-movimiento'
+  const esMascara = tecnica === 'mascara'
+  const rotulo = rotuloIntensidad(tecnica)
+  const inten = intensidad ?? 0.6
+  const acerc = acercamiento ?? 0
+  // el borde suave arranca en el valor que trae la transición del catálogo, para no cambiar de golpe
+  // el aspecto de una máscara que ya se veía bien
+  const suave = grosor ?? def.suavizado ?? 0
+
+  if (!rotulo && !esMascara && !esBarrido) return null
+  return (
+    <div className="flex flex-col gap-2.5 pt-0.5" onClick={(e) => e.stopPropagation()}>
+      {esBarrido && (
+        <DireccionBarrido tipo={tipo} direccion={direccion} onDir={(d) => onCambio({ direccion: d })} />
+      )}
+      {rotulo && (
+        <Campo etiqueta={`${rotulo} (${Math.round(inten * 100)} %)`}>
+          <Deslizador valor={Math.round(inten * 100)} min={0} max={100} onChange={(v) => onCambio({ intensidad: v / 100 })} />
+        </Campo>
+      )}
+      {esBarrido && (
+        <Campo etiqueta={`Acercamiento (${Math.round(acerc * 100)} %)`}>
+          <Deslizador valor={Math.round(acerc * 100)} min={0} max={100} onChange={(v) => onCambio({ acercamiento: v / 100 })} />
+        </Campo>
+      )}
+      {esMascara && (
+        <Campo etiqueta={`Suavidad del borde (${Math.round((suave / MAX_SUAVIZADO) * 100)} %)`}>
+          <Deslizador
+            valor={Math.round((suave / MAX_SUAVIZADO) * 100)}
+            min={0}
+            max={100}
+            onChange={(v) => onCambio({ grosor: (v / 100) * MAX_SUAVIZADO })}
+          />
+        </Campo>
+      )}
+    </div>
+  )
+}
+
 function TransicionCapa() {
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const capas = useEditorStore((s) => s.capas)
@@ -73,19 +156,21 @@ function TransicionCapa() {
 
   const trans: Transicion = capa.transicion ?? { tipo: 'ninguna', duracion: 0.5 }
   const salida: Transicion = capa.transicionSalida ?? { tipo: 'ninguna', duracion: 0.5 }
-  type Cambios = { tipo?: TipoTransicion; duracion?: number; direccion?: Dir }
+  type Cambios = { tipo?: TipoTransicion; duracion?: number; direccion?: Dir; intensidad?: number; acercamiento?: number }
   const activo =
     lado === 'inicio'
       ? {
           trans,
           // se reconstruye el objeto entero, así que hay que arrastrar también la dirección del
-          // barrido para no perderla al cambiar la duración u otra cosa
+          // barrido y los ajustes de intensidad y acercamiento para no perderlos al cambiar otra cosa
           poner: (c: Cambios) =>
             actualizarCapa(capa.id, {
               transicion: {
                 tipo: c.tipo ?? trans.tipo,
                 duracion: c.duracion ?? trans.duracion,
                 direccion: c.direccion ?? trans.direccion,
+                intensidad: c.intensidad ?? trans.intensidad,
+                acercamiento: c.acercamiento ?? trans.acercamiento,
               },
             }),
           ayuda: 'Cómo aparece este elemento cuando llega su turno en la línea de tiempo.',
@@ -98,6 +183,8 @@ function TransicionCapa() {
                 tipo: c.tipo ?? salida.tipo,
                 duracion: c.duracion ?? salida.duracion,
                 direccion: c.direccion ?? salida.direccion,
+                intensidad: c.intensidad ?? salida.intensidad,
+                acercamiento: c.acercamiento ?? salida.acercamiento,
               },
             }),
           ayuda: 'Cómo se va este elemento al final de su tramo.',
@@ -188,6 +275,8 @@ function ResumenTransicionesClip({
     nombre: string
     dur: number
     maxSeg: number
+    trans: Transicion
+    poner: (c: Partial<Transicion>) => void
     setDur: (d: number) => void
     quitar: () => void
   }[] = []
@@ -201,6 +290,8 @@ function ResumenTransicionesClip({
       maxSeg: antPegado && ant
         ? Math.min(10, Math.min(clip.duracion, ant.duracion))
         : Math.min(10, clip.duracion - (real(clip.transicionSalida?.tipo) ? clip.transicionSalida!.duracion : 0)),
+      trans: clip.transicion,
+      poner: (c) => setTransicion(clip.id, c),
       setDur: (d) => setTransicion(clip.id, { duracion: d }),
       quitar: () => setTransicion(clip.id, { tipo: 'ninguna' }),
     })
@@ -213,6 +304,8 @@ function ResumenTransicionesClip({
       nombre: buscarTransicion(sig.transicion.tipo).nombre,
       dur: sig.transicion.duracion,
       maxSeg: Math.min(10, Math.min(clip.duracion, sig.duracion)),
+      trans: sig.transicion,
+      poner: (c) => setTransicion(sig.id, c),
       setDur: (d) => setTransicion(sig.id, { duracion: d }),
       quitar: () => setTransicion(sig.id, { tipo: 'ninguna' }),
     })
@@ -225,6 +318,8 @@ function ResumenTransicionesClip({
       nombre: buscarTransicion(clip.transicionSalida!.tipo).nombre,
       dur: clip.transicionSalida!.duracion,
       maxSeg: Math.min(10, clip.duracion - (real(clip.transicion.tipo) ? clip.transicion.duracion : 0)),
+      trans: clip.transicionSalida!,
+      poner: (c) => setTransicionSalida(clip.id, c),
       setDur: (d) => setTransicionSalida(clip.id, { duracion: d }),
       quitar: () => setTransicionSalida(clip.id, { tipo: 'ninguna' }),
     })
@@ -283,6 +378,16 @@ function ResumenTransicionesClip({
                     onChange={(v) => it.setDur(v / 10)}
                   />
                 </div>
+                {/* el resto de ajustes de ESTA transición, aquí mismo bajo su duración: intensidad,
+                    acercamiento, dirección o suavidad del borde, según lo que admita cada una */}
+                <ControlesTransicion
+                  tipo={it.trans.tipo}
+                  intensidad={it.trans.intensidad}
+                  acercamiento={it.trans.acercamiento}
+                  grosor={it.trans.grosor}
+                  direccion={it.trans.direccion}
+                  onCambio={it.poner}
+                />
               </div>
             )
           })}
@@ -345,7 +450,7 @@ export function Transiciones() {
   const sig = posterior(clip, clips)
   const sigPegado = !!sig && Math.abs(sig.inicio - (clip.inicio + clip.duracion)) < 0.05
 
-  type Cambios = { tipo?: TipoTransicion; duracion?: number; direccion?: Dir }
+  type Cambios = { tipo?: TipoTransicion; duracion?: number; direccion?: Dir; intensidad?: number; acercamiento?: number }
   const finTrans: Transicion = sigPegado && sig ? sig.transicion : clip.transicionSalida ?? { tipo: 'ninguna', duracion: 0.5 }
   const setFin = (cambios: Cambios) => {
     if (sigPegado && sig) setTransicion(sig.id, cambios)
@@ -393,13 +498,6 @@ export function Transiciones() {
         </div>
         <p className="text-[13px] leading-relaxed text-[color:var(--muted)]">{activo.ayuda}</p>
         <GaleriaTransiciones actual={activo.trans.tipo} onElegir={(t) => activo.poner({ tipo: t })} />
-        {activo.trans.tipo !== 'ninguna' && activo.trans.tipo !== 'corte' && (
-          <DireccionBarrido
-            tipo={activo.trans.tipo}
-            direccion={activo.trans.direccion}
-            onDir={(d) => activo.poner({ direccion: d })}
-          />
-        )}
       </div>
     </div>
   )

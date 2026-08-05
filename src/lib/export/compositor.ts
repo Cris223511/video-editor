@@ -674,8 +674,8 @@ export function dibujarFotograma(
         ? buscarTransicion(activo.transicionSalida.tipo).tecnica
         : 'corte'
     const ladoM = Math.min(ancho, alto)
-    const entG = !anterior(activo, clips) && p < 1 && esTransicionGlobal(tecEntG) ? efectoGlobalTrans(tecEntG, p, true, ladoM) : null
-    const salG = !posterior(activo, clips) && qG < 1 && esTransicionGlobal(tecSalG) ? efectoGlobalTrans(tecSalG, qG, false, ladoM) : null
+    const entG = !anterior(activo, clips) && p < 1 && esTransicionGlobal(tecEntG) ? efectoGlobalTrans(tecEntG, p, true, ladoM, activo.transicion?.intensidad) : null
+    const salG = !posterior(activo, clips) && qG < 1 && esTransicionGlobal(tecSalG) ? efectoGlobalTrans(tecSalG, qG, false, ladoM, activo.transicionSalida?.intensidad) : null
     const globalAisladaTrans = !!(entG || salG)
     const vE = entG?.veloOpacidad ?? 0
     const vS = salG?.veloOpacidad ?? 0

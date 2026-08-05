@@ -113,11 +113,15 @@ export function efectoGlobalTrans(
   p: number,
   esEntrada: boolean,
   ladoMenor: number,
+  // fuerza del efecto que trae el clip (borrón o fogonazo). sin definir, un valor medio que
+  // reproduce el comportamiento de siempre. las atenuaciones de color no lo usan (van a fondo pleno)
+  intensidad = 0.6,
 ): EfectoGlobalTrans {
   const base: EfectoGlobalTrans = { veloColor: '#000', veloOpacidad: 0, blur: 0, opacidad: 1 }
   // el efecto es máximo en el extremo (recién abre o a punto de cerrar) y nulo cuando el
   // plano se ve limpio; al abrir arranca fuerte y afloja, al cerrar es al revés
   const k = esEntrada ? 1 - p : p
+  const i = intensidad
   switch (tecnica) {
     case 'opacidad':
       return { ...base, opacidad: esEntrada ? p : 1 - p }
@@ -126,15 +130,15 @@ export function efectoGlobalTrans(
     case 'blanco':
       return { ...base, veloColor: '#fff', veloOpacidad: k }
     case 'desenfoque':
-      return { ...base, blur: ladoMenor * 0.06 * k }
+      return { ...base, blur: ladoMenor * 0.1 * i * k }
     case 'resplandor':
-      return { ...base, blur: ladoMenor * 0.05 * k }
+      return { ...base, blur: ladoMenor * 0.083 * i * k }
     case 'zoom-desenfoque':
       return { ...base, blur: ladoMenor * 0.045 * k }
     case 'flash':
-      return { ...base, veloColor: '#fff', veloOpacidad: Math.min(1, k * 1.6) }
+      return { ...base, veloColor: '#fff', veloOpacidad: Math.min(1, k * (0.6 + 1.7 * i)) }
     case 'flash-camara':
-      return { ...base, veloColor: '#fff', veloOpacidad: Math.min(1, Math.pow(k, 0.55) * 1.9), blur: ladoMenor * 0.03 * k }
+      return { ...base, veloColor: '#fff', veloOpacidad: Math.min(1, Math.pow(k, 0.55) * (0.7 + 2 * i)), blur: ladoMenor * 0.05 * i * k }
     default:
       return base
   }
@@ -159,9 +163,11 @@ function lienzoEstela(ancho: number, alto: number): HTMLCanvasElement {
   return _lienzoEstela
 }
 
-// dibuja un clip con un filtro css (desenfoque, brillo...) y, si hace falta, un
-// leve acercamiento para que el desenfoque no deje asomar el borde transparente
-// del lienzo. lo comparten las transiciones de la familia de desenfoque
+// dibuja un clip con un filtro css (desenfoque, brillo...). el desenfoque bordea el borde
+// transparente del lienzo y lo dejaba asomar; para taparlo hay dos caminos. `cubrir` pinta
+// antes una copia nítida a tamaño natural que hace de fondo, así el borroso puede quedarse sin
+// acercar y no se ve zoom. `zoom` es el otro camino, un acercamiento de verdad, reservado a las
+// transiciones que SÍ quieren ese efecto (el golpe de zoom)
 function conFiltro(
   ctx: CanvasRenderingContext2D,
   ancho: number,
@@ -170,7 +176,9 @@ function conFiltro(
   pintar: Pintor,
   filtro: string,
   zoom: number,
+  cubrir = false,
 ) {
+  if (cubrir) pintar(clip, 1)
   ctx.save()
   ctx.filter = filtro
   if (zoom !== 1) {
@@ -223,6 +231,11 @@ export function pintarTransicion(
   // cerrar) y cero cuando el plano se ve limpio. así una entrada arranca al tope y afloja,
   // y una salida parte de limpio y llega al tope
   const kUno = esEntrada ? 1 - p : p
+
+  // fuerza del efecto que algunas transiciones dejan regular por clip (el borrón del desenfoque,
+  // el tamaño del acercón, cuánto crece la escala, la potencia del fogonazo). en un cruce vive en
+  // la entrada del que releva; en un cierre contra el fondo, en la salida del que se va
+  const intens = entrante?.transicion?.intensidad ?? saliente?.transicionSalida?.intensidad ?? 0.6
 
   switch (t.tecnica) {
     case 'opacidad': {
@@ -309,7 +322,9 @@ export function pintarTransicion(
 
     case 'escala': {
       const acercar = t.direccion === 'der'
-      const e = escalas(acercar, p)
+      // cuánto acerca o aleja lo regula el clip; sin ajuste, un valor medio como el de siempre
+      const fuerza = entrante?.transicion?.intensidad ?? saliente?.transicionSalida?.intensidad ?? 0.6
+      const e = escalas(acercar, p, fuerza)
       const centrar = (f: number) => {
         ctx.translate(ancho / 2, alto / 2)
         ctx.scale(f, f)
@@ -336,43 +351,45 @@ export function pintarTransicion(
     // lo va soltando. el cambio de plano ocurre justo en el punto de máximo efecto,
     // así el corte queda escondido detrás del desenfoque
     case 'desenfoque': {
-      const maxB = Math.min(ancho, alto) * 0.06
+      const maxB = Math.min(ancho, alto) * 0.1 * intens
       if (soloUno) {
-        if (unico) conFiltro(ctx, ancho, alto, unico, pintar, `blur(${(maxB * kUno).toFixed(2)}px)`, 1 + 0.06 * kUno)
+        if (unico) conFiltro(ctx, ancho, alto, unico, pintar, `blur(${(maxB * kUno).toFixed(2)}px)`, 1, true)
         return
       }
       if (p < 0.5) {
         const k = p / 0.5
-        if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, `blur(${(maxB * k).toFixed(2)}px)`, 1 + 0.06 * k)
+        if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, `blur(${(maxB * k).toFixed(2)}px)`, 1, true)
       } else {
         const k = 1 - (p - 0.5) / 0.5
-        if (entrante) conFiltro(ctx, ancho, alto, entrante, pintar, `blur(${(maxB * k).toFixed(2)}px)`, 1 + 0.06 * k)
+        if (entrante) conFiltro(ctx, ancho, alto, entrante, pintar, `blur(${(maxB * k).toFixed(2)}px)`, 1, true)
       }
       return
     }
 
     case 'resplandor': {
-      const maxB = Math.min(ancho, alto) * 0.05
+      const maxB = Math.min(ancho, alto) * 0.083 * intens
       const filtro = (k: number) => `blur(${(maxB * k).toFixed(2)}px) brightness(${(1 + 0.9 * k).toFixed(3)})`
       if (soloUno) {
-        if (unico) conFiltro(ctx, ancho, alto, unico, pintar, filtro(kUno), 1 + 0.05 * kUno)
+        if (unico) conFiltro(ctx, ancho, alto, unico, pintar, filtro(kUno), 1, true)
         return
       }
       if (p < 0.5) {
         const k = p / 0.5
-        if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, filtro(k), 1 + 0.05 * k)
+        if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, filtro(k), 1, true)
       } else {
         const k = 1 - (p - 0.5) / 0.5
-        if (entrante) conFiltro(ctx, ancho, alto, entrante, pintar, filtro(k), 1 + 0.05 * k)
+        if (entrante) conFiltro(ctx, ancho, alto, entrante, pintar, filtro(k), 1, true)
       }
       return
     }
 
     case 'flash': {
+      // la potencia del fogonazo la regula el clip: un valor medio deja el flash de siempre
+      const potencia = 0.6 + 1.7 * intens
       if (soloUno) {
         if (unico) pintar(unico, 1)
         // fogonazo blanco que arranca fuerte y se apaga al abrir, o al revés al cerrar
-        const veloU = Math.min(1, kUno * 1.6)
+        const veloU = Math.min(1, kUno * potencia)
         if (veloU > 0) {
           ctx.save()
           ctx.globalAlpha = veloU
@@ -392,7 +409,7 @@ export function pintarTransicion(
       const velo = Math.max(0, 1 - Math.abs(p - 0.5) / 0.5)
       if (velo > 0) {
         ctx.save()
-        ctx.globalAlpha = Math.min(1, velo * 1.6)
+        ctx.globalAlpha = Math.min(1, velo * potencia)
         ctx.fillStyle = '#fff'
         ctx.fillRect(0, 0, ancho, alto)
         ctx.restore()
@@ -402,12 +419,14 @@ export function pintarTransicion(
 
     case 'flash-camara': {
       // como tomar una foto con flash: un leve desenfoque de movimiento a cada lado y
-      // un fogonazo blanco muy agudo justo en el corte, más brusco que el flash normal
-      const maxB = Math.min(ancho, alto) * 0.03
+      // un fogonazo blanco muy agudo justo en el corte, más brusco que el flash normal. la
+      // potencia del fogonazo y el borrón la regula el clip
+      const maxB = Math.min(ancho, alto) * 0.05 * intens
+      const potencia = 0.7 + 2 * intens
       const filtroFc = (k: number) => `blur(${(maxB * k).toFixed(2)}px) brightness(${(1 + 0.25 * k).toFixed(3)})`
       if (soloUno) {
-        if (unico) conFiltro(ctx, ancho, alto, unico, pintar, filtroFc(kUno), 1 + 0.03 * kUno)
-        const veloU = Math.min(1, Math.pow(kUno, 0.55) * 1.9)
+        if (unico) conFiltro(ctx, ancho, alto, unico, pintar, filtroFc(kUno), 1, true)
+        const veloU = Math.min(1, Math.pow(kUno, 0.55) * potencia)
         if (veloU > 0) {
           ctx.save()
           ctx.globalAlpha = veloU
@@ -419,16 +438,16 @@ export function pintarTransicion(
       }
       if (p < 0.5) {
         const k = p / 0.5
-        if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, filtroFc(k), 1 + 0.03 * k)
+        if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, filtroFc(k), 1, true)
       } else {
         const k = 1 - (p - 0.5) / 0.5
-        if (entrante) conFiltro(ctx, ancho, alto, entrante, pintar, filtroFc(k), 1 + 0.03 * k)
+        if (entrante) conFiltro(ctx, ancho, alto, entrante, pintar, filtroFc(k), 1, true)
       }
       // el fogonazo: pico agudo y saturado justo en la mitad
       const velo = Math.max(0, 1 - Math.abs(p - 0.5) / 0.32)
       if (velo > 0) {
         ctx.save()
-        ctx.globalAlpha = Math.min(1, Math.pow(velo, 0.55) * 1.9)
+        ctx.globalAlpha = Math.min(1, Math.pow(velo, 0.55) * potencia)
         ctx.fillStyle = '#fff'
         ctx.fillRect(0, 0, ancho, alto)
         ctx.restore()
@@ -438,16 +457,20 @@ export function pintarTransicion(
 
     case 'zoom-desenfoque': {
       const maxB = Math.min(ancho, alto) * 0.045
+      // el tamaño del acercón se puede regular por clip. la intensidad va de 0 a 1 y de ahí
+      // sale cuánto crece la imagen en el pico (hasta 90 %). esta transición SÍ es de zoom, así
+      // que el acercamiento es su gracia, no un defecto
+      const zMax = 0.9 * intens
       if (soloUno) {
-        if (unico) conFiltro(ctx, ancho, alto, unico, pintar, `blur(${(maxB * kUno).toFixed(2)}px)`, 1 + 0.55 * kUno)
+        if (unico) conFiltro(ctx, ancho, alto, unico, pintar, `blur(${(maxB * kUno).toFixed(2)}px)`, 1 + zMax * kUno)
         return
       }
       if (p < 0.5) {
         const k = p / 0.5
-        if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, `blur(${(maxB * k).toFixed(2)}px)`, 1 + 0.55 * k)
+        if (saliente) conFiltro(ctx, ancho, alto, saliente, pintar, `blur(${(maxB * k).toFixed(2)}px)`, 1 + zMax * k)
       } else {
         const k = 1 - (p - 0.5) / 0.5
-        if (entrante) conFiltro(ctx, ancho, alto, entrante, pintar, `blur(${(maxB * k).toFixed(2)}px)`, 1 + 0.55 * k)
+        if (entrante) conFiltro(ctx, ancho, alto, entrante, pintar, `blur(${(maxB * k).toFixed(2)}px)`, 1 + zMax * k)
       }
       return
     }
@@ -472,15 +495,23 @@ export function pintarTransicion(
         'izq'
       const ux = dir === 'der' ? 1 : dir === 'izq' ? -1 : 0
       const uy = dir === 'aba' ? 1 : dir === 'arr' ? -1 : 0
+      // dos ajustes propios del clip: la intensidad (compartida) regula el largo de la estela y el
+      // borrón, y el acercamiento dice cuánto se agranda la imagen mientras corre el barrido. el
+      // acercamiento por defecto es cero, porque esto es un barrido, no un zoom; quien lo quiera lo sube
+      const inten = intens
+      const acerc = entrante?.transicion?.acercamiento ?? saliente?.transicionSalida?.acercamiento ?? 0
       const lado = Math.min(ancho, alto)
       const COPIAS = 22
-      const smear = (clip: Clip, k: number, signo: number) => {
+      const smear = (clip: Clip, k: number) => {
         if (k <= 0.001) {
           pintar(clip, 1)
           return
         }
-        const largo = lado * 0.5 * k // longitud de la estela en píxeles
-        const corr = lado * 0.13 * k * signo // corrimiento general hacia el lado (el whoosh)
+        // la estela va CENTRADA en la posición natural, no corrida hacia un lado. antes se
+        // desplazaba (el "whoosh") y eso dejaba la mitad de un lado nítida y la del otro borrosa,
+        // porque la base a tamaño natural asomaba justo por donde la estela se había ido. centrada,
+        // el borrón queda igual arriba y abajo (o a los dos lados), sin mitades
+        const largo = lado * 0.4 * inten * k // longitud de la estela en píxeles
         const sep = largo / COPIAS // separación entre copias contiguas
         const fundir = Math.max(0.6, sep * 0.9) // desenfoque que funde las copias en algo continuo
         // el clip se compone una SOLA vez en un lienzo aparte y de ahí se blitean las 22 copias.
@@ -498,16 +529,23 @@ export function pintarTransicion(
         tctx.setTransform(1, 0, 0, 1, 0, 0)
         tctx.clearRect(0, 0, ancho, alto)
         pintar(clip, 1, tctx)
+        // base que cubre TODO el lienzo con un desenfoque parejo. su papel es que en los bordes,
+        // donde la estela centrada tiene menos copias solapadas, no asome una franja nítida: ahí se
+        // ve esta base, que ya está desenfocada. el radio crece con el largo de la estela, así a más
+        // intensidad la base también se mueve más y el cuadro entero queda igual de borroso, sin un
+        // lado nítido y otro no
         ctx.save()
-        // se amplía para que la estela, el corrimiento y el fundido no descubran el borde del
-        // lienzo. la escala se calcula del desplazamiento MÁXIMO de las copias (corrimiento + media
-        // estela) para que SIEMPRE lo cubra: antes era un 1.4 fijo que se quedaba corto y dejaba una
-        // banda estirada del borde (sobre todo en vertical, en videos verticales)
-        const maxDesp = Math.abs(corr) + largo / 2
-        const escala = 1 + (2 * maxDesp) / lado + 0.06
-        ctx.translate(ancho / 2, alto / 2)
-        ctx.scale(escala, escala)
-        ctx.translate(-ancho / 2, -alto / 2)
+        ctx.filter = `blur(${Math.max(0.6, largo * 0.3).toFixed(2)}px)`
+        ctx.drawImage(tmp, 0, 0)
+        ctx.restore()
+        ctx.save()
+        // acercamiento OPCIONAL, gobernado por su ajuste. en cero la imagen no crece nada
+        const escala = 1 + acerc * 0.6 * k
+        if (escala !== 1) {
+          ctx.translate(ancho / 2, alto / 2)
+          ctx.scale(escala, escala)
+          ctx.translate(-ancho / 2, -alto / 2)
+        }
         ctx.filter = `blur(${fundir.toFixed(2)}px)`
         for (let i = 0; i < COPIAS; i++) {
           const f = i / (COPIAS - 1) - 0.5 // -0.5 a 0.5 a lo largo de la estela
@@ -515,7 +553,7 @@ export function pintarTransicion(
           ctx.save()
           // alfa decreciente: el conjunto es la media de las copias, no la última tapando al resto
           ctx.globalAlpha = 1 / (i + 1)
-          ctx.translate(ux * (off + corr), uy * (off + corr))
+          ctx.translate(ux * off, uy * off)
           ctx.drawImage(tmp, 0, 0)
           ctx.restore()
         }
@@ -523,14 +561,14 @@ export function pintarTransicion(
         ctx.restore()
       }
       if (soloUno) {
-        // un solo plano entra desde su lado o se va hacia él, con la estela, sin corte
-        if (unico) smear(unico, kUno, esEntrada ? -1 : 1)
+        // un solo plano que abre o cierra contra el fondo, con la estela y sin corte
+        if (unico) smear(unico, kUno)
         return
       }
       if (p < 0.5) {
-        if (saliente) smear(saliente, p / 0.5, 1)
+        if (saliente) smear(saliente, p / 0.5)
       } else if (entrante) {
-        smear(entrante, 1 - (p - 0.5) / 0.5, -1)
+        smear(entrante, 1 - (p - 0.5) / 0.5)
       }
       return
     }
