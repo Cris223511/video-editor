@@ -4,6 +4,12 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.35.2 (2026-08-04)
+
+- **Tomar una transición o un fundido de sonido abre su panel.** Al agarrar la transición de un clip se
+  despliega el panel de transiciones, y al tomar un fundido de audio se abre el de sonido de ese clip, de
+  la misma forma que al pulsar un impacto sale su editor. Antes había que abrir el panel a mano.
+
 ## 2.35.1 (2026-08-04)
 
 - **La transición que se resalta es la que agarras.** Al tomar la transición del inicio de un clip, el

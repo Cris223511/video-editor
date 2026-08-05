@@ -45,7 +45,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
   const recortarAudio = useEditorStore((s) => s.recortarAudio)
   const duplicarAudio = useEditorStore((s) => s.duplicarAudio)
   const setFundidoAudio = useEditorStore((s) => s.setFundidoAudio)
-  const setHerramienta = useEditorStore((s) => s.setHerramienta)
+  const setCategoriaClip = useEditorStore((s) => s.setCategoriaClip)
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
   const alternarBloque = useEditorStore((s) => s.alternarBloque)
   const insertarNivelAudio = useEditorStore((s) => s.insertarNivelAudio)
@@ -316,7 +316,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
             onSetAmbos={(s) => setFundidoAudio(audio.id, { fundidoEntrada: s, fundidoSalida: s })}
             onSeleccionar={() => {
               seleccionarRegion(audio.id)
-              setHerramienta('audio')
+              setCategoriaClip('audio')
             }}
           />
           <FundidoAudioBlock
@@ -329,7 +329,7 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
             onSetAmbos={(s) => setFundidoAudio(audio.id, { fundidoEntrada: s, fundidoSalida: s })}
             onSeleccionar={() => {
               seleccionarRegion(audio.id)
-              setHerramienta('audio')
+              setCategoriaClip('audio')
             }}
           />
         </>

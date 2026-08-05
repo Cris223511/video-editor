@@ -64,7 +64,7 @@ export default function ClipBlock({
   const colorGrupo = useEditorStore((s) => s.grupos.find((g) => g.miembros.includes(clip.id))?.color)
   const seleccionar = useEditorStore((s) => s.seleccionar)
   const setFundido = useEditorStore((s) => s.setFundido)
-  const setHerramienta = useEditorStore((s) => s.setHerramienta)
+  const setCategoriaClip = useEditorStore((s) => s.setCategoriaClip)
   const setTransicion = useEditorStore((s) => s.setTransicion)
   const setTransicionSalida = useEditorStore((s) => s.setTransicionSalida)
   const ponerEfectoEncima = useEditorStore((s) => s.ponerEfectoEncima)
@@ -630,7 +630,7 @@ export default function ClipBlock({
             }}
             onSeleccionar={() => {
               seleccionar(clip.id)
-              setHerramienta('audio')
+              setCategoriaClip('audio')
             }}
           />
           <FundidoAudioBlock
@@ -646,7 +646,7 @@ export default function ClipBlock({
             }}
             onSeleccionar={() => {
               seleccionar(clip.id)
-              setHerramienta('audio')
+              setCategoriaClip('audio')
             }}
           />
         </>
