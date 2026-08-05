@@ -4,6 +4,14 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.35.3 (2026-08-04)
+
+- **Al juntar dos clips, su transición se comparte.** Si un clip tenía una transición al final y le pegas
+  otro justo detrás, esa transición pasa a ser el cruce entre los dos (antes se borraba y quedaba un corte
+  seco). Al separarlos, el cruce se quita. Y editarla desde cualquiera de los dos lados toca la misma
+  transición. Además, un cruce entre clips pegados se reproduce de corrido, con los dos planos siguiendo
+  su curso mientras se aplica el efecto.
+
 ## 2.35.2 (2026-08-04)
 
 - **Tomar una transición o un fundido de sonido abre su panel.** Al agarrar la transición de un clip se

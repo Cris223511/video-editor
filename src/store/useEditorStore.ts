@@ -1858,6 +1858,14 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       const derViejo = otros.find((c) => pegado(c.inicio, finViejo))
       const rotaIzq = !!izqViejo && !pegado(izqViejo.inicio + izqViejo.duracion, inicio)
       const rotaDer = !!derViejo && !pegado(derViejo.inicio, fin)
+      const hayTr = (tr?: { tipo: string }) => !!tr && tr.tipo !== 'ninguna' && tr.tipo !== 'corte'
+      // el cruce que se CONSERVA al formar una junta L -> R: manda la SALIDA del clip de la izquierda
+      // (la transición que tenía al final); si no había, se respeta la ENTRADA del de la derecha; y si
+      // ninguno traía nada, queda un corte limpio. el cruce vive en la entrada del clip de la derecha.
+      // así, pegar un clip que tiene transición al final la convierte en el cruce entre los dos, en vez
+      // de borrarla, y editar cualquiera de los dos lados toca ese mismo cruce
+      const cruceDe = (salidaL?: typeof clip.transicionSalida, entradaR?: typeof clip.transicion) =>
+        hayTr(salidaL) ? salidaL! : hayTr(entradaR) ? entradaR! : { tipo: 'ninguna' as const, duracion: entradaR?.duracion ?? 0.5 }
       const sinEntrada = (c: typeof clip) => ({ ...c, transicion: { tipo: 'ninguna' as const, duracion: c.transicion.duracion } })
       const sinSalida = (c: typeof clip) => ({ ...c, transicionSalida: undefined })
       return {
@@ -1867,14 +1875,19 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
             let nc = c
             if (c.id === id) {
               nc = { ...nc, inicio }
-              // su entrada se limpia si la junta de la izquierda cambió (se formó una nueva o
-              // se rompió la que tenía); su salida, si se formó una junta nueva por la derecha
-              if (juntaIzq || rotaIzq) nc = sinEntrada(nc)
+              // junta NUEVA por la izquierda: la salida del vecino de la izquierda (o la propia entrada)
+              // se convierte en el cruce, que se guarda en la entrada de este clip. si la junta se
+              // ROMPIÓ, ese cruce ya no tiene sentido y se borra
+              if (juntaIzq && izq) nc = { ...nc, transicion: cruceDe(izq.transicionSalida, clip.transicion) }
+              else if (rotaIzq) nc = sinEntrada(nc)
+              // junta NUEVA por la derecha: la salida de este clip se muda a la entrada del vecino derecho
               if (juntaDer) nc = sinSalida(nc)
             }
-            // juntas NUEVAS: el vecino de la izquierda pierde su salida; el de la derecha, su entrada
+            // el vecino de la izquierda cede su salida (ya quedó guardada como la entrada de este clip)
             if (juntaIzq && c.id === juntaIzq) nc = sinSalida(nc)
-            if (juntaDer && c.id === juntaDer) nc = sinEntrada(nc)
+            // el vecino de la derecha recibe el cruce en su entrada: la salida de este clip, o su propia
+            // entrada si este no traía salida
+            if (juntaDer && der && c.id === juntaDer) nc = { ...nc, transicion: cruceDe(clip.transicionSalida, der.transicion) }
             // junta ROTA por la derecha: el vecino viejo de la derecha pierde su entrada (era el cruce)
             if (rotaDer && derViejo && c.id === derViejo.id) nc = sinEntrada(nc)
             return nc
