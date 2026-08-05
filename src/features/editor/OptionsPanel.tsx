@@ -240,6 +240,39 @@ function TransicionCapa() {
   )
 }
 
+// una fila de duración: la etiqueta (o el propio valor si no la lleva) a la izquierda y el
+// deslizador. cuando lleva etiqueta, el valor se repite a la derecha para no perderlo de vista
+function FilaDur({
+  etiqueta,
+  dur,
+  maxSeg,
+  onChange,
+}: {
+  etiqueta?: string
+  dur: number
+  maxSeg: number
+  onChange: (d: number) => void
+}) {
+  return (
+    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+      <span className="w-14 shrink-0 text-[11px] text-[color:var(--muted)]">
+        {etiqueta ?? `${dur.toFixed(1)} s`}
+      </span>
+      <Deslizador
+        valor={Math.round(dur * 10)}
+        min={2}
+        max={Math.max(2, Math.round(maxSeg * 10))}
+        onChange={(v) => onChange(v / 10)}
+      />
+      {etiqueta && (
+        <span className="w-9 shrink-0 text-right text-[11px] tabular-nums text-[color:var(--muted)]">
+          {dur.toFixed(1)}s
+        </span>
+      )}
+    </div>
+  )
+}
+
 // resumen de las transiciones que tiene el clip (al inicio, al final y la junta con el clip
 // pegado), cada una con su botón para quitarla. una junta entre dos clips se guarda en la
 // entrada del que releva, así que quitarla desde aquí borra esa única transición para los
@@ -275,6 +308,10 @@ function ResumenTransicionesClip({
     nombre: string
     dur: number
     maxSeg: number
+    // un cruce entre dos clips pegados: solo estos pueden separar sus dos lados (dar a cada mitad su
+    // propio tiempo). las transiciones contra el fondo (entrada del primer clip, salida del último)
+    // tienen un solo lado, así que no muestran esa opción
+    esCruce: boolean
     trans: Transicion
     poner: (c: Partial<Transicion>) => void
     setDur: (d: number) => void
@@ -290,6 +327,7 @@ function ResumenTransicionesClip({
       maxSeg: antPegado && ant
         ? Math.min(10, Math.min(clip.duracion, ant.duracion))
         : Math.min(10, clip.duracion - (real(clip.transicionSalida?.tipo) ? clip.transicionSalida!.duracion : 0)),
+      esCruce: antPegado,
       trans: clip.transicion,
       poner: (c) => setTransicion(clip.id, c),
       setDur: (d) => setTransicion(clip.id, { duracion: d }),
@@ -304,6 +342,7 @@ function ResumenTransicionesClip({
       nombre: buscarTransicion(sig.transicion.tipo).nombre,
       dur: sig.transicion.duracion,
       maxSeg: Math.min(10, Math.min(clip.duracion, sig.duracion)),
+      esCruce: true,
       trans: sig.transicion,
       poner: (c) => setTransicion(sig.id, c),
       setDur: (d) => setTransicion(sig.id, { duracion: d }),
@@ -318,6 +357,7 @@ function ResumenTransicionesClip({
       nombre: buscarTransicion(clip.transicionSalida!.tipo).nombre,
       dur: clip.transicionSalida!.duracion,
       maxSeg: Math.min(10, clip.duracion - (real(clip.transicion.tipo) ? clip.transicion.duracion : 0)),
+      esCruce: false,
       trans: clip.transicionSalida!,
       poner: (c) => setTransicionSalida(clip.id, c),
       setDur: (d) => setTransicionSalida(clip.id, { duracion: d }),
@@ -365,19 +405,30 @@ function ResumenTransicionesClip({
                     </button>
                   </Tooltip>
                 </div>
-                {/* la duración de ESTA transición, editable acá mismo: así se puede darle un tiempo a
-                    la de inicio y otro a la de final sin cambiar de pestaña */}
-                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                  <span className="w-14 shrink-0 text-[11px] text-[color:var(--muted)]">
-                    {it.dur.toFixed(1)} s
-                  </span>
-                  <Deslizador
-                    valor={Math.round(it.dur * 10)}
-                    min={2}
-                    max={Math.max(2, Math.round(it.maxSeg * 10))}
-                    onChange={(v) => it.setDur(v / 10)}
-                  />
-                </div>
+                {/* la duración de ESTA transición, editable acá mismo. en un cruce entre dos clips se
+                    puede separar en dos lados con tiempos distintos: uno puede empezar más rápido que
+                    el otro. enlazados, un solo deslizador mueve los dos por igual */}
+                {it.esCruce && it.trans.duracionSalida !== undefined ? (
+                  <>
+                    <FilaDur etiqueta="Entrada" dur={it.trans.duracion} maxSeg={it.maxSeg} onChange={(d) => it.poner({ duracion: d })} />
+                    <FilaDur etiqueta="Salida" dur={it.trans.duracionSalida} maxSeg={it.maxSeg} onChange={(d) => it.poner({ duracionSalida: d })} />
+                  </>
+                ) : (
+                  <FilaDur dur={it.dur} maxSeg={it.maxSeg} onChange={it.setDur} />
+                )}
+                {it.esCruce && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // separar arranca el lado de salida igualado al de entrada, para que el cambio no
+                      // se note de golpe; unir lo borra y los dos vuelven a moverse juntos
+                      it.poner({ duracionSalida: it.trans.duracionSalida === undefined ? it.trans.duracion : undefined })
+                    }}
+                    className="interactivo self-start text-[11px] font-medium text-[color:var(--muted)] transition-colors hover:text-brand"
+                  >
+                    {it.trans.duracionSalida === undefined ? 'Separar los dos lados' : 'Unir los dos lados'}
+                  </button>
+                )}
                 {/* el resto de ajustes de ESTA transición, aquí mismo bajo su duración: intensidad,
                     acercamiento, dirección o suavidad del borde, según lo que admita cada una */}
                 <ControlesTransicion

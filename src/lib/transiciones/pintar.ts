@@ -67,14 +67,27 @@ export function cruceCentradoEn(
     if (!esDisolucion(tr.tipo)) continue
     const sale = anterior(entra, clips)
     if (!sale) continue // sin plano anterior no es un cruce: abre contra el fondo
-    // el medio ancho no puede comerse más de la cola/cabeza disponible de cada clip, así
-    // que se acota a una fracción de cada duración para no invadir el clip entero
-    const medio = Math.min(tr.duracion / 2, entra.duracion * 0.9, sale.duracion * 0.9)
-    if (medio <= 0) continue
+    // cada lado del corte puede medir distinto. `duracion` es el lado del que ENTRA y
+    // `duracionSalida` el del que SALE; sin este último, los dos miden lo mismo y el cruce queda
+    // simétrico. cada medio ancho se acota a la cola/cabeza disponible de su clip para no invadirlo
+    const medioEntra = Math.min(tr.duracion / 2, entra.duracion * 0.9)
+    const medioSale = Math.min((tr.duracionSalida ?? tr.duracion) / 2, sale.duracion * 0.9)
+    if (medioEntra <= 0 && medioSale <= 0) continue
     const corte = entra.inicio
-    if (t >= corte - medio && t < corte + medio) {
-      const p = Math.max(0, Math.min(1, (t - (corte - medio)) / (2 * medio)))
-      return { entra, sale, p, medio, corte }
+    if (t >= corte - medioSale && t < corte + medioEntra) {
+      // el corte cae SIEMPRE en la mitad del efecto (p = 0.5): antes de él avanza dentro del tramo
+      // de salida, después dentro del de entrada. así un lado puede ser más largo que el otro sin
+      // que el punto de cambio se corra, y una de las dos mitades "empieza más rápido" que la otra
+      const p =
+        t < corte
+          ? medioSale > 0
+            ? 0.5 * ((t - (corte - medioSale)) / medioSale)
+            : 0
+          : medioEntra > 0
+            ? 0.5 + 0.5 * ((t - corte) / medioEntra)
+            : 1
+      const medio = Math.max(medioEntra, medioSale)
+      return { entra, sale, p: Math.max(0, Math.min(1, p)), medio, corte }
     }
   }
   return null
@@ -529,13 +542,19 @@ export function pintarTransicion(
         tctx.setTransform(1, 0, 0, 1, 0, 0)
         tctx.clearRect(0, 0, ancho, alto)
         pintar(clip, 1, tctx)
-        // base que cubre TODO el lienzo con un desenfoque parejo. su papel es que en los bordes,
-        // donde la estela centrada tiene menos copias solapadas, no asome una franja nítida: ahí se
-        // ve esta base, que ya está desenfocada. el radio crece con el largo de la estela, así a más
-        // intensidad la base también se mueve más y el cuadro entero queda igual de borroso, sin un
-        // lado nítido y otro no
+        // base que cubre los bordes, donde la estela centrada tiene menos copias solapadas y podría
+        // asomar una franja nítida. en vez de un desenfoque isótropo fuerte (que dejaba el cuadro como
+        // una papilla redonda, poco realista) se usa una versión ESTIRADA en el mismo eje del barrido:
+        // eso lee como movimiento en esa dirección, igual que una foto movida de verdad, y tapa el
+        // borde sin necesidad de un borrón redondo. un difuminado leve encima quita el filo del estirón
         ctx.save()
-        ctx.filter = `blur(${Math.max(0.6, largo * 0.3).toFixed(2)}px)`
+        ctx.filter = `blur(${Math.max(0.6, largo * 0.12).toFixed(2)}px)`
+        ctx.translate(ancho / 2, alto / 2)
+        // se agranda solo en el eje del barrido para cubrir hasta donde llega la estela, dejando el
+        // otro eje intacto: así no hay zoom redondo, solo un estirón en la dirección del movimiento
+        const factor = 1 + (largo / lado) * 1.2
+        ctx.scale(ux !== 0 ? factor : 1, uy !== 0 ? factor : 1)
+        ctx.translate(-ancho / 2, -alto / 2)
         ctx.drawImage(tmp, 0, 0)
         ctx.restore()
         ctx.save()

@@ -132,6 +132,12 @@ export interface Transicion {
   // cuánto se acerca la imagen durante el desenfoque de movimiento, de 0 a 1. en cero no hay
   // acercamiento: la estela corre sin agrandar el plano. solo la mira esa transición
   acercamiento?: number
+  // en un cruce entre dos clips pegados, la transición vive en la entrada del que releva y por
+  // defecto reparte su tiempo por igual a cada lado del corte (mitad se come la cola del que sale,
+  // mitad la cabeza del que entra). con esto se puede dar a cada lado un tiempo distinto: `duracion`
+  // pasa a ser el lado de la ENTRADA (el clip que releva) y esta, el de la SALIDA (el que se va).
+  // sin definir, ambos lados miden lo mismo y el cruce queda simétrico y enlazado
+  duracionSalida?: number
 }
 
 // modelo de la línea de tiempo. un clip apunta a un medio importado y define

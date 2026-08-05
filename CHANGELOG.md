@@ -4,6 +4,20 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.37.0 (2026-08-05)
+
+- **El desenfoque de movimiento se ve más real.** Antes, a mucha intensidad, el cuadro quedaba como una
+  papilla difusa. Ahora el borrón va en la dirección elegida, con estelas de movimiento como en una foto
+  movida de verdad: a poca intensidad la imagen sigue reconociéndose y a mucha el arrastre es fuerte, pero
+  siempre parejo, sin un lado nítido y otro no.
+- **Cada lado de una junta puede tener su propio tiempo.** Cuando dos clips pegados se cruzan, la transición
+  ya no obliga a que las dos mitades duren lo mismo. Arrastrando la junta se mueven las dos a la vez, como
+  siempre; con la tecla Mayús se mueve solo un lado, y así una mitad puede empezar más rápido que la otra.
+  El punto donde se cruzan los planos se corre hacia el lado más largo, y un punto marca la junta cuando
+  está separada.
+- **También desde el panel.** El cruce trae un botón para separar o unir sus dos lados; separados, aparece
+  un tiempo para la entrada y otro para la salida. Sirve para cualquier transición que una dos clips.
+
 ## 2.36.0 (2026-08-05)
 
 - **Cada transición se puede ajustar a mano.** Al elegir una transición, sus controles salen en la misma
