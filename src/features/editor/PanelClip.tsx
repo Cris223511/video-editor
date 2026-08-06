@@ -167,8 +167,10 @@ export default function PanelClip() {
 
   // ancho de la columna de controles, ajustable arrastrando su borde izquierdo.
   // es preferencia de vista, con su mínimo y su máximo
-  const [ancho, setAncho] = useState(256)
-  const ANCHO_MIN = 220
+  // el panel abre con un ancho que ya deja ver dos por fila las galerías (transiciones, efectos...),
+  // que es como se piensan; el mínimo también respeta esas dos columnas para que no se aplasten a una
+  const [ancho, setAncho] = useState(296)
+  const ANCHO_MIN = 272
   const ANCHO_MAX = 460
   const estirar = (e: React.MouseEvent) => {
     e.preventDefault()

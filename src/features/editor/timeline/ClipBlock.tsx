@@ -81,6 +81,7 @@ export default function ClipBlock({
   const estirarVelocidad = useEditorStore((s) => s.estirarVelocidad)
   const moverClipAPista = useEditorStore((s) => s.moverClipAPista)
   const insertarPistaEn = useEditorStore((s) => s.insertarPistaEn)
+  const insertarPistasGrupo = useEditorStore((s) => s.insertarPistasGrupo)
   const setInsercionPista = useEditorStore((s) => s.setInsercionPista)
   const setGuiaImantado = useEditorStore((s) => s.setGuiaImantado)
   const setPrevisualizacion = useEditorStore((s) => s.setPrevisualizacion)
@@ -164,6 +165,14 @@ export default function ClipBlock({
     // posiciones ORIGINALES de cada bloque del conjunto al empezar el gesto: el arrastre las usa
     // para colocar cada uno en origen + desplazamiento, sin acumular fotograma a fotograma
     const origenesGrupo = origenesDe(st, grupo)
+    // el arrastre vertical de un grupo (abrir una franja de pistas nuevas para él) solo tiene sentido
+    // si TODO el grupo vive en el carril de video: clips o figuras e imágenes. si mezcla audio o texto,
+    // el conjunto se mueve solo en horizontal, como hasta ahora
+    const idsVideo = new Set([
+      ...st.pista.clips.map((c) => c.id),
+      ...st.capas.filter((c) => c.tipo === 'figura' || c.tipo === 'imagen').map((c) => c.id),
+    ])
+    const grupoSoloVideo = enGrupo && grupo.every((id) => idsVideo.has(id))
     // arrastrando un conjunto: se avisa para que TODOS los bloques del grupo apaguen su suavizado
     // de posición y sigan al cursor a la par (se apaga al soltar)
     if (enGrupo) st.setArrastreBloques(true)
@@ -221,10 +230,11 @@ export default function ClipBlock({
         useEditorStore.getState().setArrastreVivo(null)
       }
 
-      // el primer desplazamiento de verdad es el que decide si el gesto era un
-      // arrastre o un simple clic con alt
+      // el primer desplazamiento de verdad es el que decide si el gesto era un arrastre o un simple
+      // clic con alt. cuenta el movimiento en CUALQUIER eje: un arrastre recto hacia arriba (subir un
+      // grupo a una pista nueva, por ejemplo) no lleva movimiento horizontal y antes no arrancaba
       if (!movido) {
-        if (Math.abs(ev.clientX - startX) < 3) return
+        if (Math.abs(ev.clientX - startX) < 3 && Math.abs(ev.clientY - startY) < 3) return
         movido = true
       }
       // con Alt el original no se toca: se rastrea dónde caería una copia y se pinta su
@@ -252,11 +262,27 @@ export default function ClipBlock({
         useEditorStore.getState().setArrastreVivo({ etiqueta: nombre, x: ev.clientX, y: ev.clientY })
         return
       }
-      // con varios bloques marcados el arrastre los lleva a todos a la vez, así que
-      // no hay imantado ni cambio de pista: solo el desplazamiento compartido
+      // con varios bloques marcados el arrastre los lleva a todos a la vez en horizontal. si además el
+      // conjunto es de video y el cursor sube o baja de verdad, se ofrece abrir una franja de pistas
+      // nuevas para él (la guía de "nueva pista aquí"); mover el grupo a filas existentes se deja aparte
       if (grupo.length) {
         const dxg = (ev.clientX - startX) / pxPorSegundo
         moverBloquesDesde(grupo, dxg, origenesGrupo)
+        if (grupoSoloVideo && Math.abs(ev.clientY - startY) > UMBRAL_VERT) {
+          const v = decidirVertical(ev.clientY)
+          if (v && v.insercion !== null) {
+            if (v.insercion !== insercionActual) {
+              insercionActual = v.insercion
+              setInsercionPista(v.insercion)
+            }
+          } else if (insercionActual !== null) {
+            insercionActual = null
+            setInsercionPista(null)
+          }
+        } else if (insercionActual !== null) {
+          insercionActual = null
+          setInsercionPista(null)
+        }
         return
       }
       // primero se mueve en el tiempo (horizontal) y luego se resuelve el nivel. así
@@ -322,9 +348,13 @@ export default function ClipBlock({
         window.removeEventListener('pointerup', soltar)
         return
       }
-      // si el gesto acabó sobre una separación, se abre allí el nivel nuevo y el
-      // clip aterriza dentro; comparte el mismo paso de historial que el arrastre
-      if (insercionActual !== null) insertarPistaEn(insercionActual, idGesto)
+      // si el gesto acabó sobre una separación, se abre allí el nivel nuevo. con un grupo se crea una
+      // franja entera (tantas pistas como filas ocupa) y el conjunto aterriza dentro conservando su
+      // forma; con un clip suelto, un solo nivel. comparte el mismo paso de historial que el arrastre
+      if (insercionActual !== null) {
+        if (grupo.length && grupoSoloVideo) insertarPistasGrupo(insercionActual, grupo)
+        else insertarPistaEn(insercionActual, idGesto)
+      }
       setInsercionPista(null)
       // al soltar, la guía desaparece: el clip ya quedó encajado en su sitio
       setGuiaImantado(null)

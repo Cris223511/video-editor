@@ -332,6 +332,11 @@ interface EstadoEditor {
   // recién creado. es lo que permite soltar un clip entre dos pistas y abrir un
   // hueco propio para él
   insertarPistaEn: (indice: number, clipId?: string) => void
+  // abre VARIAS pistas nuevas de video a la vez para dejar caer ahí un grupo que abarca varias filas.
+  // el grupo aterriza en la franja recién creada conservando su forma (los offsets de fila entre sus
+  // miembros), y se crean tantas pistas como filas ocupa el grupo. la usa el arrastre vertical de un
+  // conjunto hacia una separación
+  insertarPistasGrupo: (indice: number, ids: string[]) => void
   quitarPista: (indice: number) => void
   setAltoPista: (indice: number, alto: number) => void
   moverClipAPista: (id: string, pista: number) => void
@@ -2507,6 +2512,42 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         capas,
         clipSeleccionado: esCapa ? s.clipSeleccionado : (id ?? s.clipSeleccionado),
       }
+    }),
+
+  insertarPistasGrupo: (indice, ids) =>
+    set((s) => {
+      if (s.numPistas >= MAX_PISTAS) return {}
+      const dentro = new Set(ids)
+      const esVid = (c: (typeof s.capas)[number]) => c.tipo === 'figura' || c.tipo === 'imagen'
+      const gClips = s.pista.clips.filter((c) => dentro.has(c.id))
+      const gCapas = s.capas.filter((c) => dentro.has(c.id) && esVid(c))
+      const pistas = [...gClips.map((c) => c.pista), ...gCapas.map((c) => c.nivel ?? 0)]
+      if (pistas.length === 0) return {}
+      // cuántas filas ocupa el grupo (de la más baja a la más alta); se crearán tantas, sin pasar del
+      // tope de pistas
+      const pMin = Math.min(...pistas)
+      const pMax = Math.max(...pistas)
+      const n = Math.min(pMax - pMin + 1, MAX_PISTAS - s.numPistas)
+      if (n <= 0) return {}
+      const k = Math.max(0, Math.min(s.numPistas, indice))
+      // el grupo cae en las pistas nuevas k..k+n-1 según su fila relativa; lo demás que estuviera en k
+      // o por encima sube n puestos para hacerle sitio
+      const dest = (vieja: number) => k + Math.min(n - 1, Math.max(0, vieja - pMin))
+      const clips = s.pista.clips.map((c) =>
+        dentro.has(c.id) ? { ...c, pista: dest(c.pista) } : c.pista >= k ? { ...c, pista: c.pista + n } : c,
+      )
+      const capas = s.capas.map((c) => {
+        if (!esVid(c)) return c
+        if (dentro.has(c.id)) return { ...c, nivel: dest(c.nivel ?? 0) }
+        return (c.nivel ?? 0) >= k ? { ...c, nivel: (c.nivel ?? 0) + n } : c
+      })
+      const altosPista = [...s.altosPista]
+      const pistasMeta = [...s.pistasMeta]
+      for (let i = 0; i < n; i++) {
+        altosPista.splice(k, 0, ALTO_PISTA_BASE)
+        pistasMeta.splice(k, 0, metaPista(s.numPistas + 1 + i))
+      }
+      return { numPistas: s.numPistas + n, altosPista, pistasMeta, pista: { ...s.pista, clips }, capas }
     }),
 
   setInsercionPista: (indice) => set({ insercionPista: indice }),

@@ -4,6 +4,16 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.40.0 (2026-08-06)
+
+- **Subir un grupo a pistas nuevas.** Al arrastrar varios clips seleccionados hacia arriba (o entre
+  filas), aparece la guía de "nueva pista aquí" y, al soltar, se abren tantas filas como ocupa el grupo
+  y el conjunto aterriza ahí conservando su forma. Antes el arrastre de un grupo solo se movía de lado.
+- **Marca de "ya usado" en los medios.** Cada archivo del panel de Medios muestra un visto verde cuando
+  ya está puesto en la línea de tiempo, para distinguir de un vistazo lo que usaste de lo que no.
+- **El panel de la derecha abre más ancho.** Al abrir una opción (transiciones, efectos...), el panel
+  nace con el ancho justo para ver las galerías de dos en dos por fila, en vez de apretadas en una sola.
+
 ## 2.39.0 (2026-08-06)
 
 - **La línea de tiempo ya no se aleja sola al agregar clips.** Antes, cada video que soltabas reajustaba el

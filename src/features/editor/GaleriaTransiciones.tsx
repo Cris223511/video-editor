@@ -209,7 +209,7 @@ export default function GaleriaTransiciones({
           <p className="mb-2 text-xs font-semibold text-[color:var(--muted)]">
             {NOMBRES_GRUPO[grupo]}
           </p>
-          <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(130px,1fr))]">
+          <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(120px,1fr))]">
             {lista.map((t) => {
               const elegida = t.id === actual
               return (

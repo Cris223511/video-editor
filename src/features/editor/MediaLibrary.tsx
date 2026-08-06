@@ -54,6 +54,22 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
     return null
   }, [clipSeleccionado, capaSeleccionada, regionSeleccionada, nBloques, nCapas, clips, capas, audios, medios])
 
+  // qué medios ya están puestos en la línea de tiempo, para marcarlos y saber de un vistazo cuáles se
+  // usaron y cuáles todavía no. un medio cuenta como usado si tiene un clip de video, un audio importado
+  // desde él o una capa de imagen que apunta a su archivo
+  const usados = useMemo(() => {
+    const set = new Set<string>()
+    clips.forEach((c) => set.add(c.assetId))
+    audios.forEach((a) => set.add(a.assetId))
+    capas.forEach((c) => {
+      if (c.tipo === 'imagen') {
+        const m = medios.find((mm) => mm.url === c.src)
+        if (m) set.add(m.id)
+      }
+    })
+    return set
+  }, [clips, audios, capas, medios])
+
   // la tarjeta resaltada se lleva a la vista con un desplazamiento suave, para que no aparezca de golpe
   const activoRef = useRef<HTMLLIElement | null>(null)
   useEffect(() => {
@@ -244,11 +260,22 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
                       </span>
                     </div>
                   )}
-                  {/* número de orden en el que se importó, arriba a la izquierda. sigue el orden de la
-                      fila (izquierda a derecha, de arriba abajo), que es el mismo en el que se subieron */}
-                  <span className="pointer-events-none absolute left-1.5 top-1.5 z-10 grid h-5 min-w-[1.25rem] place-items-center rounded-md bg-black/65 px-1 text-[11px] font-semibold text-white backdrop-blur">
-                    {i + 1}
-                  </span>
+                  {/* número de orden en el que se importó, arriba a la izquierda, y a su lado un check
+                      verde cuando el medio ya está puesto en la línea de tiempo, para distinguir de un
+                      vistazo lo que ya se usó de lo que todavía no. el orden sigue la fila (izquierda a
+                      derecha, de arriba abajo), el mismo en el que se subieron */}
+                  <div className="pointer-events-none absolute left-1.5 top-1.5 z-10 flex items-center gap-1">
+                    <span className="grid h-5 min-w-[1.25rem] place-items-center rounded-md bg-black/65 px-1 text-[11px] font-semibold text-white backdrop-blur">
+                      {i + 1}
+                    </span>
+                    {usados.has(m.id) && (
+                      <Tooltip texto="Ya está en la línea de tiempo">
+                        <span className="pointer-events-auto grid h-5 w-5 place-items-center rounded-md bg-emerald-500/90 text-white backdrop-blur">
+                          <Icon name="check" size={12} />
+                        </span>
+                      </Tooltip>
+                    )}
+                  </div>
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2 py-1.5">
                     <p className="truncate text-[12px] font-medium text-white">{m.nombre}</p>
                     <p className="truncate text-[10px] text-white/70">
