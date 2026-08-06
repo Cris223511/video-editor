@@ -545,19 +545,21 @@ export function pintarTransicion(
           ctx.scale(escala, escala)
           ctx.translate(-ancho / 2, -alto / 2)
         }
-        // base a tamaño natural: cubre todo el lienzo, sin bordes transparentes ni franjas nítidas
+        // base a tamaño natural: ancla el clip en su sitio y cubre los bordes del lienzo
         ctx.drawImage(tmp, 0, 0)
-        // estela en UNA sola dirección, la elegida. TODAS las copias se corren hacia el mismo lado
-        // (nunca hacia el centro ni a los dos lados), con la opacidad bajando y el desenfoque subiendo
-        // cuanto más lejos. así el barrido se lee recto hacia ese lado, como una foto movida de verdad,
-        // en lugar de abrirse desde el medio. la dirección puede venir afinada por el propio clip
-        const PASOS = 26
-        for (let i = 1; i <= PASOS; i++) {
-          const f = i / PASOS // 0 a 1 a lo largo de la estela
+        // estela SIMÉTRICA a lo largo del eje elegido: las copias se reparten por igual a los DOS lados
+        // del centro (de -largo/2 a +largo/2) y se promedian. así el CONTENIDO no se corre a ningún lado
+        // (queda anclado en su sitio), solo se difumina en esa dirección, como una foto movida. antes las
+        // copias iban todas a un mismo lado y arrastraban el clip entero, que es lo que no se quería
+        const N = 24
+        const sep = largo / N
+        ctx.filter = `blur(${Math.max(0.6, sep * 0.9).toFixed(2)}px)`
+        for (let i = 0; i < N; i++) {
+          const f = i / (N - 1) - 0.5 // de -0.5 a 0.5: mitad hacia un lado, mitad hacia el otro
           const off = f * largo
           ctx.save()
-          ctx.globalAlpha = (1 - f) * 0.6
-          ctx.filter = `blur(${(largo * 0.05 + 0.6).toFixed(2)}px)`
+          // alfa decreciente: el conjunto es la MEDIA de las copias, centrada, no una corrida hacia un lado
+          ctx.globalAlpha = 1 / (i + 1)
           ctx.translate(ux * off, uy * off)
           ctx.drawImage(tmp, 0, 0)
           ctx.restore()

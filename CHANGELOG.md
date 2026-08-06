@@ -4,6 +4,12 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.40.1 (2026-08-06)
+
+- **El desenfoque de movimiento ya no arrastra el clip.** El borrón corría todo el plano hacia un lado,
+  como si el clip se moviera. Ahora el clip se queda en su sitio, quieto, y solo se difumina a lo largo
+  de la dirección elegida, como una foto movida de verdad.
+
 ## 2.40.0 (2026-08-06)
 
 - **Subir un grupo a pistas nuevas.** Al arrastrar varios clips seleccionados hacia arriba (o entre
