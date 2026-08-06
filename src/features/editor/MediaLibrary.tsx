@@ -77,9 +77,13 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
   // dragenter y dragleave se disparan también al pasar por los hijos, así que se
   // cuentan las entradas y salidas para no apagar el aviso a mitad del panel
   const arrastreRef = useRef(0)
-  // solo interesa el arrastre de archivos del explorador, no el de un medio que se
-  // saca del propio panel hacia la línea de tiempo (ese lleva otro tipo de dato)
-  const esArchivos = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files')
+  // solo interesa el arrastre de archivos del explorador, no el de un medio que se saca del propio
+  // panel. al arrastrar una tarjeta, el navegador cuela su miniatura como si fuera un archivo, así
+  // que además de pedir 'Files' se descarta cualquier arrastre que traiga nuestro tipo interno: sin
+  // esto, soltar un medio sobre el panel lo volvía a importar y quedaba duplicado
+  const esArrastreInterno = (e: React.DragEvent) => e.dataTransfer.types.includes(TIPO_ARRASTRE)
+  const esArchivos = (e: React.DragEvent) =>
+    Array.from(e.dataTransfer.types).includes('Files') && !esArrastreInterno(e)
 
   // quita de verdad el medio una vez confirmado: primero se llevan sus usos de la
   // línea de tiempo (clips, audios y capas de imagen) y luego se borra el asset
@@ -95,6 +99,9 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
     e.preventDefault()
     arrastreRef.current = 0
     setEncima(false)
+    // un medio arrastrado desde el propio panel no se reimporta: solo cuentan los archivos que
+    // llegan del explorador. sin esta guarda, soltar un medio sobre el panel lo duplicaba
+    if (esArrastreInterno(e)) return
     if (e.dataTransfer.files?.length) procesar(e.dataTransfer.files)
   }
 
@@ -149,7 +156,7 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
       <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-2.5">
         {medios.length > 0 && (
           <ul className="mb-2.5 grid grid-cols-2 gap-2">
-            {medios.map((m) => {
+            {medios.map((m, i) => {
               const activo = assetActivo === m.id
               return (
               <li key={m.id} ref={activo ? activoRef : undefined}>
@@ -203,6 +210,9 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
                     <img
                       src={m.miniatura}
                       alt=""
+                      // sin arrastre propio: si no, al arrastrar la tarjeta el navegador colaba la
+                      // miniatura como un archivo y el panel la tomaba por una importación
+                      draggable={false}
                       className={[
                         'aspect-video w-full transition-transform duration-300 group-hover:scale-105',
                         m.clase === 'imagen' ? 'bg-black/40 object-contain' : 'object-cover',
@@ -234,6 +244,11 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
                       </span>
                     </div>
                   )}
+                  {/* número de orden en el que se importó, arriba a la izquierda. sigue el orden de la
+                      fila (izquierda a derecha, de arriba abajo), que es el mismo en el que se subieron */}
+                  <span className="pointer-events-none absolute left-1.5 top-1.5 z-10 grid h-5 min-w-[1.25rem] place-items-center rounded-md bg-black/65 px-1 text-[11px] font-semibold text-white backdrop-blur">
+                    {i + 1}
+                  </span>
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent px-2 py-1.5">
                     <p className="truncate text-[12px] font-medium text-white">{m.nombre}</p>
                     <p className="truncate text-[10px] text-white/70">
@@ -349,7 +364,7 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
       <Confirmar
         abierto={porQuitar !== null}
         titulo="¿Quitar este medio?"
-        mensaje="Se eliminará también de la línea de tiempo: sus clips, los audios importados desde él y las capas de imagen que lo usan."
+        mensaje="Se quitará también de la línea de tiempo, y con él sus clips, los audios que sacaste de este medio y las capas de imagen que lo usan."
         aceptar="Quitar"
         peligro
         onAceptar={confirmarQuitar}

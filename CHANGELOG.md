@@ -4,6 +4,21 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.38.0 (2026-08-06)
+
+- **Número de orden en cada medio.** Cada archivo del panel de Medios muestra arriba a la izquierda su
+  posición, en el mismo orden en que lo subiste, para ubicarlos de un vistazo.
+- **Arrastrar un medio sobre el propio panel ya no lo duplica.** Antes, soltar un medio de la biblioteca
+  encima de la misma biblioteca lo volvía a agregar. Ahora solo se importan los archivos que traes del
+  explorador; los medios que ya están adentro se arrastran a la línea de tiempo, no a la biblioteca.
+- **Los clips de un grupo ya no se cruzan.** Al mover varios clips juntos, ninguno puede montarse sobre
+  otro que no sea del grupo: el conjunto se detiene al topar, en vez de solaparse.
+- **El desenfoque de movimiento va recto en su dirección.** Antes el borrón parecía abrirse desde el
+  centro hacia los dos lados. Ahora arrastra de verdad hacia el lado elegido, como una foto movida.
+- **Dividir un clip ya no inventa una transición.** Al cortar un clip que tenía una transición al inicio,
+  aparecía un cruce en el punto de corte que nadie había puesto. Ahora el corte queda limpio: la
+  transición de entrada se queda con la primera parte y la de salida con la segunda.
+
 ## 2.37.0 (2026-08-05)
 
 - **El desenfoque de movimiento se ve más real.** Antes, a mucha intensidad, el cuadro quedaba como una

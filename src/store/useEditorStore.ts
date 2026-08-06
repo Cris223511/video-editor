@@ -1639,7 +1639,43 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         if (o !== undefined) minOrigen = Math.min(minOrigen, o)
       }
       if (!Number.isFinite(minOrigen)) return {}
-      const d = Math.max(delta, -minOrigen)
+
+      // cada bloque, en su carril, tiene un intervalo [inicio, inicio+duracion]. el grupo NO puede
+      // pisar un bloque AJENO en el mismo carril, así que el desplazamiento se acota por el hueco
+      // libre a cada lado. los clips comparten carril por pista; las capas, los audios y las
+      // regiones, por su nivel. dos listas distintas no se estorban (una figura no bloquea un clip)
+      const carril = (pref: string, n: number) => `${pref}${n}`
+      const todos = [
+        ...s.pista.clips.map((x) => ({ x, carril: carril('v', x.pista) })),
+        ...s.capas.map((x) => ({ x, carril: carril('c', x.nivel ?? 0) })),
+        ...s.audios.map((x) => ({ x, carril: carril('a', x.nivel ?? 0) })),
+        ...s.audioRegiones.map((x) => ({ x, carril: carril('a', x.nivel ?? 0) })),
+      ]
+      const ajenosPorCarril = new Map<string, { inicio: number; duracion: number }[]>()
+      for (const t of todos) {
+        if (dentro.has(t.x.id)) continue
+        const lista = ajenosPorCarril.get(t.carril) ?? []
+        lista.push({ inicio: t.x.inicio, duracion: t.x.duracion })
+        ajenosPorCarril.set(t.carril, lista)
+      }
+      // margen que deja libre cada bloque del grupo: hacia la derecha, hasta el ajeno más cercano por
+      // delante; hacia la izquierda, hasta el de atrás. el tope del grupo es el más ajustado de todos
+      let dMin = -minOrigen
+      let dMax = Infinity
+      for (const t of todos) {
+        if (!dentro.has(t.x.id)) continue
+        const o = origenes[t.x.id]
+        if (o === undefined) continue
+        const fin = o + t.x.duracion
+        for (const a of ajenosPorCarril.get(t.carril) ?? []) {
+          if (a.inicio >= fin - 0.001) dMax = Math.min(dMax, a.inicio - fin)
+          else if (a.inicio + a.duracion <= o + 0.001) dMin = Math.max(dMin, a.inicio + a.duracion - o)
+        }
+      }
+      // el origen (d = 0) siempre es válido, así que [dMin, dMax] contiene el 0 y acotar ahí impide
+      // cruzar sin trabar el grupo
+      const d = Math.max(dMin, Math.min(dMax, delta))
+
       // cada bloque se coloca en su ORIGEN + d (posición absoluta), no sumando sobre la actual. así
       // no se acumula fotograma a fotograma y el grupo sigue al cursor exactamente
       const correr = <T extends { id: string; inicio: number }>(x: T): T =>
@@ -2361,13 +2397,18 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       if (idx === -1) return {}
       const c = s.pista.clips[idx]
       const offset = t - c.inicio
-      const primera = { ...c, duracion: offset }
+      // el corte no debe inventar transiciones en el punto donde se parte. la de ENTRADA vive al
+      // arranque del clip, así que se queda con la primera mitad; la de SALIDA vive al final, así que
+      // pasa a la segunda. la primera pierde su salida y la segunda su entrada, para que el nuevo
+      // borde entre las dos mitades quede como un corte seco y no como un cruce que nadie pidió
+      const primera = { ...c, duracion: offset, transicionSalida: undefined }
       const segunda = {
         ...c,
         id: crypto.randomUUID(),
         inicio: c.inicio + offset,
         recorteInicio: c.recorteInicio + offset * c.velocidad,
         duracion: c.duracion - offset,
+        transicion: { tipo: 'ninguna' as const, duracion: c.transicion.duracion },
       }
       const clips = [
         ...s.pista.clips.slice(0, idx),

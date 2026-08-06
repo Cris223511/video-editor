@@ -514,7 +514,6 @@ export function pintarTransicion(
       const inten = intens
       const acerc = entrante?.transicion?.acercamiento ?? saliente?.transicionSalida?.acercamiento ?? 0
       const lado = Math.min(ancho, alto)
-      const COPIAS = 22
       const smear = (clip: Clip, k: number) => {
         if (k <= 0.001) {
           pintar(clip, 1)
@@ -524,14 +523,10 @@ export function pintarTransicion(
         // desplazaba (el "whoosh") y eso dejaba la mitad de un lado nítida y la del otro borrosa,
         // porque la base a tamaño natural asomaba justo por donde la estela se había ido. centrada,
         // el borrón queda igual arriba y abajo (o a los dos lados), sin mitades
-        const largo = lado * 0.4 * inten * k // longitud de la estela en píxeles
-        const sep = largo / COPIAS // separación entre copias contiguas
-        const fundir = Math.max(0.6, sep * 0.9) // desenfoque que funde las copias en algo continuo
-        // el clip se compone una SOLA vez en un lienzo aparte y de ahí se blitean las 22 copias.
-        // antes cada copia repetía pintar() entero (color, nitidez, curvatura, relleno borroso...),
-        // o sea 22 composiciones completas por cuadro: en la transición eso se arrastraba durante
-        // minutos y la exportación parecía colgada. componiendo una vez y repitiendo ese mapa de bits
-        // la estela sale idéntica y el coste cae a la vigésima parte
+        const largo = lado * 0.5 * inten * k // longitud de la estela en píxeles
+        // el clip se compone una SOLA vez en un lienzo aparte y de ahí se blitean las copias. así no
+        // se repite pintar() entero (color, nitidez, curvatura...) por cada copia, que en la transición
+        // se arrastraba durante minutos y parecía que la exportación se colgaba
         const tmp = lienzoEstela(ancho, alto)
         const tctx = tmp.getContext('2d')
         if (!tctx) {
@@ -542,21 +537,6 @@ export function pintarTransicion(
         tctx.setTransform(1, 0, 0, 1, 0, 0)
         tctx.clearRect(0, 0, ancho, alto)
         pintar(clip, 1, tctx)
-        // base que cubre los bordes, donde la estela centrada tiene menos copias solapadas y podría
-        // asomar una franja nítida. en vez de un desenfoque isótropo fuerte (que dejaba el cuadro como
-        // una papilla redonda, poco realista) se usa una versión ESTIRADA en el mismo eje del barrido:
-        // eso lee como movimiento en esa dirección, igual que una foto movida de verdad, y tapa el
-        // borde sin necesidad de un borrón redondo. un difuminado leve encima quita el filo del estirón
-        ctx.save()
-        ctx.filter = `blur(${Math.max(0.6, largo * 0.12).toFixed(2)}px)`
-        ctx.translate(ancho / 2, alto / 2)
-        // se agranda solo en el eje del barrido para cubrir hasta donde llega la estela, dejando el
-        // otro eje intacto: así no hay zoom redondo, solo un estirón en la dirección del movimiento
-        const factor = 1 + (largo / lado) * 1.2
-        ctx.scale(ux !== 0 ? factor : 1, uy !== 0 ? factor : 1)
-        ctx.translate(-ancho / 2, -alto / 2)
-        ctx.drawImage(tmp, 0, 0)
-        ctx.restore()
         ctx.save()
         // acercamiento OPCIONAL, gobernado por su ajuste. en cero la imagen no crece nada
         const escala = 1 + acerc * 0.6 * k
@@ -565,13 +545,19 @@ export function pintarTransicion(
           ctx.scale(escala, escala)
           ctx.translate(-ancho / 2, -alto / 2)
         }
-        ctx.filter = `blur(${fundir.toFixed(2)}px)`
-        for (let i = 0; i < COPIAS; i++) {
-          const f = i / (COPIAS - 1) - 0.5 // -0.5 a 0.5 a lo largo de la estela
+        // base a tamaño natural: cubre todo el lienzo, sin bordes transparentes ni franjas nítidas
+        ctx.drawImage(tmp, 0, 0)
+        // estela en UNA sola dirección, la elegida. TODAS las copias se corren hacia el mismo lado
+        // (nunca hacia el centro ni a los dos lados), con la opacidad bajando y el desenfoque subiendo
+        // cuanto más lejos. así el barrido se lee recto hacia ese lado, como una foto movida de verdad,
+        // en lugar de abrirse desde el medio. la dirección puede venir afinada por el propio clip
+        const PASOS = 26
+        for (let i = 1; i <= PASOS; i++) {
+          const f = i / PASOS // 0 a 1 a lo largo de la estela
           const off = f * largo
           ctx.save()
-          // alfa decreciente: el conjunto es la media de las copias, no la última tapando al resto
-          ctx.globalAlpha = 1 / (i + 1)
+          ctx.globalAlpha = (1 - f) * 0.6
+          ctx.filter = `blur(${(largo * 0.05 + 0.6).toFixed(2)}px)`
           ctx.translate(ux * off, uy * off)
           ctx.drawImage(tmp, 0, 0)
           ctx.restore()
