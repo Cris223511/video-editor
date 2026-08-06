@@ -4,6 +4,13 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.40.3 (2026-08-06)
+
+- **Se revierte el cambio de reproducción del cruce de la versión anterior.** Ese ajuste, en videos
+  pesados, hacía que el cabezal saltara hacia atrás y reiniciara la reproducción, que es peor que el
+  problema que intentaba resolver. La reproducción vuelve al comportamiento estable anterior mientras
+  se rehace la mejora con más cuidado.
+
 ## 2.40.2 (2026-08-06)
 
 - **El video ya no se traba ni parpadea en medio de un cruce.** Al reproducir una transición entre dos

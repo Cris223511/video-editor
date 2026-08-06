@@ -637,36 +637,18 @@ export default function Preview() {
           const gc = gananciasClipRef.current.get(companero.id)
           if (gc) gc.gain.value = 0
           cv.playbackRate = companero.velocidad
+          // su tiempo continuo: la cola del que sale, o la cabeza del que entra antes de
+          // su inicio (offset negativo). se recoloca si está pausado o se desfasó; si ya
+          // venía rodando, se deja para no dar tirones
           const objetivo = companero.recorteInicio + (ph - companero.inicio) * companero.velocidad
-          // el compañero solo puede rodar mientras su objetivo caiga dentro del material de su archivo
-          // (de 0 a la duración de la fuente). así aprovecha la COLA del que sale y la CABEZA del que
-          // entra cuando el clip está recortado y hay metraje de sobra. pero cuando ya no hay más (el que
-          // entra antes del segundo 0 de su fuente, o el que sale pasado el final de la suya) no se puede
-          // reproducir en vacío: antes se le forzaba un seek y, como el objetivo se quedaba clavado en el
-          // extremo mientras el video seguía, se desfasaban y saltaba un seek de vuelta una y otra vez,
-          // que es lo que se veía como parpadeo y tirón. ahí se deja quieto en el fotograma del extremo
-          const finFuente = companero.duracionFuente
-          const dentroDeSuFuente = objetivo >= -0.02 && objetivo <= finFuente + 0.02
-          if (dentroDeSuFuente) {
-            if (Math.abs(cv.currentTime - objetivo) > 0.4) {
-              try {
-                cv.currentTime = objetivo
-              } catch {
-                // sin metadatos todavía
-              }
-            }
-            if (cv.paused) cv.play().catch(() => {})
-          } else {
-            const borde = objetivo < 0 ? 0 : finFuente
-            if (!cv.paused) cv.pause()
-            if (Math.abs(cv.currentTime - borde) > 0.05) {
-              try {
-                cv.currentTime = borde
-              } catch {
-                // sin metadatos todavía
-              }
+          if (cv.paused || Math.abs(cv.currentTime - objetivo) > 0.4) {
+            try {
+              cv.currentTime = Math.max(0, objetivo)
+            } catch {
+              // sin metadatos todavía
             }
           }
+          if (cv.paused) cv.play().catch(() => {})
         }
       }
       // un nivel silenciado no aporta sonido: su clip se ve pero la ganancia baja
@@ -689,24 +671,18 @@ export default function Preview() {
       // línea de tiempo no se descuadra
       const st = useEditorStore.getState()
       v.playbackRate = act.velocidad * (st.grabandoMovimiento ? st.velocidadGrabacion : 1)
-      // se recoloca el video al saltar el cabezal a mano, o si estaba en pausa y ADEMÁS su fotograma no
-      // corresponde con el instante actual. antes bastaba con estar en pausa para hacer el seek, pero
-      // cuando un clip venía de ser el compañero de un cruce (ya colocado en el fotograma bueno y solo
-      // pausado) ese seek al pasar a activo lo mandaba a su mismo sitio y, con la decodificación por
-      // hardware, parpadeaba en el corte. si ya está donde toca, solo se le da play
-      const objAct = act.recorteInicio + (ph - act.inicio) * act.velocidad
-      const necesitaSeek = salto || (v.paused && Math.abs(v.currentTime - objAct) > 0.12)
-      if (necesitaSeek) {
+      // se recoloca el video si estaba en pausa o si el cabezal acaba de saltar a
+      // mano; así el arrastre de la línea azul mueve de verdad la imagen. también pasa
+      // al cambiar de un clip al siguiente, cuando el nuevo video entra pausado
+      const recolocado = v.paused || salto
+      if (recolocado) {
         try {
-          v.currentTime = objAct
+          v.currentTime = act.recorteInicio + (ph - act.inicio) * act.velocidad
         } catch {
           // sin metadatos todavía
         }
+        if (v.paused) v.play().catch(() => {})
       }
-      // se marca como "recolocado" (para que el cabezal avance con el reloj mientras el video reengancha)
-      // tanto si hubo seek como si el video venía pausado y tarda uno o dos fotogramas en arrancar
-      const recolocado = necesitaSeek || v.paused
-      if (v.paused) v.play().catch(() => {})
       // el fondo borroso del clip activo persigue al video real: mismo asset, misma
       // velocidad y mismo tiempo, para que se vea el material en movimiento y no un
       // cuadro congelado. si se desfasa un poco se reengancha sin cortar la imagen. los
@@ -740,25 +716,10 @@ export default function Preview() {
       // antes de saltar a donde toca, y el corte se veía con un frame malo
       const sig = posterior(act, clipsOrdenados)
       if (sig) {
-        // punto donde el video del siguiente debe estar listo. si entra con un CRUCE (disolución u
-        // otra transición centrada) empieza a verse un poco ANTES del corte, así que se pre-posiciona
-        // en ese arranque —el recorte menos la mitad de salida del cruce— y no en su recorte pelado.
-        // así, al entrar el cruce, su fotograma ya está decodificado ahí y no hace falta un seek que
-        // congelaba y parpadeaba en mitad de la transición
-        const trSig = sig.transicion
-        // solo es un cruce si además están pegados: con un hueco entre ellos, la transición del
-        // siguiente es su aparición contra el fondo, no un cruce con este, y arranca en su recorte
-        const pegadoSig = Math.abs(sig.inicio - (act.inicio + act.duracion)) < 0.05
-        const hayCruce = pegadoSig && !!trSig && trSig.tipo !== 'ninguna' && trSig.tipo !== 'corte'
-        let posSig = sig.recorteInicio
-        if (hayCruce) {
-          const medioSale = Math.min((trSig.duracionSalida ?? trSig.duracion) / 2, act.duracion * 0.9, sig.duracion * 0.9)
-          posSig = Math.max(0, sig.recorteInicio - medioSale * sig.velocidad)
-        }
         const vsig = videosRef.current.get(sig.id)
-        if (vsig && Math.abs(vsig.currentTime - posSig) > 0.05) {
+        if (vsig && Math.abs(vsig.currentTime - sig.recorteInicio) > 0.05) {
           try {
-            vsig.currentTime = posSig
+            vsig.currentTime = sig.recorteInicio
           } catch {
             // sin metadatos todavía
           }
@@ -767,9 +728,9 @@ export default function Preview() {
         // no, al cruzar el corte sus bandas aparecen un instante en negro porque el video
         // del fondo aún no tiene fotograma decodificado en esa posición
         const fsig = fondosRef.current.get(sig.id)
-        if (fsig && Math.abs(fsig.currentTime - posSig) > 0.05) {
+        if (fsig && Math.abs(fsig.currentTime - sig.recorteInicio) > 0.05) {
           try {
-            fsig.currentTime = posSig
+            fsig.currentTime = sig.recorteInicio
           } catch {
             // sin metadatos todavía
           }
