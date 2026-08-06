@@ -623,6 +623,8 @@ interface EstadoEditor {
   pausar: () => void
   alternarReproduccion: () => void
   aplicarZoom: (factor: number) => void
+  // ajusta el zoom para que todo el proyecto quepa en el ancho visible de la línea de tiempo
+  ajustarZoomAlAncho: () => void
 
   // historial de deshacer y rehacer. cada entrada es una instantánea del
   // documento (solo lo editable), sin la selección ni el cabezal ni el zoom
@@ -1448,11 +1450,11 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       const primero = s.pista.clips.length === 0 && asset.ancho > 0
       const resolucionAuto = primero ? { ancho: asset.ancho, alto: asset.alto } : s.resolucionAuto
       const resolucion = primero && !s.lienzoManual ? resolucionAuto : s.resolucion
-      // al colocar el video se reajusta el zoom para que su duración entera quepa
-      // en el ancho visible; así no hace falta alejar a mano para ver el clip
-      // completo. si todavía no se conoce el ancho, el zoom se queda como estaba
+      // solo el PRIMER clip encuadra el zoom para que quepa entero en el ancho visible; a partir de
+      // ahí se respeta el zoom en el que esté el usuario, porque reajustarlo en cada clip que se
+      // agrega alejaba la línea de tiempo de golpe y sacaba de donde se estaba trabajando
       const nuevosClips = [...clipsPrevios, clip]
-      const encaje = zoomParaEncuadrar(duracionTotal(nuevosClips), s.anchoTimeline)
+      const encaje = s.pista.clips.length === 0 ? zoomParaEncuadrar(duracionTotal(nuevosClips), s.anchoTimeline) : null
       return {
         numPistas,
         altosPista,
@@ -3846,6 +3848,15 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     set((s) => ({
       pxPorSegundo: Math.max(PX_MIN, Math.min(PX_MAX, s.pxPorSegundo * factor)),
     })),
+
+  // pone el zoom para que TODO el proyecto quepa en el ancho visible de la línea de tiempo, de una
+  // vez, sin tener que alejar a mano. es el botón de "ajustar al ancho"
+  ajustarZoomAlAncho: () =>
+    set((s) => {
+      const total = duracionProyecto(s.pista.clips, s.capas, s.audios, s.audioRegiones)
+      const px = zoomParaEncuadrar(total, s.anchoTimeline)
+      return px ? { pxPorSegundo: px } : {}
+    }),
 
     pasado: [],
     futuro: [],

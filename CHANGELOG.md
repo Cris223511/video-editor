@@ -4,6 +4,18 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.39.0 (2026-08-06)
+
+- **La línea de tiempo ya no se aleja sola al agregar clips.** Antes, cada video que soltabas reajustaba el
+  zoom para que cupiera todo y te sacaba de donde estabas. Ahora solo el primer clip encuadra la vista; a
+  partir de ahí se respeta el zoom en el que estés trabajando.
+- **Botón para ajustar al ancho.** En la barra de la línea de tiempo, junto a acercar y alejar, hay un
+  botón que pone el zoom justo para que todo el proyecto quepa de un vistazo.
+- **Recortar el final de un clip ya no mueve la línea de tiempo.** Al acortar el último clip, la vista se
+  reajustaba sola y el tirador se escapaba del cursor. Ahora se queda quieta mientras recortas.
+- **Shift al recortar mantiene la proporción.** Al arrastrar una esquina del recuadro de recorte con Shift,
+  el ancho y el alto cambian a la vez, conservando la forma; antes solo funcionaba en los recortes redondos.
+
 ## 2.38.0 (2026-08-06)
 
 - **Número de orden en cada medio.** Cada archivo del panel de Medios muestra arriba a la izquierda su

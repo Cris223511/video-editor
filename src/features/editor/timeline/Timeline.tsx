@@ -1,5 +1,6 @@
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
+import { UnfoldHorizontal } from 'lucide-react'
 import Icon from '../../../components/ui/Icon'
 import Tooltip from '../../../components/ui/Tooltip'
 import BarraGlobales from '../BarraGlobales'
@@ -110,6 +111,7 @@ export default function Timeline({
   const irA = useEditorStore((s) => s.irA)
   const pausar = useEditorStore((s) => s.pausar)
   const aplicarZoom = useEditorStore((s) => s.aplicarZoom)
+  const ajustarZoomAlAncho = useEditorStore((s) => s.ajustarZoomAlAncho)
   const setAnchoTimeline = useEditorStore((s) => s.setAnchoTimeline)
   const limpiarSeleccion = useEditorStore((s) => s.limpiarSeleccion)
   const marcarBloques = useEditorStore((s) => s.marcarBloques)
@@ -249,7 +251,15 @@ export default function Timeline({
     window.addEventListener('pointerup', soltar)
   }
   // arrastre de una fila de audio para reordenarla entre las demás. las filas se
-  const anchoContenido = Math.max(total * pxPorSegundo + 200, anchoVisible || 600)
+  const anchoBase = Math.max(total * pxPorSegundo + 200, anchoVisible || 600)
+  // durante un recorte activo el ancho del contenido no debe MENGUAR: al acortar el último clip,
+  // `total` baja, el contenido se encoge y el navegador re-clampea el scroll, con lo que la vista
+  // saltaba y arrastraba el tirador lejos del cursor. mientras dura el recorte se congela hacia
+  // abajo (solo puede crecer); al soltar, se recalcula limpio
+  const recortando = useEditorStore((s) => s.previsualizacion) !== null
+  const anchoRef = useRef(0)
+  if (!recortando) anchoRef.current = anchoBase
+  const anchoContenido = recortando ? Math.max(anchoBase, anchoRef.current) : anchoBase
 
   // instantes a los que se imantan clips y capas: el cero, el cabezal y los
   // bordes de todos los elementos
@@ -686,6 +696,17 @@ export default function Timeline({
             </button>
           </Tooltip>
           <span className="mx-1 h-5 w-px" style={{ background: 'rgb(var(--border) / 0.14)' }} />
+          <Tooltip texto="Ajustar al ancho" lado="abajo">
+            <button
+              onClick={() => {
+                congelarLayoutUnInstante()
+                ajustarZoomAlAncho()
+              }}
+              className="interactivo grid h-8 w-8 place-items-center rounded-lg text-[color:var(--muted)]"
+            >
+              <UnfoldHorizontal size={18} />
+            </button>
+          </Tooltip>
           <Tooltip texto="Alejar" lado="abajo">
             <button
               onClick={() => {

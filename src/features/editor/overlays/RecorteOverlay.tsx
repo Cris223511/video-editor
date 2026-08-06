@@ -190,6 +190,12 @@ export default function RecorteOverlay() {
     // cursor al mismo espacio que la caja
     const escX = rr.width > 0 ? tam.w / rr.width : 1
     const escY = rr.height > 0 ? tam.h / rr.height : 1
+    // estado al empezar el gesto: sirve para conservar la proporción con Shift en un rectángulo,
+    // tomando como referencia el ancho y el alto (en píxeles de visor) que tenía el recorte al agarrar
+    const recInicio = { ...rec }
+    const wPx0 = (1 - recInicio.izq - recInicio.der) * caja.w
+    const hPx0 = (1 - recInicio.arr - recInicio.aba) * caja.h
+    const aspInicio = hPx0 > 0 ? wPx0 / hPx0 : 1
     const mover = (ev: globalThis.MouseEvent) => {
       // los atajos son los mismos que en las figuras y las censuras del lienzo, para
       // no tener que recordar dos juegos de teclas: sin nada, cada lado se estira
@@ -204,6 +210,33 @@ export default function RecorteOverlay() {
         const dxp = Math.abs((ev.clientX - rr.left) * escX - cxpx)
         const dyp = Math.abs((ev.clientY - rr.top) * escY - cypx)
         aplicarRecorte(recorteCircular(Math.max(dxp, dyp)))
+        return
+      }
+      // Shift en una ESQUINA de un rectángulo: conserva la proporción, así el ancho y el alto crecen
+      // o menguan a la vez. la esquina opuesta queda anclada y la que se arrastra manda por el eje que
+      // más se movió, sacando el otro de la proporción de partida
+      if (!esRedondo && ev.shiftKey && lados.length === 2) {
+        const fx = ((ev.clientX - rr.left) * escX - caja.x) / caja.w
+        const fy = ((ev.clientY - rr.top) * escY - caja.y) / caja.h
+        const movX: Lado = lados.includes('der') ? 'der' : 'izq'
+        const movY: Lado = lados.includes('aba') ? 'aba' : 'arr'
+        // borde fijo (la esquina de enfrente), en fracción de la caja
+        const anclaX = movX === 'der' ? recInicio.izq : 1 - recInicio.der
+        const anclaY = movY === 'aba' ? recInicio.arr : 1 - recInicio.aba
+        let wFrac = Math.max(0.02, movX === 'der' ? fx - anclaX : anclaX - fx)
+        let hFrac = Math.max(0.02, movY === 'aba' ? fy - anclaY : anclaY - fy)
+        // el eje que más creció respecto a la proporción manda; el otro sale de él
+        if ((wFrac * caja.w) / Math.max(1e-6, hFrac * caja.h) > aspInicio) {
+          hFrac = (wFrac * caja.w) / aspInicio / caja.h
+        } else {
+          wFrac = (hFrac * caja.h) * aspInicio / caja.w
+        }
+        const cambios: Partial<typeof CERO> = {}
+        if (movX === 'der') cambios.der = 1 - (anclaX + wFrac)
+        else cambios.izq = anclaX - wFrac
+        if (movY === 'aba') cambios.aba = 1 - (anclaY + hFrac)
+        else cambios.arr = anclaY - hFrac
+        aplicarRecorte(cambios)
         return
       }
       const fx = ((ev.clientX - rr.left) * escX - caja.x) / caja.w
