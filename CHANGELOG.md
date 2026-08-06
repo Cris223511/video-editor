@@ -4,6 +4,11 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.41.1 (2026-08-06)
+
+- **Importar es más rápido.** La medición del ritmo del video (que se agregó para topar las fotografías
+  por segundo al exportar) se afinó para tardar menos, así traer varios videos ya no se demora de más.
+
 ## 2.41.0 (2026-08-06)
 
 - **Las fotografías por segundo al exportar se topan a las del video.** Ahora se mide el ritmo real de

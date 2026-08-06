@@ -157,7 +157,9 @@ function medirFps(video: HTMLVideoElement): Promise<number | undefined> {
     const onFrame = (_now: number, meta: { mediaTime: number }) => {
       if (hecho) return
       tiempos.push(meta.mediaTime)
-      if (tiempos.length >= 16) {
+      // con diez cuadros ya hay nueve diferencias, de sobra para una mediana estable, y el import no se
+      // demora de más: se corta en cuanto se juntan
+      if (tiempos.length >= 10) {
         acabar(fpsDeTiempos(tiempos))
         return
       }
@@ -165,8 +167,8 @@ function medirFps(video: HTMLVideoElement): Promise<number | undefined> {
     }
     video.muted = true
     video.play().then(() => rvfc(onFrame)).catch(() => acabar(undefined))
-    // red de seguridad: si en dos segundos no se juntan los cuadros, se resuelve con lo que haya
-    window.setTimeout(() => acabar(fpsDeTiempos(tiempos)), 2000)
+    // red de seguridad: si en poco más de un segundo no se juntan los cuadros, se resuelve con lo que haya
+    window.setTimeout(() => acabar(fpsDeTiempos(tiempos)), 1200)
   })
 }
 
