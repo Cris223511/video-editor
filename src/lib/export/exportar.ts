@@ -100,6 +100,10 @@ export function bitrateSegunMedios(
   ancho: number,
   alto: number,
   fps = 30,
+  // ritmo del material de origen. el bitrate se iguala al de la fuente a ESE ritmo, así que si se exporta
+  // a menos fotogramas por segundo hace falta proporcionalmente menos bitrate (y el archivo pesa menos).
+  // sin este dato se asume que el ritmo elegido es el de la fuente y no se escala
+  fpsFuente = fps,
 ): number {
   let bps = 0
   for (const m of medios) {
@@ -110,9 +114,11 @@ export function bitrateSegunMedios(
     bps = Math.max(bps, srcBps * ratio)
   }
   if (!bps) return bitrateVideo(ancho, alto, fps)
-  // el tamaño de la fuente incluye su audio, así que ya trae algo de holgura; un 10% extra asegura
-  // que no se pierda detalle al recomprimir. tope de 40 Mbps
-  return Math.min(40_000_000, Math.round(bps * 1.1))
+  // el tamaño de la fuente incluye su audio, así que ya trae algo de holgura; un 10% extra asegura que
+  // no se pierda detalle al recomprimir. el bitrate se escala del ritmo de la fuente al ritmo elegido:
+  // exportar a menos fotogramas por segundo pesa menos, en la misma proporción. tope de 40 Mbps
+  const escalaFps = fpsFuente > 0 ? Math.min(1.5, fps / fpsFuente) : 1
+  return Math.min(40_000_000, Math.round(bps * 1.1 * escalaFps))
 }
 
 function cargarImagen(src: string): Promise<HTMLImageElement> {

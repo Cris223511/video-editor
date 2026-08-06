@@ -16,6 +16,11 @@ export interface MediaAsset {
   duracion: number // en segundos; 0 en las imágenes
   ancho: number // 0 en el audio
   alto: number // 0 en el audio
+  // fotogramas por segundo REALES del video de origen (24, 30, 59.94, 60, 144...). se mide al importar
+  // reproduciendo un instante y contando cuadros. marca el tope de fps que se puede elegir al exportar
+  // (no se puede subir por encima de lo que grabó la fuente) y sirve para estimar el peso según el ritmo.
+  // ausente en audio e imagen, o si no se pudo medir
+  fps?: number
   url: string // object url para previsualizar sin recodificar
   miniatura: string // data url de portada; vacía en el audio
   // el archivo ya no se puede leer: pasa cuando se guardó una referencia al fichero

@@ -110,6 +110,66 @@ export function frameDeVideo(url: string, segundo: number): Promise<string> {
   })
 }
 
+// fotogramas por segundo a partir de los instantes de presentación de varios cuadros seguidos: la
+// diferencia entre uno y el siguiente es la duración de un fotograma, y su MEDIANA (robusta ante algún
+// cuadro repetido o saltado) da el ritmo real. se redondea a dos decimales para conservar valores como
+// 23.98 o 59.94 sin arrastrar ruido
+function fpsDeTiempos(tiempos: number[]): number | undefined {
+  const diffs: number[] = []
+  for (let i = 1; i < tiempos.length; i++) {
+    const d = tiempos[i] - tiempos[i - 1]
+    if (d > 0.0004) diffs.push(d)
+  }
+  if (diffs.length < 2) return undefined
+  diffs.sort((a, b) => a - b)
+  const med = diffs[Math.floor(diffs.length / 2)]
+  return med > 0 ? Math.round((1 / med) * 100) / 100 : undefined
+}
+
+// mide los fotogramas por segundo del video reproduciendo un instante y contando cuadros con
+// requestVideoFrameCallback (la única vía fiable en el navegador; el elemento de video no expone el
+// ritmo). si el navegador no la trae, o no se juntan suficientes cuadros, se devuelve indefinido y se
+// cae a un valor por defecto donde haga falta
+function medirFps(video: HTMLVideoElement): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    const rvfc = (
+      video as HTMLVideoElement & {
+        requestVideoFrameCallback?: (cb: (now: number, meta: { mediaTime: number }) => void) => number
+      }
+    ).requestVideoFrameCallback?.bind(video)
+    if (!rvfc) {
+      resolve(undefined)
+      return
+    }
+    const tiempos: number[] = []
+    let hecho = false
+    const acabar = (val?: number) => {
+      if (hecho) return
+      hecho = true
+      try {
+        video.pause()
+        video.currentTime = 0
+      } catch {
+        // sin metadatos
+      }
+      resolve(val)
+    }
+    const onFrame = (_now: number, meta: { mediaTime: number }) => {
+      if (hecho) return
+      tiempos.push(meta.mediaTime)
+      if (tiempos.length >= 16) {
+        acabar(fpsDeTiempos(tiempos))
+        return
+      }
+      rvfc(onFrame)
+    }
+    video.muted = true
+    video.play().then(() => rvfc(onFrame)).catch(() => acabar(undefined))
+    // red de seguridad: si en dos segundos no se juntan los cuadros, se resuelve con lo que haya
+    window.setTimeout(() => acabar(fpsDeTiempos(tiempos)), 2000)
+  })
+}
+
 // mira si el fotograma dibujado está prácticamente en negro. muestrea de salto en
 // salto para no recorrer millones de píxeles y promedia el brillo; por debajo de
 // un umbral bajo se considera negro y conviene probar otro instante del video
@@ -142,6 +202,7 @@ export function analizarVideo(file: File): Promise<Omit<MediaAsset, 'id'>> {
     video.src = url
 
     let duracion = 0
+    let fps: number | undefined
     // orden de instantes a intentar: primero la mitad exacta, que es la más
     // representativa; si ahí el video está en negro (un corte, un fundido), se
     // tantean otros puntos alrededor antes de rendirse
@@ -158,6 +219,7 @@ export function analizarVideo(file: File): Promise<Omit<MediaAsset, 'id'>> {
         duracion,
         ancho: video.videoWidth,
         alto: video.videoHeight,
+        fps,
         url,
         miniatura,
       })
@@ -185,7 +247,12 @@ export function analizarVideo(file: File): Promise<Omit<MediaAsset, 'id'>> {
 
     video.onloadedmetadata = () => {
       duracion = isFinite(video.duration) ? video.duration : 0
-      siguienteInstante()
+      // primero se mide el ritmo (reproduciendo un momento), y recién después se salta a buscar la
+      // portada; hacerlo al revés dejaba el video en mitad de un seek al querer reproducir para contar
+      medirFps(video).then((f) => {
+        fps = f
+        siguienteInstante()
+      })
     }
 
     video.onseeked = () => {

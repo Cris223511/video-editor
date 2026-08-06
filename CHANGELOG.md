@@ -4,6 +4,14 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.41.0 (2026-08-06)
+
+- **Las fotografías por segundo al exportar se topan a las del video.** Ahora se mide el ritmo real de
+  cada video al importarlo, y al exportar no se puede elegir más de lo que grabó la fuente (subirlo solo
+  repetiría cuadros, no añade fluidez). Se ofrece ese ritmo como máximo y se puede bajar.
+- **El peso estimado cambia al cambiar las fotografías por segundo.** Antes se quedaba igual; ahora, al
+  bajar el ritmo, el archivo estimado pesa proporcionalmente menos, como es lógico.
+
 ## 2.40.4 (2026-08-06)
 
 - **La exportación ya no se congela en una transición.** Cuando el motor rápido no podía con un proyecto

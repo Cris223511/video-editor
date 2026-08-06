@@ -239,6 +239,20 @@ export default function ExportDialog() {
 
   const estado = useEditorStore.getState()
   const medios = useProjectStore.getState().medios
+  // ritmo del material: el mayor de los videos, redondeado a entero (59.94 sale 60, 143.9 sale 144). es
+  // el TOPE que se puede elegir, porque exportar a más fotogramas de los que grabó la fuente solo
+  // repetiría cuadros, no añade fluidez. si no se pudo medir ninguno se permite hasta 60, un valor sano
+  const fpsFuente = (() => {
+    const ritmos = medios
+      .filter((m) => m.clase === 'video' && m.fps && m.fps > 0)
+      .map((m) => Math.round(m.fps as number))
+    return ritmos.length ? Math.max(...ritmos) : 60
+  })()
+  // opciones ofrecidas: los pasos corrientes que no pasen del tope, más el propio ritmo de la fuente,
+  // para que se pueda bajar (menos peso) pero nunca subir por encima de lo grabado
+  const opcionesFps = [...new Set([...[24, 30, 48, 60].filter((v) => v <= fpsFuente), fpsFuente])].sort(
+    (a, b) => a - b,
+  )
   // el título del proyecto, en vivo: es el nombre con el que se descargará el archivo y también
   // el nombre del proyecto. se edita desde el propio diálogo mientras se exporta, así que se lee
   // reactivo (no un snapshot) para reflejar cada tecla, y al descargar se toma el último valor
@@ -284,7 +298,7 @@ export default function ExportDialog() {
   // bitrate base: igualado al del material original para que, en 100, el video salga tal cual. el nivel
   // de compresión lo escala hacia abajo (nunca por encima, ampliar no añade detalle). sirve para el peso
   // estimado y la tasa de bits que se muestran en vivo, y se le pasa a los motores de exportación
-  const bitrateBase = bitrateSegunMedios(medios, ancho, alto, fps)
+  const bitrateBase = bitrateSegunMedios(medios, ancho, alto, fps, fpsFuente)
   const bitrateObjetivo = Math.max(100_000, Math.round((bitrateBase * compresion) / 100))
   const bytesEstimados = total > 0 ? ((bitrateObjetivo + BITRATE_AUDIO) * total) / 8 : 0
 
@@ -293,6 +307,8 @@ export default function ExportDialog() {
   useEffect(() => {
     if (!abierto) return
     setCalidad(topeCalidad)
+    // se parte del ritmo de la fuente, para exportar tal cual sin tocar nada
+    setFps(fpsFuente)
     setCompresion(100)
     setAvanzado(false)
     setFormato('mp4')
@@ -649,7 +665,7 @@ export default function ExportDialog() {
               className="flex gap-1 rounded-xl p-1"
               style={{ background: 'rgb(var(--border) / 0.12)' }}
             >
-              {[24, 30, 60].map((v) => {
+              {opcionesFps.map((v) => {
                 const activo = fps === v
                 return (
                   <button
@@ -670,10 +686,10 @@ export default function ExportDialog() {
             </div>
           </div>
 
-          {fps === 60 && (
+          {fps >= 60 && (
             <p className="mb-4 text-xs italic leading-relaxed text-[color:var(--muted)]">
-              A 60 fotografías por segundo el movimiento se percibe más fluido, aunque el archivo
-              resulta bastante más pesado y la exportación tarda lo mismo que dura el video.
+              A muchas fotografías por segundo el movimiento se percibe más fluido, aunque el archivo
+              resulta bastante más pesado. Bajar el ritmo aligera el archivo.
             </p>
           )}
 
