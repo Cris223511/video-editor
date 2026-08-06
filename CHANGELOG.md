@@ -4,6 +4,15 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.40.4 (2026-08-06)
+
+- **La exportación ya no se congela en una transición.** Cuando el motor rápido no podía con un proyecto
+  y pasaba al motor de respaldo, este se quedaba clavado justo al llegar a un cruce entre clips: el video
+  se atascaba unos fotogramas antes del final del primer clip y la exportación no avanzaba nunca. Ahora,
+  si el video se queda sin datos, la exportación sigue con el reloj y cruza la transición sin trabarse.
+- **El campo del nombre del archivo al exportar se ve siempre como un campo.** Antes, en reposo, parecía
+  solo texto suelto; ahora lleva un borde y un fondo tenues para que se note que se puede editar.
+
 ## 2.40.3 (2026-08-06)
 
 - **Se revierte el cambio de reproducción del cruce de la versión anterior.** Ese ajuste, en videos

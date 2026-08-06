@@ -928,8 +928,10 @@ export default function ExportDialog() {
         <>
           {/* nombre del archivo, editable mientras se exporta. es el mismo título del proyecto:
               lo que se escriba aquí lo renombra en vivo, y al terminar la descarga usa el último
-              valor. se ve como texto normal y al pasar el cursor o enfocarlo se marca como campo,
-              con el ".mp4" (o ".webm") FUERA del campo para dejar claro qué se le concatena */}
+              valor. lleva SIEMPRE un borde y un fondo tenues para que se lea de una que es un campo
+              editable (sin ellos, en reposo parecía solo texto suelto), y se marca más al pasar el
+              cursor o enfocarlo. el ".mp4" (o ".webm") va FUERA del campo, para dejar claro qué se le
+              concatena */}
           <div className="mb-4">
             <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[color:var(--muted)]">
               Nombre del archivo
@@ -940,7 +942,7 @@ export default function ExportDialog() {
                 onChange={(e) => useProjectStore.setState({ titulo: e.target.value })}
                 placeholder="Nombre del video"
                 spellCheck={false}
-                className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-3 py-2 text-sm font-medium outline-none transition-colors duration-150 hover:border-[rgb(var(--border)/0.45)] hover:bg-[rgb(var(--border)/0.06)] focus:border-brand focus:bg-[rgb(var(--border)/0.09)]"
+                className="min-w-0 flex-1 rounded-lg border border-[rgb(var(--border)/0.28)] bg-[rgb(var(--border)/0.04)] px-3 py-2 text-sm font-medium outline-none transition-colors duration-150 hover:border-[rgb(var(--border)/0.5)] hover:bg-[rgb(var(--border)/0.07)] focus:border-brand focus:bg-[rgb(var(--border)/0.09)]"
               />
               <span className="shrink-0 text-sm font-semibold text-[color:var(--muted)]">
                 .{formato}

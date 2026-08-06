@@ -453,6 +453,13 @@ export function exportarProyecto(datos: DatosExport, onProgreso: OnProgreso): Co
         }
 
         const phRef = { t: 0 }
+        // control de atasco del video activo: si su currentTime deja de avanzar (se queda sin datos,
+        // cosa que pasa cerca del fin de un clip cuando además hay que decodificar el del cruce), el
+        // cabezal debe seguir con el reloj real en vez de esperar para siempre a un instante que el
+        // video no alcanza, que es lo que congelaba la exportación en la transición
+        let ctPrev = -1
+        let estancado = 0
+        let ultimoTick = performance.now()
         grabadora.start()
 
         const cablear = (id: string, v: HTMLVideoElement) => {
@@ -538,9 +545,36 @@ export function exportarProyecto(datos: DatosExport, onProgreso: OnProgreso): Co
             v.play().catch(() => {})
           }
           const finUso = act.recorteInicio + act.duracion * act.velocidad
-          if (v.currentTime >= finUso - 0.02) {
+          const finReal = Math.min(act.inicio + act.duracion, total)
+          // tiempo real transcurrido, para avanzar el cabezal cuando el video se atasca
+          const ahora = performance.now()
+          const dt = Math.min(0.05, (ahora - ultimoTick) / 1000)
+          ultimoTick = ahora
+          // ¿avanzó el video desde la última vuelta? si lleva un rato clavado, está atascado
+          if (Math.abs(v.currentTime - ctPrev) > 0.001) {
+            ctPrev = v.currentTime
+            estancado = 0
+          } else {
+            estancado += dt
+          }
+          // el clip se da por terminado cuando el video llega cerca de su fin (con holgura, porque el
+          // último fotograma suele caer un pelo antes de la duración nominal), o cuando el cabezal ya
+          // alcanzó el fin en la línea de tiempo. antes se exigía llegar EXACTO a finUso y, si el video
+          // se quedaba corto o sin datos, el bucle esperaba para siempre y se congelaba en la transición
+          if (v.currentTime >= finUso - 0.06 || v.ended || phRef.t >= finReal - 0.01) {
             v.pause()
-            phRef.t = Math.min(act.inicio + act.duracion, total)
+            phRef.t = finReal
+            estancado = 0
+            ctPrev = -1
+          } else if (estancado > 0.4) {
+            // atascado a mitad del clip (sin datos): el cabezal sigue con el reloj y se empuja el video
+            // a esa posición para que reenganche en cuanto pueda, sin dejar la exportación congelada
+            phRef.t = Math.min(phRef.t + dt * act.velocidad, finReal)
+            try {
+              v.currentTime = act.recorteInicio + (phRef.t - act.inicio) * act.velocidad
+            } catch {
+              // sin metadatos aún
+            }
           } else {
             phRef.t = Math.min(act.inicio + (v.currentTime - act.recorteInicio) / act.velocidad, total)
           }
