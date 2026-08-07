@@ -4,6 +4,17 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.44.0 (2026-08-07)
+
+- **Las transiciones ahora son un solape de verdad: los dos clips corren a la vez.** Antes, durante una
+  transición, el clip que salía se quedaba congelado en su último cuadro mientras el que entraba
+  reproducía. Ahora, igual que en los editores de escritorio, la transición es un solape entre los dos
+  planos: el que sale reproduce su cola y el que entra su cabeza, los dos avanzando al mismo tiempo,
+  mientras uno se funde en el otro. Al poner o ensanchar una transición, la línea de tiempo se acorta
+  en esa duración (el cruce se come cola del primero y cabeza del segundo), como es de esperar. Se ve
+  fluido y con los tiempos exactos tanto al reproducir como al exportar, y la duración del proyecto
+  refleja ese acortamiento en todos lados.
+
 ## 2.43.0 (2026-08-07)
 
 - **Las transiciones ya no congelan el segundo clip.** Antes, al poner una transición entre dos clips,
