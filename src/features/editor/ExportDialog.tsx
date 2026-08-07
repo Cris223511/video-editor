@@ -14,6 +14,7 @@ import { soportaH265, type Contenedor, type CodecVideo } from '../../lib/export/
 import { FORMATOS_EXOTICOS, RECOMPRIME, esExotico, type FormatoExotico } from '../../lib/export/formatos'
 import { sinExtensionMedia } from '../../lib/proyecto/nombre'
 import AyudaExport from './AyudaExport'
+import { Deslizador } from '../../components/ui/Controls'
 import { ChevronDown } from 'lucide-react'
 
 type Fase = 'inicio' | 'exportando' | 'listo' | 'error'
@@ -89,16 +90,7 @@ function SliderMejora({
           {valor === 0 ? 'Desactivada' : `${valor}%`}
         </span>
       </div>
-      <input
-        type="range"
-        min={0}
-        max={100}
-        step={5}
-        value={valor}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full cursor-pointer"
-        style={{ accentColor: '#1861ff' }}
-      />
+      <Deslizador valor={valor} min={0} max={100} paso={5} onChange={onChange} />
     </div>
   )
 }
@@ -722,16 +714,7 @@ export default function ExportDialog() {
                     <span className="text-[color:var(--muted)]">({compresion}%)</span>
                   </span>
                 </div>
-                <input
-                  type="range"
-                  min={10}
-                  max={100}
-                  step={5}
-                  value={compresion}
-                  onChange={(e) => setCompresion(Number(e.target.value))}
-                  className="w-full cursor-pointer"
-                  style={{ accentColor: '#1861ff' }}
-                />
+                <Deslizador valor={compresion} min={10} max={100} paso={5} onChange={setCompresion} />
                 {/* lectura en vivo: la tasa de bits y el peso cambian conforme se mueve el control, igual
                     que en los compresores conocidos, para que se vea el efecto al instante */}
                 <div
@@ -892,15 +875,12 @@ export default function ExportDialog() {
                           <span className="text-[color:var(--muted)]">Desde</span>
                           <span className="font-semibold tabular-nums">{formatearDuracion(tramoInicio)}</span>
                         </div>
-                        <input
-                          type="range"
+                        <Deslizador
+                          valor={tramoInicio}
                           min={0}
                           max={total}
-                          step={0.1}
-                          value={tramoInicio}
-                          onChange={(e) => setTramoInicio(Math.min(Number(e.target.value), tramoFin - 0.2))}
-                          className="w-full cursor-pointer"
-                          style={{ accentColor: '#1861ff' }}
+                          paso={0.1}
+                          onChange={(v) => setTramoInicio(Math.min(v, tramoFin - 0.2))}
                         />
                       </div>
                       <div>
@@ -908,15 +888,12 @@ export default function ExportDialog() {
                           <span className="text-[color:var(--muted)]">Hasta</span>
                           <span className="font-semibold tabular-nums">{formatearDuracion(tramoFin)}</span>
                         </div>
-                        <input
-                          type="range"
+                        <Deslizador
+                          valor={tramoFin}
                           min={0}
                           max={total}
-                          step={0.1}
-                          value={tramoFin}
-                          onChange={(e) => setTramoFin(Math.max(Number(e.target.value), tramoInicio + 0.2))}
-                          className="w-full cursor-pointer"
-                          style={{ accentColor: '#1861ff' }}
+                          paso={0.1}
+                          onChange={(v) => setTramoFin(Math.max(v, tramoInicio + 0.2))}
                         />
                       </div>
                     </div>
