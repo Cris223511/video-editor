@@ -9,7 +9,7 @@ import MarcoOverlay from './overlays/MarcoOverlay'
 import { useEditorStore } from '../../store/useEditorStore'
 import { useProjectStore } from '../../store/useProjectStore'
 import { MediaAsset } from '../../types/media'
-import { clipEnTiempo, duracionProyecto } from '../../lib/timeline/clips'
+import { clipEnTiempo, duracionProyecto, resolverSolapes } from '../../lib/timeline/clips'
 import { encuadreDe, encuadreNeutro, rectClip, giradoUnCuarto } from '../../lib/timeline/encuadre'
 import { gananciaEn, fundidoAudioEn } from '../../lib/audio/ganancia'
 import { rectContenido } from '../../lib/layers/rect'
@@ -399,7 +399,13 @@ export default function Preview() {
     }
   }, [clips.length, hayCapas])
 
-  const clipsOrdenados = useMemo(() => [...clips].sort((a, b) => a.inicio - b.inicio), [clips])
+  // los clips que consume la reproducción y el render llevan los SOLAPES de transición ya resueltos:
+  // cada cruce se vuelve un solape real donde el que sale (su cola) y el que entra (su cabeza) corren
+  // a la vez. el estado guardado sigue con los clips pegados; esto es solo la vista resuelta
+  const clipsOrdenados = useMemo(
+    () => resolverSolapes(clips).sort((a, b) => a.inicio - b.inicio),
+    [clips],
+  )
   // niveles escondidos, en forma de conjunto para consultarlos rápido al elegir
   // el clip visible. esconder el de arriba deja aflorar el de debajo
   const ocultas = useMemo(() => {
@@ -409,9 +415,11 @@ export default function Preview() {
     })
     return set
   }, [pistasMeta])
+  // el total usa los clips con los solapes resueltos: como cada cruce acorta la línea, la duración
+  // real es menor que la suma de los clips pegados
   const total = useMemo(
-    () => duracionProyecto(clips, capasTodas, audios, audioRegiones),
-    [clips, capasTodas, audios, audioRegiones],
+    () => duracionProyecto(clipsOrdenados, capasTodas, audios, audioRegiones),
+    [clipsOrdenados, capasTodas, audios, audioRegiones],
   )
   const assetPorId = useMemo(() => {
     const mapa = new Map<string, MediaAsset>()
@@ -755,8 +763,11 @@ export default function Preview() {
       // viene después, para que al cambiar de clip muestre su imagen buena de una vez.
       // sin esto asomaba un instante su fotograma inicial (el segundo cero del video)
       // antes de saltar a donde toca, y el corte se veía con un frame malo
+      // ...salvo que ese "siguiente" sea el COMPAÑERO de un cruce en curso: entonces ya lo está
+      // reproduciendo el bloque del compañero (su cabeza, avanzando), y volver a clavarlo en su
+      // primer fotograma cada frame lo dejaba pegado en cero y descuadraba el cabezal
       const sig = posterior(act, clipsOrdenados)
-      if (sig) {
+      if (sig && sig.id !== companeroId) {
         const vsig = videosRef.current.get(sig.id)
         if (vsig && Math.abs(vsig.currentTime - sig.recorteInicio) > 0.05) {
           try {
@@ -979,7 +990,7 @@ export default function Preview() {
 
         const st = useEditorStore.getState()
         const ph = st.playhead
-        const ordenados = [...st.pista.clips].sort((a, b) => a.inicio - b.inicio)
+        const ordenados = resolverSolapes(st.pista.clips).sort((a, b) => a.inicio - b.inicio)
         const ocultasSt = new Set<number>()
         st.pistasMeta.forEach((m, i) => {
           if (m.oculta) ocultasSt.add(i)
@@ -1088,7 +1099,7 @@ export default function Preview() {
             ph < i.t + i.duracion,
         )
         if (activos.length) {
-          const ordenados = [...st.pista.clips].sort((a, b) => a.inicio - b.inicio)
+          const ordenados = resolverSolapes(st.pista.clips).sort((a, b) => a.inicio - b.inicio)
           const ocultasSt = new Set<number>()
           st.pistasMeta.forEach((m, i) => {
             if (m.oculta) ocultasSt.add(i)
@@ -1209,7 +1220,7 @@ export default function Preview() {
         ctx.clearRect(0, 0, w, h)
         const st = useEditorStore.getState()
         const ph = st.playhead
-        const ordenados = [...st.pista.clips].sort((a, b) => a.inicio - b.inicio)
+        const ordenados = resolverSolapes(st.pista.clips).sort((a, b) => a.inicio - b.inicio)
         const ocultasSt = new Set<number>()
         st.pistasMeta.forEach((m, i) => {
           if (m.oculta) ocultasSt.add(i)

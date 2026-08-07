@@ -1,5 +1,46 @@
 import { Clip } from '../../types/timeline'
 
+// resuelve los SOLAPES de transición de una lista de clips. el modelo guardado tiene los clips
+// PEGADOS (sin solaparse); una transición vive en el clip que entra y dice cuánto dura el cruce. al
+// reproducir/exportar, ese cruce debe ser un SOLAPE real: el clip que entra arranca D segundos ANTES
+// del fin del que sale, para que los dos corran a la vez durante la transición (el que sale su cola,
+// el que entra su cabeza) en vez de congelarse uno. esta función corre cada clip a la izquierda por
+// la suma de las duraciones de cruce acumuladas en su pista, así el que entra solapa al anterior y
+// todo lo que sigue se recorre para cerrar el hueco, acortando el total. las duraciones no cambian,
+// solo las posiciones. es una función pura: el estado guardado sigue con los clips pegados y la
+// edición trabaja sobre ese modelo; solo lo que consume la línea de tiempo la usa
+export function resolverSolapes(clips: Clip[]): Clip[] {
+  const eps = 0.001
+  const porPista = new Map<number, Clip[]>()
+  for (const c of clips) {
+    const g = porPista.get(c.pista)
+    if (g) g.push(c)
+    else porPista.set(c.pista, [c])
+  }
+  const salida: Clip[] = []
+  for (const grupo of porPista.values()) {
+    const ord = [...grupo].sort((a, b) => a.inicio - b.inicio)
+    let acc = 0
+    let prev: Clip | null = null
+    for (const c of ord) {
+      const tr = c.transicion
+      const real = !!tr && tr.tipo !== 'ninguna' && tr.tipo !== 'corte' && tr.duracion > 0
+      // solo cuenta como cruce si el clip está PEGADO a su anterior (si hay hueco, su transición es
+      // una entrada contra el fondo, que no solapa nada)
+      const pegado = prev && Math.abs(c.inicio - (prev.inicio + prev.duracion)) < eps
+      let d = 0
+      if (real && prev && pegado) {
+        // el solape no puede comerse más que la cola del que sale ni la cabeza del que entra
+        d = Math.min(tr!.duracion, c.duracion * 0.95, prev.duracion * 0.95)
+      }
+      acc += d
+      salida.push(acc > eps ? { ...c, inicio: c.inicio - acc } : c)
+      prev = c
+    }
+  }
+  return salida
+}
+
 // devuelve el clip visible en un instante dado, o null si cae en un hueco o más
 // allá del final. cuando varios clips de distintos niveles coinciden en el mismo
 // segundo gana el de la pista más alta, que es el criterio de cualquier editor:

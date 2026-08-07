@@ -25,19 +25,22 @@ export function progresoSalida(clip: Clip, t: number): number {
 }
 
 // el clip que entra justo después de este en su misma pista. durante la salida es
-// el que va apareciendo por debajo; si no hay ninguno, se ve el fondo del lienzo
+// el que va apareciendo por debajo; si no hay ninguno, se ve el fondo del lienzo. se busca por
+// ORDEN (el de menor inicio que empiece después), no por fin, para que siga funcionando cuando los
+// clips se solapan por una transición (el que entra empieza antes del fin del que sale)
 export function posterior(clip: Clip, clips: Clip[]): Clip | null {
   const mismos = clips
-    .filter((c) => c.pista === clip.pista && c.inicio >= clip.inicio + clip.duracion - 0.001)
+    .filter((c) => c.pista === clip.pista && c.inicio > clip.inicio + 0.0005)
     .sort((a, b) => a.inicio - b.inicio)
   return mismos.length ? mismos[0] : null
 }
 
-// el clip que estaba en pantalla justo antes que este en su misma pista. es el
-// que debe verse debajo mientras dura la transición
+// el clip que estaba en pantalla justo antes que este en su misma pista. es el que debe verse
+// debajo mientras dura la transición. igual que posterior, se busca por ORDEN (el de mayor inicio
+// que empiece antes), no por fin, para tolerar el solape del cruce
 export function anterior(clip: Clip, clips: Clip[]): Clip | null {
   const mismos = clips
-    .filter((c) => c.pista === clip.pista && c.inicio + c.duracion <= clip.inicio + 0.001)
+    .filter((c) => c.pista === clip.pista && c.inicio < clip.inicio - 0.0005)
     .sort((a, b) => a.inicio - b.inicio)
   return mismos.length ? mismos[mismos.length - 1] : null
 }
@@ -67,20 +70,17 @@ export function cruceCentradoEn(
     if (!esDisolucion(tr.tipo)) continue
     const sale = anterior(entra, clips)
     if (!sale) continue // sin plano anterior no es un cruce: abre contra el fondo
-    // el cruce ARRANCA en el corte y ocupa la cabeza del que entra: la ventana es
-    // [corte, corte + D]. la razón es de reproducción: si el cruce estuviera centrado, en su
-    // primera mitad el clip que entra tendría que mostrar fotogramas ANTERIORES a su inicio, que
-    // no existen cuando el clip está completo (recorteInicio 0), y por eso se quedaba congelado en
-    // su primer cuadro hasta llegar al corte. arrancando en el corte, el que entra es el clip
-    // ACTIVO durante toda la transición y se reproduce por el camino normal, sin congelarse ni dar
-    // un salto; el que sale se funde por encima sostenido en su último cuadro. la duración se acota
-    // a la cabeza del que entra para no pisar lo que venga después
-    const dur = Math.min(tr.duracion, entra.duracion * 0.95)
-    if (dur <= 0) continue
-    const corte = entra.inicio
-    if (t >= corte && t < corte + dur) {
-      const p = (t - corte) / dur // 0 justo en el corte, 1 al cerrar la transición
-      return { entra, sale, p: Math.max(0, Math.min(1, p)), medio: dur, corte }
+    // con los solapes ya resueltos (ver resolverSolapes), el clip que entra arranca ANTES del fin
+    // del que sale: ese solape ES la ventana del cruce, [entra.inicio, sale.fin]. durante ella los
+    // DOS corren a la vez —el que sale reproduce su cola, el que entra su cabeza—, ninguno se
+    // congela, y el que entra sube su opacidad por encima del que sale. como los dos son clips de
+    // verdad tocando en ese tramo, el cabezal se calcula igual y no hay saltos
+    const finSale = sale.inicio + sale.duracion
+    const dur = finSale - entra.inicio
+    if (dur <= 0.001) continue
+    if (t >= entra.inicio && t < finSale) {
+      const p = (t - entra.inicio) / dur // 0 al empezar el solape, 1 al cerrar (fin del que sale)
+      return { entra, sale, p: Math.max(0, Math.min(1, p)), medio: dur, corte: finSale }
     }
   }
   return null
