@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useEditorStore } from '../../store/useEditorStore'
 import { useAppStore } from '../../store/useAppStore'
-import { duracionTotal } from '../../lib/timeline/clips'
+import { duracionTotal, resolverSolapes } from '../../lib/timeline/clips'
 import { posicionCapa } from '../../lib/layers/motion'
 import { CapaCensura } from '../../types/layers'
 
@@ -34,7 +34,7 @@ export function useAtajos() {
       // otra forma del mismo despiste. radix marca el diálogo abierto en el dom
       if (document.querySelector('[role="dialog"],[role="alertdialog"]')) return
       const st = useEditorStore.getState()
-      const total = duracionTotal(st.pista.clips)
+      const total = duracionTotal(resolverSolapes(st.pista.clips))
       const largo = e.shiftKey ? PASO_LARGO : PASO
 
       // copiar y pegar el elemento elegido (clip, capa o audio). al estar fuera de

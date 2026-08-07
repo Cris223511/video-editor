@@ -4,7 +4,7 @@ import Modal from '../../components/ui/Modal'
 import { useAppStore } from '../../store/useAppStore'
 import { useEditorStore } from '../../store/useEditorStore'
 import { useProjectStore } from '../../store/useProjectStore'
-import { duracionProyecto } from '../../lib/timeline/clips'
+import { duracionProyecto, resolverSolapes } from '../../lib/timeline/clips'
 import { formatearDuracion } from '../../lib/format/duracion'
 import { formatearBytes } from '../../lib/format/bytes'
 import { exportarProyecto, ControlExport, bitrateSegunMedios, DatosExport, OnProgreso } from '../../lib/export/exportar'
@@ -249,7 +249,7 @@ export default function ExportDialog() {
   // el nombre del proyecto. se edita desde el propio diálogo mientras se exporta, así que se lee
   // reactivo (no un snapshot) para reflejar cada tecla, y al descargar se toma el último valor
   const titulo = useProjectStore((s) => s.titulo)
-  const total = duracionProyecto(estado.pista.clips, estado.capas, estado.audios, estado.audioRegiones)
+  const total = duracionProyecto(resolverSolapes(estado.pista.clips), estado.capas, estado.audios, estado.audioRegiones)
   // resolución de salida: la del proyecto, pero con el lado menor limitado a la calidad
   // elegida (1080 como tope). así un proyecto en 4K sale en 1080p y a 1080p es idéntico
   // a la vista previa. se redondea a par, que es lo que piden los códecs de video

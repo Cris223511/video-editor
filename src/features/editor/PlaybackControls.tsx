@@ -3,7 +3,7 @@ import { Maximize2, Minimize2, RotateCcw, RotateCw, Volume2, Volume1, VolumeX } 
 import Icon from '../../components/ui/Icon'
 import Tooltip from '../../components/ui/Tooltip'
 import { useEditorStore } from '../../store/useEditorStore'
-import { duracionProyecto } from '../../lib/timeline/clips'
+import { duracionProyecto, resolverSolapes } from '../../lib/timeline/clips'
 import { formatearDuracion } from '../../lib/format/duracion'
 
 // mando de volumen del visor. es solo de escucha: sube o baja lo que suena en la
@@ -127,7 +127,9 @@ export default function PlaybackControls({
   const reproduciendo = useEditorStore((s) => s.reproduciendo)
   const alternar = useEditorStore((s) => s.alternarReproduccion)
   const irA = useEditorStore((s) => s.irA)
-  const total = duracionProyecto(clips, capas, audios, audioRegiones)
+  // con los solapes resueltos: cada cruce acorta la línea, así que la duración real es menor que la
+  // suma de los clips pegados
+  const total = duracionProyecto(resolverSolapes(clips), capas, audios, audioRegiones)
   const vacio = total === 0
 
   // saltos de cinco segundos, recortados a los extremos del montaje. el de

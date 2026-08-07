@@ -1,7 +1,7 @@
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
 import { Campo } from '../../../components/ui/Controls'
-import { duracionTotal } from '../../../lib/timeline/clips'
+import { duracionTotal, resolverSolapes } from '../../../lib/timeline/clips'
 import { formatearDuracion } from '../../../lib/format/duracion'
 import { formatearBytes } from '../../../lib/format/bytes'
 
@@ -70,7 +70,7 @@ export default function ProyectoPanel() {
 
       <div className="flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/10">
         <span className="text-[13px] font-medium">Contenido</span>
-        <Dato etiqueta="Duración" valor={formatearDuracion(duracionTotal(clips))} />
+        <Dato etiqueta="Duración" valor={formatearDuracion(duracionTotal(resolverSolapes(clips)))} />
         <Dato etiqueta="Clips" valor={`${clips.length} en ${numPistas} ${numPistas === 1 ? 'nivel' : 'niveles'}`} />
         <Dato etiqueta="Capas" valor={capas.length === 0 ? 'ninguna' : resumenCapas} />
         {audioRegiones.length > 0 && (
