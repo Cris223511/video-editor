@@ -97,6 +97,9 @@ export interface ResumenProyecto {
   abierto?: number
   portada: string
   numMedios: number
+  // suma en bytes de todos los medios del proyecto, para enseñar cuánto ocupa sin
+  // tener que abrirlo
+  pesoTotal: number
   duracion: number
 }
 

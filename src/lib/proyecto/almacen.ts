@@ -70,6 +70,7 @@ export async function listarProyectos(): Promise<ResumenProyecto[]> {
       abierto: p.abierto,
       portada: p.portada,
       numMedios: p.medios?.length ?? 0,
+      pesoTotal: (p.medios ?? []).reduce((t, m) => t + (m.tamano ?? 0), 0),
       duracion: (p.edicion?.clips ?? []).reduce(
         (max, c) => Math.max(max, c.inicio + c.duracion),
         0,

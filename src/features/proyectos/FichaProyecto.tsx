@@ -227,7 +227,7 @@ export default function FichaProyecto({
                 nombre="Proporción de salida"
                 valor={proporcion(proyecto.edicion.resolucion.ancho, proyecto.edicion.resolucion.alto)}
               />
-              <Dato nombre="Espacio ocupado" valor={formatearBytes(pesoTotal)} />
+              <Dato nombre="Tamaño total" valor={formatearBytes(pesoTotal)} />
             </dl>
           </section>
 

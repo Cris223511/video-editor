@@ -114,10 +114,12 @@ export default function Modal({
                   <div className="flex shrink-0 items-start justify-between gap-3 px-5 pb-4 pt-5">
                     <div className="min-w-0 flex-1">
                       {/* el título ocupa TODO el ancho disponible (flex-1) hasta el botón de
-                          cerrar; si el nombre es largo, parte de palabra (break-words) y no pasa
-                          de dos líneas, con los puntos suspensivos ya en la segunda línea. sin el
-                          flex-1 el bloque se quedaba a su ancho natural y cortaba antes de tiempo */}
-                      <Dialog.Title className="line-clamp-2 break-words font-display text-[17px] font-bold leading-snug">
+                          cerrar y no pasa de dos líneas. se parte con break-all (no break-words)
+                          a propósito: los nombres autogenerados son cadenas largas sin espacios y
+                          con guiones, y con break-words rompían en el guion dejando la segunda
+                          línea a mitad de ancho; break-all rellena cada línea hasta el borde y
+                          recién ahí pone los puntos suspensivos */}
+                      <Dialog.Title className="line-clamp-2 [word-break:break-all] font-display text-[17px] font-bold leading-snug">
                         {titulo}
                       </Dialog.Title>
                       {descripcion && (

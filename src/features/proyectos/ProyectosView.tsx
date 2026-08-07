@@ -6,6 +6,7 @@ import {
   Save,
   Clock,
   Film,
+  HardDrive,
   PencilLine,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
@@ -424,6 +425,7 @@ export default function ProyectosView() {
                   <Film size={13} className="shrink-0 text-brand" />
                   <span className="truncate">
                     {p.numMedios} {p.numMedios === 1 ? 'medio' : 'medios'}
+                    {p.pesoTotal > 0 && ` · ${formatearBytes(p.pesoTotal)}`}
                   </span>
                 </p>
               </div>
@@ -534,7 +536,6 @@ export default function ProyectosView() {
           una línea para leerlo de un vistazo */}
       <Modal
         titulo={detalle?.titulo ?? ''}
-        descripcion="Todo lo que se sabe de este proyecto."
         abierto={detalle !== null}
         onCerrar={() => setDetalle(null)}
         ancho="max-w-lg"
@@ -548,6 +549,11 @@ export default function ProyectosView() {
             )}
             <dl className="flex flex-col">
               <FilaDato icono={<Film size={14} />} nombre="Medios" valor={`${detalle.numMedios}`} />
+              <FilaDato
+                icono={<HardDrive size={14} />}
+                nombre="Tamaño"
+                valor={formatearBytes(detalle.pesoTotal)}
+              />
               <FilaDato
                 icono={<Clock size={14} />}
                 nombre="Duración del montaje"
