@@ -26,6 +26,11 @@ interface Props {
   url?: string
   altoPista?: number
   pxPorSegundo: number
+  // cuánto correr el bloque a la IZQUIERDA respecto a su inicio guardado, en segundos. es el
+  // solape acumulado de las transiciones anteriores: solo cambia dónde se PINTA, no los datos del
+  // clip (la edición sigue trabajando sobre su inicio guardado). así el bloque cae en su sitio real
+  // (los cruces se ven solapados y la línea acortada) sin tocar el arrastre ni el recorte
+  desfase?: number
   puntos: number[] // instantes a los que imantar el clip al moverlo
   // cuando la transición de entrada es una disolución con el clip anterior, la dibuja el
   // bloque de cruce del carril (que monta sobre los dos), así que aquí se omite su cuña
@@ -48,6 +53,7 @@ export default function ClipBlock({
   url,
   altoPista = 64,
   pxPorSegundo,
+  desfase = 0,
   puntos,
   sinCuñaEntrada = false,
   onResaltarJunta,
@@ -598,7 +604,9 @@ export default function ClipBlock({
             : 'border-transparent hover:border-white/30',
       ].join(' ')}
       style={{
-        left: clip.inicio * pxPorSegundo,
+        // se pinta corrido a la izquierda por el solape acumulado (desfase); los datos del clip no
+        // cambian, solo su posición en pantalla, para que los cruces se vean solapados
+        left: (clip.inicio - desfase) * pxPorSegundo,
         width: ancho,
         // en reposo la posición se anima con una curva suave, de modo que al
         // cerrar un hueco los clips se deslizan hasta su nuevo sitio; durante un

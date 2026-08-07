@@ -12,14 +12,17 @@ import Tooltip from '../../../components/ui/Tooltip'
 // poder pisar la cabeza del clip que entra, y un tirador a la derecha alarga o acorta el cruce
 export default function CruceBlock({
   entra,
+  sale,
+  desfase = 0,
   altoPista,
   pxPorSegundo,
 }: {
-  // el que entra es el dueño de la transición (su .transicion); el que sale es el anterior. `sale`
-  // se recibe por compatibilidad con quien monta el bloque, pero el cruce ya solo se apoya en el
-  // que entra (arranca en el corte y ocupa su cabeza)
+  // el que entra es el dueño de la transición (su .transicion); el que sale es el anterior
   entra: Clip
   sale: Clip
+  // desplazamiento visual acumulado del clip que entra (ver Timeline): el bloque se pinta corrido a
+  // la izquierda por igual, para caer justo en el SOLAPE entre los dos clips
+  desfase?: number
   altoPista: number
   pxPorSegundo: number
 }) {
@@ -30,14 +33,14 @@ export default function CruceBlock({
   const tr = entra.transicion
   const nombre = buscarTransicion(tr.tipo).nombre
 
-  // el corte está en el inicio del que entra y la transición ocupa desde ahí hacia adelante, sobre
-  // su cabeza. la duración se acota a la cabeza libre del clip para no invadir lo que venga después
-  const corte = entra.inicio
+  // el cruce es el SOLAPE entre los dos clips: arranca donde el que entra empieza de verdad (su
+  // inicio guardado corrido por el desfase) y dura D, acotado a la cola del que sale y la cabeza del
+  // que entra, igual que resolverSolapes. así el bloque se ve montado sobre los dos planos
   const tope = entra.duracion * 0.95
-  const dur = Math.min(tr.duracion, tope)
+  const dur = Math.min(tr.duracion, tope, sale.duracion * 0.95)
   if (dur <= 0) return null
 
-  const izquierda = corte * pxPorSegundo
+  const izquierda = (entra.inicio - desfase) * pxPorSegundo
   const ancho = dur * pxPorSegundo
 
   // arrastrar el tirador de la derecha cambia la duración del cruce

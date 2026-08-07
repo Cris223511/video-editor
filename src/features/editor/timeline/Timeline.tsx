@@ -10,7 +10,7 @@ import { TIPO_ARRASTRE, tipoClaseArrastre } from '../MediaLibrary'
 import { nivelBajoCursor, separacionBajoCursor, porDebajoDelUltimo } from './nivelCursor'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
-import { duracionProyecto } from '../../../lib/timeline/clips'
+import { duracionProyecto, resolverSolapes } from '../../../lib/timeline/clips'
 import { formatearDuracion } from '../../../lib/format/duracion'
 import TimeRuler from './TimeRuler'
 import ClipBlock from './ClipBlock'
@@ -197,7 +197,21 @@ export default function Timeline({
   // la línea de tiempo y, al soltar, marca todos los bloques que toca. es el mismo
   // gesto que el marquee del visor, pero aquí opera sobre los bloques de tiempo
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
-  const total = duracionProyecto(clips, capas, audios, audioRegiones)
+  // los clips con los solapes de transición resueltos: cada cruce solapa D segundos su clip anterior
+  // y todo lo que sigue se recorre, acortando el total. el estado guardado sigue con los clips
+  // pegados (la edición trabaja sobre él); esto es solo para PINTAR la línea a la escala real y para
+  // saber cuánto desplazar cada bloque hacia la izquierda
+  const resueltos = useMemo(() => resolverSolapes(clips), [clips])
+  // cuánto corre a la izquierda cada clip respecto a su posición guardada, por id. es el
+  // acumulado de las duraciones de cruce anteriores; lo usan los bloques para pintarse en su sitio
+  // real sin tocar sus datos de edición
+  const desfase = useMemo(() => {
+    const porId = new Map(resueltos.map((r) => [r.id, r.inicio]))
+    const m = new Map<string, number>()
+    for (const c of clips) m.set(c.id, c.inicio - (porId.get(c.id) ?? c.inicio))
+    return m
+  }, [clips, resueltos])
+  const total = duracionProyecto(resueltos, capas, audios, audioRegiones)
 
   // añade un nivel al carril indicado, usado por la guía que sale entre grupos
   const NOMBRE_CARRIL: Record<string, string> = {
@@ -923,6 +937,7 @@ export default function Timeline({
                           <ClipBlock
                             key={c.id}
                             clip={c}
+                            desfase={desfase.get(c.id) ?? 0}
                             nombre={asset?.nombre ?? 'clip'}
                             // sin url el bloque muestra "no encontrado"; se fuerza cuando el
                             // archivo ya no está para no intentar sacarle fotogramas
@@ -962,6 +977,7 @@ export default function Timeline({
                           key={`cruce-${x.entra.id}`}
                           entra={x.entra}
                           sale={x.sale}
+                          desfase={desfase.get(x.entra.id) ?? 0}
                           altoPista={altosPista[p]}
                           pxPorSegundo={pxPorSegundo}
                         />
