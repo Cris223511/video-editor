@@ -52,8 +52,8 @@ export function anterior(clip: Clip, clips: Clip[]): Clip | null {
 export interface CruceCentrado {
   entra: Clip
   sale: Clip
-  p: number // 0 al empezar la ventana, 1 al terminarla
-  medio: number // medio ancho de la ventana en segundos (D/2, ya acotado)
+  p: number // 0 al empezar la ventana (en el corte), 1 al terminarla
+  medio: number // duración de la ventana del cruce en segundos, ya acotada
   corte: number // instante del corte entre los dos clips
 }
 export function cruceCentradoEn(
@@ -67,27 +67,20 @@ export function cruceCentradoEn(
     if (!esDisolucion(tr.tipo)) continue
     const sale = anterior(entra, clips)
     if (!sale) continue // sin plano anterior no es un cruce: abre contra el fondo
-    // cada lado del corte puede medir distinto. `duracion` es el lado del que ENTRA y
-    // `duracionSalida` el del que SALE; sin este último, los dos miden lo mismo y el cruce queda
-    // simétrico. cada medio ancho se acota a la cola/cabeza disponible de su clip para no invadirlo
-    const medioEntra = Math.min(tr.duracion / 2, entra.duracion * 0.9)
-    const medioSale = Math.min((tr.duracionSalida ?? tr.duracion) / 2, sale.duracion * 0.9)
-    if (medioEntra <= 0 && medioSale <= 0) continue
+    // el cruce ARRANCA en el corte y ocupa la cabeza del que entra: la ventana es
+    // [corte, corte + D]. la razón es de reproducción: si el cruce estuviera centrado, en su
+    // primera mitad el clip que entra tendría que mostrar fotogramas ANTERIORES a su inicio, que
+    // no existen cuando el clip está completo (recorteInicio 0), y por eso se quedaba congelado en
+    // su primer cuadro hasta llegar al corte. arrancando en el corte, el que entra es el clip
+    // ACTIVO durante toda la transición y se reproduce por el camino normal, sin congelarse ni dar
+    // un salto; el que sale se funde por encima sostenido en su último cuadro. la duración se acota
+    // a la cabeza del que entra para no pisar lo que venga después
+    const dur = Math.min(tr.duracion, entra.duracion * 0.95)
+    if (dur <= 0) continue
     const corte = entra.inicio
-    if (t >= corte - medioSale && t < corte + medioEntra) {
-      // el corte cae SIEMPRE en la mitad del efecto (p = 0.5): antes de él avanza dentro del tramo
-      // de salida, después dentro del de entrada. así un lado puede ser más largo que el otro sin
-      // que el punto de cambio se corra, y una de las dos mitades "empieza más rápido" que la otra
-      const p =
-        t < corte
-          ? medioSale > 0
-            ? 0.5 * ((t - (corte - medioSale)) / medioSale)
-            : 0
-          : medioEntra > 0
-            ? 0.5 + 0.5 * ((t - corte) / medioEntra)
-            : 1
-      const medio = Math.max(medioEntra, medioSale)
-      return { entra, sale, p: Math.max(0, Math.min(1, p)), medio, corte }
+    if (t >= corte && t < corte + dur) {
+      const p = (t - corte) / dur // 0 justo en el corte, 1 al cerrar la transición
+      return { entra, sale, p: Math.max(0, Math.min(1, p)), medio: dur, corte }
     }
   }
   return null

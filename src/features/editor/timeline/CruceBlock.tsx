@@ -5,18 +5,19 @@ import { buscarTransicion } from '../../../lib/transiciones/catalogo'
 import { TIPO_TRANSICION } from '../GaleriaTransiciones'
 import Tooltip from '../../../components/ui/Tooltip'
 
-// bloque de una transición de cruce (disolución) entre dos clips pegados. a diferencia de
-// las cuñas de entrada y salida, que viven dentro de un clip, este monta sobre el corte y
-// engancha a los DOS clips: la mitad cae sobre la cola del que sale y la otra sobre la
-// cabeza del que entra. se dibuja a nivel del carril, que no recorta, para poder pisar
-// ambos bloques. al arrastrar cualquiera de sus dos tiradores crece o mengua simétrico
+// bloque de una transición de cruce (disolución/barrido) entre dos clips pegados. la transición
+// ARRANCA en el corte y ocupa la cabeza del que entra (ventana [corte, corte + duración]): así el
+// clip que entra se reproduce de verdad durante el cruce en vez de congelarse en su primer cuadro,
+// y el que sale se funde por encima. el bloque se dibuja a nivel del carril (que no recorta) para
+// poder pisar la cabeza del clip que entra, y un tirador a la derecha alarga o acorta el cruce
 export default function CruceBlock({
   entra,
-  sale,
   altoPista,
   pxPorSegundo,
 }: {
-  // el que entra es el dueño de la transición (su .transicion); el que sale es el anterior
+  // el que entra es el dueño de la transición (su .transicion); el que sale es el anterior. `sale`
+  // se recibe por compatibilidad con quien monta el bloque, pero el cruce ya solo se apoya en el
+  // que entra (arranca en el corte y ocupa su cabeza)
   entra: Clip
   sale: Clip
   altoPista: number
@@ -29,48 +30,28 @@ export default function CruceBlock({
   const tr = entra.transicion
   const nombre = buscarTransicion(tr.tipo).nombre
 
-  // el corte está en el inicio del que entra. cada lado de la junta tiene su propio medio ancho:
-  // el de entrada sale de la duración del cruce y el de salida de `duracionSalida` (si no está, cae
-  // en la misma duración y la junta queda simétrica). cada uno se acota a la cola o cabeza que su
-  // clip deja libre, igual que el render centrado
+  // el corte está en el inicio del que entra y la transición ocupa desde ahí hacia adelante, sobre
+  // su cabeza. la duración se acota a la cabeza libre del clip para no invadir lo que venga después
   const corte = entra.inicio
-  const topeEntra = entra.duracion * 0.9
-  const topeSale = sale.duracion * 0.9
-  const medioEntra = Math.min(tr.duracion / 2, topeEntra)
-  const medioSale = Math.min((tr.duracionSalida ?? tr.duracion) / 2, topeSale)
-  if (medioEntra + medioSale <= 0) return null
-  const separado = tr.duracionSalida !== undefined
+  const tope = entra.duracion * 0.95
+  const dur = Math.min(tr.duracion, tope)
+  if (dur <= 0) return null
 
-  const izquierda = (corte - medioSale) * pxPorSegundo
-  const ancho = (medioSale + medioEntra) * pxPorSegundo
-  // dónde cae el corte dentro del bloque, en fracción: con lados iguales queda en el centro, y si
-  // uno es más largo se corre hacia ese lado. la pajarita se cruza justo ahí
-  const fracCorte = (medioSale / (medioSale + medioEntra)) * 100
+  const izquierda = corte * pxPorSegundo
+  const ancho = dur * pxPorSegundo
 
-  // arrastrar un tirador cambia el medio ancho de SU lado. sin shift, los dos lados se mueven por
-  // igual (la junta crece o mengua entera, como siempre); con shift, solo el lado que se agarró, y
-  // así cada mitad puede tener su propio tiempo: una empieza más rápido que la otra
-  function estirar(e: ReactPointerEvent, lado: 'izq' | 'der') {
+  // arrastrar el tirador de la derecha cambia la duración del cruce
+  function estirar(e: ReactPointerEvent) {
     e.stopPropagation()
     e.preventDefault()
     seleccionar(entra.id)
     const inicioX = e.clientX
-    // el tirador derecho gobierna el lado de ENTRADA; el izquierdo, el de SALIDA
-    const esEntrada = lado === 'der'
-    const medioOriginal = esEntrada ? medioEntra : medioSale
-    const topeLado = esEntrada ? topeEntra : topeSale
+    const durOriginal = dur
     const mover = (ev: globalThis.PointerEvent) => {
-      const delta = ((ev.clientX - inicioX) / pxPorSegundo) * (lado === 'izq' ? -1 : 1)
-      const nuevo = Math.min(topeLado, Math.max(0.1, medioOriginal + delta))
-      const dur = Number((nuevo * 2).toFixed(2))
-      if (ev.shiftKey) {
-        // solo este lado: separa la junta en dos tiempos distintos
-        if (esEntrada) setTransicion(entra.id, { duracion: dur, duracionSalida: Number((medioSale * 2).toFixed(2)) })
-        else setTransicion(entra.id, { duracionSalida: dur })
-      } else {
-        // los dos lados por igual: un solo valor y vuelven a quedar enlazados
-        setTransicion(entra.id, { duracion: dur, duracionSalida: undefined })
-      }
+      const delta = (ev.clientX - inicioX) / pxPorSegundo
+      const nuevo = Number(Math.min(tope, Math.max(0.1, durOriginal + delta)).toFixed(2))
+      // se deja un solo valor de duración: al mover-en-el-corte no hay dos lados que separar
+      setTransicion(entra.id, { duracion: nuevo, duracionSalida: undefined })
     }
     const soltar = () => {
       window.removeEventListener('pointermove', mover)
@@ -79,16 +60,6 @@ export default function CruceBlock({
     window.addEventListener('pointermove', mover)
     window.addEventListener('pointerup', soltar)
   }
-
-  const tirador = (lado: 'izq' | 'der') => (
-    <div
-      onPointerDown={(e) => estirar(e, lado)}
-      className={`pointer-events-auto absolute top-0 flex h-full w-2.5 cursor-ew-resize flex-col items-center justify-between bg-white/85 py-1 transition-colors duration-150 group-hover/cruce:bg-white ${lado === 'izq' ? 'left-0 rounded-l-sm' : 'right-0 rounded-r-sm'}`}
-    >
-      <span className="h-2 w-px bg-black/40" />
-      <span className="h-2 w-px bg-black/40" />
-    </div>
-  )
 
   return (
     <Tooltip texto={`Transición: ${nombre}`} lado="arriba">
@@ -121,35 +92,27 @@ export default function CruceBlock({
         className="group/cruce pointer-events-auto absolute top-0 z-20 cursor-pointer"
         style={{ left: izquierda, width: ancho, height: altoPista }}
       >
-        {/* cuerpo con dos triángulos que se cruzan en el corte (una pajarita), para leer de
-            un vistazo que los dos planos se solapan y uno releva al otro */}
+        {/* cuerpo con un degradado que sube de izquierda a derecha: da a entender que en el corte
+            el plano nuevo entra tenue y va tomando el cuadro conforme avanza la transición */}
         <div
           className={`pointer-events-none absolute inset-0 overflow-hidden rounded-md ${soltarEncima || seleccionado ? 'ring-2 ring-inset ring-brand' : ''}`}
-          style={{ background: 'rgb(24 97 255 / 0.16)', border: '1px solid rgb(255 255 255 / 0.35)' }}
+          style={{ border: '1px solid rgb(255 255 255 / 0.35)' }}
         >
           <div
             className="absolute inset-0"
-            style={{
-              background: 'rgb(24 97 255 / 0.5)',
-              clipPath: `polygon(0 0, ${fracCorte}% 50%, 0 100%)`,
-            }}
+            style={{ background: 'linear-gradient(to right, rgb(24 97 255 / 0.12), rgb(24 97 255 / 0.55))' }}
           />
-          <div
-            className="absolute inset-0"
-            style={{
-              background: 'rgb(24 97 255 / 0.5)',
-              clipPath: `polygon(100% 0, ${fracCorte}% 50%, 100% 100%)`,
-            }}
-          />
-          {/* línea del corte: cae donde se cruzan los dos planos, corrida si un lado es más largo */}
-          <span className="absolute inset-y-0 w-px -translate-x-1/2 bg-white/50" style={{ left: `${fracCorte}%` }} />
-          {/* cuando los dos lados tienen tiempos distintos, un punto marca que la junta está separada */}
-          {separado && (
-            <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-white/80" title="Lados con tiempos distintos" />
-          )}
+          {/* línea del corte, pegada al borde izquierdo, donde el plano nuevo releva al anterior */}
+          <span className="absolute inset-y-0 left-0 w-px bg-white/60" />
         </div>
-        {tirador('izq')}
-        {tirador('der')}
+        {/* tirador de la derecha para alargar o acortar el cruce */}
+        <div
+          onPointerDown={estirar}
+          className="pointer-events-auto absolute right-0 top-0 flex h-full w-2.5 cursor-ew-resize flex-col items-center justify-between rounded-r-sm bg-white/85 py-1 transition-colors duration-150 group-hover/cruce:bg-white"
+        >
+          <span className="h-2 w-px bg-black/40" />
+          <span className="h-2 w-px bg-black/40" />
+        </div>
       </div>
     </Tooltip>
   )

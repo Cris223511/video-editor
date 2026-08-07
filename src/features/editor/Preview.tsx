@@ -333,6 +333,47 @@ export default function Preview() {
     }
   }
 
+  // mueve una ganancia de clip con una micro-rampa en vez de un salto. un cambio de volumen
+  // instantáneo (callar el saliente en un corte, silenciar el compañero de un cruce, o devolverle
+  // la voz al activo) corta la onda de golpe y suelta un "pup"/chasquido. la rampa arranca desde el
+  // valor actual para ser continua y llega al destino en unos milisegundos, imperceptible al oído
+  function rampaGanancia(g: GainNode, destino: number) {
+    const ctx = audioCtxRef.current
+    if (!ctx) {
+      g.gain.value = destino
+      return
+    }
+    try {
+      g.gain.cancelScheduledValues(ctx.currentTime)
+      g.gain.setValueAtTime(g.gain.value, ctx.currentTime)
+      g.gain.setTargetAtTime(destino, ctx.currentTime, 0.004)
+    } catch {
+      g.gain.value = destino
+    }
+  }
+
+  // pausa el video de un clip pero antes baja su audio con la micro-rampa; la pausa se difiere un
+  // pelo hasta que el sonido ya se apagó, así el corte entre clips no chasquea
+  function pausarSuave(id: string, el: HTMLVideoElement) {
+    const g = gananciasClipRef.current.get(id)
+    if (g) {
+      rampaGanancia(g, 0)
+      window.setTimeout(() => {
+        try {
+          if (!el.paused) el.pause()
+        } catch {
+          // ya estaba pausado
+        }
+      }, 28)
+    } else {
+      try {
+        el.pause()
+      } catch {
+        // ya estaba pausado
+      }
+    }
+  }
+
   useEffect(() => () => void audioCtxRef.current?.close().catch(() => {}), [])
 
   // mide el área disponible para dibujar el marco del lienzo con su proporción
@@ -620,22 +661,22 @@ export default function Preview() {
       clipsOrdenados.forEach((c) => {
         if (c.id !== act.id && c.id !== companeroId) {
           const otro = videosRef.current.get(c.id)
-          if (otro && !otro.paused) otro.pause()
+          if (otro && !otro.paused) pausarSuave(c.id, otro)
         }
       })
       const nodo = asegurarGrafo()
       cablearVideo(act.id, v)
-      // la ganancia propia del activo vuelve a 1 por si venía de ser el saliente de un
-      // cruce anterior (donde quedó a cero)
+      // la ganancia propia del activo vuelve a 1 (con rampa) por si venía de ser el saliente de un
+      // cruce anterior, donde quedó a cero; subirla de golpe volvería a chasquear
       const gAct = gananciasClipRef.current.get(act.id)
-      if (gAct) gAct.gain.value = 1
+      if (gAct) rampaGanancia(gAct, 1)
       // el compañero sigue corriendo (silenciado) para que su imagen no se congele
       if (companero) {
         const cv = videosRef.current.get(companero.id)
         if (cv) {
           cablearVideo(companero.id, cv)
           const gc = gananciasClipRef.current.get(companero.id)
-          if (gc) gc.gain.value = 0
+          if (gc) rampaGanancia(gc, 0)
           cv.playbackRate = companero.velocidad
           // su tiempo continuo: la cola del que sale, o la cabeza del que entra antes de
           // su inicio (offset negativo). se recoloca si está pausado o se desfasó; si ya

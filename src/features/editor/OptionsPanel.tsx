@@ -405,30 +405,9 @@ function ResumenTransicionesClip({
                     </button>
                   </Tooltip>
                 </div>
-                {/* la duración de ESTA transición, editable acá mismo. en un cruce entre dos clips se
-                    puede separar en dos lados con tiempos distintos: uno puede empezar más rápido que
-                    el otro. enlazados, un solo deslizador mueve los dos por igual */}
-                {it.esCruce && it.trans.duracionSalida !== undefined ? (
-                  <>
-                    <FilaDur etiqueta="Entrada" dur={it.trans.duracion} maxSeg={it.maxSeg} onChange={(d) => it.poner({ duracion: d })} />
-                    <FilaDur etiqueta="Salida" dur={it.trans.duracionSalida} maxSeg={it.maxSeg} onChange={(d) => it.poner({ duracionSalida: d })} />
-                  </>
-                ) : (
-                  <FilaDur dur={it.dur} maxSeg={it.maxSeg} onChange={it.setDur} />
-                )}
-                {it.esCruce && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      // separar arranca el lado de salida igualado al de entrada, para que el cambio no
-                      // se note de golpe; unir lo borra y los dos vuelven a moverse juntos
-                      it.poner({ duracionSalida: it.trans.duracionSalida === undefined ? it.trans.duracion : undefined })
-                    }}
-                    className="interactivo self-start text-[11px] font-medium text-[color:var(--muted)] transition-colors hover:text-brand"
-                  >
-                    {it.trans.duracionSalida === undefined ? 'Separar los dos lados' : 'Unir los dos lados'}
-                  </button>
-                )}
+                {/* la duración de ESTA transición, editable acá mismo. el cruce arranca en el corte y
+                    ocupa la cabeza del que entra, así que es un solo tiempo (ya no hay dos lados) */}
+                <FilaDur dur={it.dur} maxSeg={it.maxSeg} onChange={it.setDur} />
                 {/* el resto de ajustes de ESTA transición, aquí mismo bajo su duración: intensidad,
                     acercamiento, dirección o suavidad del borde, según lo que admita cada una */}
                 <ControlesTransicion
