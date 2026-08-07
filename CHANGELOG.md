@@ -4,6 +4,22 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.42.0 (2026-08-07)
+
+- **Nuevo impacto: Fuera de foco.** Un desenfoque redondo que crece hasta la mitad del golpe y vuelve a
+  nítido, como una cámara que pierde el foco un instante y lo recupera. Se maneja con la fuerza y con el
+  largo del bloque en la línea de tiempo: cuanto más largo, más lento entra y sale de foco.
+- **Nuevo Look de un clic: Nocturno púrpura.** En el panel de Efectos, una receta completa que enciende
+  de una sola vez el aspecto de video nocturno de coches: un baño violeta, brillo en las luces, bordes
+  cromáticos y grano. Después cada parte queda editable por separado, y la tonalidad se cambia con un
+  clic desde Ajustar colores (violeta, azul, rosa, rojo, lo que quieras).
+- **El peso de cada proyecto se ve sin abrirlo.** En la tarjeta aparece junto a la cantidad de medios, y
+  en la ventana de información se sumó la fila Tamaño con el peso total. En el detalle completo, lo que
+  antes decía "Espacio ocupado" ahora dice "Tamaño total".
+- **El título largo de un proyecto se lee mejor.** En la ventana de información, los nombres largos sin
+  espacios llenaban solo media línea antes de cortarse; ahora aprovechan todo el ancho hasta el borde
+  antes de los puntos suspensivos.
+
 ## 2.41.1 (2026-08-06)
 
 - **Importar es más rápido.** La medición del ritmo del video (que se agregó para topar las fotografías
