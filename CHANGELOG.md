@@ -4,6 +4,21 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.43.0 (2026-08-07)
+
+- **Las transiciones ya no congelan el segundo clip.** Antes, al poner una transición entre dos clips,
+  el que entraba se quedaba pegado en su primer cuadro hasta llegar al corte, porque la transición
+  estaba centrada y le pedía fotogramas anteriores a su inicio, que no existen. Ahora la transición
+  arranca en el corte y ocupa la cabeza del clip que entra: ese clip se reproduce de verdad durante
+  todo el cruce, mientras el que sale se funde por encima. Se ve fluido tanto al reproducir como al
+  exportar, con los tiempos exactos.
+- **Sin chasquidos ("pup") en los cortes de audio.** Cada clip abre y cierra su sonido con una
+  micro-rampa imperceptible que lleva el borde a cero, así un corte seco o un cruce ya no sueltan el
+  clic que se oía al pasar de un plano a otro.
+- **Los deslizadores del cuadro de exportar se ven como los del resto de la app.** El nivel de
+  compresión, la nitidez, la reducción de ruido y el tramo usaban un control más grueso y de otro
+  color; ahora comparten el mismo deslizador fino de siempre.
+
 ## 2.42.0 (2026-08-07)
 
 - **Nuevo impacto: Fuera de foco.** Un desenfoque redondo que crece hasta la mitad del golpe y vuelve a
