@@ -3,7 +3,7 @@ import { Capa } from '../../types/layers'
 import { Impacto } from '../../types/impacto'
 import { Marco } from '../../types/marco'
 import { RegionAudio, ClipAudio } from '../../types/audio'
-import { clipEnTiempo, duracionProyecto } from '../timeline/clips'
+import { clipEnTiempo, duracionProyecto, resolverSolapes } from '../timeline/clips'
 import { gananciaEn, fundidoAudioEn } from '../audio/ganancia'
 import { usaMatriz, matrizTono, tablasColor, stdDeviationsDesenfoque } from '../color/tono'
 import { mezclarTono, mezclarEfectos, mixEntradaEfecto } from '../color/mezcla'
@@ -172,7 +172,7 @@ export function exportarProyecto(datos: DatosExport, onProgreso: OnProgreso): Co
   const promesa = new Promise<Blob>((resolve, reject) => {
     ;(async () => {
       const { ancho, alto } = datos
-      const clips = [...datos.clips].sort((a, b) => a.inicio - b.inicio)
+      const clips = resolverSolapes(datos.clips).sort((a, b) => a.inicio - b.inicio)
       // niveles escondidos y silenciados, resueltos una sola vez. el visible se
       // elige ignorando los ocultos y el audio se apaga si el clip que suena cae
       // en un nivel silenciado, exactamente el criterio del visor

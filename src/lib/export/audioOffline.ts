@@ -1,5 +1,6 @@
 import { DatosExport } from './exportar'
 import { gananciaEn, fundidoAudioEn } from '../audio/ganancia'
+import { resolverSolapes } from '../timeline/clips'
 
 const SR = 48_000
 
@@ -84,8 +85,9 @@ export async function mezclarAudio(datos: DatosExport, total: number): Promise<A
   }
 
   // clips de video: aportan su audio salvo que el nivel esté silenciado, el clip esté
-  // en mudo o tenga su audio separado a la pista de sonido
-  for (const c of datos.clips) {
+  // en mudo o tenga su audio separado a la pista de sonido. se usan las posiciones con los solapes
+  // resueltos para que el sonido de cada clip caiga donde cae su imagen tras el acortamiento del cruce
+  for (const c of resolverSolapes(datos.clips)) {
     const silenciada = (datos.pistasMeta[c.pista]?.silenciada ?? false) || !!c.mudo || !!c.silenciado
     if (silenciada) continue
     const buf = await bufferDe(c.assetId)

@@ -1,6 +1,6 @@
 import { DatosExport, ControlExport, bitrateVideo, OnProgreso, relojExport } from './exportar'
 import { Escena, dibujarFotograma } from './compositor'
-import { clipEnTiempo, duracionProyecto } from '../timeline/clips'
+import { clipEnTiempo, duracionProyecto, resolverSolapes } from '../timeline/clips'
 import { anterior, posterior } from '../transiciones/pintar'
 import { montarDefsColor } from './defsColor'
 import { demuxVideo, VideoDemux } from './demux'
@@ -47,7 +47,9 @@ export function exportarRapido(
   return { promesa, cancelar, lienzo: canvas }
 
   async function correr(): Promise<Blob> {
-  const clips = [...datos.clips].sort((a, b) => a.inicio - b.inicio)
+  // con los solapes de transición resueltos: cada cruce es un solape donde el que sale y el que
+  // entra corren a la vez, igual que en el visor, y el total queda acortado
+  const clips = resolverSolapes(datos.clips).sort((a, b) => a.inicio - b.inicio)
   const ocultas = new Set<number>()
   datos.pistasMeta.forEach((m, i) => {
     if (m.oculta) ocultas.add(i)
