@@ -35,6 +35,11 @@ export async function mezclarAudio(datos: DatosExport, total: number): Promise<A
 
   let algo = false
   const DT = 1 / 60 // cada cuánto se recalcula la ganancia (automatización de la curva)
+  // micro-rampa de entrada y salida de cada fuente. sin ella, si el clip arranca o corta con la
+  // onda fuera de un cruce por cero (lo normal en un corte seco), el salto instantáneo de amplitud
+  // se oye como un "pup"/chasquido. seis milésimas suben o bajan el sonido de forma imperceptible
+  // pero llevan el borde a cero y matan el clic, en cada clip, tenga o no fundido propio
+  const DECLICK = 0.006
 
   // coloca una fuente en la línea de tiempo con su curva de ganancia. gananciaEnT da el
   // valor en cada instante de la línea (no de la fuente), igual que el grafo en vivo
@@ -51,10 +56,27 @@ export async function mezclarAudio(datos: DatosExport, total: number): Promise<A
     src.buffer = buf
     src.playbackRate.value = velocidad
     const g = ctx.createGain()
-    for (let tt = inicio; tt < fin; tt += DT) {
-      g.gain.setValueAtTime(Math.max(0, gananciaEnT(tt)), tt)
+    const seguro = (t: number) => Math.max(0, gananciaEnT(t))
+    if (fin - inicio <= 2 * DECLICK) {
+      // clip más corto que las dos rampas juntas: un triángulo simple 0 -> pico -> 0
+      const medio = (inicio + fin) / 2
+      g.gain.setValueAtTime(0, inicio)
+      g.gain.linearRampToValueAtTime(seguro(medio), medio)
+      g.gain.linearRampToValueAtTime(0, fin)
+    } else {
+      const finEntrada = inicio + DECLICK
+      const inicioSalida = fin - DECLICK
+      // entra desde cero en los primeros 6 ms
+      g.gain.setValueAtTime(0, inicio)
+      g.gain.linearRampToValueAtTime(seguro(finEntrada), finEntrada)
+      // automatización normal de la curva en el tramo central
+      for (let tt = finEntrada; tt < inicioSalida; tt += DT) {
+        g.gain.setValueAtTime(seguro(tt), tt)
+      }
+      // baja a cero en los últimos 6 ms para no chasquear al cortar
+      g.gain.setValueAtTime(seguro(inicioSalida), inicioSalida)
+      g.gain.linearRampToValueAtTime(0, fin)
     }
-    g.gain.setValueAtTime(Math.max(0, gananciaEnT(fin)), fin)
     src.connect(g).connect(ctx.destination)
     src.start(inicio, Math.max(0, offsetFuente))
     src.stop(fin)
