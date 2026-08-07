@@ -31,6 +31,7 @@ export const IMPACTOS: DefImpacto[] = [
   { tipo: 'sacudida', nombre: 'Sacudida', categoria: 'camara', descripcion: 'Tiembla un momento, como un golpe.' },
   { tipo: 'latido', nombre: 'Latido', categoria: 'camara', descripcion: 'Un par de pulsos rápidos.' },
   { tipo: 'movimiento', nombre: 'Movimiento', categoria: 'camara', descripcion: 'Barrido de cámara: la imagen se desenfoca con estelas en el sentido del movimiento, como cuando mueves la cámara rápido. La dirección se elige.' },
+  { tipo: 'desenfoque', nombre: 'Fuera de foco', categoria: 'camara', descripcion: 'La cámara pierde el foco: la imagen se desenfoca de a poco hasta el medio y vuelve a nítida, como enfocar mal y corregir.' },
   { tipo: 'flashColor', nombre: 'Flash', categoria: 'camara', descripcion: 'Un destello del color que elijas. Por defecto, negro.' },
   { tipo: 'destello', nombre: 'Destello', categoria: 'camara', descripcion: 'Un fogonazo de luz seco.' },
   { tipo: 'parpadeo', nombre: 'Parpadeo', categoria: 'camara', descripcion: 'Parpadea a negro varias veces.' },
@@ -161,6 +162,15 @@ export function estadoImpacto(
         desenfoqueX: Math.abs(ux) * 0.22 * amp * env,
         desenfoqueY: Math.abs(uy) * 0.22 * amp * env,
       }
+    }
+    case 'desenfoque': {
+      // fuera de foco: un desenfoque redondo (isótropo) que crece hasta el medio del impacto y
+      // regresa a nítido, como una cámara que pierde el foco un instante y lo recupera. la
+      // envolvente ^0.6 ensancha la meseta para que la imagen quede borrosa buena parte del
+      // tramo en vez de un pico fino, y el pico llega alto (~0.13 del alto a fuerza plena) para
+      // que se sienta bien fuera de foco, no un velo tímido
+      const env = Math.pow(Math.sin(Math.PI * Math.max(0, Math.min(1, p))), 0.6)
+      return { ...NEUTRO, desenfoque: 0.13 * amp * env }
     }
     case 'flashNegro':
       return { ...NEUTRO, veloColor: '#000000', veloOpacidad: amp * Math.sin(Math.PI * p) }

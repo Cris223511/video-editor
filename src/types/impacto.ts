@@ -12,6 +12,9 @@ export type TipoImpacto =
   // golpe de movimiento: el cuadro se lanza rápido hacia un lado y vuelve, con desenfoque,
   // como una sacudida veloz de cámara. la dirección se elige en los ajustes
   | 'movimiento'
+  // fuera de foco: la imagen pierde el foco como una cámara que desenfoca y vuelve, un
+  // desenfoque redondo (isótropo) que sube hasta el medio del impacto y regresa a nítido
+  | 'desenfoque'
   | 'flashNegro'
   | 'flashBlanco'
   | 'destello'
