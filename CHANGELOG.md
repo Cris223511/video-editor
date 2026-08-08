@@ -6,7 +6,7 @@ El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com
 
 ## 2.45.2 (2026-08-08)
 
-- **La copia "sin comprimir" ya sale idéntica a tu video.** Al recodificar un video a la misma tasa de
+- **La copia "sin comprimir" ya sale idéntica al original.** Al recodificar un video a la misma tasa de
   bits de la fuente se perdía un poco de detalle (por eso "sin comprimir" se veía algo más blando).
   Ahora la calidad plena lleva más margen y la copia queda igual al original, dejándole a la
   compresión de dónde recortar sin que se note.
@@ -228,12 +228,12 @@ de sonido, y varios detalles del editor.
 - **La ventana de exportar se rediseñó, más ordenada y con más control.** La vista sencilla mantiene lo de
   siempre (calidad y fotografías por segundo) y ahora hay un apartado plegable de ajustes avanzados para
   quien quiera afinar el resultado, sin estorbar a quien solo busca exportar rápido.
-- **Las resoluciones se ofrecen según tu material.** En lugar de mostrar siempre las mismas opciones, solo
-  aparecen las que tu video de verdad puede dar, desde 144p hasta su tamaño original, con un tope en 1080p.
+- **Las resoluciones se ofrecen según el material.** En lugar de mostrar siempre las mismas opciones, solo
+  aparecen las que el video de verdad puede dar, desde 144p hasta su tamaño original, con un tope en 1080p.
   Así no se elige una resolución mayor que la del video, que no lo mejoraría.
 - **Nivel de compresión con tasa de bits y peso en vivo.** Un control regula el equilibrio entre la calidad
   y el tamaño del archivo, y al moverlo se ven al instante la tasa de bits y el peso estimado. En el nivel
-  Original el video conserva la misma calidad que tu material.
+  Original el video conserva la misma calidad que el material.
 - **Una ayuda en cada opción.** Cada ajuste lleva un signo de interrogación que, al pasar el cursor,
   explica en pocas palabras para qué sirve.
 
