@@ -4,6 +4,17 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.45.0 (2026-08-07)
+
+- **Las transiciones ahora también cruzan el audio.** Durante una transición, el sonido ya no salta de
+  golpe de un clip a otro: el que sale se mantiene y el que entra aparece con un fundido. Y no cruza a
+  la par del video, que en una transición larga haría que se oyera el segundo clip encima del primero
+  todo el rato: el audio del segundo se empieza a oír recién desde la mitad de la transición y con un
+  cruce suave. Es automático (va con la duración de la transición) y no lleva controles que ajustar.
+  Si le separaste el audio a un clip, no aplica: ese clip ya no tiene sonido propio.
+- **El botón para no cancelar la exportación se entiende mejor.** El aviso de "Cancelar exportación"
+  tenía un botón "Cancelar" que en realidad servía para seguir; ahora dice "No, seguir exportando".
+
 ## 2.44.1 (2026-08-07)
 
 - **La exportación de proyectos con varias transiciones ya usa el motor rápido.** Un proyecto con
