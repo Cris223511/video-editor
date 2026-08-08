@@ -137,13 +137,15 @@ const ESCALERA_RES = [144, 240, 360, 480, 720, 1080]
 
 // nombre legible del nivel de compresión, para que el número por sí solo no diga nada. 100 = tal cual
 // el original (sin perder calidad); por debajo, cada tramo pesa menos a cambio de algo de calidad
+// nombre del nivel según cuánto se COMPRIME (0 = nada, 100 = al máximo). a más porcentaje, más
+// apretado y más liviano el archivo, a cambio de algo de nitidez
 function nombreCompresion(p: number): string {
-  if (p >= 100) return 'Original'
-  if (p >= 80) return 'Muy alta'
-  if (p >= 60) return 'Alta'
-  if (p >= 40) return 'Media'
-  if (p >= 20) return 'Baja'
-  return 'Mínima'
+  if (p <= 0) return 'Sin comprimir'
+  if (p >= 80) return 'Máxima'
+  if (p >= 60) return 'Muy alta'
+  if (p >= 40) return 'Alta'
+  if (p >= 20) return 'Media'
+  return 'Ligera'
 }
 
 // tasa de bits en un texto corto, en megabits por segundo, como la muestran los compresores conocidos
@@ -193,15 +195,16 @@ export default function ExportDialog() {
   const pedirConfirmacion = useEditorStore((s) => s.pedirConfirmacion)
   const [urlSalida, setUrlSalida] = useState('')
   const [extension, setExtension] = useState('mp4')
-  // 30 es el valor corriente para material de pantalla; 60 se nota en el
-  // movimiento rápido a cambio de un archivo bastante más pesado
-  const [fps, setFps] = useState(30)
+  // fps ELEGIDO a mano; en null se usa el ritmo de la fuente (fpsFuente). así, al abrir el diálogo,
+  // el fps ya sale en el del video sin verse un cambio de 30 a 60 en pantalla
+  const [fpsElegido, setFpsElegido] = useState<number | null>(null)
   // calidad = a cuántos píxeles se limita el lado menor del video. arranca en el tope real del
   // material (se ajusta al abrir el diálogo). nunca sube por encima de lo que da la fuente
   const [calidad, setCalidad] = useState(1080)
-  // nivel de compresión, de 10 a 100. en 100 el archivo sale igual que el original (bitrate
-  // igualado a la fuente); por debajo, se aprieta más y pesa menos a cambio de algo de calidad
-  const [compresion, setCompresion] = useState(100)
+  // cuánto se COMPRIME, de 0 a 90. en 0 el archivo sale igual que el original (bitrate igualado a la
+  // fuente); a más porcentaje, más apretado y más liviano, a cambio de algo de nitidez. arranca con
+  // una compresión moderada para que el archivo no pese de más sin que se note la pérdida
+  const [compresion, setCompresion] = useState(30)
   // el bloque de ajustes avanzados arranca plegado: quien no lo abra exporta igual que siempre
   const [avanzado, setAvanzado] = useState(false)
   // contenedor y códec de salida. por defecto mp4 + h264, que es el camino de siempre. webm y mkv, y
@@ -245,6 +248,9 @@ export default function ExportDialog() {
   const opcionesFps = [...new Set([...[24, 30, 48, 60].filter((v) => v <= fpsFuente), fpsFuente])].sort(
     (a, b) => a - b,
   )
+  // el fps que manda: el elegido a mano, o el de la fuente si no se tocó. al derivarlo así (en vez de
+  // un estado que arranca en 30 y luego salta), al abrir el diálogo ya se ve el ritmo del video
+  const fps = fpsElegido ?? fpsFuente
   // el título del proyecto, en vivo: es el nombre con el que se descargará el archivo y también
   // el nombre del proyecto. se edita desde el propio diálogo mientras se exporta, así que se lee
   // reactivo (no un snapshot) para reflejar cada tecla, y al descargar se toma el último valor
@@ -291,17 +297,25 @@ export default function ExportDialog() {
   // de compresión lo escala hacia abajo (nunca por encima, ampliar no añade detalle). sirve para el peso
   // estimado y la tasa de bits que se muestran en vivo, y se le pasa a los motores de exportación
   const bitrateBase = bitrateSegunMedios(medios, ancho, alto, fps, fpsFuente)
-  const bitrateObjetivo = Math.max(100_000, Math.round((bitrateBase * compresion) / 100))
+  // la compresión baja el bitrate: en 0 sale igual que la fuente, en 90 queda en la décima parte. a
+  // más compresión, menos tasa de bits y menos peso
+  const bitrateObjetivo = Math.max(100_000, Math.round((bitrateBase * (100 - compresion)) / 100))
   const bytesEstimados = total > 0 ? ((bitrateObjetivo + BITRATE_AUDIO) * total) / 8 : 0
 
   // al abrir el diálogo se parte del tope real del material (la mejor calidad que da), con la compresión
   // en original y lo avanzado plegado. así, sin tocar nada, se exporta con la misma calidad de siempre
+  // al cerrar se olvida el fps elegido, así el próximo abrir vuelve a mostrar el de la fuente sin un
+  // salto visible (el estado no queda con un valor viejo que parpadee)
+  useEffect(() => {
+    if (!abierto) setFpsElegido(null)
+  }, [abierto])
+
   useEffect(() => {
     if (!abierto) return
     setCalidad(topeCalidad)
-    // se parte del ritmo de la fuente, para exportar tal cual sin tocar nada
-    setFps(fpsFuente)
-    setCompresion(100)
+    // el ritmo se toma de la fuente por derivación (fpsElegido en null), no hace falta fijarlo
+    setFpsElegido(null)
+    setCompresion(30)
     setAvanzado(false)
     setFormato('mp4')
     setCodecVideo('h264')
@@ -663,7 +677,7 @@ export default function ExportDialog() {
                 return (
                   <button
                     key={v}
-                    onClick={() => setFps(v)}
+                    onClick={() => setFpsElegido(v)}
                     className={[
                       'flex-1 rounded-lg py-2 text-sm font-semibold transition-all duration-200',
                       activo
@@ -707,15 +721,15 @@ export default function ExportDialog() {
               <div className="border-t px-3.5 pb-4 pt-3.5" style={{ borderColor: 'rgb(var(--border) / 0.12)' }}>
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-[13px] font-medium text-[color:var(--muted)]">
-                    Nivel de compresión
-                    <AyudaExport texto="El equilibrio entre la calidad de la imagen y el peso del archivo. A mayor compresión, menor tamaño. El nivel Original mantiene la calidad de tu video." />
+                    Compresión
+                    <AyudaExport texto="Cuánto se aprieta el video para que pese menos. A mayor compresión, archivo más liviano a cambio de algo de nitidez. En cero sale igual que el original." />
                   </span>
                   <span className="text-[13px] font-semibold tabular-nums">
                     {nombreCompresion(compresion)}{' '}
                     <span className="text-[color:var(--muted)]">({compresion}%)</span>
                   </span>
                 </div>
-                <Deslizador valor={compresion} min={10} max={100} paso={5} onChange={setCompresion} />
+                <Deslizador valor={compresion} min={0} max={90} paso={5} onChange={setCompresion} />
                 {/* lectura en vivo: la tasa de bits y el peso cambian conforme se mueve el control, igual
                     que en los compresores conocidos, para que se vea el efecto al instante */}
                 <div
@@ -728,10 +742,10 @@ export default function ExportDialog() {
                     valor={bytesEstimados > 0 ? `≈ ${formatearBytes(bytesEstimados)}` : '—'}
                   />
                 </div>
-                {compresion < 100 && (
+                {compresion > 0 && (
                   <p className="mt-2.5 text-[11.5px] leading-relaxed text-[color:var(--muted)]">
-                    Estás aplicando una compresión mayor que la original. El archivo pesará menos, aunque
-                    puede perder algo de calidad. Vuelve al nivel Original para conservarla por completo.
+                    El archivo pesará menos que el original. A más compresión, más liviano, aunque puede
+                    perder algo de nitidez. Ponla en cero para conservar la calidad tal cual.
                   </p>
                 )}
 
