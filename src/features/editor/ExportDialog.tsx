@@ -24,6 +24,10 @@ type Fase = 'inicio' | 'exportando' | 'listo' | 'error'
 // mostrado no ignore la pista de sonido
 const BITRATE_AUDIO = 128_000
 
+// compresión RECOMENDADA por defecto (0 = sin comprimir, 90 = al máximo). es el punto donde el
+// archivo baja bastante de peso sin que la pérdida se note; de ahí para arriba empieza a ablandarse
+const COMP_RECO = 45
+
 // pasos que recorre la exportación por dentro, en orden. el diálogo los muestra como una lista y va
 // marcando cuál está en curso, para que el usuario entienda qué hace (leer, codificar, audio, cerrar)
 const PASOS_EXPORT = [
@@ -201,10 +205,10 @@ export default function ExportDialog() {
   // calidad = a cuántos píxeles se limita el lado menor del video. arranca en el tope real del
   // material (se ajusta al abrir el diálogo). nunca sube por encima de lo que da la fuente
   const [calidad, setCalidad] = useState(1080)
-  // cuánto se COMPRIME, de 0 a 90. en 0 el archivo sale igual que el original (bitrate igualado a la
-  // fuente); a más porcentaje, más apretado y más liviano, a cambio de algo de nitidez. arranca con
-  // una compresión moderada para que el archivo no pese de más sin que se note la pérdida
-  const [compresion, setCompresion] = useState(30)
+  // cuánto se COMPRIME, de 0 a 90. en 0 el archivo sale idéntico al original; a más porcentaje, más
+  // apretado y más liviano, a cambio de algo de nitidez. arranca en el punto RECOMENDADO (COMP_RECO):
+  // el máximo de compresión sin que se note la pérdida. de ahí para arriba empieza a ablandarse
+  const [compresion, setCompresion] = useState(COMP_RECO)
   // el bloque de ajustes avanzados arranca plegado: quien no lo abra exporta igual que siempre
   const [avanzado, setAvanzado] = useState(false)
   // contenedor y códec de salida. por defecto mp4 + h264, que es el camino de siempre. webm y mkv, y
@@ -315,7 +319,7 @@ export default function ExportDialog() {
     setCalidad(topeCalidad)
     // el ritmo se toma de la fuente por derivación (fpsElegido en null), no hace falta fijarlo
     setFpsElegido(null)
-    setCompresion(30)
+    setCompresion(COMP_RECO)
     setAvanzado(false)
     setFormato('mp4')
     setCodecVideo('h264')
@@ -725,6 +729,7 @@ export default function ExportDialog() {
                     <AyudaExport texto="Cuánto se aprieta el video para que pese menos. A mayor compresión, archivo más liviano a cambio de algo de nitidez. En cero sale igual que el original." />
                   </span>
                   <span className="text-[13px] font-semibold tabular-nums">
+                    {compresion === COMP_RECO && <span className="mr-1.5 text-brand">Recomendada</span>}
                     {nombreCompresion(compresion)}{' '}
                     <span className="text-[color:var(--muted)]">({compresion}%)</span>
                   </span>
@@ -742,12 +747,13 @@ export default function ExportDialog() {
                     valor={bytesEstimados > 0 ? `≈ ${formatearBytes(bytesEstimados)}` : '—'}
                   />
                 </div>
-                {compresion > 0 && (
-                  <p className="mt-2.5 text-[11.5px] leading-relaxed text-[color:var(--muted)]">
-                    El archivo pesará menos que el original. A más compresión, más liviano, aunque puede
-                    perder algo de nitidez. Ponla en cero para conservar la calidad tal cual.
-                  </p>
-                )}
+                <p className="mt-2.5 text-[11.5px] leading-relaxed text-[color:var(--muted)]">
+                  {compresion === 0
+                    ? 'Sin comprimir: el archivo sale idéntico a tu video, sin perder nada, pero pesa más.'
+                    : compresion <= COMP_RECO
+                      ? `El nivel recomendado (${COMP_RECO}%) baja bastante el peso sin que se note la pérdida. Súbela para achicar más, o ponla en cero para calidad idéntica.`
+                      : 'Estás comprimiendo por encima de lo recomendado: el archivo pesa menos, pero ya puede notarse algo de pérdida de nitidez.'}
+                </p>
 
                 {/* formato de salida (contenedor) y códec del video. mp4/webm/mkv los arma el navegador;
                     mov/avi/wmv/flv/3gp se convierten desde el mp4 con ffmpeg, así que no llevan elección

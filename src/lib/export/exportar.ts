@@ -114,11 +114,14 @@ export function bitrateSegunMedios(
     bps = Math.max(bps, srcBps * ratio)
   }
   if (!bps) return bitrateVideo(ancho, alto, fps)
-  // el tamaño de la fuente incluye su audio, así que ya trae algo de holgura; un 10% extra asegura que
-  // no se pierda detalle al recomprimir. el bitrate se escala del ritmo de la fuente al ritmo elegido:
-  // exportar a menos fotogramas por segundo pesa menos, en la misma proporción. tope de 40 Mbps
+  // al RE-codificar un video ya comprimido a la misma tasa de la fuente se pierde un poco de detalle
+  // (pérdida de generación): por eso el "sin comprimir" salía algo más blando que el original. se le
+  // da un 30% de margen sobre la fuente para que la copia a calidad plena quede de verdad idéntica y
+  // la compresión tenga de dónde recortar sin que se note. el bitrate se escala del ritmo de la
+  // fuente al elegido: exportar a menos fotogramas por segundo pesa menos, en la misma proporción.
+  // tope de 40 Mbps
   const escalaFps = fpsFuente > 0 ? Math.min(1.5, fps / fpsFuente) : 1
-  return Math.min(40_000_000, Math.round(bps * 1.1 * escalaFps))
+  return Math.min(40_000_000, Math.round(bps * 1.3 * escalaFps))
 }
 
 function cargarImagen(src: string): Promise<HTMLImageElement> {
