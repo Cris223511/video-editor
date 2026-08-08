@@ -452,11 +452,18 @@ export default function Preview() {
   useEffect(() => {
     if (reproduciendo) return
     const act = clipEnTiempo(clipsOrdenados, phVista, ocultas)
+    // durante un cruce (solape) también se ve por encima el clip que ENTRA, no solo el activo (que
+    // es el que SALE). en pausa hay que colocar SU fotograma igual, o se quedaría congelado en su
+    // primer cuadro mientras el activo sí se posiciona, y al reproducir/scrub daría un salto
+    const cruceP = cruceCentradoEn(clipsOrdenados, phVista, (t) => t !== 'ninguna' && t !== 'corte')
+    const companeroP = cruceP ? (act && act.id === cruceP.entra.id ? cruceP.sale : cruceP.entra) : null
+    // el fotograma exacto en el que va un clip para este instante del cabezal
+    const cuadroDe = (c: Clip) => Math.max(0, c.recorteInicio + (phVista - c.inicio) * c.velocidad)
     clipsOrdenados.forEach((c) => {
       const v = videosRef.current.get(c.id)
       if (!v) return
-      if (act && c.id === act.id) {
-        const objetivo = c.recorteInicio + (phVista - c.inicio) * c.velocidad
+      if ((act && c.id === act.id) || (companeroP && c.id === companeroP.id)) {
+        const objetivo = cuadroDe(c)
         if (Math.abs(v.currentTime - objetivo) > 0.05) {
           try {
             v.currentTime = objetivo
@@ -467,12 +474,13 @@ export default function Preview() {
       }
       if (!v.paused) v.pause()
     })
-    // el relleno borroso comparte asset y tiempos con el clip activo, así que se
-    // coloca en el mismo fotograma y se queda quieto mientras el visor no corre. los
+    // el relleno borroso comparte asset y tiempos con su clip, así que se coloca en el mismo
+    // fotograma (activo y compañero del cruce) y se queda quieto mientras el visor no corre. los
     // fondos de los demás clips se dejan en pausa, listos para cuando les toque
     fondosRef.current.forEach((f, id) => {
-      if (act && id === act.id) {
-        const objetivo = act.recorteInicio + (phVista - act.inicio) * act.velocidad
+      const suyo = (act && id === act.id && act) || (companeroP && id === companeroP.id && companeroP)
+      if (suyo) {
+        const objetivo = cuadroDe(suyo)
         if (Math.abs(f.currentTime - objetivo) > 0.05) {
           try {
             f.currentTime = objetivo
