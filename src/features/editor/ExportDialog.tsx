@@ -1047,6 +1047,13 @@ export default function ExportDialog() {
                 <FilaInfo etiqueta="Tamaño" valor={pesoParcial} />
                 <FilaInfo etiqueta="Falta" valor={restante} />
               </div>
+              {/* aviso para no perder el progreso: si se minimiza o se cambia de pestaña, el
+                  navegador frena esta pestaña en segundo plano y la exportación se ralentiza o se
+                  para hasta volver a ella. mejor dejarla a la vista */}
+              <p className="mt-3 text-[11px] leading-relaxed text-[color:var(--muted)]">
+                Deja esta pestaña abierta y a la vista mientras se exporta. Si la minimizas o cambias
+                de pestaña, el navegador la frena y la exportación se detiene hasta que vuelvas.
+              </p>
             </div>
           </div>
 
