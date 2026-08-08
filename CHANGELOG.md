@@ -4,6 +4,17 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.45.2 (2026-08-08)
+
+- **La copia "sin comprimir" ya sale idéntica a tu video.** Al recodificar un video a la misma tasa de
+  bits de la fuente se perdía un poco de detalle (por eso "sin comprimir" se veía algo más blando).
+  Ahora la calidad plena lleva más margen y la copia queda igual al original, dejándole a la
+  compresión de dónde recortar sin que se note.
+- **La compresión arranca en un nivel recomendado.** Por defecto se marca la compresión "Recomendada":
+  el punto donde el archivo baja bastante de peso sin que la pérdida se note. De ahí para arriba se
+  puede achicar más (con algo de pérdida), o bajarla a cero para una copia idéntica. El diálogo lo
+  explica según dónde esté el control.
+
 ## 2.45.1 (2026-08-08)
 
 - **El control de compresión al exportar ahora va en el sentido intuitivo.** Antes el 100 % era
