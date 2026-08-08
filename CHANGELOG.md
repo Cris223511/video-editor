@@ -4,6 +4,16 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.45.1 (2026-08-08)
+
+- **El control de compresión al exportar ahora va en el sentido intuitivo.** Antes el 100 % era
+  "sin comprimir" y bajar el número comprimía más, lo cual confundía. Ahora es al revés y claro: a
+  más porcentaje, más compresión y archivo más liviano; en cero sale igual que el original. Arranca
+  con una compresión moderada para que el archivo no pese de más sin que se note la pérdida.
+- **Las fotografías por segundo ya salen bien desde que se abre el diálogo de exportar.** Antes se
+  veía un salto de 30 al ritmo real del video (por ejemplo 60); ahora se muestra el del material de
+  entrada de una vez, sin ese parpadeo.
+
 ## 2.45.0 (2026-08-07)
 
 - **Las transiciones ahora también cruzan el audio.** Durante una transición, el sonido ya no salta de
