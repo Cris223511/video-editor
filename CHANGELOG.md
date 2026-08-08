@@ -4,6 +4,18 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.44.1 (2026-08-07)
+
+- **La exportación de proyectos con varias transiciones ya usa el motor rápido.** Un proyecto con
+  varios clips (sobre todo en 1080p) caía al motor de respaldo, que graba en tiempo real: tardaba
+  eternidades y, peor, se paraba si minimizabas o cambiabas de pestaña. La causa era que el motor
+  rápido abría de golpe un decodificador por cada clip y, con muchos clips pesados, se pasaba del
+  límite del navegador y se rendía. Ahora los videos se leen al inicio (con su barra de progreso) y
+  los decodificadores se abren de a pocos, solo los que hace falta en cada momento, así que el motor
+  rápido aguanta cualquier cantidad de clips y exporta en una fracción del tiempo.
+- **Aviso al exportar.** El diálogo recuerda dejar la pestaña abierta y a la vista mientras se
+  exporta, porque el navegador frena las pestañas en segundo plano.
+
 ## 2.44.0 (2026-08-07)
 
 - **Las transiciones ahora son un solape de verdad: los dos clips corren a la vez.** Antes, durante una
