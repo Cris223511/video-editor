@@ -1275,10 +1275,18 @@ export default function Preview() {
   // a tiempo sin necesidad de retención
   const [clipListoId, setClipListoId] = useState<string | null>(null)
   useEffect(() => {
-    // reproduciendo, o en un cruce (sus opacidades las maneja el cruce): no se retiene nada,
-    // el clip activo se muestra de una vez para no cortar la fluidez
-    if (!activo || cruce || reproduciendo) {
+    // reproduciendo o sin clip: no se retiene nada, el activo se muestra de una vez
+    if (!activo || reproduciendo) {
       setClipListoId(activo ? activo.id : null)
+      return
+    }
+    // en un cruce, sus opacidades las maneja el cruce, pero OJO con qué clip se marca como "listo":
+    // con el solape, el clip ACTIVO es el que SALE (queda debajo) y el que se ve por encima es el que
+    // ENTRA. si se marcara el activo (el que sale), al pasar el final del cruce el visor lo retendría
+    // un instante mientras el que entra confirma su cuadro, y aparecía un mini-fragmento del primer
+    // clip. se marca el que ENTRA, que es el que se ve arriba y quedará activo al cerrar el cruce
+    if (cruce) {
+      setClipListoId(cruce.entra.id)
       return
     }
     const v = videosRef.current.get(activo.id)
