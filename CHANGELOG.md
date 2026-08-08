@@ -4,6 +4,14 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.45.4 (2026-08-08)
+
+- **En pausa, el segundo clip ya no se ve congelado dentro de una transición.** Al detener el cabezal
+  o arrastrarlo por el medio de un cruce, el clip que entra se quedaba en su primer cuadro mientras el
+  que sale sí se colocaba bien, y al cruzar el final daba un salto. El visor solo posicionaba el
+  fotograma del clip activo; ahora también coloca el del clip que entra por encima, así los dos
+  muestran el cuadro correcto en cada punto y el recorrido por la transición se ve continuo.
+
 ## 2.45.3 (2026-08-08)
 
 - **Se corrige el parpadeo del primer clip al final de una transición.** Al terminar el cruce aparecía
