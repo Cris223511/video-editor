@@ -86,6 +86,22 @@ export function cruceCentradoEn(
   return null
 }
 
+// factor de volumen que la transición le pone al AUDIO de un clip en el instante t. la idea: el
+// audio NO cruza a la par del video. si lo hiciera, en una transición larga se oiría el 2do clip
+// encima del 1ro todo el rato. en cambio, durante la 1ra MITAD del solape sigue sonando solo el que
+// sale; a partir del medio entra el del que releva con un cruce de igual potencia, así el sonido del
+// 2do plano se empieza a oír recién desde la mitad y sin bajón. fuera de un cruce devuelve 1. es
+// automático (va con la duración de la transición) y no crea tiradores editables
+export function fundidoTransicionAudio(clips: Clip[], t: number, clipId: string): number {
+  const cruce = cruceCentradoEn(clips, t, (tipo) => tipo !== 'ninguna' && tipo !== 'corte')
+  if (!cruce) return 1
+  // x recorre 0..1 SOLO en la segunda mitad del solape (antes está en la primera mitad)
+  const x = Math.max(0, (cruce.p - 0.5) * 2)
+  if (clipId === cruce.entra.id) return Math.sin(x * (Math.PI / 2)) // el que entra: 0 hasta el medio, sube
+  if (clipId === cruce.sale.id) return Math.cos(x * (Math.PI / 2)) // el que sale: 1 hasta el medio, baja
+  return 1
+}
+
 // técnicas cuyo efecto (velo de color, desenfoque u opacidad) se puede aplicar sobre
 // TODA la composición a la vez, no solo sobre el video. las geométricas (barridos,
 // puertas, empujes) no entran aquí porque recortan o mueven el fotograma y necesitan

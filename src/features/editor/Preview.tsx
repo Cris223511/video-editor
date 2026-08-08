@@ -27,7 +27,7 @@ import {
   hayEfectoFiltro,
   stdDeviationsDesenfoque,
 } from '../../lib/color/tono'
-import { anterior, posterior, pintarTransicion, progreso, progresoSalida, esTransicionGlobal, efectoGlobalTrans, cruceCentradoEn } from '../../lib/transiciones/pintar'
+import { anterior, posterior, pintarTransicion, progreso, progresoSalida, esTransicionGlobal, efectoGlobalTrans, cruceCentradoEn, fundidoTransicionAudio } from '../../lib/transiciones/pintar'
 import { cssEfectos } from '../../lib/efectos/catalogo'
 import { paramsNB, nodosFiltroNB, NodoFiltro } from '../../lib/efectos/nitidezBrillo'
 import { paramsGoPro, nodosFiltroGoPro } from '../../lib/efectos/goPro'
@@ -674,17 +674,27 @@ export default function Preview() {
       })
       const nodo = asegurarGrafo()
       cablearVideo(act.id, v)
-      // la ganancia propia del activo vuelve a 1 (con rampa) por si venía de ser el saliente de un
-      // cruce anterior, donde quedó a cero; subirla de golpe volvería a chasquear
+      // el VOLUMEN de cada clip (su volumen propio, sus fundidos y el cruce de audio de la
+      // transición) vive en su ganancia PROPIA, no en la maestra; así el que sale y el que entra de
+      // un cruce pueden sonar a la vez cada uno con su curva. la maestra solo lleva lo compartido
+      // (franjas, volumen general y el del preview). el silencio del nivel, el mudo o el clip
+      // silenciado lo dejan en cero
+      const volPropio = (c: Clip): number =>
+        metas[c.pista]?.silenciada || c.mudo || c.silenciado
+          ? 0
+          : (c.volumen ?? 1) *
+            fundidoAudioEn(ph, c.inicio, c.duracion, c.fundidoEntrada, c.fundidoSalida) *
+            fundidoTransicionAudio(clipsOrdenados, ph, c.id)
       const gAct = gananciasClipRef.current.get(act.id)
-      if (gAct) rampaGanancia(gAct, 1)
-      // el compañero sigue corriendo (silenciado) para que su imagen no se congele
+      if (gAct) rampaGanancia(gAct, volPropio(act))
+      // el compañero sigue corriendo, y su AUDIO ya no se calla del todo: entra con el cruce de la
+      // transición (desde el medio del solape), para que se oiga el fundido de sonido entre planos
       if (companero) {
         const cv = videosRef.current.get(companero.id)
         if (cv) {
           cablearVideo(companero.id, cv)
           const gc = gananciasClipRef.current.get(companero.id)
-          if (gc) rampaGanancia(gc, 0)
+          if (gc) rampaGanancia(gc, volPropio(companero))
           cv.playbackRate = companero.velocidad
           // su tiempo continuo: la cola del que sale, o la cabeza del que entra antes de
           // su inicio (offset negativo). se recoloca si está pausado o se desfasó; si ya
@@ -703,16 +713,12 @@ export default function Preview() {
       // un nivel silenciado no aporta sonido: su clip se ve pero la ganancia baja
       // a cero, igual que hará la exportación
       if (nodo) {
-        // un nivel silenciado o un clip con su audio ya separado no suena: el
-        // sonido de un clip separado lo lleva su clip de audio vinculado
-        // el volumen propio del clip multiplica a la ganancia de la pista, así que
-        // un clip bajo sigue respetando las franjas y el volumen general
-        nodo.gain.value = metas[act.pista]?.silenciada || act.mudo || act.silenciado
-          ? 0
-          : gananciaEn(audioRef.current.regiones, audioRef.current.general, ph) *
-            audioRef.current.preview *
-            (act.volumen ?? 1) *
-            fundidoAudioEn(ph, act.inicio, act.duracion, act.fundidoEntrada, act.fundidoSalida)
+        // la maestra solo lleva lo COMPARTIDO por todos los clips: las franjas de ganancia, el
+        // volumen general del proyecto y el del preview. el volumen y los fundidos de cada clip (y
+        // el silencio de su nivel o su mudo) ya van en su ganancia propia, arriba, para que el cruce
+        // de audio de una transición suene con los dos clips a la vez
+        nodo.gain.value =
+          gananciaEn(audioRef.current.regiones, audioRef.current.general, ph) * audioRef.current.preview
       }
       // grabando un recorrido el video corre más despacio, que es la única forma
       // de seguir con el cursor algo que se mueve rápido sin ir a tirones. el

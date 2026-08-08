@@ -1,6 +1,7 @@
 import { DatosExport } from './exportar'
 import { gananciaEn, fundidoAudioEn } from '../audio/ganancia'
 import { resolverSolapes } from '../timeline/clips'
+import { fundidoTransicionAudio } from '../transiciones/pintar'
 
 const SR = 48_000
 
@@ -87,7 +88,8 @@ export async function mezclarAudio(datos: DatosExport, total: number): Promise<A
   // clips de video: aportan su audio salvo que el nivel esté silenciado, el clip esté
   // en mudo o tenga su audio separado a la pista de sonido. se usan las posiciones con los solapes
   // resueltos para que el sonido de cada clip caiga donde cae su imagen tras el acortamiento del cruce
-  for (const c of resolverSolapes(datos.clips)) {
+  const clipsRes = resolverSolapes(datos.clips)
+  for (const c of clipsRes) {
     const silenciada = (datos.pistasMeta[c.pista]?.silenciada ?? false) || !!c.mudo || !!c.silenciado
     if (silenciada) continue
     const buf = await bufferDe(c.assetId)
@@ -101,7 +103,10 @@ export async function mezclarAudio(datos: DatosExport, total: number): Promise<A
       (t) =>
         gananciaEn(datos.audioRegiones, datos.volumenGlobal, t) *
         (c.volumen ?? 1) *
-        fundidoAudioEn(t, c.inicio, c.duracion, c.fundidoEntrada, c.fundidoSalida),
+        fundidoAudioEn(t, c.inicio, c.duracion, c.fundidoEntrada, c.fundidoSalida) *
+        // el cruce de audio de la transición: en el solape, el que sale se mantiene y el que entra
+        // sube recién desde el medio, para no oír los dos planos encima todo el rato
+        fundidoTransicionAudio(clipsRes, t, c.id),
     )
   }
 
