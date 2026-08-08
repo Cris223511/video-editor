@@ -4,6 +4,14 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.45.3 (2026-08-08)
+
+- **Se corrige el parpadeo del primer clip al final de una transición.** Al terminar el cruce aparecía
+  un instante un mini-fragmento del clip que salía y desaparecía. Con el solape, el clip que sale es
+  el activo por debajo y el que entra se ve por encima; el visor retenía por error el que sale al
+  cerrar el cruce. Ahora se marca como listo el clip que entra, que es el que queda en pantalla, y el
+  corte final del cruce se ve limpio, sin ese destello.
+
 ## 2.45.2 (2026-08-08)
 
 - **La copia "sin comprimir" ya sale idéntica al original.** Al recodificar un video a la misma tasa de
