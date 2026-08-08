@@ -111,20 +111,24 @@ export function exportarRapido(
     // porque cada uno va por un instante distinto). ya preparado no se rehace, así el primer
     // vistazo y el bucle no decodifican dos veces el mismo clip
     const demuxCache = new Map<string, VideoDemux>()
-    const prepararFuente = async (c: Clip) => {
-      if (fuentes.has(c.id)) return
-      // el archivo real, tomado DIRECTO del medio; nada de fetch a una object URL que puede
-      // estar revocada (era la causa del ERR_FILE_NOT_FOUND que dejaba la exportación clavada)
-      const blob = datos.fileDeAsset(c.assetId)
+    // desarma un asset (lo lee y lo trocea en paquetes) una sola vez, y lo cachea. es el paso LENTO
+    // y pesado; se hace por asset (no por clip) y aparte de crear el decodificador, para poder
+    // repartir su progreso al inicio sin abrir decodificadores todavía
+    const demuxAsset = async (assetId: string) => {
+      if (demuxCache.has(assetId)) return
+      // el archivo real, tomado DIRECTO del medio; nada de fetch a una object URL que puede estar
+      // revocada (era la causa del ERR_FILE_NOT_FOUND que dejaba la exportación clavada)
+      const blob = datos.fileDeAsset(assetId)
       if (!blob) return
-      let dem = demuxCache.get(c.assetId)
-      if (!dem) {
-        // leer y desarmar el archivo es lo que más tarda antes de arrancar, sobre todo con
-        // videos pesados; se avisa para que el 0% no parezca colgado mientras tanto
-        onProgreso(0, 'Leyendo el video…')
-        dem = await demuxVideo(blob)
-        demuxCache.set(c.assetId, dem)
-      }
+      demuxCache.set(assetId, await demuxVideo(blob))
+    }
+    // crea el decodificador de un clip a partir de su asset ya desarmado. es SÍNCRONO y barato: no
+    // lee el archivo (eso lo hizo demuxAsset). se llama bajo demanda en el bucle para no tener más
+    // de unos pocos decodificadores abiertos a la vez
+    const prepararFuente = (c: Clip) => {
+      if (fuentes.has(c.id)) return
+      const dem = demuxCache.get(c.assetId)
+      if (!dem) return
       fuentes.set(c.id, new FuenteDecodificada(dem.config, dem.chunks, preferirSoftware))
     }
 
@@ -135,7 +139,8 @@ export function exportarRapido(
     try {
       const clip0 = clipEnTiempo(clips, 0, ocultas) ?? clips[0]
       if (clip0) {
-        await prepararFuente(clip0)
+        await demuxAsset(clip0.assetId)
+        prepararFuente(clip0)
         const fu0 = fuentes.get(clip0.id)
         if (fu0) {
           await fu0.irAlSegundo(clip0.recorteInicio)
@@ -148,8 +153,24 @@ export function exportarRapido(
       // el vistazo es solo cosmético; que no impida exportar
     }
 
-    // el resto de los clips (y el primero, si el vistazo no pudo con él) se preparan aquí
-    for (const c of clips) await prepararFuente(c)
+    // se desarman TODOS los assets del proyecto al inicio, repartiendo su progreso. este es el paso
+    // lento con videos pesados; hacerlo con progreso mantiene vivo al vigilante del diálogo (que si
+    // no ve avance en 25s tira al motor clásico) y le enseña al usuario una fase de lectura clara.
+    // los DECODIFICADORES en cambio se abren después, bajo demanda en el bucle (ver más abajo)
+    const assetsUnicos = [...new Set(clips.map((c) => c.assetId))]
+    for (let i = 0; i < assetsUnicos.length; i++) {
+      if (señal.cancelado) throw new Error('Exportación cancelada.')
+      await demuxAsset(assetsUnicos[i])
+      onProgreso(0.005 + 0.02 * ((i + 1) / assetsUnicos.length), `Leyendo los videos… ${i + 1} de ${assetsUnicos.length}`)
+    }
+
+    // OJO: los decodificadores NO se abren todos de golpe. el navegador limita cuántos
+    // VideoDecoder de hardware pueden existir a la vez (con 1080p el tope es bajo), y un proyecto
+    // con varias transiciones tiene varios clips: abrirlos todos hacía fallar el motor rápido, que
+    // caía al clásico (grabación en tiempo real, lentísima y que además se congela en segundo
+    // plano). se abren BAJO DEMANDA en el bucle (solo los que el cuadro necesita: el activo y sus
+    // vecinos por si hay cruce) y se cierran los que dejan de hacer falta, así nunca hay más de
+    // unos pocos abiertos y el motor rápido aguanta cualquier cantidad de clips
 
     // se mezcla todo el audio del proyecto en un solo buffer (rápido, con
     // OfflineAudioContext) antes de armar el escritor, que necesita saber si hay pista de
@@ -202,11 +223,22 @@ export function exportarRapido(
         const p = posterior(activo, clips)
         if (p) necesarios.add(p)
       }
+      // se abren (si no estaban) solo los decodificadores que este cuadro necesita
       for (const c of necesarios) {
+        prepararFuente(c)
         const fu = fuentes.get(c.id)
         if (!fu) continue
         const s = c.recorteInicio + Math.max(0, Math.min(t - c.inicio, c.duracion)) * c.velocidad
         await fu.irAlSegundo(s)
+      }
+      // y se cierran los que ya no hacen falta, para no acumular decodificadores y pasar el
+      // límite del navegador. su demux queda cacheado, así que reabrir uno más adelante es barato
+      const idsNec = new Set([...necesarios].map((c) => c.id))
+      for (const [id, fu] of fuentes) {
+        if (!idsNec.has(id)) {
+          fu.cerrar()
+          fuentes.delete(id)
+        }
       }
 
       defs.refrescar(t)
