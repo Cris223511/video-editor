@@ -15,6 +15,7 @@ export default function ConfirmacionGlobal() {
       titulo={confirmacion?.titulo ?? ''}
       mensaje={confirmacion?.mensaje ?? ''}
       aceptar={confirmacion?.aceptar ?? 'Eliminar'}
+      cancelar={confirmacion?.cancelar}
       onAceptar={() => {
         confirmacion?.onAceptar()
         cerrar()

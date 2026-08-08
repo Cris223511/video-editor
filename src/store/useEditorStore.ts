@@ -288,8 +288,8 @@ interface EstadoEditor {
   // ventana de confirmación global: cualquier sitio pide un aviso con su texto y su
   // acción, y se pinta con el mismo modal bonito de siempre en vez del feo del
   // navegador. es de vista, no entra al historial
-  confirmacion: { titulo: string; mensaje: string; aceptar?: string; onAceptar: () => void } | null
-  pedirConfirmacion: (c: { titulo: string; mensaje: string; aceptar?: string; onAceptar: () => void }) => void
+  confirmacion: { titulo: string; mensaje: string; aceptar?: string; cancelar?: string; onAceptar: () => void } | null
+  pedirConfirmacion: (c: { titulo: string; mensaje: string; aceptar?: string; cancelar?: string; onAceptar: () => void }) => void
   cerrarConfirmacion: () => void
   // borra de una vez todos los bloques marcados, sea cual sea su tipo
   quitarBloques: (ids: string[]) => void

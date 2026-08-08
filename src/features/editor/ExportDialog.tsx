@@ -349,6 +349,7 @@ export default function ExportDialog() {
         titulo: 'Cancelar exportación',
         mensaje: '¿Seguro que quieres cancelar? Se perderá todo el avance de la exportación.',
         aceptar: 'Sí, cancelar',
+        cancelar: 'No, seguir exportando',
         onAceptar: cerrarTodo,
       })
       return
