@@ -10,7 +10,7 @@ import { useEditorStore } from '../../store/useEditorStore'
 import { useProjectStore } from '../../store/useProjectStore'
 import { MediaAsset } from '../../types/media'
 import { clipEnTiempo, duracionProyecto, resolverSolapes } from '../../lib/timeline/clips'
-import { encuadreDe, encuadreNeutro, rectClip, giradoUnCuarto } from '../../lib/timeline/encuadre'
+import { encuadreDe, encuadreNeutro, rectClip, factorLlenado } from '../../lib/timeline/encuadre'
 import { gananciaEn, fundidoAudioEn } from '../../lib/audio/ganancia'
 import { rectContenido } from '../../lib/layers/rect'
 import { posicionCapa } from '../../lib/layers/motion'
@@ -1876,16 +1876,10 @@ export default function Preview() {
                   espejoV: enc.espejoV,
                 })
                 // el video del visor se coloca con object-contain, que encaja sin
-                // saber del giro. cuando el clip va de lado, se le suma un factor de
-                // escala para que, ya girado, llene el lienzo igual que en el
-                // compositor (que sí encaja con las medidas cruzadas). así el visor y
-                // la exportación muestran lo mismo
-                let factorGiro = 1
-                if (giradoUnCuarto(enc.rotacion)) {
-                  const sinGirar = Math.min(resolucion.ancho / asset.ancho, resolucion.alto / asset.alto)
-                  const cruzado = Math.min(resolucion.ancho / asset.alto, resolucion.alto / asset.ancho)
-                  if (sinGirar > 0) factorGiro = cruzado / sinGirar
-                }
+                // saber del giro. al girar el clip se le suma el mismo factor de llenado
+                // que usa el compositor, para que ya girado cubra el lienzo sin esquinas
+                // vacías. así el visor y la exportación muestran lo mismo
+                const factorGiro = factorLlenado(asset.ancho, asset.alto, resolucion.ancho, resolucion.alto, enc.rotacion)
                 const escalaGiro = factorGiro !== 1 ? ` scale(${factorGiro.toFixed(4)})` : ''
                 const transform = `${base} ${giro}${escalaGiro}`.trim() || undefined
                 // el recorte se aplica al propio elemento: el rectángulo con un
