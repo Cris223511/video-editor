@@ -81,7 +81,7 @@ export interface EfectoCromatico {
 
 // la textura animada (grano, cine viejo, vhs, destellos) se define junto a su motor de
 // dibujo en lib/efectos/animados y se referencia aquí para cerrar la unión
-export type EfectoClip = { id: string } & (
+export type EfectoClip = { id: string; origenLook?: boolean } & (
   | EfectoDesenfoque
   | EfectoFiltro
   | EfectoNitidezBrillo
@@ -153,6 +153,10 @@ export interface Clip {
   velocidad: number // 1 es normal; mayor acelera y ocupa menos en la pista
   tono: AjusteTono // corrección de color del clip
   efectos: EfectoClip[] // cadena de efectos, vacía mientras no se aplique ninguno
+  // combinación (look) activa: una receta de aspecto que pisa el tono y enciende varios
+  // efectos de un golpe. guarda solo su id, para saber cuál marcar en el panel. solo puede
+  // haber una a la vez; elegir otra reemplaza la anterior. sin definir, no hay ninguna puesta
+  combinacion?: string
   transicion: Transicion // cómo entra el clip respecto al anterior
   // duración, en segundos, durante la cual la corrección de color y los efectos
   // del clip aparecen de forma progresiva desde su arranque, en vez de estar a

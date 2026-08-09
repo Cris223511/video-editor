@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { Track, Clip, AjusteTono, Transicion, PistaMeta, EfectoClip, Encuadre } from '../types/timeline'
 import { claveEfecto } from '../lib/efectos/catalogo'
+import type { Look } from '../lib/efectos/looks'
 import { MediaAsset } from '../types/media'
 import { Capa, CapaCensura, CapaFigura, CapaImagen, CapaTexto, CapaTrazo, KeyframePos } from '../types/layers'
 import { Impacto, TipoImpacto } from '../types/impacto'
@@ -230,6 +231,10 @@ interface EstadoEditor {
   setVelocidadClip: (id: string, velocidad: number) => void
   setTono: (id: string, cambios: Partial<AjusteTono>) => void
   resetTono: (id: string) => void
+  // aplica una combinación (look) al clip: pisa el tono y enciende sus efectos de un golpe.
+  // con null, la quita (tono a neutro y fuera sus efectos). solo una a la vez: reemplaza la
+  // anterior, respetando los efectos que el usuario haya puesto a mano
+  aplicarCombinacion: (id: string, look: Look | null) => void
   // encuadre del clip en el lienzo: posición y tamaño del video. actualizar
   // recibe cambios sueltos y reset lo devuelve al centrado de siempre
   actualizarEncuadre: (id: string, cambios: Partial<Encuadre>) => void
@@ -2102,6 +2107,37 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         pista: {
           ...s.pista,
           clips: s.pista.clips.map((c) => (dest.has(c.id) ? { ...c, tono: { ...tonoNeutro } } : c)),
+        },
+      }
+    }),
+
+  aplicarCombinacion: (id, look) =>
+    set((s) => {
+      const dest = clipsObjetivo(s, id)
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) => {
+            if (!dest.has(c.id)) return c
+            // los efectos que puso una combinación anterior se retiran; los que el usuario
+            // haya agregado a mano (sin la marca) se conservan
+            const propios = (c.efectos ?? []).filter((e) => !e.origenLook)
+            if (!look) {
+              // quitar la combinación: el tono vuelve a neutro y solo quedan los efectos propios
+              return { ...c, tono: { ...tonoNeutro }, efectos: propios, combinacion: undefined }
+            }
+            // los efectos de la combinación nacen con id propio y marcados como suyos. si alguno
+            // choca de tipo con uno puesto a mano, manda el de la combinación (su dosis)
+            const suyos = look.efectos().map((e) => ({ ...e, id: crypto.randomUUID(), origenLook: true }))
+            const clavesSuyas = new Set(suyos.map(claveEfecto))
+            const sinChoque = propios.filter((e) => !clavesSuyas.has(claveEfecto(e)))
+            return {
+              ...c,
+              tono: { ...tonoNeutro, ...look.tono },
+              efectos: [...sinChoque, ...suyos],
+              combinacion: look.id,
+            }
+          }),
         },
       }
     }),

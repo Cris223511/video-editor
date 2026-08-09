@@ -7,6 +7,7 @@ import { useProjectStore } from '../../store/useProjectStore'
 import { Transiciones } from './OptionsPanel'
 import TonePanel from './panels/TonePanel'
 import EffectsPanel from './panels/EffectsPanel'
+import CombinacionesPanel from './panels/CombinacionesPanel'
 import SpeedPanel from './panels/SpeedPanel'
 import RecortarPanel from './panels/RecortarPanel'
 import TransformarPanel from './panels/TransformarPanel'
@@ -33,6 +34,7 @@ interface Categoria {
 // concreto, sin las herramientas que son de todo el proyecto
 const CLIP: Categoria[] = [
   { id: 'transiciones', icono: 'transiciones', etiqueta: 'Transiciones', panel: <Transiciones /> },
+  { id: 'combinaciones', icono: 'pelicula', etiqueta: 'Combinaciones', panel: <CombinacionesPanel /> },
   { id: 'tono', icono: 'tono', etiqueta: 'Ajustar colores', panel: <TonePanel /> },
   { id: 'efectos', icono: 'efectos', etiqueta: 'Efectos', panel: <EffectsPanel /> },
   { id: 'impactos', icono: 'impacto', etiqueta: 'Impactos', panel: <ImpactosPanel /> },
@@ -53,6 +55,7 @@ const IMPACTO_EDITOR: Categoria[] = [
 // todo el conjunto: el color y los efectos. el resto (transiciones, velocidad,
 // recortar, transformar) es cosa de un clip concreto, así que ahí no tiene sentido
 const MULTI: Categoria[] = [
+  { id: 'combinaciones', icono: 'pelicula', etiqueta: 'Combinaciones', panel: <CombinacionesPanel /> },
   { id: 'tono', icono: 'tono', etiqueta: 'Ajustar colores', panel: <TonePanel /> },
   { id: 'efectos', icono: 'efectos', etiqueta: 'Efectos', panel: <EffectsPanel /> },
   { id: 'audio', icono: 'audio', etiqueta: 'Audio', panel: <MultiAudioPanel /> },
