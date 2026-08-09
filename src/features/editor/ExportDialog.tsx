@@ -164,8 +164,8 @@ function limpiarNombre(titulo: string): string {
     .replace(/[^a-zA-Z0-9 _-]/g, '')
     .trim()
     .replace(/\s+/g, '-')
-    // el " - Video Editor" del título (espacio-guion-espacio) dejaba "---" al pasar los espacios a
-    // guiones; se colapsan los guiones repetidos a uno solo y se quitan los que queden en los extremos
+    // un título con espacio-guion-espacio dejaría varios guiones seguidos al pasar los espacios a
+    // guiones; se colapsan los repetidos a uno solo y se quitan los que queden en los extremos
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
     .toLowerCase()

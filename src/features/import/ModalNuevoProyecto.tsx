@@ -13,11 +13,11 @@ function sinExtension(nombre: string): string {
   return nombre.replace(/\.[^.]+$/, '').trim() || nombre
 }
 
-// el nombre que se propone: el del PRIMER medio (respeta el orden de la lista) con " - Video Editor"
-// pegado detrás. si no hay medios, queda vacío
+// el nombre que se propone es directamente el del PRIMER medio (respeta el orden de la lista), sin
+// nada pegado detrás. si no hay medios, queda vacío
 function nombrePropuesto(medios: MediaAsset[]): string {
   const primero = medios[0]
-  return primero ? `${sinExtension(primero.nombre)} - Video Editor` : ''
+  return primero ? sinExtension(primero.nombre) : ''
 }
 
 // una fila arrastrable de la lista de medios: miniatura, nombre y un botón para quitarlo. el arrastre
@@ -67,9 +67,8 @@ function FilaMedio({ medio, onQuitar }: { medio: MediaAsset; onQuitar: () => voi
 }
 
 // modal que sale al importar los primeros medios de un proyecto nuevo: confirma el nombre (propuesto
-// a partir del primer video, con " - Video Editor"), una descripción, y la lista de medios, que se
-// puede reordenar, ampliar o recortar. al aceptar, el nombre y la nota quedan en el proyecto y se
-// entra al editor
+// a partir del primer video), una descripción, y la lista de medios, que se puede reordenar, ampliar
+// o recortar. al aceptar, el nombre y la nota quedan en el proyecto y se entra al editor
 export default function ModalNuevoProyecto({
   abierto,
   onCancelar,

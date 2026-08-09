@@ -12,9 +12,9 @@ El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com
   crece hasta cubrir todo, recortando un poco el borde. El visor y la exportación aplican la misma
   cuenta, así que lo que se ve al editar es lo que sale en el archivo. El giro en pasos de 90° con su
   botón mantiene el mismo resultado de antes.
-- **El nombre del archivo exportado ya no lleva guiones de más.** El título termina en " - Video Editor"
-  y al armar el nombre quedaban varios guiones seguidos. Ahora se reducen a uno solo, de modo que un
-  proyecto "asdasd - Video Editor" se descarga como "asdasd-video-editor".
+- **El nombre del proyecto es directamente el del primer video.** Antes se le pegaba " - Video Editor"
+  detrás, que además dejaba varios guiones en el nombre del archivo al exportar. Ahora el proyecto toma
+  tal cual el nombre del primer video, así que ese mismo nombre es el del archivo descargado.
 - **La exportación sin ajustes avanzados sale idéntica al original.** La compresión vuelve a arrancar en
   cero: exportar sin tocar nada conserva toda la calidad. El valor de fábrica anterior recortaba algo de
   nitidez sin que se pidiera; quien quiera un archivo más liviano puede subir la compresión a mano.
