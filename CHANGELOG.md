@@ -4,6 +4,21 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.47.0 (2026-08-09)
+
+- **Nueva sección "Combinaciones".** Las recetas de aspecto de un clic dejan el panel de efectos y
+  pasan a una sección propia en el clip. Una combinación cambia de una vez el color, el tono, las
+  ruedas de color y varios efectos, para lograr una estética completa sin ajustar pieza por pieza.
+  Solo puede haber una a la vez: elegir otra reemplaza la anterior y se puede quitar. Los efectos que
+  se hayan puesto a mano se conservan, y cada parte se sigue afinando en Ajustar colores y en Efectos.
+- **Quince combinaciones** para empezar: Nocturno púrpura, Atardecer dorado, Neón ciber, Cine teal &
+  naranja, Verano vivo, VHS retro, Blanco y negro, Noir dramático, Verde terminal, Rosa de ensueño,
+  Frío de invierno, Ámbar de noche, Vida nocturna, Sepia antiguo y Drama intenso.
+- **Nocturno púrpura, rehecho.** Antes oscurecía tanto que una escena de noche se hundía en negro y el
+  grano la ensuciaba. Ahora baja el contraste para levantar las sombras sin lavar la imagen, tiñe de
+  violeta con las ruedas, sube la nitidez y deja las luces brillando con un filo cromático limpio, sin
+  grano.
+
 ## 2.46.0 (2026-08-08)
 
 - **El video girado a cualquier ángulo llena el lienzo.** Al rotar el clip en diagonal quedaban
