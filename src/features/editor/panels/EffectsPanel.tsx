@@ -33,6 +33,7 @@ function nombreEfecto(e: EfectoClip): string {
   if (e.tipo === 'nitidez-brillo') return e.variante === 'resplandor' ? 'Resplandor' : 'Nítido y brilloso'
   if (e.tipo === 'gopro') return 'Cámara de acción'
   if (e.tipo === 'cromatico') return 'Cromático'
+  if (e.tipo === 'zoomblur') return 'Desenfoque radial'
   if (e.tipo === 'animado') return buscarEfecto(e.animado)?.nombre ?? 'Efecto animado'
   if (esFiltro(e)) return buscarEfecto(e.filtro)?.nombre ?? 'Efecto'
   return 'Desenfoque de movimiento'
@@ -580,6 +581,21 @@ function MandosEfecto({
             />
           </Campo>
         </>
+      )}
+
+      {/* el desenfoque radial deja elegir la silueta de la zona nítida del centro */}
+      {efecto.tipo === 'zoomblur' && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-[color:var(--muted)]">Forma</span>
+          <Segmentado
+            valor={efecto.forma}
+            opciones={[
+              { valor: 'circular', etiqueta: 'Circular' },
+              { valor: 'cuadrada', etiqueta: 'Cuadrada' },
+            ]}
+            onChange={(v) => onCambiar({ forma: v as 'circular' | 'cuadrada' })}
+          />
+        </div>
       )}
     </>
   )

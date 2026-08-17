@@ -87,6 +87,7 @@ export type EfectoClip = { id: string; origenLook?: boolean } & (
   | EfectoNitidezBrillo
   | EfectoGoPro
   | EfectoCromatico
+  | import('../lib/efectos/zoomBlur').EfectoZoomBlur
   | import('../lib/efectos/animados').EfectoAnimado
 )
 

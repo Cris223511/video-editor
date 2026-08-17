@@ -15,6 +15,9 @@ export type TipoImpacto =
   // fuera de foco: la imagen pierde el foco como una cámara que desenfoca y vuelve, un
   // desenfoque redondo (isótropo) que sube hasta el medio del impacto y regresa a nítido
   | 'desenfoque'
+  // zoom veloz: un golpe de desenfoque radial (centro nítido, bordes estirados hacia afuera)
+  // que sube hasta el medio del impacto y vuelve, ese envión de cámara que embiste al frente
+  | 'zoomblur'
   | 'flashNegro'
   | 'flashBlanco'
   | 'destello'

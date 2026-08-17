@@ -20,6 +20,7 @@ import { paramsNB } from '../efectos/nitidezBrillo'
 import { paramsGoPro } from '../efectos/goPro'
 import { paramsCromatico } from '../efectos/cromatico'
 import { efectoAnimado, pintarAnimado } from '../efectos/animados'
+import { pintarZoomBlur } from '../efectos/zoomBlur'
 import { encuadreDe, rectClip, ENCUADRE_NEUTRO } from '../timeline/encuadre'
 import { aplicarTransformCanvas } from '../layers/transform'
 
@@ -118,6 +119,14 @@ function auxAnim(w: number, h: number): HTMLCanvasElement {
   if (lienzoAnim.width !== w) lienzoAnim.width = w
   if (lienzoAnim.height !== h) lienzoAnim.height = h
   return lienzoAnim
+}
+
+// lienzo de trabajo del desenfoque radial, donde el helper acumula las copias escaladas antes
+// de volcarlas sobre el cuadro
+let lienzoZoomTmp: HTMLCanvasElement | null = null
+function auxZoomTmp(): HTMLCanvasElement {
+  if (!lienzoZoomTmp) lienzoZoomTmp = document.createElement('canvas')
+  return lienzoZoomTmp
 }
 
 // lienzo aparte para el impacto: el cuadro ya compuesto se copia aquí y se vuelve
@@ -862,6 +871,24 @@ export function dibujarFotograma(
         rctx.fill()
         rctx.restore()
         ctx.drawImage(rl, 0, 0)
+      }
+
+      // desenfoque radial (zoom): se compone encima del cuadro ya pintado, con copias del
+      // propio video escaladas desde el centro y el foco nítido en el medio. la fuente es el
+      // mismo elemento de video que usa el visor (el cuadro crudo, sin el grado de color, que
+      // el visor tampoco le mete a este lienzo), de modo que editar y exportar coinciden. va
+      // antes de las texturas animadas, que se pintan por encima de todo
+      const zoom = (clip.efectos ?? []).find((e) => e.tipo === 'zoomblur' && e.intensidad > 0)
+      // la fuerza suma el efecto de clip (con su aparición progresiva) y el golpe del impacto
+      // "Zoom veloz" activo en este instante, igual que en el visor
+      const impZoom = estadoImpactosEn(escena.impactos ?? [], t).zoomBlur
+      const fEfectoZoom = zoom && zoom.tipo === 'zoomblur' ? zoom.intensidad * mixEf : 0
+      const fuerzaZoom = Math.min(100, fEfectoZoom + impZoom * 100)
+      if (fuerzaZoom > 0) {
+        pintarZoomBlur(ctx, video, { dx, dy, dw, dh }, auxZoomTmp(), {
+          intensidad: fuerzaZoom,
+          forma: zoom && zoom.tipo === 'zoomblur' ? zoom.forma : 'circular',
+        })
       }
 
       // textura animada (grano, cine viejo, vhs, destellos) por encima del clip ya

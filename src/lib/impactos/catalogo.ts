@@ -32,6 +32,7 @@ export const IMPACTOS: DefImpacto[] = [
   { tipo: 'latido', nombre: 'Latido', categoria: 'camara', descripcion: 'Un par de pulsos rápidos.' },
   { tipo: 'movimiento', nombre: 'Movimiento', categoria: 'camara', descripcion: 'Barrido de cámara: la imagen se desenfoca con estelas en el sentido del movimiento, como cuando mueves la cámara rápido. La dirección se elige.' },
   { tipo: 'desenfoque', nombre: 'Fuera de foco', categoria: 'camara', descripcion: 'La cámara pierde el foco: la imagen se desenfoca de a poco hasta el medio y vuelve a nítida, como enfocar mal y corregir.' },
+  { tipo: 'zoomblur', nombre: 'Zoom veloz', categoria: 'camara', descripcion: 'Un golpe de desenfoque radial: el centro queda nítido y los bordes se estiran hacia afuera, como la cámara que embiste al frente. Sube hasta el medio y vuelve.' },
   { tipo: 'flashColor', nombre: 'Flash', categoria: 'camara', descripcion: 'Un destello del color que elijas. Por defecto, negro.' },
   { tipo: 'destello', nombre: 'Destello', categoria: 'camara', descripcion: 'Un fogonazo de luz seco.' },
   { tipo: 'parpadeo', nombre: 'Parpadeo', categoria: 'camara', descripcion: 'Parpadea a negro varias veces.' },
@@ -90,12 +91,15 @@ export interface EstadoImpacto {
   // rápido (no un blur redondo). en fracción del alto; x borra en horizontal, y en vertical
   desenfoqueX: number
   desenfoqueY: number
+  // desenfoque RADIAL (zoom): fuerza de 0 a 1 del estirón desde el centro. lo pinta el mismo
+  // motor que el efecto de clip (copias escaladas), sobre el video del clip activo
+  zoomBlur: number
   // velo de color por encima de todo y su opacidad de 0 a 1
   veloColor: string
   veloOpacidad: number
 }
 
-const NEUTRO: EstadoImpacto = { escala: 1, x: 0, y: 0, desenfoque: 0, desenfoqueX: 0, desenfoqueY: 0, veloColor: '#000000', veloOpacidad: 0 }
+const NEUTRO: EstadoImpacto = { escala: 1, x: 0, y: 0, desenfoque: 0, desenfoqueX: 0, desenfoqueY: 0, zoomBlur: 0, veloColor: '#000000', veloOpacidad: 0 }
 
 // pseudoaleatorio estable a partir de un número: la misma p siempre da el mismo
 // temblor, así el efecto no baila distinto entre el visor y la exportación
@@ -172,6 +176,13 @@ export function estadoImpacto(
       const env = Math.pow(Math.sin(Math.PI * Math.max(0, Math.min(1, p))), 0.6)
       return { ...NEUTRO, desenfoque: 0.13 * amp * env }
     }
+    case 'zoomblur': {
+      // el estirón radial sube hasta el medio y vuelve, con la misma meseta ancha del fuera de
+      // foco. a fuerza plena llega alto (0.85) para que el golpe se sienta, ya que un zoom suave
+      // casi no se nota
+      const env = Math.pow(Math.sin(Math.PI * Math.max(0, Math.min(1, p))), 0.6)
+      return { ...NEUTRO, zoomBlur: 0.85 * amp * env }
+    }
     case 'flashNegro':
       return { ...NEUTRO, veloColor: '#000000', veloOpacidad: amp * Math.sin(Math.PI * p) }
     case 'flashBlanco':
@@ -204,6 +215,7 @@ export function estadoImpactosEn(
   let desenfoque = 0
   let desenfoqueX = 0
   let desenfoqueY = 0
+  let zoomBlur = 0
   let veloColor = '#000000'
   let veloOpacidad = 0
   for (const im of impactos) {
@@ -217,10 +229,11 @@ export function estadoImpactosEn(
     desenfoque += e.desenfoque
     desenfoqueX += e.desenfoqueX
     desenfoqueY += e.desenfoqueY
+    zoomBlur += e.zoomBlur
     if (e.veloOpacidad > veloOpacidad) {
       veloOpacidad = e.veloOpacidad
       veloColor = e.veloColor
     }
   }
-  return { escala, x, y, desenfoque, desenfoqueX, desenfoqueY, veloColor, veloOpacidad }
+  return { escala, x, y, desenfoque, desenfoqueX, desenfoqueY, zoomBlur, veloColor, veloOpacidad }
 }

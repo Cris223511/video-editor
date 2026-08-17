@@ -46,6 +46,10 @@ export const CATEGORIAS_EFECTO: CategoriaEfecto[] = [
       // desenfoque de movimiento: el borroso direccional, tipo barrido de cámara. es
       // otro efecto, con su propio ángulo, y por eso lo pinta un filtro svg aparte
       { id: 'desenfoque-movimiento', nombre: 'Desenfoque de movimiento', css: (i) => `blur(${(p(i) * 3).toFixed(2)}px)` },
+      // desenfoque radial (zoom): el centro nítido y los bordes estirados hacia afuera, ese
+      // aire de túnel de velocidad. no cabe en un filtro css (que difumina por ejes, no en
+      // radial), así que se pinta por copias escaladas; la muestra solo lo insinúa
+      { id: 'zoomblur', nombre: 'Desenfoque radial', css: (i) => `blur(${(p(i) * 2).toFixed(2)}px) contrast(${1 + p(i) * 0.05})` },
     ],
   },
   {
@@ -185,6 +189,7 @@ export function claveEfecto(e: EfectoClip): string {
   if (e.tipo === 'desenfoque-movimiento') return 'desenfoque'
   if (e.tipo === 'gopro') return 'gopro'
   if (e.tipo === 'cromatico') return 'cromatico'
+  if (e.tipo === 'zoomblur') return 'zoomblur'
   if (e.tipo === 'animado') return `animado:${e.animado}`
   // el resplandor y el nítido y brilloso comparten motor pero son muestras distintas:
   // la variante los separa para que en el catálogo solo se marque el que se aplicó
@@ -203,6 +208,7 @@ export function claveCatalogo(id: string): string {
   if (id === 'desenfoque-movimiento') return 'desenfoque'
   if (id === 'gopro') return 'gopro'
   if (id === 'cromatico') return 'cromatico'
+  if (id === 'zoomblur') return 'zoomblur'
   if (IDS_ANIMADOS.has(id)) return `animado:${id}`
   return `filtro:${id}`
 }
@@ -220,6 +226,9 @@ export function crearEfecto(id: string): EfectoClip {
     return { id: crypto.randomUUID(), tipo: 'desenfoque-movimiento', intensidad: 40, angulo: 0 }
   if (id === 'gopro') return { id: crypto.randomUUID(), tipo: 'gopro', curvatura: 45 }
   if (id === 'cromatico') return { id: crypto.randomUUID(), tipo: 'cromatico', intensidad: 50 }
+  // el desenfoque radial nace con fuerza media y forma circular, que es la más natural para
+  // el "túnel de velocidad"; el panel deja cambiar la forma y la intensidad
+  if (id === 'zoomblur') return { id: crypto.randomUUID(), tipo: 'zoomblur', intensidad: 55, forma: 'circular' }
   if (IDS_ANIMADOS.has(id))
     return { id: crypto.randomUUID(), tipo: 'animado', animado: id as TipoAnimado, intensidad: 55 }
   return { id: crypto.randomUUID(), tipo: 'filtro', filtro: id, intensidad: 50 }
