@@ -183,6 +183,10 @@ interface EstadoEditor {
   resolucion: { ancho: number; alto: number }
   resolucionAuto: { ancho: number; alto: number }
   lienzoManual: boolean
+  // recorte interactivo del lienzo: mientras está activo, un recuadro sobre el visor deja elegir
+  // la región que pasará a ser el nuevo lienzo. las medidas van en fracción del lienzo actual
+  // (0..1). null cuando no se está recortando
+  recorteLienzo: { x: number; y: number; w: number; h: number } | null
   colorFondo: string
   // qué rellena las bandas cuando el video no cubre el lienzo entero
   fondo: 'color' | 'desenfoque'
@@ -623,6 +627,9 @@ interface EstadoEditor {
   setLadoTransicion: (lado: 'inicio' | 'final') => void
   setLienzo: (ancho: number, alto: number) => void
   setLienzoAuto: () => void
+  // enciende/apaga el recuadro de recorte del lienzo y actualiza su región mientras se arrastra
+  iniciarRecorteLienzo: () => void
+  setRecorteLienzo: (r: { x: number; y: number; w: number; h: number } | null) => void
   setColorFondo: (color: string) => void
   setFondo: (f: 'color' | 'desenfoque') => void
   setDesenfoqueFondo: (v: number) => void
@@ -1190,6 +1197,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   resolucion: { ancho: 1920, alto: 1080 },
   resolucionAuto: { ancho: 1920, alto: 1080 },
   lienzoManual: false,
+  recorteLienzo: null,
   colorFondo: '#000000',
   fondo: 'color',
   desenfoqueFondo: 45,
@@ -3885,6 +3893,11 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       const res = cuarto ? { ancho: auto.alto, alto: auto.ancho } : { ...auto }
       return { resolucion: res, lienzoManual: false }
     }),
+
+  // arranca el recuadro cubriendo casi todo el lienzo, con un pequeño margen para que se vean sus
+  // tiradores desde el primer momento. desde ahí el usuario lo ajusta en el visor
+  iniciarRecorteLienzo: () => set({ recorteLienzo: { x: 0.06, y: 0.06, w: 0.88, h: 0.88 } }),
+  setRecorteLienzo: (r) => set({ recorteLienzo: r }),
 
   setColorFondo: (color) => set({ colorFondo: color }),
   setFondo: (f) => set({ fondo: f }),

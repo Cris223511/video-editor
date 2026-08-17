@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   AlignCenterHorizontal,
   AlignCenterVertical,
@@ -7,7 +8,10 @@ import {
   AlignStartHorizontal,
   AlignStartVertical,
   AlignVerticalDistributeCenter,
+  Crop,
   Crosshair,
+  Link,
+  Link2Off,
   Maximize2,
   MoveHorizontal,
   MoveVertical,
@@ -27,6 +31,11 @@ const PROPORCIONES = [
   { etiqueta: '4:3', ancho: 1440, alto: 1080 },
   { etiqueta: '3:4', ancho: 1080, alto: 1440 },
 ]
+
+// topes del tamaño del lienzo, en píxeles por lado. ni tan chico que no se vea nada ni tan
+// grande que el navegador se ahogue componiendo; 4K de lado como techo va sobrado
+const LIENZO_MIN = 240
+const LIENZO_MAX = 3840
 
 // un fotograma de mentira que representa el video dentro del lienzo. es apaisado
 // a propósito: puesto en un lienzo cuadrado o vertical deja las bandas arriba y
@@ -79,6 +88,7 @@ export default function LienzoPanel() {
   const setFondoGiro = useEditorStore((s) => s.setFondoGiro)
   const setLienzo = useEditorStore((s) => s.setLienzo)
   const setLienzoAuto = useEditorStore((s) => s.setLienzoAuto)
+  const iniciarRecorteLienzo = useEditorStore((s) => s.iniciarRecorteLienzo)
   const setColorFondo = useEditorStore((s) => s.setColorFondo)
   // el encuadre del clip elegido se acomoda desde aquí, al estilo de las opciones
   // de alinear de un editor vectorial: sin video seleccionado los botones van
@@ -112,6 +122,95 @@ export default function LienzoPanel() {
     else if (modo === 'alto') escala = resolucion.alto / dh
     else escala = Math.max(resolucion.ancho / dw, resolucion.alto / dh)
     actualizarEncuadre(clip.id, { x: 0.5, y: 0.5, escala })
+  }
+
+  // el candado del tamaño manual: cerrado, ancho y alto se mueven juntos conservando la
+  // proporción; abierto, cada uno va por su lado. arranca cerrado, que es lo habitual
+  const [proporcionBloqueada, setProporcionBloqueada] = useState(true)
+
+  // los campos de ancho y alto llevan su propio texto para poder escribir con libertad (incluso
+  // valores a medio teclear que aún no son válidos) sin que el lienzo salte a cada tecla. lo que
+  // se aplica en vivo es el número cuando ya cae dentro de los topes. si el lienzo cambia por otro
+  // lado (un preset, un botón), estos efectos ponen los campos al día
+  const [anchoStr, setAnchoStr] = useState(String(resolucion.ancho))
+  const [altoStr, setAltoStr] = useState(String(resolucion.alto))
+  useEffect(() => setAnchoStr(String(resolucion.ancho)), [resolucion.ancho])
+  useEffect(() => setAltoStr(String(resolucion.alto)), [resolucion.alto])
+
+  // fija el lienzo acotando cada lado a los topes, para que nunca quede infinito ni invisible
+  function fijarTamano(ancho: number, alto: number) {
+    const a = Math.round(Math.max(LIENZO_MIN, Math.min(LIENZO_MAX, ancho)))
+    const b = Math.round(Math.max(LIENZO_MIN, Math.min(LIENZO_MAX, alto)))
+    setLienzo(a, b)
+  }
+  function cambiarAncho(v: number) {
+    if (!Number.isFinite(v) || v <= 0) return
+    if (proporcionBloqueada) fijarTamano(v, v / (resolucion.ancho / resolucion.alto))
+    else fijarTamano(v, resolucion.alto)
+  }
+  function cambiarAlto(v: number) {
+    if (!Number.isFinite(v) || v <= 0) return
+    if (proporcionBloqueada) fijarTamano(v * (resolucion.ancho / resolucion.alto), v)
+    else fijarTamano(resolucion.ancho, v)
+  }
+
+  // primer clip de la pista, con su medio. es el que mandan los dos botones de ajuste al video
+  const primerClip = [...clips].sort((a, b) => a.inicio - b.inicio)[0] ?? null
+  const primerMedio = primerClip ? medios.find((m) => m.id === primerClip.assetId) ?? null : null
+
+  // parte visible del video tras su recorte: la fracción de ancho y alto que queda, y cuánto se
+  // corre su centro (si el recorte no es simétrico). sin recorte, todo visible y centrado
+  function recVisible(rec?: { izq: number; der: number; arr: number; aba: number }) {
+    const izq = rec?.izq ?? 0, der = rec?.der ?? 0, arr = rec?.arr ?? 0, aba = rec?.aba ?? 0
+    return {
+      visW: Math.max(0.02, 1 - izq - der),
+      visH: Math.max(0.02, 1 - arr - aba),
+      ox: (izq - der) / 2,
+      oy: (arr - aba) / 2,
+    }
+  }
+
+  // encuadre que hace que la parte RECORTADA del video cubra un lienzo de W×H (cover): la agranda
+  // hasta llenar y la recentra, teniendo en cuenta que el recorte pudo dejar la zona visible
+  // descentrada. sin recorte se reduce al "llenar" de siempre (escala de cover, centrado)
+  function encuadreCover(med: { ancho: number; alto: number }, rec: { izq: number; der: number; arr: number; aba: number } | undefined, W: number, H: number) {
+    const { visW, visH, ox, oy } = recVisible(rec)
+    const base = Math.min(W / med.ancho, H / med.alto)
+    const escala = Math.max(W / (visW * med.ancho * base), H / (visH * med.alto * base))
+    return {
+      x: 0.5 - (ox * med.ancho * base * escala) / W,
+      y: 0.5 - (oy * med.alto * base * escala) / H,
+      escala,
+    }
+  }
+
+  // lleva el LIENZO a la forma del primer video RESPETANDO su recorte: si el clip está recortado a
+  // un cuadrado, el lienzo queda cuadrado y solo se ve esa zona, llenándolo. sin recorte se usa el
+  // ajuste automático de siempre, que además contempla el giro de un cuarto
+  function ajustarLienzoAlVideo() {
+    if (!primerClip || !primerMedio) return
+    const rec = primerClip.recorte
+    if (!rec || (rec.izq === 0 && rec.der === 0 && rec.arr === 0 && rec.aba === 0)) {
+      setLienzoAuto()
+      return
+    }
+    const { visW, visH } = recVisible(rec)
+    const rot = primerClip.encuadre?.rotacion ?? 0
+    const cuarto = Math.abs(Math.round(rot / 90)) % 2 === 1
+    let W = Math.round(primerMedio.ancho * visW)
+    let H = Math.round(primerMedio.alto * visH)
+    if (cuarto) { const t = W; W = H; H = t }
+    setLienzo(W, H)
+    actualizarEncuadre(primerClip.id, encuadreCover(primerMedio, rec, W, H))
+  }
+
+  // agranda el video (el elegido, o el primero) hasta cubrir el lienzo actual sin cambiar su
+  // proporción, respetando su recorte: llena todo el cuadro sin dejar bandas ni huecos negros
+  function llenarConVideo() {
+    const objetivo = clip ?? primerClip
+    const med = objetivo ? medios.find((m) => m.id === objetivo.assetId) : null
+    if (!objetivo || !med) return
+    actualizarEncuadre(objetivo.id, encuadreCover(med, objetivo.recorte, resolucion.ancho, resolucion.alto))
   }
 
   const activa = (a: number, b: number) =>
@@ -194,34 +293,139 @@ export default function LienzoPanel() {
             bandas que ya funcionaban */}
         <section className="flex flex-col gap-4">
           <Campo etiqueta="Proporción">
+            {/* cada opción lleva su forma dibujada a escala, para reconocer de un vistazo si es
+                apaisada, vertical o cuadrada sin tener que saberse los números de memoria */}
             <div className="grid grid-cols-3 gap-2">
-              {PROPORCIONES.map((p) => (
-                <button
-                  key={p.etiqueta}
-                  onClick={() => setLienzo(p.ancho, p.alto)}
-                  className={[
-                    'rounded-lg border py-2 text-sm font-medium transition-colors',
-                    activa(p.ancho, p.alto)
-                      ? 'border-brand bg-brand/10 text-brand'
-                      : 'border-black/10 text-[color:var(--muted)] hover:text-[color:var(--text)] dark:border-white/10',
-                  ].join(' ')}
-                >
-                  {p.etiqueta}
-                </button>
-              ))}
+              {PROPORCIONES.map((p) => {
+                const sel = activa(p.ancho, p.alto)
+                const pr = p.ancho / p.alto
+                // el rectángulo de muestra cabe en una caja de 30×30 conservando su proporción
+                const w = pr >= 1 ? 30 : 30 * pr
+                const h = pr >= 1 ? 30 / pr : 30
+                return (
+                  <button
+                    key={p.etiqueta}
+                    onClick={() => setLienzo(p.ancho, p.alto)}
+                    className={[
+                      'flex flex-col items-center gap-1.5 rounded-lg border py-2 transition-colors',
+                      sel
+                        ? 'border-brand bg-brand/10 text-brand'
+                        : 'border-black/10 text-[color:var(--muted)] hover:text-[color:var(--text)] dark:border-white/10',
+                    ].join(' ')}
+                  >
+                    <span className="grid h-8 place-items-center">
+                      <span
+                        className={sel ? 'rounded-[2px] bg-brand' : 'rounded-[2px] bg-current opacity-60'}
+                        style={{ width: `${w}px`, height: `${h}px` }}
+                      />
+                    </span>
+                    <span className="text-[12px] font-medium leading-none">{p.etiqueta}</span>
+                  </button>
+                )
+              })}
             </div>
           </Campo>
 
+          {/* tamaño exacto a mano: ancho y alto en píxeles, que se aplican en vivo (también con la
+              rueda del ratón sobre el campo). el candado del medio decide si al mover uno el otro lo
+              sigue conservando la forma, o si van por separado */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-[color:var(--muted)]">Tamaño exacto (px)</span>
+              <Tooltip
+                texto="El tamaño del lienzo en píxeles. Se aplica al instante, incluso girando la rueda del ratón sobre el campo. Con el candado cerrado, el ancho y el alto se mueven juntos para conservar la forma; abierto, cada uno por su lado."
+                lado="arriba"
+              >
+                <span className="grid h-4 w-4 cursor-help place-items-center rounded-full border border-current text-[10px] font-bold leading-none text-[color:var(--muted)]">?</span>
+              </Tooltip>
+            </div>
+            <div className="flex items-end gap-2">
+              <label className="flex flex-1 flex-col gap-1">
+                <span className="text-[11px] text-[color:var(--muted)]">Ancho</span>
+                <input
+                  type="number"
+                  min={LIENZO_MIN}
+                  max={LIENZO_MAX}
+                  step={10}
+                  value={anchoStr}
+                  onChange={(e) => {
+                    setAnchoStr(e.target.value)
+                    const v = parseInt(e.target.value, 10)
+                    if (Number.isFinite(v) && v >= LIENZO_MIN && v <= LIENZO_MAX) cambiarAncho(v)
+                  }}
+                  className="w-full rounded-lg border border-black/10 bg-transparent px-2.5 py-1.5 text-sm tabular-nums outline-none focus:border-brand dark:border-white/10"
+                />
+              </label>
+              <Tooltip texto={proporcionBloqueada ? 'Proporción fija: ancho y alto se mueven juntos' : 'Proporción libre: cada uno por su lado'} lado="arriba">
+                <button
+                  type="button"
+                  onClick={() => setProporcionBloqueada((v) => !v)}
+                  aria-label="Bloquear o soltar la proporción"
+                  aria-pressed={proporcionBloqueada}
+                  className={[
+                    'mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition-colors',
+                    proporcionBloqueada
+                      ? 'border-brand bg-brand/10 text-brand'
+                      : 'border-black/10 text-[color:var(--muted)] hover:text-brand dark:border-white/10',
+                  ].join(' ')}
+                >
+                  {proporcionBloqueada ? <Link size={15} /> : <Link2Off size={15} />}
+                </button>
+              </Tooltip>
+              <label className="flex flex-1 flex-col gap-1">
+                <span className="text-[11px] text-[color:var(--muted)]">Alto</span>
+                <input
+                  type="number"
+                  min={LIENZO_MIN}
+                  max={LIENZO_MAX}
+                  step={10}
+                  value={altoStr}
+                  onChange={(e) => {
+                    setAltoStr(e.target.value)
+                    const v = parseInt(e.target.value, 10)
+                    if (Number.isFinite(v) && v >= LIENZO_MIN && v <= LIENZO_MAX) cambiarAlto(v)
+                  }}
+                  className="w-full rounded-lg border border-black/10 bg-transparent px-2.5 py-1.5 text-sm tabular-nums outline-none focus:border-brand dark:border-white/10"
+                />
+              </label>
+            </div>
+            <p className="text-[11px] leading-relaxed text-[color:var(--muted)]">
+              Entre {LIENZO_MIN} y {LIENZO_MAX} px por lado.
+            </p>
+          </div>
+
+          {/* ajuste al primer video, en dos opciones lado a lado: una lleva el LIENZO a la forma
+              del video (sin bandas), la otra deja el lienzo como está y agranda el VIDEO hasta
+              cubrirlo. se reparten a la mitad y saltan de línea si el panel se estrecha */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={ajustarLienzoAlVideo}
+              disabled={!primerClip}
+              className={[
+                'rounded-lg border px-2 py-2 text-[13px] font-medium leading-tight transition-colors disabled:pointer-events-none disabled:opacity-40',
+                !lienzoManual
+                  ? 'border-brand bg-brand/10 text-brand'
+                  : 'border-black/10 text-[color:var(--muted)] hover:text-[color:var(--text)] dark:border-white/10',
+              ].join(' ')}
+            >
+              Lienzo al primer video
+            </button>
+            <button
+              onClick={llenarConVideo}
+              disabled={clips.length === 0}
+              className="rounded-lg border border-black/10 px-2 py-2 text-[13px] font-medium leading-tight text-[color:var(--muted)] transition-colors hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-40 dark:border-white/10"
+            >
+              El video llena el lienzo
+            </button>
+          </div>
+
+          {/* recorte a mano sobre el visor: enciende el recuadro con tiradores y guías para elegir
+              la región que será el nuevo lienzo, y al aceptar el contenido se reajusta para llenarlo */}
           <button
-            onClick={setLienzoAuto}
-            className={[
-              'rounded-lg border py-2 text-sm font-medium transition-colors',
-              !lienzoManual
-                ? 'border-brand bg-brand/10 text-brand'
-                : 'border-black/10 text-[color:var(--muted)] hover:text-[color:var(--text)] dark:border-white/10',
-            ].join(' ')}
+            onClick={iniciarRecorteLienzo}
+            className="flex items-center justify-center gap-2 rounded-lg border border-black/10 py-2.5 text-sm font-medium transition-colors hover:border-brand hover:text-brand dark:border-white/10"
           >
-            Ajustar al primer video
+            <Crop size={16} /> Recortar el lienzo en el visor
           </button>
 
           <Campo etiqueta="Relleno de las bandas">
