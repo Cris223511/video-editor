@@ -52,6 +52,8 @@ const ef = (id: string, cambios: Partial<EfectoClip>): EfectoClip =>
 const resplandor = (brillo: number) => ef('resplandor', { brillo })
 const cromatico = (intensidad: number) => ef('cromatico', { intensidad })
 const grano = (intensidad: number) => ef('grano', { intensidad })
+const zoom = (intensidad: number, forma: 'circular' | 'cuadrada' = 'circular') =>
+  ef('zoomblur', { intensidad, forma })
 
 export const LOOKS: Look[] = [
   {
@@ -161,7 +163,7 @@ export const LOOKS: Look[] = [
       tinte: 8,
       ruedas: ruedas({ sombras: rueda(210, 0.4), altas: rueda(50, 0.3) }),
     }),
-    efectos: () => [cromatico(55), grano(45)],
+    efectos: () => [cromatico(40), grano(20)],
   },
   {
     id: 'blanco-negro',
@@ -174,7 +176,7 @@ export const LOOKS: Look[] = [
       saturacion: -100,
       nitidez: 18,
     }),
-    efectos: () => [grano(24)],
+    efectos: () => [grano(12)],
   },
   {
     id: 'noir',
@@ -188,7 +190,7 @@ export const LOOKS: Look[] = [
       saturacion: -100,
       nitidez: 26,
     }),
-    efectos: () => [resplandor(24), grano(18)],
+    efectos: () => [resplandor(24), grano(10)],
   },
   {
     id: 'matrix-verde',
@@ -206,7 +208,7 @@ export const LOOKS: Look[] = [
       nitidez: 16,
       ruedas: ruedas({ sombras: rueda(120, 0.5), altas: rueda(120, 0.3) }),
     }),
-    efectos: () => [resplandor(48), grano(16)],
+    efectos: () => [resplandor(48)],
   },
   {
     id: 'rosa-ensueno',
@@ -258,7 +260,7 @@ export const LOOKS: Look[] = [
       nitidez: 16,
       ruedas: ruedas({ sombras: rueda(30, 0.4), altas: rueda(30, 0.35) }),
     }),
-    efectos: () => [resplandor(66), grano(18)],
+    efectos: () => [resplandor(66), grano(9)],
   },
   {
     id: 'neon-nocturno',
@@ -274,7 +276,7 @@ export const LOOKS: Look[] = [
       nitidez: 20,
       ruedas: ruedas({ sombras: rueda(260, 0.5), altas: rueda(330, 0.45) }),
     }),
-    efectos: () => [resplandor(74), cromatico(36), grano(14)],
+    efectos: () => [resplandor(74), cromatico(36)],
   },
   {
     id: 'sepia-antiguo',
@@ -291,7 +293,7 @@ export const LOOKS: Look[] = [
       temperatura: 18,
       ruedas: ruedas({ sombras: rueda(35, 0.4), medios: rueda(40, 0.3) }),
     }),
-    efectos: () => [grano(34)],
+    efectos: () => [grano(16)],
   },
   {
     id: 'drama-alto',
@@ -307,6 +309,63 @@ export const LOOKS: Look[] = [
       ruedas: ruedas({ sombras: rueda(240, 0.3), altas: rueda(40, 0.3) }),
     }),
     efectos: () => [resplandor(40)],
+  },
+  {
+    id: 'aftermovie',
+    nombre: 'Aftermovie',
+    descripcion: 'Festival de noche: color vivo, luces que estallan y el zoom hacia el centro.',
+    colorA: '#22d3ee',
+    colorB: '#a21caf',
+    // el aire de vídeo de festival: colores subidos, algo de frío, brillo fuerte en las luces
+    // del escenario y el desenfoque radial que empuja la mirada al centro, como la cámara que
+    // se lanza hacia la tarima. sin grano, limpio
+    tono: t({
+      exposicion: 4,
+      contraste: 12,
+      saturacion: 34,
+      temperatura: -6,
+      nitidez: 24,
+      ruedas: ruedas({ sombras: rueda(240, 0.4), altas: rueda(300, 0.3) }),
+    }),
+    efectos: () => [resplandor(72), zoom(48, 'circular')],
+  },
+  {
+    id: 'adrenalina',
+    nombre: 'Adrenalina',
+    descripcion: 'Acción a tope: contraste duro, color intenso y el estirón de velocidad.',
+    colorA: '#f97316',
+    colorB: '#b91c1c',
+    // el zoom más marcado y un color cálido y contrastado, ese pico de energía de un plano de
+    // acción o un drop. el desenfoque radial da la sensación de embestida hacia adelante
+    tono: t({
+      exposicion: 2,
+      contraste: 26,
+      saturacion: 24,
+      temperatura: 8,
+      nitidez: 30,
+      ruedas: ruedas({ sombras: rueda(20, 0.28), altas: rueda(40, 0.3) }),
+    }),
+    efectos: () => [zoom(66, 'circular'), resplandor(38)],
+  },
+  {
+    id: 'ensueno-radial',
+    nombre: 'Ensueño',
+    descripcion: 'Suave y soñador, con las luces flotando y un desenfoque circular en los bordes.',
+    colorA: '#c4b5fd',
+    colorB: '#f9a8d4',
+    // pastel lavado, brillo alto y un zoom suave de forma circular que deja el centro nítido y
+    // difumina los bordes con dulzura, ese aire de recuerdo
+    tono: t({
+      tinteColor: '#d7b7ff',
+      tinteFuerza: 20,
+      exposicion: 9,
+      contraste: -14,
+      saturacion: 4,
+      temperatura: 4,
+      tinte: 8,
+      ruedas: ruedas({ altas: rueda(320, 0.32) }),
+    }),
+    efectos: () => [resplandor(66), zoom(38, 'circular')],
   },
 ]
 
