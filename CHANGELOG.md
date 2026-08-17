@@ -4,6 +4,24 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.48.0 (2026-08-09)
+
+- **Desenfoque radial (zoom).** Un desenfoque nuevo que deja el centro nítido y estira los bordes hacia
+  afuera, ese aire de túnel de velocidad. Está disponible en dos formas: como efecto de clip, en Efectos
+  → Desenfoque, con intensidad y forma (circular o cuadrada); y como impacto momentáneo, "Zoom veloz",
+  un golpe que sube hasta el medio y vuelve. Se ve igual al editar y al exportar.
+- **Tres combinaciones nuevas** que estrenan el desenfoque radial: Aftermovie, Adrenalina y Ensueño.
+  Además se reduce o se quita el grano de varias combinaciones que quedaban con demasiado ruido.
+- **Panel de Lienzo renovado.** Cada proporción muestra su forma dibujada. Se añade un tamaño exacto en
+  píxeles, con ancho y alto que se aplican al instante (también con la rueda del ratón) y un candado para
+  moverlos juntos o por separado, dentro de unos topes. Los ajustes al primer video respetan el recorte
+  del clip, de modo que un video recortado llena el lienzo sin dejar bandas negras.
+- **Recorte del lienzo sobre el visor.** Un recuadro con tiradores y guías que se imantan a las
+  proporciones conocidas permite elegir a mano la región que será el nuevo lienzo; al aceptar, el
+  contenido se reajusta para llenarla.
+- **Al terminar la reproducción, el visor se queda en el último fotograma.** Antes, con ciertos videos,
+  parecía volver al inicio al acabar. La opción de reiniciar dándole a reproducir se mantiene igual.
+
 ## 2.47.0 (2026-08-09)
 
 - **Nueva sección "Combinaciones".** Las recetas de aspecto de un clic dejan el panel de efectos y
