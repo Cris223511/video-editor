@@ -3,6 +3,7 @@ import Icon from '../../components/ui/Icon'
 import CapasOverlay from './overlays/CapasOverlay'
 import ClipOverlay from './overlays/ClipOverlay'
 import RecorteOverlay from './overlays/RecorteOverlay'
+import RecorteLienzoOverlay from './overlays/RecorteLienzoOverlay'
 import CuentaRegresiva from './overlays/CuentaRegresiva'
 import Vacio from '../../components/ui/Vacio'
 import MarcoOverlay from './overlays/MarcoOverlay'
@@ -33,6 +34,7 @@ import { paramsNB, nodosFiltroNB, NodoFiltro } from '../../lib/efectos/nitidezBr
 import { paramsGoPro, nodosFiltroGoPro } from '../../lib/efectos/goPro'
 import { paramsCromatico, nodosFiltroCromatico } from '../../lib/efectos/cromatico'
 import { efectoAnimado, pintarAnimado } from '../../lib/efectos/animados'
+import { pintarZoomBlur } from '../../lib/efectos/zoomBlur'
 import { estadoImpactosEn } from '../../lib/impactos/catalogo'
 import { dibujarContorno, dibujarLineas3d, dibujarRayos, crearLienzosContorno, LienzosContorno } from '../../lib/impactos/contorno'
 import { dibujarManchas } from '../../lib/impactos/manchas'
@@ -107,6 +109,13 @@ export default function Preview() {
   const hayAnimado = useEditorStore((s) =>
     s.pista.clips.some((c) => (c.efectos ?? []).some((e) => e.tipo === 'animado' && e.intensidad > 0)),
   )
+  // el desenfoque radial también se pinta en el lienzo que va sobre el video, así que enciende
+  // el mismo bucle por cuadro que las texturas animadas. lo encienden tanto el efecto de clip
+  // como el impacto "Zoom veloz", que comparten el mismo dibujo
+  const hayZoomBlur = useEditorStore((s) =>
+    s.pista.clips.some((c) => (c.efectos ?? []).some((e) => e.tipo === 'zoomblur' && e.intensidad > 0)),
+  )
+  const hayImpactoZoom = useEditorStore((s) => s.impactos.some((i) => i.tipo === 'zoomblur'))
   const resolucion = useEditorStore((s) => s.resolucion)
   const colorFondo = useEditorStore((s) => s.colorFondo)
   const fondo = useEditorStore((s) => s.fondo)
@@ -139,6 +148,9 @@ export default function Preview() {
   // lienzo de las texturas animadas del clip (grano, cine viejo, vhs, destellos). se
   // pinta por cuadro encima del video, con el mismo tiempo del cabezal
   const animCanvasRef = useRef<HTMLCanvasElement>(null)
+  // lienzo de trabajo del desenfoque radial: acumula las copias escaladas antes de volcarlas.
+  // vive en un ref para no crear uno nuevo en cada cuadro
+  const zoomBlurTmp = useRef<HTMLCanvasElement | null>(null)
   // lienzo que solo se enciende mientras dura una transición con geometría
   const transRef = useRef<HTMLCanvasElement>(null)
   // dos lienzos auxiliares para graduar cada plano de la transición en pasadas (color,
@@ -464,9 +476,15 @@ export default function Preview() {
       if (!v) return
       if ((act && c.id === act.id) || (companeroP && c.id === companeroP.id)) {
         const objetivo = cuadroDe(c)
-        if (Math.abs(v.currentTime - objetivo) > 0.05) {
+        // al terminar la reproducción el video puede quedar en estado "ended"; varios navegadores lo
+        // muestran entonces en su PRIMER cuadro en vez del último, y parece que el visor volvió al
+        // inicio. cuando está así se le fuerza un fotograma apenas antes de su final, para dejarlo
+        // clavado en el último cuadro visible. no toca la lógica de reiniciar con play (esa vive en
+        // el store), solo asegura qué imagen queda mientras está pausado al final
+        const destino = v.ended ? Math.max(0, Math.min(objetivo, (v.duration || objetivo) - 0.05)) : objetivo
+        if (Math.abs(v.currentTime - objetivo) > 0.05 || v.ended) {
           try {
-            v.currentTime = objetivo
+            v.currentTime = destino
           } catch {
             // el video aún no tiene metadatos listos; se ignora
           }
@@ -1209,7 +1227,7 @@ export default function Preview() {
   // su video, con el tiempo del cabezal. es el mismo dibujo que usa la exportación, así
   // que lo que se ve aquí es lo que sale en el archivo
   useEffect(() => {
-    if (!hayAnimado) {
+    if (!hayAnimado && !hayZoomBlur && !hayImpactoZoom) {
       const c = animCanvasRef.current
       const ctx = c?.getContext('2d')
       if (c && ctx) ctx.clearRect(0, 0, c.width, c.height)
@@ -1241,7 +1259,12 @@ export default function Preview() {
         })
         const activoClip = clipEnTiempo(ordenados, ph, ocultasSt)
         const anim = activoClip ? efectoAnimado(activoClip.efectos ?? []) : null
-        if (activoClip && anim) {
+        const zoom = activoClip
+          ? (activoClip.efectos ?? []).find((e) => e.tipo === 'zoomblur' && e.intensidad > 0)
+          : undefined
+        // el zoom veloz como IMPACTO aporta su propia fuerza en este instante (0..~0.85)
+        const impZoom = estadoImpactosEn(st.impactos, ph).zoomBlur
+        if (activoClip && (anim || zoom || impZoom > 0)) {
           const video = videosRef.current.get(activoClip.id)
           if (video && video.videoWidth > 0) {
             const rect = rectContenido(w, h, st.resolucion.ancho / st.resolucion.alto)
@@ -1249,7 +1272,24 @@ export default function Preview() {
             const vr = rectClip(video.videoWidth, video.videoHeight, rect.w, rect.h, enc)
             const dst = { dx: rect.ox + vr.dx, dy: rect.oy + vr.dy, dw: vr.dw, dh: vr.dh }
             const mix = mixEntradaEfecto(activoClip.inicio, activoClip.transicionEfecto, ph)
-            pintarAnimado(ctx, anim, ph, dst, mix)
+            // el desenfoque radial va primero: reencuadra el propio video en copias escaladas
+            // sobre este mismo lienzo, dejando el centro transparente para que se vea el video
+            // nítido de debajo. la textura animada (grano, vhs...) se pinta después, encima.
+            // mientras dura una transición el clip se pinta por el lienzo del cruce, que no lleva
+            // este efecto (igual que la exportación), así que ahí se salta para no descuadrarse ni
+            // diferir del archivo: el zoom se pausa durante el cruce y vuelve al terminar
+            const enCruce =
+              !!cruceCentradoEn(ordenados, ph, esDisolucion) || !!cruceCentradoEn(ordenados, ph, esGeometrica)
+            // la fuerza del zoom suma el efecto de clip (si lo hay, con su aparición progresiva) y
+            // el golpe del impacto. si solo actúa el impacto, la forma es circular
+            const fEfecto = zoom && zoom.tipo === 'zoomblur' ? zoom.intensidad * Math.max(0, Math.min(1, mix)) : 0
+            const fuerzaZoom = Math.min(100, fEfecto + impZoom * 100)
+            if (fuerzaZoom > 0 && !enCruce) {
+              if (!zoomBlurTmp.current) zoomBlurTmp.current = document.createElement('canvas')
+              const forma = zoom && zoom.tipo === 'zoomblur' ? zoom.forma : 'circular'
+              pintarZoomBlur(ctx, video, dst, zoomBlurTmp.current, { intensidad: fuerzaZoom, forma })
+            }
+            if (anim) pintarAnimado(ctx, anim, ph, dst, mix)
           }
         }
       }
@@ -1260,7 +1300,7 @@ export default function Preview() {
       cancelado = true
       cancelAnimationFrame(raf)
     }
-  }, [hayAnimado])
+  }, [hayAnimado, hayZoomBlur, hayImpactoZoom])
 
   // una disolución entre dos clips se resuelve como un cruce centrado en el corte: la
   // mitad se come la cola del que sale y la otra la cabeza del que entra. si el instante
@@ -2088,6 +2128,7 @@ export default function Preview() {
             <ClipOverlay />
             <CapasOverlay />
             <RecorteOverlay />
+            <RecorteLienzoOverlay />
             <MarcoOverlay alturaLienzo={lienzoRect.h} />
             <CuentaRegresiva />
 
