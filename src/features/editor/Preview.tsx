@@ -54,6 +54,7 @@ import { estiloRecorte, cajaContain } from '../../lib/layers/recorteMascara'
 import { buscarTransicion } from '../../lib/transiciones/catalogo'
 import { sufijoTransformCss, aplicarTransformCanvas } from '../../lib/layers/transform'
 import { TIPO_FIGURA } from './panels/FiguraPanel'
+import { TIPO_CENSURA } from './panels/CensuraPanel'
 
 // una disolución (técnica de opacidad) se centra en el corte y se pinta con la opacidad de
 // los propios elementos del DOM. las demás transiciones entre dos clips —geométricas
@@ -98,6 +99,7 @@ export default function Preview() {
   const limpiarSeleccion = useEditorStore((s) => s.limpiarSeleccion)
   const seleccionarCapa = useEditorStore((s) => s.seleccionarCapa)
   const agregarFigura = useEditorStore((s) => s.agregarFigura)
+  const agregarCensura = useEditorStore((s) => s.agregarCensura)
   const hayCapas = useEditorStore((s) => s.capas.length > 0)
   const hayCensura = useEditorStore((s) => s.capas.some((c) => c.tipo === 'censura'))
   const hayContorno = useEditorStore((s) =>
@@ -172,6 +174,23 @@ export default function Preview() {
   // acercamiento manual del visor. arranca en 1, que es el lienzo entero, y de ahí
   // solo sube: alejarse más allá del lienzo no aporta nada
   const [zoomVisor, setZoomVisor] = useState({ z: 1, x: 0, y: 0 })
+  // con el visor acercado se puede estar en dos modos: "mover" (arrastrar para pasear el encuadre)
+  // o "editar" (seleccionar y mover figuras, textos, censuras... como sin zoom, pero acercado). se
+  // alterna con los botones de arriba a la izquierda o con la tecla V. arranca en "mover"
+  const [modoVisor, setModoVisor] = useState<'editar' | 'mover'>('mover')
+  // la tecla V alterna entre mover y editar mientras hay zoom. se ignora si se está escribiendo en un
+  // campo o si lleva Ctrl/Cmd (que es pegar). sin zoom no hace nada, para no interferir con la edición
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key !== 'v' && e.key !== 'V') || e.ctrlKey || e.metaKey || e.altKey) return
+      const el = document.activeElement as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return
+      if (zoomVisor.z <= 1.01) return
+      setModoVisor((m) => (m === 'mover' ? 'editar' : 'mover'))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zoomVisor.z])
   // estado del pellizco de dos dedos en curso: la separación inicial y el zoom de arranque
   const pellizco = useRef<{ dist: number; z: number } | null>(null)
   // aplica un factor de acercamiento anclando el punto (clientX, clientY) de la pantalla, para que
@@ -959,6 +978,7 @@ export default function Preview() {
         dx = cx - w / 2
         dy = cy - h / 2
         if (c.forma === 'circulo') ctx.ellipse(cx, cy, w / 2, h / 2, 0, 0, Math.PI * 2)
+        else if (c.forma === 'redondeado') ctx.roundRect(dx, dy, w, h, Math.min(w, h) * 0.2)
         else ctx.rect(dx, dy, w, h)
       }
       ctx.clip()
@@ -1021,8 +1041,12 @@ export default function Preview() {
         const h = stage.clientHeight
 
         const st = useEditorStore.getState()
-        const ph = st.playhead
         const ordenados = resolverSolapes(st.pista.clips).sort((a, b) => a.inicio - b.inicio)
+        // se usa el mismo recorte del tiempo que el video (total - 0.001): así en el último
+        // instante exacto la censura sigue mostrándose sobre el último fotograma en vez de
+        // desaparecer, igual que el clip. antes leía el cabezal crudo y en el final se perdía
+        const totalCap = duracionProyecto(ordenados, st.capas, st.audios, st.audioRegiones)
+        const ph = totalCap > 0 ? Math.min(st.playhead, Math.max(0, totalCap - 0.001)) : st.playhead
         const ocultasSt = new Set<number>()
         st.pistasMeta.forEach((m, i) => {
           if (m.oculta) ocultasSt.add(i)
@@ -1742,15 +1766,46 @@ export default function Preview() {
           PANEAR el encuadre (mover el zoom a donde se quiera), desactivando cualquier otra acción de
           arrastre (mover un texto, un recuadro de selección...). la rueda y el pellizco siguen
           funcionando porque burbujean al contenedor; la lupa va por encima de esta capa */}
-      {hayContenido && zoomVisor.z > 1.01 && (
+      {hayContenido && zoomVisor.z > 1.01 && modoVisor === 'mover' && (
         <div
           className="absolute inset-0 z-40"
           style={{ cursor: 'grab' }}
           onMouseDown={iniciarMarquee}
           // doble clic sobre el visor acercado vuelve al tamaño que encaja, la misma salida que la lupa.
-          // esta capa solo existe con zoom, así que no pisa el doble clic que edita un texto sin acercar
+          // esta capa solo existe con zoom en modo mover, así que en modo editar los overlays reciben
+          // los clics y se puede seleccionar y mover como sin zoom
           onDoubleClick={() => setZoomVisor({ z: 1, x: 0, y: 0 })}
         />
+      )}
+
+      {/* con el visor acercado, un par de botones arriba a la izquierda alternan entre mover el
+          encuadre y editar los elementos. la tecla V hace lo mismo. en modo editar la capa de paneo
+          de arriba no se monta, así que los overlays vuelven a recibir los clics */}
+      {hayContenido && zoomVisor.z > 1.01 && (
+        <div className="absolute left-3 top-3 z-50 flex overflow-hidden rounded-full bg-black/55 p-0.5 backdrop-blur">
+          <button
+            type="button"
+            onClick={() => setModoVisor('editar')}
+            title="Editar los elementos (tecla V)"
+            className={[
+              'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors',
+              modoVisor === 'editar' ? 'bg-brand text-white' : 'text-white/80 hover:text-white',
+            ].join(' ')}
+          >
+            <Icon name="transformar" size={12} /> Editar
+          </button>
+          <button
+            type="button"
+            onClick={() => setModoVisor('mover')}
+            title="Mover el encuadre (tecla V)"
+            className={[
+              'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors',
+              modoVisor === 'mover' ? 'bg-brand text-white' : 'text-white/80 hover:text-white',
+            ].join(' ')}
+          >
+            <Icon name="transformar" size={12} /> Mover
+          </button>
+        </div>
       )}
 
       {/* lupa del visor: cuando hay acercamiento, muestra el nivel y, al pulsarla, vuelve al encaje
@@ -1804,22 +1859,24 @@ export default function Preview() {
               if ((e.target as HTMLElement).closest('[data-capa-id]')) return
               if (activo) seleccionar(activo.id)
             }}
-            // aceptar el soltar de una forma arrastrada desde el panel de figuras.
-            // solo se admite si el arrastre trae ese tipo, para no interferir con
+            // aceptar el soltar de una forma arrastrada desde el panel de figuras o de censura.
+            // solo se admite si el arrastre trae uno de esos tipos, para no interferir con
             // otros arrastres del editor
             onDragOver={(e) => {
-              if (e.dataTransfer.types.includes(TIPO_FIGURA)) e.preventDefault()
+              if (e.dataTransfer.types.includes(TIPO_FIGURA) || e.dataTransfer.types.includes(TIPO_CENSURA)) e.preventDefault()
             }}
             onDrop={(e) => {
-              const forma = e.dataTransfer.getData(TIPO_FIGURA) as CapaFigura['forma']
-              if (!forma) return
+              const figura = e.dataTransfer.getData(TIPO_FIGURA) as CapaFigura['forma']
+              const censura = e.dataTransfer.getData(TIPO_CENSURA) as CapaCensura['forma']
+              if (!figura && !censura) return
               e.preventDefault()
               // el propio div del lienzo ya tiene la proporción exacta, así que su
               // rectángulo basta para pasar el cursor a fracción 0..1 acotada
               const r = e.currentTarget.getBoundingClientRect()
               const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width))
               const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))
-              agregarFigura(forma, x, y)
+              if (censura) agregarCensura(censura, x, y)
+              else agregarFigura(figura, x, y)
             }}
           >
             {/* capa del relleno borroso de las bandas, aparte del resto. queda fuera del
