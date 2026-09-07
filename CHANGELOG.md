@@ -4,6 +4,21 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.49.0 (2026-08-09)
+
+- **La censura se arrastra al video.** El panel deja de tener un botón que la coloca sola: ahora salen
+  las formas (Rectángulo, Redondeado, Círculo y Pincel) y se arrastra la que se quiera sobre el video,
+  que aparece justo donde se suelta. Después se ajustan el tamaño, el efecto y el recorrido.
+- **Nueva forma de censura con bordes redondeados**, dibujada igual en la edición y en la exportación.
+- **La censura puede achicarse hasta un cuadrado de 4 px.** Antes su tamaño mínimo era mayor y
+  rectangular, y no dejaba tapar algo pequeño.
+- **Todo se mantiene en el último fotograma.** Al llegar al final, la censura, los textos, las figuras,
+  las imágenes y los dibujos ya no desaparecen en el instante exacto: se ven hasta el último cuadro,
+  igual que el video.
+- **Modo de edición con el visor acercado.** Con zoom aparecen dos botones arriba a la izquierda,
+  Editar y Mover (atajo V): en Mover se arrastra para desplazar el encuadre, y en Editar se pueden
+  seleccionar y mover los elementos como sin zoom, pero de cerca.
+
 ## 2.48.0 (2026-08-09)
 
 - **Desenfoque radial (zoom).** Un desenfoque nuevo que deja el centro nítido y estira los bordes hacia
