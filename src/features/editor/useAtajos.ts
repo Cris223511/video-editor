@@ -88,14 +88,17 @@ export function useAtajos() {
       ) as CapaCensura | undefined
       if (censura && e.key.startsWith('Arrow')) {
         e.preventDefault()
+        // mínimo de 4 px por eje (en fracción del lienzo), igual que al redimensionar con el ratón
+        const minAncho = 4 / st.resolucion.ancho
+        const minAlto = 4 / st.resolucion.alto
         if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
           const d = e.key === 'ArrowRight' ? PASO_TAMANO : -PASO_TAMANO
-          st.actualizarCapa(censura.id, { anchoRel: Math.max(0.03, Math.min(2, censura.anchoRel + d)) })
+          st.actualizarCapa(censura.id, { anchoRel: Math.max(minAncho, Math.min(2, censura.anchoRel + d)) })
           return
         }
         if (e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
           const d = e.key === 'ArrowUp' ? PASO_TAMANO : -PASO_TAMANO
-          st.actualizarCapa(censura.id, { altoRel: Math.max(0.03, Math.min(2, censura.altoRel + d)) })
+          st.actualizarCapa(censura.id, { altoRel: Math.max(minAlto, Math.min(2, censura.altoRel + d)) })
           return
         }
         let dx = 0

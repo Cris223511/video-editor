@@ -102,7 +102,7 @@ export interface CapaImagen extends CapaBase {
 
 export interface CapaCensura extends CapaBase {
   tipo: 'censura'
-  forma: 'circulo' | 'rectangulo' | 'pincel'
+  forma: 'circulo' | 'rectangulo' | 'redondeado' | 'pincel'
   efecto: 'pixelar' | 'difuminar' | 'transparente'
   intensidad: number // 1 a 100: tamaño de bloque o radio de desenfoque
   anchoRel: number // ancho de la máscara sobre el lienzo, de 0 a 1 (círculo/rectángulo)

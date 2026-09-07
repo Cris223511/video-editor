@@ -2,8 +2,28 @@ import { ReactNode } from 'react'
 import Icon from '../../../components/ui/Icon'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { CapaCensura } from '../../../types/layers'
-import { Campo, Deslizador, Segmentado, BOTON_AGREGAR } from '../../../components/ui/Controls'
+import { Campo, Deslizador, Segmentado } from '../../../components/ui/Controls'
 import MotionControls from './MotionControls'
+
+// dato del arrastre de una forma de censura desde el panel hasta el visor. es propio, distinto
+// del de figuras, para que soltar una forma de censura cree una censura y no una figura
+export const TIPO_CENSURA = 'application/x-ve-censura'
+
+// formas que se pueden arrastrar al video. el pincel nace como censura y luego se pinta la máscara
+const FORMAS_CENSURA: { valor: CapaCensura['forma']; etiqueta: string }[] = [
+  { valor: 'rectangulo', etiqueta: 'Rectángulo' },
+  { valor: 'redondeado', etiqueta: 'Redondeado' },
+  { valor: 'circulo', etiqueta: 'Círculo' },
+  { valor: 'pincel', etiqueta: 'Pincel' },
+]
+
+// una muestra pequeña de cada forma para reconocerla en la paleta
+function MuestraForma({ forma }: { forma: CapaCensura['forma'] }) {
+  if (forma === 'circulo') return <span className="h-6 w-6 rounded-full bg-current opacity-70" />
+  if (forma === 'redondeado') return <span className="h-5 w-7 rounded-[7px] bg-current opacity-70" />
+  if (forma === 'pincel') return <Icon name="censura" size={20} />
+  return <span className="h-5 w-7 rounded-[3px] bg-current opacity-70" />
+}
 
 // tecla suelta del recordatorio de atajos, con el aspecto de una tecla física
 function Tecla({ children }: { children: ReactNode }) {
@@ -23,7 +43,6 @@ function Tecla({ children }: { children: ReactNode }) {
 export default function CensuraPanel({ ocultarAgregar = false }: { ocultarAgregar?: boolean } = {}) {
   const capas = useEditorStore((s) => s.capas)
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
-  const agregarCensura = useEditorStore((s) => s.agregarCensura)
   const actualizarCapa = useEditorStore((s) => s.actualizarCapa)
   const quitarCapa = useEditorStore((s) => s.quitarCapa)
   const dibujando = useEditorStore((s) => s.dibujandoMascara)
@@ -40,10 +59,35 @@ export default function CensuraPanel({ ocultarAgregar = false }: { ocultarAgrega
 
   return (
     <div className="flex flex-col gap-4">
+      {/* paleta de formas: se arrastra una al video para taparlo. nada se coloca solo; la censura
+          aparece justo donde se suelta, como las figuras. el clic no hace nada a propósito */}
       {!ocultarAgregar && (
-        <button onClick={agregarCensura} className={BOTON_AGREGAR}>
-          <Icon name="mas" size={16} /> {capa ? 'Agregar otra censura' : 'Agregar censura'}
-        </button>
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium text-[color:var(--muted)]">Formas de censura</span>
+          <p className="text-[12px] leading-relaxed text-[color:var(--muted)]">
+            Arrastra una forma sobre el video para taparlo. Después ajustas su tamaño, el efecto y el
+            recorrido. Con el pincel se pinta la zona a mano.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {FORMAS_CENSURA.map((f) => (
+              <button
+                key={f.valor}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(TIPO_CENSURA, f.valor)
+                  e.dataTransfer.effectAllowed = 'copy'
+                }}
+                title={`Arrastra "${f.etiqueta}" al video`}
+                className="flex cursor-grab flex-col items-center gap-1.5 rounded-lg border border-black/10 py-3 text-[color:var(--muted)] transition-colors hover:border-brand hover:text-brand active:cursor-grabbing dark:border-white/10"
+              >
+                <span className="grid h-7 place-items-center">
+                  <MuestraForma forma={f.valor} />
+                </span>
+                <span className="text-[11px] font-medium">{f.etiqueta}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {capa && (
@@ -54,6 +98,7 @@ export default function CensuraPanel({ ocultarAgregar = false }: { ocultarAgrega
               opciones={[
                 { valor: 'circulo', etiqueta: 'Círculo' },
                 { valor: 'rectangulo', etiqueta: 'Rect.' },
+                { valor: 'redondeado', etiqueta: 'Redond.' },
                 { valor: 'pincel', etiqueta: 'Pincel' },
               ]}
               onChange={(v) => editar('forma', v)}

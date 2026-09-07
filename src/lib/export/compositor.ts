@@ -481,6 +481,7 @@ function dibujarCensura(
     dx = cx - w / 2
     dy = cy - h / 2
     if (c.forma === 'circulo') ctx.ellipse(cx, cy, w / 2, h / 2, 0, 0, Math.PI * 2)
+    else if (c.forma === 'redondeado') ctx.roundRect(dx, dy, w, h, Math.min(w, h) * 0.2)
     else ctx.rect(dx, dy, w, h)
   }
   ctx.clip()

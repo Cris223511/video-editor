@@ -69,18 +69,24 @@ export function crearCapaImagen(
 // ancho y el alto del lienzo no miden lo mismo, el alto en fracción se corrige con esa
 // proporción para que los dos lados acaben iguales en píxeles. el usuario luego elige
 // forma, efecto, tamaño y recorrido
-export function crearCapaCensura(inicio: number, aspecto = 1): CapaCensura {
+export function crearCapaCensura(
+  inicio: number,
+  aspecto = 1,
+  forma: CapaCensura['forma'] = 'rectangulo',
+  x = 0.5,
+  y = 0.5,
+): CapaCensura {
   const lado = 0.18
   return {
     id: crypto.randomUUID(),
     tipo: 'censura',
     inicio,
     duracion: 4,
-    x: 0.5,
-    y: 0.5,
+    x,
+    y,
     opacidad: 100,
     keyframes: [],
-    forma: 'rectangulo',
+    forma,
     efecto: 'pixelar',
     intensidad: 20,
     anchoRel: lado,

@@ -465,7 +465,7 @@ interface EstadoEditor {
 
   agregarTexto: () => void
   agregarImagen: (src: string, anchoNatural: number, altoNatural: number) => void
-  agregarCensura: () => void
+  agregarCensura: (forma?: CapaCensura['forma'], x?: number, y?: number) => void
   agregarFigura: (forma?: CapaFigura['forma'], x?: number, y?: number) => void
   // crea una capa de dibujo nueva desde el cabezal y devuelve su id, para poder
   // encadenar el primer trazo en el mismo gesto
@@ -3052,9 +3052,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       }
     }),
 
-  agregarCensura: () =>
+  agregarCensura: (forma: CapaCensura['forma'] = 'rectangulo', x = 0.5, y = 0.5) =>
     set((s) => {
-      const capa = crearCapaCensura(s.playhead, s.resolucion.ancho / s.resolucion.alto)
+      const capa = crearCapaCensura(s.playhead, s.resolucion.ancho / s.resolucion.alto, forma, x, y)
       return {
         capas: [...s.capas, capa],
         capaSeleccionada: capa.id,

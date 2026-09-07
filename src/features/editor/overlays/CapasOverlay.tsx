@@ -5,6 +5,7 @@ import { REPETICIONES_BRILLO, desenfoqueBrillo, hexAOpacidad } from '../../../li
 import { rectContenido } from '../../../lib/layers/rect'
 import { puntosEstrella } from '../../../lib/layers/figuras'
 import { posicionCapa } from '../../../lib/layers/motion'
+import { duracionProyecto } from '../../../lib/timeline/clips'
 import { fundidoEn } from '../../../lib/audio/ganancia'
 import { Ancla, Caja, redimensionar, aMarcoLocal, aMarcoLienzo, envolventeGirada } from '../../../lib/layers/resize'
 import { CajaGuia, Guia, imantar, imanesPorEje, imantarRedimension } from '../../../lib/layers/guias'
@@ -71,6 +72,14 @@ function dibujoFigura(c: CapaFigura, w: number, h: number, g: number) {
 export default function CapasOverlay() {
   const capas = useEditorStore((s) => s.capas)
   const playhead = useEditorStore((s) => s.playhead)
+  const clips = useEditorStore((s) => s.pista.clips)
+  const audios = useEditorStore((s) => s.audios)
+  const audioRegiones = useEditorStore((s) => s.audioRegiones)
+  // mismo recorte del tiempo que el video: en el instante final exacto (cabezal en el total) las
+  // capas siguen viéndose sobre el último fotograma en lugar de desaparecer. antes usaban el
+  // cabezal crudo con un rango [inicio, fin) y en el final justo quedaban fuera
+  const totalProyecto = duracionProyecto(clips, capas, audios, audioRegiones)
+  const phVista = totalProyecto > 0 ? Math.min(playhead, Math.max(0, totalProyecto - 0.001)) : playhead
   const herramienta = useEditorStore((s) => s.herramienta)
   const categoriaClip = useEditorStore((s) => s.categoriaClip)
   // el lápiz se activa con su herramienta del riel o con la categoría Dibujo
@@ -343,12 +352,14 @@ export default function CapasOverlay() {
   // se está arrastrando
   function cajasVecinas(idExcluido: string): CajaGuia[] {
     const st = useEditorStore.getState()
+    const tot = duracionProyecto(st.pista.clips, st.capas, st.audios, st.audioRegiones)
+    const ph = tot > 0 ? Math.min(st.playhead, Math.max(0, tot - 0.001)) : st.playhead
     return st.capas
       .filter(
         (c) =>
           c.id !== idExcluido &&
-          st.playhead >= c.inicio &&
-          st.playhead < c.inicio + c.duracion,
+          ph >= c.inicio &&
+          ph < c.inicio + c.duracion,
       )
       .map((c) => cajaDe(c, null) as CajaGuia)
   }
@@ -398,7 +409,12 @@ export default function CapasOverlay() {
       // tamaño de letra, un único valor, así que va proporcional pase lo que pase
       const proporcional = capa.tipo === 'texto' ? true : ev.shiftKey
       // la caja tentativa sale de la posición cruda del cursor
-      const n0 = redimensionar(inicial, ancla, p.x, p.y, { proporcional, simetrico: ev.altKey })
+      // el mínimo es un cuadrado de 4 px, en fracción del lienzo por eje (antes un 3% fijo, que en
+      // 1080p daba ~57x32 px y no dejaba una censura pequeña). se toma el lado menor para el motor
+      // de redimensionado y luego se acota cada eje a su propio mínimo de 4 px
+      const minAnchoRel = 4 / resolucion.ancho
+      const minAltoRel = 4 / resolucion.alto
+      const n0 = redimensionar(inicial, ancla, p.x, p.y, { proporcional, simetrico: ev.altKey }, Math.min(minAnchoRel, minAltoRel))
       let n = n0
       let gs: Guia[] = []
       // el imantado mira a dónde caen los cuatro bordes de la caja ya estirada, no el
@@ -436,8 +452,8 @@ export default function CapasOverlay() {
       }
       actualizarCapa(capa.id, {
         ...posicion,
-        anchoRel: entre(0.03, 2, n.w),
-        altoRel: entre(0.03, 2, n.h),
+        anchoRel: entre(minAnchoRel, 2, n.w),
+        altoRel: entre(minAltoRel, 2, n.h),
       })
     }
     const soltar = () => {
@@ -516,9 +532,9 @@ export default function CapasOverlay() {
   // repartirlo por cada sitio que la dibuja. así el resto del render no se entera
   // y la exportación puede hacer exactamente lo mismo
   const visibles = capas
-    .filter((c) => playhead >= c.inicio && playhead < c.inicio + c.duracion)
+    .filter((c) => phVista >= c.inicio && phVista < c.inicio + c.duracion)
     .map((c) => {
-      const f = fundidoEn(playhead, c.inicio, c.duracion, c.fundidoEntrada, c.fundidoSalida)
+      const f = fundidoEn(phVista, c.inicio, c.duracion, c.fundidoEntrada, c.fundidoSalida)
       return f >= 1 ? c : ({ ...c, opacidad: c.opacidad * f } as Capa)
     })
 
