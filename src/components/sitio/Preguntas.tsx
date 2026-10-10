@@ -35,7 +35,7 @@ const PREGUNTAS: { p: string; r: ReactNode }[] = [
         archivo. También <b>imágenes</b> en PNG, JPG, WebP, GIF, AVIF, BMP y otros formatos
         habituales de hasta 5 MB, y <b>audio</b> en MP3, WAV, OGG, M4A, AAC, FLAC y Opus. Cada
         archivo se revisa al entrar mirando su contenido real y no solo su extensión, de modo que un
-        archivo renombrado se detecta enseguida en lugar de fallar a mitad del montaje. El formato
+        archivo renombrado se detecta enseguida en lugar de fallar a mitad de la edición. El formato
         AVI queda fuera a propósito, ya que el navegador no sabe decodificarlo.
       </>
     ),

@@ -56,8 +56,9 @@ export default function PieSitio() {
             </span>
           </Link>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-[rgb(var(--pie-suave))]">
-            Un editor de video completo que corre dentro del navegador. Abres la página y ya
-            puedes montar.
+            Un editor de video completo que funciona dentro del navegador, sin instalar nada. Nada más
+            abrir la página ya puedes recortar tus clips, ponerles texto, música y efectos y descargar
+            el video terminado.
           </p>
         </div>
 

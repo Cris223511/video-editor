@@ -80,13 +80,13 @@ const CAPACIDADES = [
     icono: <Download size={20} />,
     titulo: 'Exporta a tu medida',
     texto:
-      'Elige los fotogramas por segundo y descarga el resultado ya montado. El archivo sale limpio, sin recortes ni límite de duración, listo para publicar donde quieras.',
+      'Elige los fotogramas por segundo y descarga tu video ya terminado. El archivo sale limpio, sin recortes ni límite de duración, listo para publicar donde quieras.',
   },
   {
     icono: <Save size={20} />,
     titulo: 'Proyectos que continúan',
     texto:
-      'Guarda el montaje con sus videos dentro y retómalo cuando quieras. Se guarda solo unos segundos después de cada cambio, y puedes descargarlo como archivo.',
+      'Guarda tu proyecto con sus videos dentro y retómalo cuando quieras. Se guarda solo unos segundos después de cada cambio, y puedes descargarlo como archivo.',
   },
 ]
 
@@ -167,9 +167,10 @@ export default function PortadaView() {
               Edita tu video <Subrayado>de principio a fin</Subrayado>
             </Titulo>
             <p className="mt-5 max-w-2xl text-entrada text-[color:var(--muted)]">
-              Un editor completo que corre dentro del navegador. Monta la línea de tiempo en varios
-              niveles, ajusta el color con ruedas y curvas, añade texto, figuras y censura en
-              movimiento, y exporta el archivo terminado a la calidad que elijas.
+              Un editor completo que funciona dentro del navegador. Trabajas con varios niveles de
+              video en la línea de tiempo, ajustas el color con ruedas y curvas, agregas texto,
+              figuras y censura que sigue al objeto en movimiento, y exportas el video terminado a la
+              calidad que elijas.
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-3">
               <button
@@ -192,7 +193,7 @@ export default function PortadaView() {
                   editor */}
               <img
                 src={MEDIOS.montaje.imagen}
-                alt="Línea de tiempo de un montaje en marcha"
+                alt="Línea de tiempo de un video en marcha"
                 className="absolute inset-0 h-full w-full object-cover"
                 style={{ filter: 'grayscale(0.55) brightness(0.8)' }}
               />
@@ -207,7 +208,7 @@ export default function PortadaView() {
               />
               <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
                 <p className="font-display text-sm font-bold text-white">
-                  De los archivos sueltos al montaje terminado
+                  De los archivos sueltos al video terminado
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
                   {DATOS.map((d) => (
@@ -317,7 +318,7 @@ export default function PortadaView() {
                   nombre: 'Visor',
                   icono: <PlayCircle size={15} />,
                   descripcion:
-                    'Los mismos controles con los que se revisa el montaje: reproducir, buscar por la barra, silenciar y cambiar el ritmo, incluida la cámara lenta que se usa al grabar recorridos.',
+                    'Los mismos controles con los que revisas tu video mientras lo editas, para reproducir, buscar por la barra, silenciar y cambiar el ritmo, incluida la cámara lenta que se usa al grabar recorridos.',
                   contenido: <DemoVideo />,
                 },
                 {
@@ -353,7 +354,7 @@ export default function PortadaView() {
               Tus archivos se procesan <Subrayado>en tu equipo</Subrayado>
             </Titulo>
             <p className="mt-4 text-sm leading-relaxed text-[color:var(--muted)]">
-              El montaje, los efectos y la exportación ocurren dentro de tu navegador. No existe una
+              La edición, los efectos y la exportación ocurren dentro de tu navegador. No existe una
               subida previa ni una cola de procesado en la nube, así que la única velocidad que
               cuenta es la de tu equipo y ningún tercero ve el material con el que trabajas.
             </p>
@@ -459,8 +460,9 @@ export default function PortadaView() {
               Empieza a editar tu video ahora.
             </h2>
             <p className="relative mx-auto mt-4 max-w-lg text-sm leading-relaxed text-white/65">
-              Arrastra un archivo y ponte a trabajar. Montas la línea de tiempo, corriges el color,
-              añades efectos y descargas el resultado terminado, todo en la misma pestaña.
+              Arrastra un archivo y empieza a trabajar en la misma pestaña, ordenando tus clips en la
+              línea de tiempo, corrigiendo el color, agregando efectos y descargando el video ya
+              terminado.
             </p>
             <button
               onClick={irAImportar}

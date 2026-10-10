@@ -39,7 +39,7 @@ export const TERMINOS: Documento = {
       id: 'que-es',
       titulo: 'Qué ofrece la aplicación',
       parrafos: [
-        'Video Editor permite montar una línea de tiempo con **hasta seis niveles de video**, recortar y dividir clips, ajustar su velocidad, corregir el color con ruedas por zona tonal y curvas por canal, aplicar veintiuna transiciones distintas, añadir texto con control de tipografía, interlineado y espaciado, incorporar imágenes y figuras geométricas, importar audio, censurar zonas con pixelado o desenfoque incluso cuando el objeto se mueve por la escena, y exportar el resultado a un archivo de video listo para compartir.',
+        'Video Editor permite armar una línea de tiempo con **hasta seis niveles de video**, recortar y dividir clips, ajustar su velocidad, corregir el color con ruedas por zona tonal y curvas por canal, aplicar veintiuna transiciones distintas, añadir texto con control de tipografía, interlineado y espaciado, incorporar imágenes y figuras geométricas, importar audio, censurar zonas con pixelado o desenfoque incluso cuando el objeto se mueve por la escena, y exportar el resultado a un archivo de video listo para compartir.',
         'También permite guardar proyectos con todos sus archivos incluidos, descargarlos como un único fichero para llevarlos a otro equipo y volver a importarlos más tarde tal como estaban. **No hay funciones reservadas, versiones de pago, marcas de agua forzadas ni límites de duración o de exportación.** Lo que ves es todo lo que hay, y está disponible desde el primer momento sin pedir nada a cambio.',
         'Todo el procesamiento ocurre en tu equipo. No existe ningún servidor que reciba, almacene ni transforme tus archivos en ningún momento, ni siquiera de forma temporal mientras dura la edición. La decodificación del video, el dibujo de cada fotograma y la generación del archivo final los realiza tu navegador con las mismas capacidades que usa para reproducir cualquier contenido.',
         'La aplicación se encuentra en desarrollo activo y sus funciones pueden cambiar, ampliarse o afinarse con el tiempo. Las que ya existen se mantienen salvo que un cambio resulte técnicamente inevitable, y en ese caso queda documentado en el historial del repositorio, que cualquiera puede revisar.',
@@ -50,7 +50,7 @@ export const TERMINOS: Documento = {
       titulo: 'Qué necesitas para usarla',
       parrafos: [
         'Hace falta un navegador de escritorio reciente basado en Chromium (como Chrome, Edge, Brave u Opera) o en Firefox, con soporte para las capacidades de video, lienzo y grabación que utiliza la aplicación. No se requiere instalar nada, ni crear una cuenta, ni conceder permisos especiales del sistema, ni mantener una conexión permanente una vez que la página ha terminado de cargar.',
-        'La aplicación no comprueba tu equipo por adelantado ni te impide empezar a trabajar. Si tu navegador no admite alguna de las capacidades necesarias, lo notarás en el punto concreto donde entran en juego, sobre todo al exportar, que es la operación más exigente. Por eso conviene hacer una prueba corta antes de emprender un montaje largo.',
+        'La aplicación no comprueba tu equipo por adelantado ni te impide empezar a trabajar. Si tu navegador no admite alguna de las capacidades necesarias, lo notarás en el punto concreto donde entran en juego, sobre todo al exportar, que es la operación más exigente. Por eso conviene hacer una prueba corta antes de emprender una edición larga.',
       ],
       lista: [
         'Un navegador actualizado, en su versión de escritorio; las versiones de móvil no están contempladas.',
@@ -81,14 +81,14 @@ export const TERMINOS: Documento = {
       titulo: 'Limitaciones técnicas',
       parrafos: [
         'El rendimiento depende por completo de tu equipo y de tu navegador. Un proyecto largo o en alta resolución puede resultar lento en un ordenador modesto, y no hay forma de trasladar ese trabajo a un servicio más potente porque no existe ningún servicio detrás: todo el cálculo sale de tu propia máquina.',
-        'La exportación se realiza reproduciendo el montaje y capturándolo, por lo que **tarda aproximadamente lo que dura el video final**. Un montaje de diez minutos necesita del orden de diez minutos de espera. Conviene tener presentes estos puntos antes de empezar una exportación larga:',
+        'La exportación se realiza reproduciendo el video y capturándolo, por lo que **tarda aproximadamente lo que dura el video final**. Un video de diez minutos necesita del orden de diez minutos de espera. Conviene tener presentes estos puntos antes de empezar una exportación larga.',
       ],
       lista: [
         'La pestaña debe permanecer activa y visible mientras dura la exportación; si la dejas en segundo plano, el navegador puede ralentizarla o detenerla.',
         'El formato y el códec del archivo final dependen de lo que admita tu navegador, no de una elección libre de la aplicación.',
         'Los proyectos guardados ocupan espacio real en el disco, ya que incluyen los videos completos y no simples enlaces a ellos.',
         'Un equipo muy justo de memoria o de procesador puede perder fotogramas al exportar, lo que se aprecia como pequeños tirones en el resultado.',
-        'Si el navegador se queda sin memoria durante la exportación, el proceso se interrumpe y hay que repetirlo, por lo general con un montaje más ligero o una resolución menor.',
+        'Si el navegador se queda sin memoria durante la exportación, el proceso se interrumpe y hay que repetirlo, por lo general con un video más ligero o una resolución menor.',
       ],
     },
     {

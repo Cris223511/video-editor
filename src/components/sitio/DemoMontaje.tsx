@@ -23,7 +23,7 @@ const GUION = [
   { hasta: 6.1, texto: 'Y el tercero en otro nivel' },
   { hasta: 8.35, texto: 'Estiras un clip para ajustar su duración' },
   { hasta: 10.1, texto: 'Añades un rótulo sobre la imagen' },
-  { hasta: 13.5, texto: 'Reproduces el montaje terminado' },
+  { hasta: 13.5, texto: 'Reproduces el video terminado' },
 ]
 const TOTAL = 13.5
 // el montaje se arma durante los primeros diez segundos; a partir de ahí el

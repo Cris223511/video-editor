@@ -70,7 +70,7 @@ export default function ImportView() {
         <h1 className="font-display text-titulo-lg">Empieza tu proyecto</h1>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[color:var(--muted)]">
           Trae los videos, las imágenes y los audios con los que vas a trabajar. Puedes soltar
-          varios de una vez y añadir más cuando quieras, ya con el montaje empezado.
+          varios de una vez y añadir más cuando quieras, ya con el proyecto empezado.
         </p>
       </div>
 

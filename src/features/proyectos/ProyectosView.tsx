@@ -310,7 +310,7 @@ export default function ProyectosView() {
             </button>
           }
         >
-          Al guardar desde el editor, tu montaje aparecerá aquí con los videos incluidos y podrás
+          Al guardar desde el editor, tu proyecto aparecerá aquí con los videos incluidos y podrás
           retomarlo cuando quieras, exactamente donde lo dejaste.
         </Vacio>
       )}
@@ -556,7 +556,7 @@ export default function ProyectosView() {
               />
               <FilaDato
                 icono={<Clock size={14} />}
-                nombre="Duración del montaje"
+                nombre="Duración del video"
                 valor={formatearDuracion(detalle.duracion)}
               />
               <FilaDato

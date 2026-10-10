@@ -114,7 +114,7 @@ export default function MaquetaExporta() {
             transform: listo ? 'translateY(0)' : 'translateY(4px)',
           }}
         >
-          <span className="truncate font-mono text-[11px]">montaje_final.mp4</span>
+          <span className="truncate font-mono text-[11px]">video_final.mp4</span>
           <span className="shrink-0 font-mono text-[10px] text-[color:var(--muted)]">
             48 MB · 0:32
           </span>

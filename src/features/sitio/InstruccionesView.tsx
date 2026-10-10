@@ -19,7 +19,7 @@ const MONTAJE: Paso[] = [
   {
     clave: 'Importa',
     texto:
-      'tus videos arrastrándolos a la zona de carga o pulsando para buscarlos. Puedes traer varios de una vez, y sumar más cuando quieras sin perder lo que ya llevas montado.',
+      'tus videos arrastrándolos a la zona de carga o pulsando para buscarlos. Puedes traer varios de una vez, y sumar más cuando quieras sin perder lo que ya llevas hecho.',
   },
   {
     clave: 'Arrastra',
@@ -39,7 +39,7 @@ const MONTAJE: Paso[] = [
   {
     clave: 'Duplica',
     texto:
-      'o copia cualquier elemento manteniendo Alt mientras lo arrastras, o con Ctrl+C y Ctrl+V. Todo el montaje se deshace y se rehace con Ctrl+Z y Ctrl+Y.',
+      'o copia cualquier elemento manteniendo Alt mientras lo arrastras, o con Ctrl+C y Ctrl+V. Todo lo que hagas se deshace y se rehace con Ctrl+Z y Ctrl+Y.',
   },
   {
     clave: 'Divide',
@@ -234,7 +234,7 @@ export default function InstruccionesView() {
           para retomarlo cuando quieras.
         </p>
 
-        <Lista titulo="Montar la línea de tiempo" pasos={MONTAJE} />
+        <Lista titulo="Armar la línea de tiempo" pasos={MONTAJE} />
         <Lista titulo="Color, transiciones y velocidad" pasos={EFECTOS} />
         <Lista titulo="Texto, imágenes y censura" pasos={CAPAS} />
         <Lista titulo="Guardar y exportar" pasos={SALIDA} />
@@ -266,7 +266,7 @@ export default function InstruccionesView() {
         <Aparece className="mt-10">
           <Aviso titulo="Qué esperar del rendimiento">
             La exportación va en tiempo real, así que un video de un minuto tarda alrededor de un
-            minuto. El resto del montaje se mueve al instante, aunque con material muy pesado o
+            minuto. El resto de la edición se mueve al instante, aunque con material muy pesado o
             muchos niveles a la vez notarás que el equipo trabaja más.
           </Aviso>
         </Aparece>
