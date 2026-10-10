@@ -4,6 +4,14 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.50.0 (2026-10-10)
+
+- **Textos del sitio y de la aplicación reescritos con un lenguaje más claro.** Se deja de usar "montar"
+  y "montaje" en todo el texto visible (pie de página, portada, instrucciones, proyectos, importar,
+  preguntas frecuentes, demostraciones y textos legales) y se pasa a hablar de editar, de armar la línea
+  de tiempo, del video o del proyecto, según corresponda. Las frases se escriben seguidas y sin signos de
+  más, para que se lean de forma natural.
+
 ## 2.49.0 (2026-08-09)
 
 - **La censura se arrastra al video.** El panel deja de tener un botón que la coloca sola: ahora salen
