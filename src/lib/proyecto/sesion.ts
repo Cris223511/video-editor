@@ -100,6 +100,7 @@ export function capturarProyecto(id: string, creado: number, portada: string): P
     // al guardar se quita la extensión que haya quedado pegada al final del nombre (".mp4", etc.)
     titulo: sinExtensionMedia(pr.titulo),
     descripcion: pr.descripcion || undefined,
+    tituloAuto: pr.tituloAuto,
     creado,
     modificado: Date.now(),
     portada,
@@ -188,7 +189,20 @@ async function abrirSesionInterno(id: string): Promise<boolean> {
   const medios = (p.medios ?? []).map(guardadoAMedio)
   // al abrir se adopta la identidad del proyecto guardado, para que los
   // siguientes guardados actualicen este mismo y no creen uno nuevo
-  useProjectStore.setState({ idProyecto: p.id, creado: p.creado, titulo: p.titulo, descripcion: p.descripcion ?? '', medios })
+  // los proyectos guardados antes de existir la marca se interpretan por su nombre: si coincide con el
+  // de alguno de sus medios (o es el de por defecto) se tratan como automáticos
+  const auto =
+    p.tituloAuto ??
+    (p.titulo === 'Proyecto sin título' ||
+      medios.some((m) => m.nombre.replace(/\.[^.]+$/, '').trim() === p.titulo.trim()))
+  useProjectStore.setState({
+    idProyecto: p.id,
+    creado: p.creado,
+    titulo: p.titulo,
+    tituloAuto: auto,
+    descripcion: p.descripcion ?? '',
+    medios,
+  })
   // en segundo plano se revisa que cada archivo se pueda leer. algunos navegadores
   // guardan una referencia al fichero del disco en vez de una copia, así que si el
   // usuario lo borró de su explorador, el medio deja de existir. leer un byte falla con
@@ -321,6 +335,7 @@ export function nuevoProyecto(): void {
     idProyecto: id,
     creado: Date.now(),
     titulo: 'Proyecto sin título',
+    tituloAuto: true,
     descripcion: '',
     guardadoEn: null,
     sinGuardar: false,

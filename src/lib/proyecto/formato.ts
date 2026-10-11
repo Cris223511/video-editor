@@ -36,6 +36,8 @@ export interface ProyectoGuardado {
   // nota libre que escribe quien monta, para reconocer el proyecto de un vistazo
   // cuando el título no basta. opcional, así que lo guardado antes sigue valiendo
   descripcion?: string
+  // si el nombre era automático (acompaña al primer medio) o lo escribió el usuario
+  tituloAuto?: boolean
   creado: number
   modificado: number
   // última vez que se abrió el proyecto, que suele decir más que la fecha de
@@ -92,6 +94,8 @@ export interface ResumenProyecto {
   id: string
   titulo: string
   descripcion?: string
+  // si el nombre era automático (acompaña al primer medio) o lo escribió el usuario
+  tituloAuto?: boolean
   creado: number
   modificado: number
   abierto?: number

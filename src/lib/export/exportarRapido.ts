@@ -129,7 +129,7 @@ export function exportarRapido(
       if (fuentes.has(c.id)) return
       const dem = demuxCache.get(c.assetId)
       if (!dem) return
-      fuentes.set(c.id, new FuenteDecodificada(dem.config, dem.chunks, preferirSoftware))
+      fuentes.set(c.id, new FuenteDecodificada(dem.config, dem.chunks, preferirSoftware, dem.info.rotacion))
     }
 
     // primer vistazo: en cuanto el primer clip está listo se compone su fotograma inicial y se

@@ -24,12 +24,22 @@ export class FuenteDecodificada {
   // resolvedores en espera de que el decodificador saque el próximo cuadro
   private esperas: (() => void)[] = []
   readonly lienzo: LienzoComoVideo
+  // giro que el archivo pide al mostrarse (0, 90, 180 o 270). los cuadros decodificados llegan
+  // sin girar, y se pintan en el lienzo ya girados, igual que los muestra un reproductor
+  private rotacion: number
 
-  constructor(config: VideoDecoderConfig, chunks: EncodedVideoChunk[], preferirSoftware = false) {
+  constructor(
+    config: VideoDecoderConfig,
+    chunks: EncodedVideoChunk[],
+    preferirSoftware = false,
+    rotacion = 0,
+  ) {
     this.chunks = chunks
+    this.rotacion = rotacion
     this.lienzo = document.createElement('canvas') as LienzoComoVideo
-    this.lienzo.videoWidth = config.codedWidth ?? 0
-    this.lienzo.videoHeight = config.codedHeight ?? 0
+    const de_lado = rotacion === 90 || rotacion === 270
+    this.lienzo.videoWidth = (de_lado ? config.codedHeight : config.codedWidth) ?? 0
+    this.lienzo.videoHeight = (de_lado ? config.codedWidth : config.codedHeight) ?? 0
     this.decoder = new VideoDecoder({
       output: (f) => {
         this.listas.push(f)
@@ -133,12 +143,28 @@ export class FuenteDecodificada {
     if (elegido && elegido !== this.actual) {
       if (this.actual) this.actual.close()
       this.actual = elegido
-      this.lienzo.videoWidth = elegido.displayWidth
-      this.lienzo.videoHeight = elegido.displayHeight
-      this.lienzo.width = elegido.displayWidth
-      this.lienzo.height = elegido.displayHeight
+      const w = elegido.displayWidth
+      const h = elegido.displayHeight
+      const de_lado = this.rotacion === 90 || this.rotacion === 270
+      const cw = de_lado ? h : w
+      const ch = de_lado ? w : h
+      this.lienzo.videoWidth = cw
+      this.lienzo.videoHeight = ch
+      this.lienzo.width = cw
+      this.lienzo.height = ch
       const ctx = this.lienzo.getContext('2d')
-      if (ctx) ctx.drawImage(elegido, 0, 0)
+      if (ctx) {
+        if (this.rotacion === 0) {
+          ctx.drawImage(elegido, 0, 0)
+        } else {
+          // se gira alrededor del centro del lienzo ya con las medidas intercambiadas
+          ctx.save()
+          ctx.translate(cw / 2, ch / 2)
+          ctx.rotate((this.rotacion * Math.PI) / 180)
+          ctx.drawImage(elegido, -w / 2, -h / 2)
+          ctx.restore()
+        }
+      }
     }
   }
 
@@ -156,8 +182,8 @@ export class FuenteDecodificada {
 
 // desarma un video y arma su proveedor de cuadros, listo para pedirle instantes
 export async function crearFuente(archivo: Blob): Promise<FuenteDecodificada> {
-  const { config, chunks } = await demuxVideo(archivo)
+  const { config, chunks, info } = await demuxVideo(archivo)
   const soporte = await VideoDecoder.isConfigSupported(config)
   if (!soporte.supported) throw new Error('El códec del video no lo soporta WebCodecs: ' + config.codec)
-  return new FuenteDecodificada(config, chunks)
+  return new FuenteDecodificada(config, chunks, false, info.rotacion)
 }

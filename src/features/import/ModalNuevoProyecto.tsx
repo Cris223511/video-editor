@@ -126,7 +126,10 @@ export default function ModalNuevoProyecto({
   const continuar = () => {
     // al continuar se quita la extensión que haya quedado pegada al final (".mp4", etc.)
     const limpio = sinExtensionMedia(nombre.trim()) || 'Proyecto sin título'
-    useProjectStore.getState().renombrar(limpio)
+    // si el nombre quedó igual al propuesto por el primer medio, el proyecto sigue siendo automático
+    // y acompañará al primer medio que haya. si el usuario lo cambió, queda fijo
+    const sigueAuto = limpio === (sinExtensionMedia(nombrePropuesto(medios)) || 'Proyecto sin título')
+    useProjectStore.getState().renombrar(limpio, sigueAuto)
     useProjectStore.getState().setDescripcion(descripcion.trim())
     onContinuar()
   }

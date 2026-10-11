@@ -6,7 +6,21 @@ export interface VideoDemux {
   config: VideoDecoderConfig
   chunks: EncodedVideoChunk[]
   // metadatos útiles para medir y para el resto del pipeline
-  info: { ancho: number; alto: number; duracion: number; fps: number; nSamples: number }
+  // rotacion es lo que el archivo pide girar el cuadro al mostrarlo (0, 90, 180 o 270), que los
+  // teléfonos guardan como un dato aparte en vez de rotar los píxeles. el visor del navegador ya la
+  // aplica; la decodificación cruda de WebCodecs no, y por eso hay que leerla acá
+  info: { ancho: number; alto: number; duracion: number; fps: number; nSamples: number; rotacion: number }
+}
+
+// saca el giro de la matriz de transformación del track (nueve números en punto fijo 16.16).
+// el ángulo sale de las dos primeras entradas y se redondea al cuarto de vuelta más cercano
+function rotacionDeMatriz(matriz: ArrayLike<number> | undefined): number {
+  if (!matriz || matriz.length < 2) return 0
+  const a = matriz[0] / 65536
+  const b = matriz[1] / 65536
+  if (a === 0 && b === 0) return 0
+  const grados = (Math.atan2(b, a) * 180) / Math.PI
+  return ((Math.round(grados / 90) * 90) % 360 + 360) % 360
 }
 
 // mp4box entrega los boxes ya parseados; para arrancar el VideoDecoder hace falta la
@@ -63,6 +77,7 @@ export function demuxVideo(archivo: Blob): Promise<VideoDemux> {
         duracion,
         fps: isFinite(fps) ? fps : 30,
         nSamples: track.nb_samples,
+        rotacion: rotacionDeMatriz(trak?.tkhd?.matrix ?? track.matrix),
       }
 
       // se piden todas las muestras del track de una vez; llegan por onSamples

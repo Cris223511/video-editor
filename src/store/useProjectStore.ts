@@ -18,11 +18,17 @@ interface EstadoProyecto {
   // completa, para que uno no vea el editor a medio montar con un video pesado
   preparando: boolean
   titulo: string
+  // true mientras el nombre del proyecto es el que se armó solo a partir de un medio. en ese caso
+  // acompaña al primer medio que haya (si se borra o se reordena, pasa al siguiente). en cuanto el
+  // usuario escribe un nombre a mano deja de ser automático y ya nada lo cambia
+  tituloAuto: boolean
   // nota libre del proyecto, la misma que se ve en la lista de proyectos. vive aquí para poder
   // fijarla desde el modal de un proyecto nuevo y que se guarde con él
   descripcion: string
   medios: MediaAsset[]
-  renombrar: (titulo: string) => void
+  // el segundo argumento marca si el nombre queda como automático. escribirlo a mano es lo normal,
+  // así que por defecto deja de serlo
+  renombrar: (titulo: string, automatico?: boolean) => void
   setDescripcion: (descripcion: string) => void
   agregar: (medio: MediaAsset) => void
   quitar: (id: string) => void
@@ -62,6 +68,11 @@ function idInicial(): string {
   return nuevo
 }
 
+// nombre de un medio sin su extensión, que es con lo que se bautiza un proyecto automático
+export function nombreDeMedio(m: MediaAsset): string {
+  return m.nombre.replace(/\.[^.]+$/, '').trim() || m.nombre
+}
+
 // guarda el nombre del proyecto y sus medios importados. al quitar uno se
 // libera su object url para no dejar memoria colgando
 export const useProjectStore = create<EstadoProyecto>((set) => ({
@@ -72,23 +83,33 @@ export const useProjectStore = create<EstadoProyecto>((set) => ({
   guardando: false,
   preparando: false,
   titulo: 'Proyecto sin título',
+  tituloAuto: true,
   descripcion: '',
   medios: [],
   // mientras se escribe se admite cualquier valor, incluido el vacío, para poder
   // borrar todo y volver a teclear. el relleno con el nombre por defecto se hace
   // recién al salir del foco, no en cada pulsación
-  renombrar: (titulo) => set({ titulo }),
+  renombrar: (titulo, automatico = false) => set({ titulo, tituloAuto: automatico }),
   setDescripcion: (descripcion) => set({ descripcion }),
-  agregar: (medio) => set((s) => ({ medios: [...s.medios, medio] })),
+  agregar: (medio) =>
+    set((s) => {
+      const medios = [...s.medios, medio]
+      // con el nombre automático, el proyecto se llama como el primer medio que tenga
+      return s.tituloAuto ? { medios, titulo: nombreDeMedio(medios[0]) } : { medios }
+    }),
   reordenarMedios: (ids) =>
-    set((s) => ({
-      medios: ids.map((id) => s.medios.find((m) => m.id === id)).filter((m): m is MediaAsset => !!m),
-    })),
+    set((s) => {
+      const medios = ids.map((id) => s.medios.find((m) => m.id === id)).filter((m): m is MediaAsset => !!m)
+      return s.tituloAuto && medios[0] ? { medios, titulo: nombreDeMedio(medios[0]) } : { medios }
+    }),
   quitar: (id) =>
     set((s) => {
       const objetivo = s.medios.find((m) => m.id === id)
       if (objetivo) URL.revokeObjectURL(objetivo.url)
-      return { medios: s.medios.filter((m) => m.id !== id) }
+      const medios = s.medios.filter((m) => m.id !== id)
+      // si el nombre es automático pasa al primer medio que quede. si no queda ninguno, el
+      // proyecto conserva el nombre que ya tenía hasta que entre otro medio
+      return s.tituloAuto && medios[0] ? { medios, titulo: nombreDeMedio(medios[0]) } : { medios }
     }),
   marcarFaltante: (id) =>
     set((s) => ({ medios: s.medios.map((m) => (m.id === id ? { ...m, faltante: true } : m)) })),
