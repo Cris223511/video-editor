@@ -21,6 +21,7 @@ import { paramsGoPro } from '../efectos/goPro'
 import { paramsCromatico } from '../efectos/cromatico'
 import { efectoAnimado, pintarAnimado } from '../efectos/animados'
 import { pintarZoomBlur } from '../efectos/zoomBlur'
+import { pintarMarco } from '../marcos/pintar'
 import { encuadreDe, rectClip, ENCUADRE_NEUTRO } from '../timeline/encuadre'
 import { aplicarTransformCanvas } from '../layers/transform'
 
@@ -538,85 +539,6 @@ function dibujarCensura(
   ctx.restore()
 }
 
-function dibujarMarco(ctx: CanvasRenderingContext2D, marco: Marco, ancho: number, alto: number, escala: number) {
-  if (marco.tipo === 'ninguno') return
-  const g = marco.grosor * escala
-  const r = marco.radio * escala
-  ctx.save()
-  ctx.strokeStyle = marco.color
-  ctx.fillStyle = marco.color
-  ctx.lineWidth = g
-
-  switch (marco.tipo) {
-    case 'solido':
-      ctx.strokeRect(g / 2, g / 2, ancho - g, alto - g)
-      break
-    case 'doble':
-      ctx.lineWidth = g / 3
-      ctx.strokeRect(g / 6, g / 6, ancho - g / 3, alto - g / 3)
-      ctx.strokeRect(g - g / 6, g - g / 6, ancho - 2 * g + g / 3, alto - 2 * g + g / 3)
-      break
-    case 'discontinuo':
-      ctx.setLineDash([g * 2, g])
-      ctx.strokeRect(g / 2, g / 2, ancho - g, alto - g)
-      break
-    case 'punteado':
-      ctx.setLineDash([g / 2, g])
-      ctx.lineCap = 'round'
-      ctx.strokeRect(g / 2, g / 2, ancho - g, alto - g)
-      break
-    case 'redondeado':
-      rectRedondeado(ctx, g / 2, g / 2, ancho - g, alto - g, r)
-      ctx.stroke()
-      break
-    case 'sombra':
-      ctx.shadowColor = 'rgba(0,0,0,.55)'
-      ctx.shadowBlur = g * 2
-      ctx.lineWidth = g
-      ctx.strokeStyle = 'rgba(0,0,0,.55)'
-      ctx.strokeRect(g, g, ancho - 2 * g, alto - 2 * g)
-      break
-    case 'neon':
-      ctx.shadowColor = marco.color
-      ctx.shadowBlur = g
-      ctx.lineWidth = Math.max(1, g / 3)
-      ctx.strokeRect(g / 2, g / 2, ancho - g, alto - g)
-      break
-    case 'degradado': {
-      const grad = ctx.createLinearGradient(0, 0, ancho, alto)
-      grad.addColorStop(0, '#ff6b6b')
-      grad.addColorStop(0.4, '#f9d423')
-      grad.addColorStop(0.7, '#4ecdc4')
-      grad.addColorStop(1, '#556270')
-      ctx.strokeStyle = grad
-      ctx.strokeRect(g / 2, g / 2, ancho - g, alto - g)
-      break
-    }
-    case 'vineta': {
-      const grad = ctx.createRadialGradient(
-        ancho / 2,
-        alto / 2,
-        Math.min(ancho, alto) * 0.35,
-        ancho / 2,
-        alto / 2,
-        Math.max(ancho, alto) * 0.62,
-      )
-      grad.addColorStop(0, 'rgba(0,0,0,0)')
-      grad.addColorStop(1, 'rgba(0,0,0,.75)')
-      ctx.fillStyle = grad
-      ctx.fillRect(0, 0, ancho, alto)
-      break
-    }
-    case 'polaroid':
-      ctx.fillRect(0, 0, ancho, g)
-      ctx.fillRect(0, 0, g, alto)
-      ctx.fillRect(ancho - g, 0, g, alto)
-      ctx.fillRect(0, alto - g * 3, ancho, g * 3)
-      break
-  }
-  ctx.restore()
-}
-
 // dibuja un fotograma completo del proyecto en el instante t
 export function dibujarFotograma(
   ctx: CanvasRenderingContext2D,
@@ -1000,7 +922,7 @@ export function dibujarFotograma(
     ctx.restore()
   }
 
-  dibujarMarco(ctx, marco, ancho, alto, escala)
+  pintarMarco(ctx, marco, ancho, alto, escala, t)
 
   // impactos de neón (contorno, líneas 3D, rayos): con el mismo motor que el visor, por
   // encima de todo, para que el archivo salga idéntico. los tres muestrean el video
