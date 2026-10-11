@@ -229,8 +229,9 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       if (esDePistaVideo) {
         if (insercionActual !== null) insertarPistaEn(insercionActual, idGesto)
         setInsercionPista(null)
-        // si la figura o imagen dejó su pista de video sin nada, esa fila se poda
-        if (movido) useEditorStore.getState().podarPistasVacias()
+        // si la figura o imagen dejó su pista de video sin nada, esa fila se poda, salvo que el
+        // gesto haya abierto una pista nueva, que entonces se deja para que se vea el resultado
+        if (movido && insercionActual === null) useEditorStore.getState().podarPistasVacias()
         window.removeEventListener('pointermove', mover)
         window.removeEventListener('pointerup', soltar)
         return
@@ -239,18 +240,22 @@ export default function CapaBlock({ capa, pxPorSegundo, puntos }: Props) {
       // texto: si se soltó sobre la juntura entre dos filas se abre una nueva ahí y
       // el bloque estrena ese nivel; si cayó dentro de una fila, se muda a ella
       const junta = separacionBajoCursor(ultimoX, ultimoY, 'nivelTexto')
+      let creoFila = false
       if (junta !== null) {
         insertarNivelTexto(junta, idGesto)
+        creoFila = true
       } else if (porDebajoDelUltimo(ultimoX, ultimoY, 'nivelTexto')) {
         // soltado bajo la última fila: nace un nivel nuevo en el fondo y el bloque
         // se queda en él
         insertarNivelTexto(0, idGesto)
+        creoFila = true
       } else {
         const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelTexto')
         if (destino !== null) moverCapaNivel(idGesto, destino)
       }
-      // si el bloque dejó vacía su fila de texto de origen, se cierra sola
-      if (movido) useEditorStore.getState().podarNivelesTextoVacios()
+      // si el bloque dejó vacía su fila de texto de origen, se cierra sola, salvo que el gesto haya
+      // sido abrir una fila nueva, que entonces se deja para que se vea el resultado
+      if (movido && !creoFila) useEditorStore.getState().podarNivelesTextoVacios()
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)
     }

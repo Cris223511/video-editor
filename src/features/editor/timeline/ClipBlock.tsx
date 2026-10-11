@@ -82,6 +82,8 @@ export default function ClipBlock({
   )
   const moverClip = useEditorStore((s) => s.moverClip)
   const duplicarClipEn = useEditorStore((s) => s.duplicarClipEn)
+  const duplicarClipEnNuevaPista = useEditorStore((s) => s.duplicarClipEnNuevaPista)
+  const moverClipAPistaEmpujando = useEditorStore((s) => s.moverClipAPistaEmpujando)
   const setFantasmaDup = useEditorStore((s) => s.setFantasmaDup)
   const recortarClip = useEditorStore((s) => s.recortarClip)
   const estirarVelocidad = useEditorStore((s) => s.estirarVelocidad)
@@ -216,6 +218,9 @@ export default function ClipBlock({
     // store en cada fotograma del movimiento
     let pistaActual = clip.pista
     let insercionActual: number | null = null
+    // nivel sobre el que está el cursor y al que el clip todavía no pudo mudarse porque no cabe
+    // sin tocar a otros. al soltar, se muda empujando hacia la derecha a los que estorban
+    let destinoPendiente: number | null = null
 
     // el criterio de a qué nivel o separación apunta el gesto vive en un ayudante
     // compartido: el mismo que usa el arrastre de un medio desde el panel, para
@@ -226,7 +231,9 @@ export default function ClipBlock({
       return resolverDestinoVertical(stack, clientY, useEditorStore.getState().numPistas)
     }
 
+    let ultimoX = e.clientX
     const mover = (ev: globalThis.PointerEvent) => {
+      ultimoX = ev.clientX
       // la etiqueta que sigue al cursor solo aparece cuando el gesto es vertical (se
       // está cambiando de nivel o abriendo uno nuevo). moviendo el bloque a los lados
       // no viene a cuento y estorbaba
@@ -258,6 +265,18 @@ export default function ClipBlock({
         let pistaDest = clip.pista
         const v = Math.abs(ev.clientY - startY) > UMBRAL_VERT ? decidirVertical(ev.clientY) : undefined
         if (v && v.destino !== null) pistaDest = v.destino
+        // apuntando a una separación entre niveles, la copia abrirá uno nuevo ahí: se enciende la
+        // misma guía celeste que con un arrastre normal y el fantasma se oculta
+        const nuevaDestino = v && v.insercion !== null ? v.insercion : null
+        if (nuevaDestino !== insercionActual) {
+          insercionActual = nuevaDestino
+          setInsercionPista(nuevaDestino)
+        }
+        if (nuevaDestino !== null) {
+          setFantasmaDup(null)
+          useEditorStore.getState().setArrastreVivo({ etiqueta: nombre, x: ev.clientX, y: ev.clientY })
+          return
+        }
         const st2 = useEditorStore.getState()
         const enPista = st2.pista.clips.filter((c) => c.pista === pistaDest)
         const choca = enPista.some(
@@ -322,11 +341,26 @@ export default function ClipBlock({
             setInsercionPista(null)
           }
           if (v.destino !== null && v.destino !== pistaActual) {
-            // moverClipAPista solo cambia de pista si el destino está libre en el
-            // tramo del clip; si lo consiguió, se recuerda la nueva pista
-            moverClipAPista(idGesto, v.destino)
-            const real = useEditorStore.getState().pista.clips.find((c) => c.id === idGesto)
-            if (real) pistaActual = real.pista
+            // si el clip cabe tal cual en el nivel de destino se muda al instante. si no cabe, se
+            // anota como destino pendiente y al soltar se muda empujando a los que estorban
+            const st3 = useEditorStore.getState()
+            const actual = st3.pista.clips.find((c) => c.id === idGesto)
+            const ini = actual ? actual.inicio : inicio
+            const durC = actual ? actual.duracion : clip.duracion
+            const destinoV = v.destino
+            const cabe = !st3.pista.clips.some(
+              (c) => c.id !== idGesto && c.pista === destinoV && c.inicio < ini + durC - 0.001 && c.inicio + c.duracion > ini + 0.001,
+            )
+            if (cabe) {
+              destinoPendiente = null
+              moverClipAPista(idGesto, destinoV)
+              const real = useEditorStore.getState().pista.clips.find((c) => c.id === idGesto)
+              if (real) pistaActual = real.pista
+            } else {
+              destinoPendiente = destinoV
+            }
+          } else if (v.destino !== null && v.destino === pistaActual) {
+            destinoPendiente = null
           }
         }
       } else if (insercionActual !== null) {
@@ -345,7 +379,18 @@ export default function ClipBlock({
       // si ese hueco estaba libre. si no, el gesto se cancela y no se crea nada
       if (conAlt && movido) {
         const f = useEditorStore.getState().fantasmaDup
-        if (f && f.valido) duplicarClipEn(clip.id, f.inicio, f.pista)
+        if (insercionActual !== null) {
+          // soltado sobre una separación: la copia nace en una pista nueva, en el instante donde
+          // estaba el original más el recorrido horizontal del gesto
+          const dxFinal = (ultimoX - startX) / pxPorSegundo
+          const { inicio: iniCopia } = imantarMover(
+            Math.max(0, inicioOriginal + dxFinal), clip.duracion, puntos, umbral, [],
+          )
+          duplicarClipEnNuevaPista(clip.id, iniCopia, insercionActual)
+        } else if (f && f.valido) {
+          duplicarClipEn(clip.id, f.inicio, f.pista)
+        }
+        setInsercionPista(null)
         setFantasmaDup(null)
         setGuiaImantado(null)
         setInteractuando(false)
@@ -360,13 +405,17 @@ export default function ClipBlock({
       if (insercionActual !== null) {
         if (grupo.length && grupoSoloVideo) insertarPistasGrupo(insercionActual, grupo)
         else insertarPistaEn(insercionActual, idGesto)
+      } else if (destinoPendiente !== null && !grupo.length) {
+        // el clip no cabía en el nivel señalado: se muda empujando hacia la derecha lo que estorba
+        moverClipAPistaEmpujando(idGesto, destinoPendiente)
       }
       setInsercionPista(null)
       // al soltar, la guía desaparece: el clip ya quedó encajado en su sitio
       setGuiaImantado(null)
       setInteractuando(false)
       // si mover el clip dejó su antigua pista sin nada, esa fila se poda sola
-      if (movido) useEditorStore.getState().podarPistasVacias()
+      // (salvo que el gesto haya abierto una pista nueva: entonces se deja para que se vea)
+      if (movido && insercionActual === null) useEditorStore.getState().podarPistasVacias()
       finGesto()
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)
@@ -429,6 +478,15 @@ export default function ClipBlock({
             lado === 'inicio'
               ? enganche.punto - base.inicio
               : enganche.punto - base.inicio - base.duracion
+        }
+        // cuando el cabezal cae dentro del clip hace de tope: el borde que se arrastra llega hasta la
+        // línea azul y ahí se queda, así no se recorta de más ni el contenido se encoge por debajo
+        // del cabezal (que era lo que arrastraba la vista al pasarse)
+        const cabezal = useEditorStore.getState().playhead
+        const dentro = cabezal > base.inicio + 0.0005 && cabezal < base.inicio + base.duracion - 0.0005
+        if (dentro) {
+          if (lado === 'inicio') d = Math.min(d, cabezal - base.inicio)
+          else d = Math.max(d, cabezal - (base.inicio + base.duracion))
         }
         setGuiaImantado(enganche ? enganche.guia : null)
         recortarClip(clip.id, lado, d, base)

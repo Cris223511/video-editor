@@ -36,6 +36,21 @@ const AGARRES: { id: string; lados: Lado[]; x: number; y: number; cursor: string
   { id: 'w', lados: ['izq'], x: 0, y: 0.5, cursor: 'ew-resize' },
 ]
 
+// proporciones conocidas a las que el recuadro se imanta al estirarlo. además de estas se
+// ofrece la proporción del lienzo del proyecto, que es la que importa para encajar el resultado
+const PROPORCIONES = [
+  { r: 16 / 9, e: '16:9' },
+  { r: 9 / 16, e: '9:16' },
+  { r: 4 / 3, e: '4:3' },
+  { r: 3 / 4, e: '3:4' },
+  { r: 1, e: '1:1' },
+  { r: 4 / 5, e: '4:5' },
+  { r: 5 / 4, e: '5:4' },
+  { r: 21 / 9, e: '21:9' },
+  { r: 3 / 2, e: '3:2' },
+  { r: 2 / 3, e: '2:3' },
+]
+
 // capa de recorte que sale sobre el visor cuando la herramienta de recortar está
 // activa y hay un video seleccionado bajo el cabezal. muestra el recuadro que se
 // conserva con líneas blancas finas, oscurece lo que queda fuera, y por sus
@@ -61,6 +76,8 @@ export default function RecorteOverlay() {
   // ejes en los que el recorte quedó centrado mientras se arrastra, para pintar la
   // línea guía que ayuda a cuadrarlo, igual que al mover el elemento entero
   const [guias, setGuias] = useState<('x' | 'y')[]>([])
+  // etiqueta de la proporción a la que el recuadro está pegado en este momento, si alguna
+  const [etiquetaProp, setEtiquetaProp] = useState<string | null>(null)
 
   useEffect(() => {
     const el = rootRef.current
@@ -176,6 +193,41 @@ export default function RecorteOverlay() {
     else if (objetivo) recortarClipImagen(objetivo.id, cambios)
   }
 
+  // línea inteligente de proporción. si el recuadro queda a muy poco de una proporción conocida
+  // (o de la del lienzo), se ajusta exacto a ella moviendo el lado que se arrastra, y se devuelve
+  // su nombre para mostrarlo. con un lado horizontal se corrige el ancho y con uno vertical o una
+  // esquina, el alto
+  function imantarProporcion(cambios: Partial<typeof CERO>, lados: Lado[]) {
+    const n = { ...rec, ...cambios }
+    const w = (1 - n.izq - n.der) * nativoW
+    const h = (1 - n.arr - n.aba) * nativoH
+    if (w <= 0 || h <= 0 || nativoW <= 0 || nativoH <= 0) return { cambios, etiqueta: null as string | null }
+    const actual = w / h
+    const candidatos = [...PROPORCIONES, { r: aspecto, e: 'Lienzo' }]
+    let mejor: { r: number; e: string } | null = null
+    let dif = 0.025
+    for (const c of candidatos) {
+      const d = Math.abs(actual - c.r) / c.r
+      if (d < dif) {
+        dif = d
+        mejor = c
+      }
+    }
+    if (!mejor) return { cambios, etiqueta: null as string | null }
+    const out = { ...cambios }
+    const soloLateral = lados.every((l) => l === 'izq' || l === 'der')
+    if (soloLateral) {
+      const wFrac = (h * mejor.r) / nativoW
+      if (lados.includes('der')) out.der = 1 - n.izq - wFrac
+      else out.izq = 1 - n.der - wFrac
+    } else {
+      const hFrac = w / mejor.r / nativoH
+      if (lados.includes('aba')) out.aba = 1 - n.arr - hFrac
+      else out.arr = 1 - n.aba - hFrac
+    }
+    return { cambios: out, etiqueta: mejor.e }
+  }
+
   // arrastre de un agarre: la posición del cursor en fracción de la caja marca
   // dónde queda el lado que se mueve
   function iniciar(e: ReactMouseEvent, lados: Lado[]) {
@@ -255,10 +307,17 @@ export default function RecorteOverlay() {
         if (cambios.der !== undefined && cambios.izq === undefined) cambios.izq = cambios.der
         if (cambios.arr !== undefined) cambios.aba = cambios.arr
         if (cambios.aba !== undefined && cambios.arr === undefined) cambios.arr = cambios.aba
+        setEtiquetaProp(null)
+        aplicarRecorte(cambios)
+        return
       }
-      aplicarRecorte(cambios)
+      // sin Alt, el recuadro se pega a la proporción conocida más cercana y la nombra
+      const im = esRedondo ? { cambios, etiqueta: null as string | null } : imantarProporcion(cambios, lados)
+      setEtiquetaProp(im.etiqueta)
+      aplicarRecorte(im.cambios)
     }
     const soltar = () => {
+      setEtiquetaProp(null)
       window.removeEventListener('mousemove', mover)
       window.removeEventListener('mouseup', soltar)
     }
@@ -383,6 +442,15 @@ export default function RecorteOverlay() {
             <div className="absolute left-0 top-1/3 h-px w-full bg-white/25" />
             <div className="absolute left-0 top-2/3 h-px w-full bg-white/25" />
           </div>
+        )}
+        {/* proporción a la que el recuadro está pegado ahora mismo, dentro del recuadro */}
+        {etiquetaProp && (
+          <span
+            className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-semibold text-white"
+            style={{ background: 'rgb(24 97 255)' }}
+          >
+            {etiquetaProp}
+          </span>
         )}
         {/* tamaño del recorte en píxeles reales, arriba del recuadro */}
         <span

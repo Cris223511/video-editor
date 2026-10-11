@@ -84,7 +84,12 @@ export default function CapasOverlay() {
   const categoriaClip = useEditorStore((s) => s.categoriaClip)
   // el lápiz se activa con su herramienta del riel o con la categoría Dibujo
   // abierta en el panel derecho de un dibujo elegido
-  const dibujando = herramienta === 'dibujar' || categoriaClip === 'dibujar'
+  const enDibujo = herramienta === 'dibujar' || categoriaClip === 'dibujar'
+  const modoDibujo = useEditorStore((s) => s.modoDibujo)
+  // con Dibujar abierto, solo el modo lápiz pinta: en seleccionar el arrastre mueve lo ya dibujado
+  // y en borrar quita trazos
+  const dibujando = enDibujo && modoDibujo === 'lapiz'
+  const borrandoTrazos = enDibujo && modoDibujo === 'borrar'
   const resolucion = useEditorStore((s) => s.resolucion)
   const capaSeleccionada = useEditorStore((s) => s.capaSeleccionada)
   const capasSeleccionadas = useEditorStore((s) => s.capasSeleccionadas)
@@ -1064,7 +1069,7 @@ export default function CapasOverlay() {
       {/* superficie del borrador: mismo tamaño que la de dibujo, pero el arrastre
           quita en lugar de pintar. el cursor se dibuja del tamaño real del borrador
           para saber qué se va a llevar antes de pulsar */}
-      {herramienta === 'borrador' && (
+      {borrandoTrazos && (
         <div
           onPointerDown={iniciarBorrado}
           className="pointer-events-auto absolute z-20"

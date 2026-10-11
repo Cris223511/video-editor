@@ -16,7 +16,6 @@ export const herramientas: { id: Herramienta; icono: NombreIcono; etiqueta: stri
   { id: 'dibujar', icono: 'dibujar', etiqueta: 'Dibujar' },
   { id: 'censura', icono: 'censura', etiqueta: 'Censura' },
   { id: 'audio', icono: 'audio', etiqueta: 'Audio' },
-  { id: 'borrador', icono: 'papelera', etiqueta: 'Borrador' },
 ]
 
 // clave con la que se recuerda entre visitas si el riel quedó ancho o estrecho.

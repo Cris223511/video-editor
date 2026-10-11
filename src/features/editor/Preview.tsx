@@ -3,7 +3,6 @@ import Icon from '../../components/ui/Icon'
 import CapasOverlay from './overlays/CapasOverlay'
 import ClipOverlay from './overlays/ClipOverlay'
 import RecorteOverlay from './overlays/RecorteOverlay'
-import RecorteLienzoOverlay from './overlays/RecorteLienzoOverlay'
 import CuentaRegresiva from './overlays/CuentaRegresiva'
 import Vacio from '../../components/ui/Vacio'
 import MarcoOverlay from './overlays/MarcoOverlay'
@@ -471,6 +470,11 @@ export default function Preview() {
   const activo = clipEnTiempo(clipsOrdenados, phVista, ocultas)
   // el archivo del clip visible ya no está: se avisa en el lienzo en vez de dejarlo negro
   const activoFaltante = !!(activo && assetPorId.get(activo.assetId)?.faltante)
+  // mientras se edita el recorte de un clip se deja ver el video ENTERO aunque se salga del lienzo,
+  // para saber qué se descarta y hasta dónde se puede estirar el recuadro. lo de fuera lo oscurece
+  // el propio recuadro de recorte. al cerrar la herramienta el lienzo vuelve a cortar como siempre
+  const verCompletoRecortando =
+    (herramienta === 'recortar' || categoriaClip === 'recortar' || recorteRapido) && !!clipSeleccionado
 
   // en pausa, el cabezal manda: phRef lo sigue para arrancar donde toca
   useEffect(() => {
@@ -1946,7 +1950,7 @@ export default function Preview() {
                 transition: impactoActivo ? 'none' : 'transform 140ms ease-out',
               }}
             >
-            <div className="absolute inset-0 overflow-hidden">
+            <div className={`absolute inset-0 ${verCompletoRecortando ? 'overflow-visible' : 'overflow-hidden'}`}>
               {clipsOrdenados.map((c) => {
                 const asset = assetPorId.get(c.assetId)
                 // aparición progresiva del color y los efectos, si el clip la lleva
@@ -2185,7 +2189,6 @@ export default function Preview() {
             <ClipOverlay />
             <CapasOverlay />
             <RecorteOverlay />
-            <RecorteLienzoOverlay />
             <MarcoOverlay alturaLienzo={lienzoRect.h} />
             <CuentaRegresiva />
 

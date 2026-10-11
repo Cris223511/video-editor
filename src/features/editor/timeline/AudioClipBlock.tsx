@@ -197,17 +197,20 @@ export default function AudioClipBlock({ audio, asset, pxPorSegundo, puntos }: P
       // si se soltó sobre la juntura entre dos filas se abre una nueva ahí y el
       // bloque estrena ese carril; si cayó dentro de una fila, se muda a ella
       const junta = separacionBajoCursor(ultimoX, ultimoY, 'nivelAudio')
+      let creoFila = false
       if (junta !== null) {
         insertarNivelAudio(junta, idGesto)
+        creoFila = true
       } else if (porDebajoDelUltimo(ultimoX, ultimoY, 'nivelAudio')) {
         insertarNivelAudio(0, idGesto)
+        creoFila = true
       } else {
         const destino = nivelBajoCursor(ultimoX, ultimoY, 'nivelAudio')
         if (destino !== null) moverAudioNivel(idGesto, destino)
       }
-      // si mover el bloque dejó su fila de origen sin nada, esa fila se cierra sola,
-      // igual que las pistas de video con los clips
-      if (movido) useEditorStore.getState().podarNivelesAudioVacios()
+      // si mover el bloque dejó su fila de origen sin nada, esa fila se cierra sola, salvo que el
+      // gesto haya sido abrir una fila nueva, que entonces se deja todo para que se vea el resultado
+      if (movido && !creoFila) useEditorStore.getState().podarNivelesAudioVacios()
       window.removeEventListener('pointermove', mover)
       window.removeEventListener('pointerup', soltar)
     }

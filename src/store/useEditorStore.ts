@@ -112,7 +112,6 @@ export type Herramienta =
   | 'dibujar'
   | 'transformar'
   | 'recortar'
-  | 'borrador'
 
 // las tres secciones que conviven en la línea de tiempo, cada una con sus filas.
 // las figuras y las imágenes dejaron de tener carril propio: ahora viven dentro
@@ -183,10 +182,6 @@ interface EstadoEditor {
   resolucion: { ancho: number; alto: number }
   resolucionAuto: { ancho: number; alto: number }
   lienzoManual: boolean
-  // recorte interactivo del lienzo: mientras está activo, un recuadro sobre el visor deja elegir
-  // la región que pasará a ser el nuevo lienzo. las medidas van en fracción del lienzo actual
-  // (0..1). null cuando no se está recortando
-  recorteLienzo: { x: number; y: number; w: number; h: number } | null
   colorFondo: string
   // qué rellena las bandas cuando el video no cubre el lienzo entero
   fondo: 'color' | 'desenfoque'
@@ -440,6 +435,11 @@ interface EstadoEditor {
   // crea una copia del clip en un sitio concreto (segundo y pista) solo si el tramo
   // está libre; devuelve el id de la copia o null si ahí no cabía
   duplicarClipEn: (id: string, inicio: number, pista: number) => string | null
+  // duplica un clip abriendo antes una pista nueva en el índice dado, y la copia nace ahí
+  duplicarClipEnNuevaPista: (id: string, inicio: number, indice: number) => string | null
+  // lleva un clip a otro nivel sin pedirle permiso al hueco: si en ese tramo hay otros clips, los
+  // empuja hacia la derecha en cadena para hacerle sitio, en vez de rechazarlo o desviarlo
+  moverClipAPistaEmpujando: (id: string, pista: number) => void
   setInsercionPista: (indice: number | null) => void
   // instante (en segundos) donde se dibuja la línea guía del imantado mientras se
   // mueve o recorta un bloque. queda en null cuando no hay ningún enganche activo
@@ -488,11 +488,15 @@ interface EstadoEditor {
   duplicarAudio: (id: string) => string | null
   // orden de apilado de las capas: las capas se dibujan en el orden del array, así
   // que llevar una al final la pone delante de todo y al principio, detrás de todo
-  // qué se lleva por delante el borrador. 'todo' borra cualquier capa que toque;
-  // el resto lo limita a un tipo, para poder limpiar los trazos sin arriesgar los
-  // textos que hay al lado
-  borradorFiltro: 'todo' | 'trazo' | 'figura' | 'texto' | 'imagen'
-  setBorradorFiltro: (f: 'todo' | 'trazo' | 'figura' | 'texto' | 'imagen') => void
+  // modo con el que se trabaja dentro de Dibujar. 'lapiz' pinta trazos al arrastrar, 'seleccion' deja
+  // elegir y mover lo ya dibujado como cualquier otro elemento, y 'borrar' quita trazos al rozarlos.
+  // se elige desde la barrita de iconos del panel de dibujo
+  modoDibujo: 'lapiz' | 'seleccion' | 'borrar'
+  setModoDibujo: (m: 'lapiz' | 'seleccion' | 'borrar') => void
+  // color, grosor y opacidad con los que nacerá el siguiente dibujo, y que el panel edita aunque
+  // todavía no haya ninguno dibujado
+  ajustesDibujo: { color: string; grosor: number; opacidad: number }
+  setAjustesDibujo: (a: Partial<{ color: string; grosor: number; opacidad: number }>) => void
   borradorGrosor: number
   setBorradorGrosor: (v: number) => void
   // borra lo que el borrador toque en un punto del lienzo. de un dibujo se lleva
@@ -600,7 +604,9 @@ interface EstadoEditor {
 
   setVolumenGlobal: (v: number) => void
   setVolumenPreview: (v: number) => void
-  agregarRegionAudio: () => void
+  // crea una franja de volumen y devuelve su id. sin opciones nace en el cabezal, y con ellas donde se
+  // pida, que es lo que usa soltar una franja arrastrada sobre el carril de audio
+  agregarRegionAudio: (opciones?: { inicio?: number; nivel?: number }) => string
   actualizarRegionAudio: (id: string, cambios: Partial<RegionAudio>) => void
   quitarRegionAudio: (id: string) => void
   // duplica una franja de volumen con nuevo id y los mismos valores. devuelve el
@@ -627,9 +633,6 @@ interface EstadoEditor {
   setLadoTransicion: (lado: 'inicio' | 'final') => void
   setLienzo: (ancho: number, alto: number) => void
   setLienzoAuto: () => void
-  // enciende/apaga el recuadro de recorte del lienzo y actualiza su región mientras se arrastra
-  iniciarRecorteLienzo: () => void
-  setRecorteLienzo: (r: { x: number; y: number; w: number; h: number } | null) => void
   setColorFondo: (color: string) => void
   setFondo: (f: 'color' | 'desenfoque') => void
   setDesenfoqueFondo: (v: number) => void
@@ -744,9 +747,10 @@ function restaurarDocumento(doc: Documento, s: EstadoEditor): Partial<EstadoEdit
   }
 }
 
-// cuántos pasos guarda el historial hacia atrás; pasado ese tope se olvidan los
-// más antiguos para no dejar que la memoria crezca sin freno
-const MAX_HISTORIAL = 50
+// el historial de deshacer no tiene tope. cada paso guarda una foto del documento, y como
+// el estado se actualiza de forma inmutable esas fotos comparten casi todo con la anterior,
+// así que miles de pasos pesan poco. se reinicia solo al abrir otro proyecto, que es cuando
+// el usuario espera empezar de cero
 
 // nombres de las acciones que tocan el documento. son las únicas que se envuelven
 // para capturar antes de mutar. seleccionar, mover el cabezal, el zoom o cambiar
@@ -790,6 +794,8 @@ const ACCIONES_DOCUMENTO: (keyof EstadoEditor)[] = [
   'quitarPista',
   'setAltoPista',
   'moverClipAPista',
+  'moverClipAPistaEmpujando',
+  'duplicarClipEnNuevaPista',
   'alternarSilencioClip',
   'setVolumenClip',
   'setFundido',
@@ -1110,7 +1116,6 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     }
     const s = get()
     const pasado = [...s.pasado, tomarDocumento(s)]
-    if (pasado.length > MAX_HISTORIAL) pasado.shift()
     set({ pasado, futuro: [] })
     capturado = true
     ultimoSello = ahora
@@ -1177,7 +1182,8 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   capasSeleccionadas: [],
   bloquesSeleccionados: [],
   grupos: [],
-  borradorFiltro: 'todo',
+  modoDibujo: 'lapiz',
+  ajustesDibujo: { color: '#ff3b30', grosor: 6, opacidad: 100 },
   borradorGrosor: 24,
   menuContextual: null,
   confirmacion: null,
@@ -1197,7 +1203,6 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   resolucion: { ancho: 1920, alto: 1080 },
   resolucionAuto: { ancho: 1920, alto: 1080 },
   lienzoManual: false,
-  recorteLienzo: null,
   colorFondo: '#000000',
   fondo: 'color',
   desenfoqueFondo: 45,
@@ -2632,6 +2637,86 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     })
     return copia.id
   },
+  duplicarClipEnNuevaPista: (id, inicio, indice) => {
+    const s = get()
+    const orig = s.pista.clips.find((c) => c.id === id)
+    if (!orig || s.numPistas >= MAX_PISTAS) return null
+    const k = Math.max(0, Math.min(s.numPistas, indice))
+    // las pistas de ese índice hacia arriba suben un puesto para hacer sitio, igual que al
+    // insertar un nivel con un clip suelto
+    const clips = s.pista.clips.map((c) => (c.pista >= k ? { ...c, pista: c.pista + 1 } : c))
+    const capas = s.capas.map((c) =>
+      (c.tipo === 'figura' || c.tipo === 'imagen') && (c.nivel ?? 0) >= k ? { ...c, nivel: (c.nivel ?? 0) + 1 } : c,
+    )
+    const altosPista = [...s.altosPista]
+    altosPista.splice(k, 0, ALTO_PISTA_BASE)
+    const pistasMeta = [...s.pistasMeta]
+    pistasMeta.splice(k, 0, metaPista(s.numPistas + 1))
+    const copia = structuredClone(orig)
+    copia.id = crypto.randomUUID()
+    copia.efectos = copia.efectos.map((e) => ({ ...e, id: crypto.randomUUID() }))
+    copia.inicio = Math.max(0, inicio)
+    copia.pista = k
+    set({
+      numPistas: s.numPistas + 1,
+      altosPista,
+      pistasMeta,
+      pista: { ...s.pista, clips: [...clips, copia] },
+      capas,
+      clipSeleccionado: copia.id,
+      capaSeleccionada: null,
+      regionSeleccionada: null,
+      fantasmaDup: null,
+    })
+    return copia.id
+  },
+
+  moverClipAPistaEmpujando: (id, pista) =>
+    set((s) => {
+      const clip = s.pista.clips.find((c) => c.id === id)
+      if (!clip) return {}
+      const destino = Math.min(s.numPistas - 1, Math.max(0, pista))
+      if (destino === clip.pista) return {}
+      const dur = clip.duracion
+      const otros = s.pista.clips
+        .filter((c) => c.id !== id && c.pista === destino)
+        .sort((a, b) => a.inicio - b.inicio)
+      // si el clip arranca montado sobre la cola de otro, se coloca justo a continuación de él
+      let inicio = clip.inicio
+      for (const o of otros) {
+        if (o.inicio < inicio - 0.001 && o.inicio + o.duracion > inicio + 0.001) inicio = o.inicio + o.duracion
+      }
+      // lo que quede a la derecha se corre en cadena lo justo para no pisarlo
+      const corridos = new Map<string, number>()
+      let tope = inicio + dur
+      for (const o of otros) {
+        if (o.inicio + o.duracion <= inicio + 0.001) continue
+        if (o.inicio < tope - 0.001) {
+          corridos.set(o.id, tope)
+          tope = tope + o.duracion
+        } else {
+          tope = o.inicio + o.duracion
+        }
+      }
+      const delta = inicio - clip.inicio
+      return {
+        pista: {
+          ...s.pista,
+          clips: s.pista.clips.map((c) => {
+            if (c.id === id) return { ...c, pista: destino, inicio }
+            const nuevo = corridos.get(c.id)
+            return nuevo !== undefined ? { ...c, inicio: nuevo } : c
+          }),
+        },
+        audios: s.audios.map((a) => {
+          if (a.vinculadoA === id) return delta ? { ...a, inicio: Math.max(0, a.inicio + delta) } : a
+          const nuevo = a.vinculadoA ? corridos.get(a.vinculadoA) : undefined
+          if (nuevo === undefined) return a
+          const orig = s.pista.clips.find((c) => c.id === a.vinculadoA)
+          return orig ? { ...a, inicio: Math.max(0, a.inicio + (nuevo - orig.inicio)) } : a
+        }),
+      }
+    }),
   setGuiaImantado: (segundo) => set({ guiaImantado: segundo }),
 
   moviendoVisor: false,
@@ -3080,7 +3165,9 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
 
   agregarTrazo: () => {
     const s = get()
-    const capa = crearCapaTrazo(s.playhead)
+    // el dibujo nuevo nace con lo que el panel tenga puesto en color, grosor y opacidad
+    const a = s.ajustesDibujo
+    const capa = { ...crearCapaTrazo(s.playhead, a.color, a.grosor), opacidad: a.opacidad }
     set({
       capas: [...s.capas, capa],
       capaSeleccionada: capa.id,
@@ -3153,13 +3240,15 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
     return copia.id
   },
 
-  setBorradorFiltro: (f) => set({ borradorFiltro: f }),
+  setModoDibujo: (m) => set({ modoDibujo: m }),
+  setAjustesDibujo: (a) => set((s) => ({ ajustesDibujo: { ...s.ajustesDibujo, ...a } })),
   setBorradorGrosor: (v) => set({ borradorGrosor: Math.max(4, Math.min(200, v)) }),
 
   borrarEn: (x, y, radio) =>
     set((s) => {
       const t = s.playhead
-      const filtro = s.borradorFiltro
+      // el borrador ya solo existe dentro de Dibujar y se lleva trazos
+      const filtro: string = 'trazo'
       // solo entra lo que está en pantalla ahora mismo y encaja con el filtro
       const alcanza = (c: Capa) =>
         t >= c.inicio && t < c.inicio + c.duracion && (filtro === 'todo' || c.tipo === filtro)
@@ -3226,15 +3315,16 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
           ? s.capasSeleccionadas.filter((x) => x !== id)
           : [...s.capasSeleccionadas, id]
         : [id]
-      // el tipo de capa coincide con el nombre de su herramienta salvo la imagen y
-      // el dibujo, que abren 'transformar' (sus opciones generales). el dibujo no
-      // puede abrir 'dibujar' al elegirlo: con esa herramienta activa el arrastre
-      // pinta en vez de mover, así que elegir un trazo lo dejaba imposible de
-      // agarrar. quien quiera seguir pintando entra a Dibujar a propósito
+      // el tipo de capa coincide con el nombre de su herramienta. un dibujo abre Dibujar, pero en modo
+      // seleccionar, para que el arrastre lo mueva en vez de pintar encima. la imagen no cambia de
+      // panel: sus opciones viven a la derecha y mover la pestaña de la izquierda a Proyecto sin
+      // que nadie lo pida era justo lo que molestaba
       const herrCapa: Herramienta = capa
-        ? capa.tipo === 'trazo' || capa.tipo === 'imagen'
-          ? 'transformar'
-          : capa.tipo
+        ? capa.tipo === 'imagen'
+          ? s.herramienta
+          : capa.tipo === 'trazo'
+            ? 'dibujar'
+            : capa.tipo
         : s.herramienta
       return {
         capaSeleccionada: conjunto[conjunto.length - 1] ?? null,
@@ -3245,6 +3335,7 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
         // al elegir una sola capa se abre su herramienta; sumando al conjunto no
         // se cambia de panel, para no sacar al usuario de donde estaba
         herramienta: !aditivo && capa ? herrCapa : s.herramienta,
+        modoDibujo: !aditivo && capa?.tipo === 'trazo' ? 'seleccion' : s.modoDibujo,
         // elegir una capa suelta deshace la selección múltiple de la línea de tiempo. el
         // arrastre del grupo no llama aquí, así que moverlo no lo desmarca
         bloquesSeleccionados: id ? [] : s.bloquesSeleccionados,
@@ -3624,22 +3715,24 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   // multiplica el sonido más allá del original
   setVolumenPreview: (v) => set({ volumenPreview: Math.max(0, Math.min(1, v)) }),
 
-  agregarRegionAudio: () =>
-    set((s) => {
-      const region = {
-        id: crypto.randomUUID(),
-        inicio: s.playhead,
-        duracion: 2,
-        ganancia: s.volumenGlobal,
-      }
-      return {
-        audioRegiones: [...s.audioRegiones, region],
-        regionSeleccionada: region.id,
-        clipSeleccionado: null,
-        capaSeleccionada: null,
-        herramienta: 'audio',
-      }
-    }),
+  agregarRegionAudio: (opciones) => {
+    const s = get()
+    const region = {
+      id: crypto.randomUUID(),
+      inicio: Math.max(0, opciones?.inicio ?? s.playhead),
+      duracion: 2,
+      ganancia: s.volumenGlobal,
+      ...(opciones?.nivel !== undefined ? { nivel: opciones.nivel } : {}),
+    }
+    set({
+      audioRegiones: [...s.audioRegiones, region],
+      regionSeleccionada: region.id,
+      clipSeleccionado: null,
+      capaSeleccionada: null,
+      herramienta: 'audio',
+    })
+    return region.id
+  },
 
   actualizarRegionAudio: (id, cambios) =>
     set((s) => ({
@@ -3807,6 +3900,15 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
   setHerramienta: (h) =>
     set((s) => ({
       herramienta: h,
+      // al entrar a Dibujar desde otra pestaña se arranca con el lápiz y sin dibujo elegido, de modo
+      // que el primer trazo abre un dibujo nuevo e independiente
+      modoDibujo: h === 'dibujar' && s.herramienta !== 'dibujar' ? 'lapiz' : s.modoDibujo,
+      capaSeleccionada:
+        h === 'dibujar' &&
+        s.herramienta !== 'dibujar' &&
+        s.capas.find((c) => c.id === s.capaSeleccionada)?.tipo === 'trazo'
+          ? null
+          : s.capaSeleccionada,
       // cambiar de herramienta corta cualquier grabación de recorrido que
       // estuviera en marcha. si no, la grabación abierta para una censura seguía
       // viva al pasar a dibujar, y el panel aparecía en rojo diciendo que estaba
@@ -3893,11 +3995,6 @@ export const useEditorStore = create<EstadoEditor>((set, get) => {
       const res = cuarto ? { ancho: auto.alto, alto: auto.ancho } : { ...auto }
       return { resolucion: res, lienzoManual: false }
     }),
-
-  // arranca el recuadro cubriendo casi todo el lienzo, con un pequeño margen para que se vean sus
-  // tiradores desde el primer momento. desde ahí el usuario lo ajusta en el visor
-  iniciarRecorteLienzo: () => set({ recorteLienzo: { x: 0.06, y: 0.06, w: 0.88, h: 0.88 } }),
-  setRecorteLienzo: (r) => set({ recorteLienzo: r }),
 
   setColorFondo: (color) => set({ colorFondo: color }),
   setFondo: (f) => set({ fondo: f }),

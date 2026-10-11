@@ -7,6 +7,7 @@ import BarraGlobales from '../BarraGlobales'
 import { OndaAudio } from './AudioBlock'
 import FantasmaArrastre from './FantasmaArrastre'
 import { TIPO_ARRASTRE, tipoClaseArrastre } from '../MediaLibrary'
+import { TIPO_FRANJA } from '../panels/AudioPanel'
 import { nivelBajoCursor, separacionBajoCursor, porDebajoDelUltimo } from './nivelCursor'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
@@ -584,11 +585,12 @@ export default function Timeline({
   }
 
   function alArrastrarMedioEncima(e: React.DragEvent) {
-    if (!e.dataTransfer.types.includes(TIPO_ARRASTRE)) return
+    const esFranja = e.dataTransfer.types.includes(TIPO_FRANJA)
+    if (!esFranja && !e.dataTransfer.types.includes(TIPO_ARRASTRE)) return
     e.preventDefault()
-    // un audio se sombrea y se inserta sobre el carril de audio, no sobre las pistas
-    // de video. la clase viaja en su propio tipo, que sí se puede leer en el dragover
-    if (e.dataTransfer.types.includes(tipoClaseArrastre('audio'))) {
+    // un audio (o una franja de volumen) se sombrea y se inserta sobre el carril de audio, no sobre
+    // las pistas de video. la clase viaja en su propio tipo, que sí se puede leer en el dragover
+    if (esFranja || e.dataTransfer.types.includes(tipoClaseArrastre('audio'))) {
       if (pistaResaltada !== null) setPistaResaltada(null)
       if (insercionPista !== null) setInsercionPista(null)
       const junta = separacionBajoCursor(e.clientX, e.clientY, 'nivelAudio')
@@ -640,6 +642,24 @@ export default function Timeline({
   // o, si se apuntaba a una separación, en una fila o pista nueva abierta ahí mismo
   function alSoltar(e: React.DragEvent) {
     e.preventDefault()
+    // una franja de volumen arrastrada desde el panel de audio: nace en el instante donde se soltó,
+    // en la fila de audio bajo el cursor o en una nueva si se apuntaba a una separación
+    if (e.dataTransfer.types.includes(TIPO_FRANJA)) {
+      const zona = contenidoRef.current
+      const inicio = zona ? Math.max(0, (e.clientX - zona.getBoundingClientRect().left) / pxPorSegundo) : undefined
+      const junta = separacionBajoCursor(e.clientX, e.clientY, 'nivelAudio')
+      const debajo = porDebajoDelUltimo(e.clientX, e.clientY, 'nivelAudio')
+      apagarSenales()
+      const st = useEditorStore.getState()
+      if (junta !== null || debajo) {
+        const nuevo = st.agregarRegionAudio({ inicio })
+        useEditorStore.getState().insertarNivelAudio(junta ?? 0, nuevo)
+      } else {
+        const n = nivelBajoCursor(e.clientX, e.clientY, 'nivelAudio')
+        st.agregarRegionAudio({ inicio, nivel: n ?? 0 })
+      }
+      return
+    }
     const id = e.dataTransfer.getData(TIPO_ARRASTRE)
     const asset = id ? medios.find((m) => m.id === id) : undefined
 

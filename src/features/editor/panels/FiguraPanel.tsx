@@ -58,22 +58,24 @@ function RejillaFormas({
   actual?: CapaFigura['forma']
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-3 gap-2">
       {FORMAS.map((f) => {
         const activa = f.valor === actual
         return (
           <button
             key={f.valor}
             onClick={() => agregar(f.valor)}
+            // el nombre solo aparece al posar el cursor: la celda enseña únicamente el dibujo
+            title={f.etiqueta}
+            aria-label={f.etiqueta}
             draggable
             onDragStart={(e) => {
               e.dataTransfer.setData(TIPO_FIGURA, f.valor)
               e.dataTransfer.effectAllowed = 'copy'
             }}
             className={[
-              // dos por fila y bajas: la forma y su nombre van en horizontal, así la
-              // celda ocupa poco alto en vez del cuadrado grande de antes
-              'group flex cursor-grab items-center gap-2 rounded-xl px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:cursor-grabbing',
+              // tres por fila y solo con el dibujo de la figura, centrado en su celda
+              'group flex aspect-[4/3] cursor-grab items-center justify-center rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:cursor-grabbing',
               activa
                 ? 'bg-brand/10 text-brand ring-2 ring-brand'
                 : 'text-[color:var(--muted)] ring-1 ring-black/10 hover:text-brand hover:ring-brand/50 dark:ring-white/10',
@@ -81,7 +83,6 @@ function RejillaFormas({
             style={{ background: activa ? undefined : 'rgb(var(--border) / 0.05)' }}
           >
             <FormaSVG forma={f.valor} />
-            <span className="text-[11px] font-medium leading-none">{f.etiqueta}</span>
           </button>
         )
       })}

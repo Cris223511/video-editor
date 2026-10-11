@@ -78,3 +78,34 @@ export function rectClip(
   const dy = e.y * alto - dh / 2
   return { dx, dy, dw, dh }
 }
+
+// el encuadre que deja la parte RECORTADA de un video como si fuera el video entero dentro de un
+// lienzo de W por H. el recorte se toma como el tamaño real del video: con 'contener' esa zona
+// entra completa y lo más grande posible (sin cortar nada), y con 'llenar' cubre todo el lienzo
+// recortando lo que sobre. tiene en cuenta que el recorte pudo dejar la zona visible descentrada
+// respecto al fotograma. sin recorte, equivale al encaje de siempre
+export function encuadreParaRecorte(
+  med: { ancho: number; alto: number },
+  rec: { izq: number; der: number; arr: number; aba: number } | undefined,
+  W: number,
+  H: number,
+  modo: 'contener' | 'llenar',
+): { x: number; y: number; escala: number } {
+  const izq = rec?.izq ?? 0
+  const der = rec?.der ?? 0
+  const arr = rec?.arr ?? 0
+  const aba = rec?.aba ?? 0
+  const visW = Math.max(0.02, 1 - izq - der)
+  const visH = Math.max(0.02, 1 - arr - aba)
+  const ox = (izq - der) / 2
+  const oy = (arr - aba) / 2
+  const base = Math.min(W / med.ancho, H / med.alto)
+  const ancho1 = visW * med.ancho * base
+  const alto1 = visH * med.alto * base
+  const escala = modo === 'contener' ? Math.min(W / ancho1, H / alto1) : Math.max(W / ancho1, H / alto1)
+  return {
+    x: 0.5 - (ox * med.ancho * base * escala) / W,
+    y: 0.5 - (oy * med.alto * base * escala) / H,
+    escala,
+  }
+}

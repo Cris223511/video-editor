@@ -171,7 +171,7 @@ export default function MenuContextual() {
       { id: 'copiar', etiqueta: 'Copiar', icono: <Copy size={15} />, atajo: 'Ctrl+C', onElegir: con(() => { st.seleccionar(clip.id); st.copiar() }) },
       { id: 'pegar', etiqueta: 'Pegar', icono: <ClipboardPaste size={15} />, atajo: 'Ctrl+V', desactivada: !portapapeles, onElegir: con(() => st.pegar()) },
       { id: 'dividir', etiqueta: 'Dividir en el cabezal', icono: <Scissors size={15} />, atajo: 'S', separadorAntes: true, onElegir: con(() => { st.seleccionar(clip.id); st.dividirEnCabezal() }) },
-      { id: 'recortar', etiqueta: 'Recortar la imagen', icono: <Crop size={15} />, atajo: 'C', onElegir: con(() => { st.seleccionar(clip.id); st.setHerramienta('recortar') }) },
+      { id: 'recortar', etiqueta: 'Recortar la imagen', icono: <Crop size={15} />, atajo: 'C', onElegir: con(() => { st.seleccionar(clip.id); st.setRecorteRapido(true) }) },
       {
         id: 'silencio',
         etiqueta: clip.mudo ? 'Su audio está en la pista' : clip.silenciado ? 'Quitar el silencio' : 'Silenciar',
@@ -198,7 +198,7 @@ export default function MenuContextual() {
       )
     }
     if (capa.tipo === 'imagen') {
-      opciones.push({ id: 'recortar', etiqueta: 'Recortar la imagen', icono: <Crop size={15} />, atajo: 'C', onElegir: con(() => { st.seleccionarCapa(capa.id); st.setHerramienta('recortar') }) })
+      opciones.push({ id: 'recortar', etiqueta: 'Recortar la imagen', icono: <Crop size={15} />, atajo: 'C', onElegir: con(() => { st.seleccionarCapa(capa.id); st.setRecorteRapido(true) }) })
     }
     opciones.push({ id: 'borrar', etiqueta: 'Borrar', icono: <Trash2 size={15} />, atajo: 'Supr', peligro: true, separadorAntes: true, onElegir: con(() => st.quitarCapa(capa.id)) })
   }

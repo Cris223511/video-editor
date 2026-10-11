@@ -20,6 +20,25 @@ export const TIPO_ARRASTRE = 'application/x-video-editor-asset'
 // si sombrear las pistas de video o el carril de audio antes de soltar
 export const tipoClaseArrastre = (clase: string) => `application/x-ve-clase-${clase}`
 
+// preferencia de no volver a preguntar al quitar un medio suelto. vive en el navegador, es una
+// comodidad por equipo y no hace falta llevarla dentro del proyecto
+const CLAVE_NO_PREGUNTAR = 've.noPreguntarQuitarMedio'
+function leerNoPreguntar(): boolean {
+  try {
+    return localStorage.getItem(CLAVE_NO_PREGUNTAR) === '1'
+  } catch {
+    return false
+  }
+}
+function guardarNoPreguntar(v: boolean) {
+  try {
+    if (v) localStorage.setItem(CLAVE_NO_PREGUNTAR, '1')
+    else localStorage.removeItem(CLAVE_NO_PREGUNTAR)
+  } catch {
+    // sin almacenamiento disponible, simplemente se seguirá preguntando
+  }
+}
+
 // panel de medios, abajo a la izquierda y junto a la línea de tiempo. los
 // medios se arrastran desde aquí hasta la pista, y se importan más soltando
 // archivos del explorador sobre la zona punteada
@@ -86,7 +105,15 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
   const [detalle, setDetalle] = useState<MediaAsset | null>(null)
   // medio pendiente de confirmar antes de quitarlo. mientras no sea nulo, la
   // ventana de aviso queda abierta preguntando por él
-  const [porQuitar, setPorQuitar] = useState<MediaAsset | null>(null)
+  const [porQuitar, setPorQuitar] = useState<MediaAsset[] | null>(null)
+  // medios marcados en el panel, por id. se marcan con clic, con Ctrl o Shift y clic, o arrastrando
+  // un recuadro sobre el fondo de la lista. la tecla Suprimir los quita (pidiendo confirmación)
+  const [seleccion, setSeleccion] = useState<string[]>([])
+  const ultimoMarcado = useRef<string | null>(null)
+  // si el usuario pidió no volver a ver el aviso al quitar UN medio suelto
+  const [noPreguntar, setNoPreguntar] = useState(false)
+  const listaRef = useRef<HTMLDivElement>(null)
+  const [recuadro, setRecuadro] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   // entrada de archivos oculta, disparada por el botón "+" de la cabecera para
   // elegir por el explorador. arrastrar sobre el panel es la otra vía
   const inputRef = useRef<HTMLInputElement>(null)
@@ -106,9 +133,116 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
   // del proyecto, así no queda nada apuntando a un medio que ya no existe
   const confirmarQuitar = () => {
     if (!porQuitar) return
-    quitarUsosDeAsset(porQuitar.id, porQuitar.url)
-    quitar(porQuitar.id)
+    // marcar "no volver a preguntar" solo vale para quitar un medio suelto. con varios a la vez el
+    // aviso sale siempre
+    if (porQuitar.length === 1 && noPreguntar) guardarNoPreguntar(true)
+    porQuitar.forEach((m) => {
+      quitarUsosDeAsset(m.id, m.url)
+      quitar(m.id)
+    })
+    setSeleccion((prev) => prev.filter((id) => !porQuitar.some((m) => m.id === id)))
+    setNoPreguntar(false)
     setPorQuitar(null)
+  }
+
+  // quitar uno o varios medios. un medio suelto se quita directo si el usuario ya pidió no volver a
+  // preguntar. con varios, el aviso siempre sale
+  const pedirQuitar = (lista: MediaAsset[]) => {
+    if (lista.length === 0) return
+    if (lista.length === 1 && leerNoPreguntar()) {
+      quitarUsosDeAsset(lista[0].id, lista[0].url)
+      quitar(lista[0].id)
+      setSeleccion((prev) => prev.filter((id) => id !== lista[0].id))
+      return
+    }
+    setPorQuitar(lista)
+  }
+  const mediosSeleccionados = medios.filter((m) => seleccion.includes(m.id))
+
+  // clic sobre una tarjeta. con Ctrl o Cmd suma o quita esa tarjeta, con Shift marca todo el tramo
+  // desde la última, y sin nada deja marcada solo esa
+  const marcar = (e: React.MouseEvent, id: string) => {
+    if (e.ctrlKey || e.metaKey) {
+      setSeleccion((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+    } else if (e.shiftKey && ultimoMarcado.current) {
+      const a = medios.findIndex((m) => m.id === ultimoMarcado.current)
+      const b = medios.findIndex((m) => m.id === id)
+      if (a >= 0 && b >= 0) {
+        const [d, h] = a < b ? [a, b] : [b, a]
+        setSeleccion(medios.slice(d, h + 1).map((m) => m.id))
+      }
+    } else {
+      setSeleccion([id])
+    }
+    ultimoMarcado.current = id
+  }
+
+  // Suprimir quita lo marcado en el panel. se atiende en la fase de captura para ganarle al atajo
+  // global que borra lo seleccionado en la línea de tiempo: si hay medios marcados aquí, es esto lo
+  // que se quiere borrar. fuera de un campo de texto, y solo mientras haya algo marcado
+  useEffect(() => {
+    if (seleccion.length === 0) return
+    const alTeclar = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete') return
+      const el = document.activeElement as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      pedirQuitar(medios.filter((m) => seleccion.includes(m.id)))
+    }
+    window.addEventListener('keydown', alTeclar, true)
+    return () => window.removeEventListener('keydown', alTeclar, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seleccion, medios])
+
+  // un clic fuera del panel suelta la selección de medios, para que Suprimir vuelva a actuar sobre la
+  // línea de tiempo
+  useEffect(() => {
+    if (seleccion.length === 0) return
+    const alPulsar = (e: MouseEvent) => {
+      const dentro = (e.target as HTMLElement | null)?.closest?.('[data-panel-medios]')
+      const enModal = (e.target as HTMLElement | null)?.closest?.('[role="dialog"]')
+      if (!dentro && !enModal) setSeleccion([])
+    }
+    window.addEventListener('mousedown', alPulsar)
+    return () => window.removeEventListener('mousedown', alPulsar)
+  }, [seleccion.length])
+
+  // recuadro elástico sobre el fondo de la lista: lo que toque queda marcado
+  const iniciarRecuadro = (e: React.MouseEvent) => {
+    if (e.button !== 0) return
+    const destino = e.target as HTMLElement
+    if (destino.closest('[data-medio-id]') || destino.closest('button')) return
+    const cont = listaRef.current
+    if (!cont) return
+    const base = cont.getBoundingClientRect()
+    const x0 = e.clientX - base.left + cont.scrollLeft
+    const y0 = e.clientY - base.top + cont.scrollTop
+    if (!e.ctrlKey && !e.metaKey && !e.shiftKey) setSeleccion([])
+    const previa = e.ctrlKey || e.metaKey || e.shiftKey ? seleccion : []
+    const mover = (ev: MouseEvent) => {
+      const x1 = ev.clientX - base.left + cont.scrollLeft
+      const y1 = ev.clientY - base.top + cont.scrollTop
+      const r = { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) }
+      setRecuadro(r)
+      const tocados: string[] = []
+      cont.querySelectorAll<HTMLElement>('[data-medio-id]').forEach((el) => {
+        const b = el.getBoundingClientRect()
+        const bx = b.left - base.left + cont.scrollLeft
+        const by = b.top - base.top + cont.scrollTop
+        if (bx < r.x + r.w && bx + b.width > r.x && by < r.y + r.h && by + b.height > r.y) {
+          tocados.push(el.getAttribute('data-medio-id') as string)
+        }
+      })
+      setSeleccion(Array.from(new Set([...previa, ...tocados])))
+    }
+    const soltar = () => {
+      setRecuadro(null)
+      window.removeEventListener('mousemove', mover)
+      window.removeEventListener('mouseup', soltar)
+    }
+    window.addEventListener('mousemove', mover)
+    window.addEventListener('mouseup', soltar)
   }
 
   const soltarArchivos = (e: React.DragEvent) => {
@@ -138,6 +272,7 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
         if (arrastreRef.current === 0) setEncima(false)
       }}
       onDrop={soltarArchivos}
+      data-panel-medios
       className="panel relative flex-1 overflow-hidden rounded-xl"
     >
       {/* bloque en absoluto con ancho controlado para que, al plegar o desplegar,
@@ -155,6 +290,17 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
         >
           {medios.length} {medios.length === 1 ? 'medio' : 'medios'}
         </span>
+        {seleccion.length > 0 && (
+          <Tooltip texto={`Quitar ${seleccion.length === 1 ? 'el medio marcado' : `los ${seleccion.length} medios marcados`}`}>
+            <button
+              onClick={() => pedirQuitar(mediosSeleccionados)}
+              aria-label="Quitar los medios marcados"
+              className="grid h-6 w-6 place-items-center rounded-md text-[color:var(--muted)] transition-colors hover:bg-red-500/10 hover:text-red-500"
+            >
+              <Icon name="papelera" size={14} />
+            </button>
+          </Tooltip>
+        )}
         {/* elegir archivos por el explorador, sin ocupar sitio con un cartel; el
             arrastre sobre el panel es la otra forma de traerlos */}
         <Tooltip texto="Agregar medios">
@@ -169,7 +315,17 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
         </Tooltip>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-2.5">
+      <div
+        ref={listaRef}
+        onMouseDown={iniciarRecuadro}
+        className="relative min-h-0 flex-1 overflow-y-auto px-2.5 pb-2.5"
+      >
+        {recuadro && (
+          <div
+            className="pointer-events-none absolute z-30 rounded-sm border border-brand bg-brand/15"
+            style={{ left: recuadro.x, top: recuadro.y, width: recuadro.w, height: recuadro.h }}
+          />
+        )}
         {medios.length > 0 && (
           <ul className="mb-2.5 grid grid-cols-2 gap-2">
             {medios.map((m, i) => {
@@ -177,6 +333,8 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
               return (
               <li key={m.id} ref={activo ? activoRef : undefined}>
                 <div
+                  data-medio-id={m.id}
+                  onClick={(e) => marcar(e, m.id)}
                   draggable
                   onDragStart={(e) => {
                     e.dataTransfer.setData(TIPO_ARRASTRE, m.id)
@@ -300,7 +458,11 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
                     </Tooltip>
                     <Tooltip texto="Quitar del proyecto">
                       <button
-                        onClick={() => setPorQuitar(m)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // si la tarjeta forma parte de una selección de varios, se quitan todos
+                          pedirQuitar(seleccion.includes(m.id) && seleccion.length > 1 ? mediosSeleccionados : [m])
+                        }}
                         aria-label="Quitar del proyecto"
                         className="grid h-7 w-7 place-items-center rounded-md bg-black/60 text-white backdrop-blur transition-colors hover:bg-red-500"
                       >
@@ -309,6 +471,9 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
                     </Tooltip>
                   </div>
 
+                  {seleccion.includes(m.id) && (
+                    <div className="pointer-events-none absolute inset-0 z-20 rounded-lg bg-brand/20 ring-2 ring-inset ring-brand" />
+                  )}
                   {/* sombreado azul de selección, el MISMO diseño que el del clip en la línea de tiempo
                       (fondo tenue de marca + borde interior). entra y sale con un fundido para que el
                       borde se dibuje suave, sin brusquedad */}
@@ -390,12 +555,24 @@ export default function MediaLibrary({ plegando = false }: { plegando?: boolean 
           golpe con un clic */}
       <Confirmar
         abierto={porQuitar !== null}
-        titulo="¿Quitar este medio?"
-        mensaje="Se quitará también de la línea de tiempo, y con él sus clips, los audios que sacaste de este medio y las capas de imagen que lo usan."
+        titulo={porQuitar && porQuitar.length > 1 ? `¿Quitar estos ${porQuitar.length} medios?` : '¿Quitar este medio?'}
+        mensaje={
+          porQuitar && porQuitar.length > 1
+            ? 'Se quitarán también de la línea de tiempo, con sus clips, los audios que sacaste de ellos y las capas de imagen que los usan.'
+            : 'Se quitará también de la línea de tiempo, y con él sus clips, los audios que sacaste de este medio y las capas de imagen que lo usan.'
+        }
         aceptar="Quitar"
         peligro
+        casilla={
+          porQuitar && porQuitar.length === 1
+            ? { etiqueta: 'No volver a preguntar', marcada: noPreguntar, onCambiar: setNoPreguntar }
+            : undefined
+        }
         onAceptar={confirmarQuitar}
-        onCancelar={() => setPorQuitar(null)}
+        onCancelar={() => {
+          setNoPreguntar(false)
+          setPorQuitar(null)
+        }}
       />
     </aside>
   )

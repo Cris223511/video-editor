@@ -169,7 +169,9 @@ export function useAtajos() {
           const capaSel = st.capas.find((c) => c.id === st.capaSeleccionada)
           if (st.clipSeleccionado || capaSel?.tipo === 'imagen') {
             e.preventDefault()
-            st.setHerramienta('recortar')
+            // el recorte se abre como modo del visor sin tocar la herramienta del panel izquierdo,
+            // así la pestaña en la que se estaba (lienzo, marco...) se queda donde estaba
+            st.setRecorteRapido(true)
           }
           return
         }
@@ -180,12 +182,6 @@ export function useAtajos() {
         case 'T':
           e.preventDefault()
           st.setHerramienta('texto')
-          return
-
-        case 'b':
-        case 'B':
-          e.preventDefault()
-          st.setHerramienta('borrador')
           return
 
         case 'p':

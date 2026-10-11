@@ -17,6 +17,7 @@ export default function Confirmar({
   aceptar = 'Aceptar',
   cancelar = 'Cancelar',
   peligro = false,
+  casilla,
   onAceptar,
   onCancelar,
 }: {
@@ -26,6 +27,9 @@ export default function Confirmar({
   aceptar?: string
   cancelar?: string
   peligro?: boolean
+  // casilla opcional bajo el mensaje, para cosas como "no volver a preguntar". si no se pasa, la
+  // ventana es la de siempre
+  casilla?: { etiqueta: string; marcada: boolean; onCambiar: (v: boolean) => void }
   onAceptar: () => void
   onCancelar: () => void
 }) {
@@ -38,6 +42,18 @@ export default function Confirmar({
   return (
     <Modal titulo={titulo} abierto={abierto} onCerrar={onCancelar} ancho="max-w-sm">
       <p className="text-[13px] leading-relaxed text-[color:var(--muted)]">{mensaje}</p>
+
+      {casilla && (
+        <label className="mt-3 flex cursor-pointer items-center gap-2 text-[13px] text-[color:var(--muted)]">
+          <input
+            type="checkbox"
+            checked={casilla.marcada}
+            onChange={(e) => casilla.onCambiar(e.target.checked)}
+            className="h-4 w-4 accent-brand"
+          />
+          {casilla.etiqueta}
+        </label>
+      )}
 
       <div className="mt-5 flex justify-end gap-2">
         <button

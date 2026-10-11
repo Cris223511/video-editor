@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   AlignCenterHorizontal,
   AlignCenterVertical,
@@ -8,7 +8,6 @@ import {
   AlignStartHorizontal,
   AlignStartVertical,
   AlignVerticalDistributeCenter,
-  Crop,
   Crosshair,
   Link,
   Link2Off,
@@ -20,6 +19,7 @@ import {
 } from 'lucide-react'
 import { useEditorStore } from '../../../store/useEditorStore'
 import { useProjectStore } from '../../../store/useProjectStore'
+import { encuadreParaRecorte } from '../../../lib/timeline/encuadre'
 import Tooltip from '../../../components/ui/Tooltip'
 import { Campo, ColorCampo, Deslizador, Segmentado } from '../../../components/ui/Controls'
 
@@ -88,7 +88,6 @@ export default function LienzoPanel() {
   const setFondoGiro = useEditorStore((s) => s.setFondoGiro)
   const setLienzo = useEditorStore((s) => s.setLienzo)
   const setLienzoAuto = useEditorStore((s) => s.setLienzoAuto)
-  const iniciarRecorteLienzo = useEditorStore((s) => s.iniciarRecorteLienzo)
   const setColorFondo = useEditorStore((s) => s.setColorFondo)
   // el encuadre del clip elegido se acomoda desde aquí, al estilo de las opciones
   // de alinear de un editor vectorial: sin video seleccionado los botones van
@@ -99,9 +98,16 @@ export default function LienzoPanel() {
   const resetEncuadre = useEditorStore((s) => s.resetEncuadre)
   const medios = useProjectStore((s) => s.medios)
 
+  const bloquesSeleccionados = useEditorStore((s) => s.bloquesSeleccionados)
   const clip = clips.find((c) => c.id === clipSeleccionado) ?? null
-  const asset = clip ? medios.find((m) => m.id === clip.assetId) ?? null : null
-  const hayVideo = !!clip && !!asset
+  // los videos sobre los que actúan los botones de acomodo: el elegido, o todos los marcados a la
+  // vez. sin ninguno, la sección entera no se muestra para no confundir
+  const idsVideoSel = new Set<string>([
+    ...(clipSeleccionado ? [clipSeleccionado] : []),
+    ...bloquesSeleccionados.filter((id) => clips.some((c) => c.id === id)),
+  ])
+  const objetivosVideo = clips.filter((c) => idsVideoSel.has(c.id))
+  const hayVideo = objetivosVideo.length > 0
 
   // alinear y distribuir operan sobre las capas marcadas (imágenes, textos,
   // figuras). los botones se apagan sin selección, y distribuir pide tres o más
@@ -110,18 +116,31 @@ export default function LienzoPanel() {
   const distribuirCapas = useEditorStore((s) => s.distribuirCapas)
   const nSel = capasSeleccionadas.length
 
-  // el factor con el que el video cabe "contenido" en el lienzo actual. de ahí
-  // salen las escalas de cada ajuste: al ancho, al alto o llenando del todo
+  // acomoda cada video elegido dentro del lienzo actual. el tamaño que cuenta es el de su zona ya
+  // recortada, que para mí es el video real
   function encuadrar(modo: 'ancho' | 'alto' | 'llenar') {
-    if (!clip || !asset) return
-    const base = Math.min(resolucion.ancho / asset.ancho, resolucion.alto / asset.alto)
-    const dw = asset.ancho * base
-    const dh = asset.alto * base
-    let escala = 1
-    if (modo === 'ancho') escala = resolucion.ancho / dw
-    else if (modo === 'alto') escala = resolucion.alto / dh
-    else escala = Math.max(resolucion.ancho / dw, resolucion.alto / dh)
-    actualizarEncuadre(clip.id, { x: 0.5, y: 0.5, escala })
+    for (const c of objetivosVideo) {
+      const med = medios.find((m) => m.id === c.assetId)
+      if (!med) continue
+      const rec = c.recorte
+      const visW = Math.max(0.02, 1 - (rec?.izq ?? 0) - (rec?.der ?? 0))
+      const visH = Math.max(0.02, 1 - (rec?.arr ?? 0) - (rec?.aba ?? 0))
+      const base = Math.min(resolucion.ancho / med.ancho, resolucion.alto / med.alto)
+      const w1 = visW * med.ancho * base
+      const h1 = visH * med.alto * base
+      let escala = 1
+      if (modo === 'ancho') escala = resolucion.ancho / w1
+      else if (modo === 'alto') escala = resolucion.alto / h1
+      else escala = Math.max(resolucion.ancho / w1, resolucion.alto / h1)
+      // el centro del recorte va al centro del lienzo con la escala pedida
+      const ox = ((rec?.izq ?? 0) - (rec?.der ?? 0)) / 2
+      const oy = ((rec?.arr ?? 0) - (rec?.aba ?? 0)) / 2
+      actualizarEncuadre(c.id, {
+        x: 0.5 - (ox * med.ancho * base * escala) / resolucion.ancho,
+        y: 0.5 - (oy * med.alto * base * escala) / resolucion.alto,
+        escala,
+      })
+    }
   }
 
   // el candado del tamaño manual: cerrado, ancho y alto se mueven juntos conservando la
@@ -137,12 +156,56 @@ export default function LienzoPanel() {
   useEffect(() => setAnchoStr(String(resolucion.ancho)), [resolucion.ancho])
   useEffect(() => setAltoStr(String(resolucion.alto)), [resolucion.alto])
 
+  // cambia el lienzo y vuelve a acoplar el PRIMER video: toma su zona recortada como si fuera el
+  // video entero y la agranda lo más posible dentro de la nueva forma, centrada y sin cortar nada.
+  // solo el primer video, el resto de clips se queda como estaba. si está girado, se deja el
+  // acomodo que ya hace el store, porque el giro cambia qué lado es cuál
+  function ponerLienzo(ancho: number, alto: number) {
+    setLienzo(ancho, alto)
+    const primero = [...useEditorStore.getState().pista.clips].sort((a, b) => a.inicio - b.inicio)[0]
+    if (!primero) return
+    const rot = primero.encuadre?.rotacion ?? 0
+    if (rot % 360 !== 0) return
+    const med = medios.find((m) => m.id === primero.assetId)
+    if (!med) return
+    actualizarEncuadre(primero.id, encuadreParaRecorte(med, primero.recorte, ancho, alto, 'contener'))
+  }
+
   // fija el lienzo acotando cada lado a los topes, para que nunca quede infinito ni invisible
   function fijarTamano(ancho: number, alto: number) {
     const a = Math.round(Math.max(LIENZO_MIN, Math.min(LIENZO_MAX, ancho)))
     const b = Math.round(Math.max(LIENZO_MIN, Math.min(LIENZO_MAX, alto)))
-    setLienzo(a, b)
+    ponerLienzo(a, b)
   }
+
+  // la rueda del ratón sobre un campo de medida lo sube o lo baja de 10 en 10 (de 1 en 1 con
+  // Shift) aunque el campo no tenga el foco. se engancha de forma nativa y no pasiva porque hay
+  // que impedir que la rueda desplace el panel mientras se ajusta
+  const refAncho = useRef<HTMLInputElement>(null)
+  const refAlto = useRef<HTMLInputElement>(null)
+  const vivo = useRef({ cambiarAncho: (_v: number) => {}, cambiarAlto: (_v: number) => {}, ancho: 0, alto: 0 })
+  useEffect(() => {
+    const enganchar = (el: HTMLInputElement | null, cual: 'ancho' | 'alto') => {
+      if (!el) return () => {}
+      const alRodar = (ev: WheelEvent) => {
+        ev.preventDefault()
+        const paso = ev.shiftKey ? 1 : 10
+        const dir = ev.deltaY < 0 ? 1 : -1
+        const base = cual === 'ancho' ? vivo.current.ancho : vivo.current.alto
+        const nuevo = Math.max(LIENZO_MIN, Math.min(LIENZO_MAX, base + dir * paso))
+        if (cual === 'ancho') vivo.current.cambiarAncho(nuevo)
+        else vivo.current.cambiarAlto(nuevo)
+      }
+      el.addEventListener('wheel', alRodar, { passive: false })
+      return () => el.removeEventListener('wheel', alRodar)
+    }
+    const a = enganchar(refAncho.current, 'ancho')
+    const b = enganchar(refAlto.current, 'alto')
+    return () => {
+      a()
+      b()
+    }
+  }, [])
   function cambiarAncho(v: number) {
     if (!Number.isFinite(v) || v <= 0) return
     if (proporcionBloqueada) fijarTamano(v, v / (resolucion.ancho / resolucion.alto))
@@ -154,35 +217,12 @@ export default function LienzoPanel() {
     else fijarTamano(resolucion.ancho, v)
   }
 
+  // se deja a la mano de la rueda lo último que hace falta, ya con el estado de este render
+  vivo.current = { cambiarAncho, cambiarAlto, ancho: resolucion.ancho, alto: resolucion.alto }
+
   // primer clip de la pista, con su medio. es el que mandan los dos botones de ajuste al video
   const primerClip = [...clips].sort((a, b) => a.inicio - b.inicio)[0] ?? null
   const primerMedio = primerClip ? medios.find((m) => m.id === primerClip.assetId) ?? null : null
-
-  // parte visible del video tras su recorte: la fracción de ancho y alto que queda, y cuánto se
-  // corre su centro (si el recorte no es simétrico). sin recorte, todo visible y centrado
-  function recVisible(rec?: { izq: number; der: number; arr: number; aba: number }) {
-    const izq = rec?.izq ?? 0, der = rec?.der ?? 0, arr = rec?.arr ?? 0, aba = rec?.aba ?? 0
-    return {
-      visW: Math.max(0.02, 1 - izq - der),
-      visH: Math.max(0.02, 1 - arr - aba),
-      ox: (izq - der) / 2,
-      oy: (arr - aba) / 2,
-    }
-  }
-
-  // encuadre que hace que la parte RECORTADA del video cubra un lienzo de W×H (cover): la agranda
-  // hasta llenar y la recentra, teniendo en cuenta que el recorte pudo dejar la zona visible
-  // descentrada. sin recorte se reduce al "llenar" de siempre (escala de cover, centrado)
-  function encuadreCover(med: { ancho: number; alto: number }, rec: { izq: number; der: number; arr: number; aba: number } | undefined, W: number, H: number) {
-    const { visW, visH, ox, oy } = recVisible(rec)
-    const base = Math.min(W / med.ancho, H / med.alto)
-    const escala = Math.max(W / (visW * med.ancho * base), H / (visH * med.alto * base))
-    return {
-      x: 0.5 - (ox * med.ancho * base * escala) / W,
-      y: 0.5 - (oy * med.alto * base * escala) / H,
-      escala,
-    }
-  }
 
   // lleva el LIENZO a la forma del primer video RESPETANDO su recorte: si el clip está recortado a
   // un cuadrado, el lienzo queda cuadrado y solo se ve esa zona, llenándolo. sin recorte se usa el
@@ -194,14 +234,15 @@ export default function LienzoPanel() {
       setLienzoAuto()
       return
     }
-    const { visW, visH } = recVisible(rec)
+    const visW = Math.max(0.02, 1 - rec.izq - rec.der)
+    const visH = Math.max(0.02, 1 - rec.arr - rec.aba)
     const rot = primerClip.encuadre?.rotacion ?? 0
     const cuarto = Math.abs(Math.round(rot / 90)) % 2 === 1
     let W = Math.round(primerMedio.ancho * visW)
     let H = Math.round(primerMedio.alto * visH)
     if (cuarto) { const t = W; W = H; H = t }
     setLienzo(W, H)
-    actualizarEncuadre(primerClip.id, encuadreCover(primerMedio, rec, W, H))
+    actualizarEncuadre(primerClip.id, encuadreParaRecorte(primerMedio, rec, W, H, 'llenar'))
   }
 
   // agranda el video (el elegido, o el primero) hasta cubrir el lienzo actual sin cambiar su
@@ -210,7 +251,7 @@ export default function LienzoPanel() {
     const objetivo = clip ?? primerClip
     const med = objetivo ? medios.find((m) => m.id === objetivo.assetId) : null
     if (!objetivo || !med) return
-    actualizarEncuadre(objetivo.id, encuadreCover(med, objetivo.recorte, resolucion.ancho, resolucion.alto))
+    actualizarEncuadre(objetivo.id, encuadreParaRecorte(med, objetivo.recorte, resolucion.ancho, resolucion.alto, 'llenar'))
   }
 
   const activa = (a: number, b: number) =>
@@ -305,7 +346,7 @@ export default function LienzoPanel() {
                 return (
                   <button
                     key={p.etiqueta}
-                    onClick={() => setLienzo(p.ancho, p.alto)}
+                    onClick={() => ponerLienzo(p.ancho, p.alto)}
                     className={[
                       'flex flex-col items-center gap-1.5 rounded-lg border py-2 transition-colors',
                       sel
@@ -343,6 +384,7 @@ export default function LienzoPanel() {
               <label className="flex flex-1 flex-col gap-1">
                 <span className="text-[11px] text-[color:var(--muted)]">Ancho</span>
                 <input
+                  ref={refAncho}
                   type="number"
                   min={LIENZO_MIN}
                   max={LIENZO_MAX}
@@ -375,6 +417,7 @@ export default function LienzoPanel() {
               <label className="flex flex-1 flex-col gap-1">
                 <span className="text-[11px] text-[color:var(--muted)]">Alto</span>
                 <input
+                  ref={refAlto}
                   type="number"
                   min={LIENZO_MIN}
                   max={LIENZO_MAX}
@@ -418,15 +461,6 @@ export default function LienzoPanel() {
               El video llena el lienzo
             </button>
           </div>
-
-          {/* recorte a mano sobre el visor: enciende el recuadro con tiradores y guías para elegir
-              la región que será el nuevo lienzo, y al aceptar el contenido se reajusta para llenarlo */}
-          <button
-            onClick={iniciarRecorteLienzo}
-            className="flex items-center justify-center gap-2 rounded-lg border border-black/10 py-2.5 text-sm font-medium transition-colors hover:border-brand hover:text-brand dark:border-white/10"
-          >
-            <Crop size={16} /> Recortar el lienzo en el visor
-          </button>
 
           <Campo etiqueta="Relleno de las bandas">
             <Segmentado
@@ -490,6 +524,7 @@ export default function LienzoPanel() {
           {/* acomodo del video dentro del lienzo. como en un editor vectorial, los
               botones se apagan si no hay ningún video elegido y se encienden al
               seleccionar uno en el visor o en la línea de tiempo */}
+          {hayVideo && (
           <div className="flex flex-col gap-2 border-t border-black/10 pt-4 dark:border-white/10">
             <span className="text-xs font-medium text-[color:var(--muted)]">Acomodar el video</span>
             <div className="grid grid-cols-4 gap-2">
@@ -497,7 +532,7 @@ export default function LienzoPanel() {
                 etiqueta="Centrar"
                 descripcion="Vuelve el video al centro, a su tamaño natural"
                 disabled={!hayVideo}
-                onClick={() => clip && resetEncuadre(clip.id)}
+                onClick={() => objetivosVideo.forEach((c) => resetEncuadre(c.id))}
               >
                 <Crosshair size={17} />
               </BotonEncuadre>
@@ -526,16 +561,13 @@ export default function LienzoPanel() {
                 <Maximize2 size={17} />
               </BotonEncuadre>
             </div>
-            {!hayVideo && (
-              <p className="text-[11px] leading-relaxed text-[color:var(--muted)]">
-                Selecciona un video en el visor o en la línea de tiempo para acomodarlo.
-              </p>
-            )}
           </div>
+          )}
 
           {/* alinear y distribuir las capas del lienzo (imágenes, textos,
               figuras), al estilo de un editor vectorial. con shift y clic en el
               visor se marcan varias; sin ninguna marcada los botones van apagados */}
+          {nSel > 0 && (
           <div className="flex flex-col gap-2 border-t border-black/10 pt-4 dark:border-white/10">
             <span className="text-xs font-medium text-[color:var(--muted)]">Alinear objetos</span>
             <div className="grid grid-cols-6 gap-2">
@@ -566,12 +598,8 @@ export default function LienzoPanel() {
                 <AlignVerticalDistributeCenter size={16} />
               </BotonEncuadre>
             </div>
-            {nSel === 0 && (
-              <p className="text-[11px] leading-relaxed text-[color:var(--muted)]">
-                Marca una o varias capas en el visor (con Shift y clic para varias) para alinearlas.
-              </p>
-            )}
           </div>
+          )}
         </section>
       </div>
     </div>
