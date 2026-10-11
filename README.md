@@ -124,14 +124,14 @@ El movimiento no es exclusivo de la censura. Los textos, las imágenes, las figu
 - **Texto.** Contenido, doce tipografías que se previsualizan escritas con su propia letra, tamaño de 8 a 400 px, negrita, cursiva, subrayado, alineación, color y opacidad. Admite además interlineado y espaciado entre letras, fondo propio con su color y su opacidad, contorno con color y grosor, sombra y un resplandor de tipo neón.
 - **Imágenes.** Logos y fotos superpuestos, en su propio carril de la línea de tiempo, con tamaño del 3 al 200 % del ancho del lienzo, opacidad, corrección de color propia y recorte con la misma herramienta de recuadro que el video. Al redimensionarlas mantienen su proporción, y con Shift pulsado se deforman libremente.
 - **Figuras.** Rectángulo, redondeado, elipse, triángulo, estrella, línea y flecha, con relleno y borde independientes, o color y grosor en el caso de la línea y la flecha.
-- **Marco.** Diez estilos decorativos alrededor del video, entre ellos sólido, doble, discontinuo, punteado, redondeado con radio ajustable, sombra, neón, degradado, viñeta y polaroid.
+- **Marco.** Veinticuatro estilos repartidos en cuatro categorías con pestañas. Los clásicos (sólido, doble, discontinuo, punteado, redondeado, esquinas, polaroid, sombra, viñeta y degradado), los de luz (neón, neón doble y brillo), los de cine (película, barras de cine y visor) y los que se mueven (neón que late, borde giratorio, luces en carrera, cinta que corre, arcoíris, borde que respira, esquinas vivas y grabando). Cada uno ofrece solo los controles que le sirven, como color, segundo color, grosor, separación del borde, esquinas, velocidad y opacidad, y se ve igual en el visor y en el archivo exportado.
 
 Cada capa se mueve y se redimensiona con ocho tiradores en el visor, manteniendo la proporción si pulsas Shift, y en la línea de tiempo se decide de qué segundo a qué segundo aparece.
 
 ### Audio
 
 - **Volumen general** del proyecto, de 0 a 200 %, con un botón de silencio que recuerda el nivel anterior.
-- **Franjas de volumen.** Añades un tramo, lo colocas y lo recortas en la línea de tiempo, y le das su propia ganancia entre 0 y 200 %. Sirve para bajar la música justo donde alguien habla, o para silenciar solo un fragmento.
+- **Franjas de volumen.** Arrastras el icono de franja desde el panel hasta el carril de audio, la recortas en la línea de tiempo y le das su propia ganancia entre 0 y 200 %. Sirve para bajar la música justo donde alguien habla, o para silenciar solo un fragmento.
 - **Audio por clip de video.** Al elegir un clip, el panel de Audio deja ajustar su volumen, sus fundidos de entrada y salida y su silencio, no solo el sonido general o los audios sueltos.
 - **Separar el audio de un video.** El sonido de un clip se extrae a su propia pista, enlazado al video de origen, para moverlo, recortarlo o darle su propio volumen por separado.
 

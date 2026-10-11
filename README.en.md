@@ -115,7 +115,7 @@ Motion is not exclusive to censorship: text, images, shapes and drawings are ani
 - **Text:** content, twelve typefaces previewed in their own lettering, size from 8 to 400 px, bold, italic, underline, alignment, color and opacity. It also takes its own background with color and opacity, an outline with color and width, and a shadow.
 - **Images:** logos and photos on top, in their own timeline lane, sized from 3 to 200 % of the canvas width, with independent cropping on each of the four sides and adjustable opacity. When resized they keep their proportion, and holding Shift deforms them freely. PNG, JPG, WebP, GIF, BMP and AVIF up to 20 MB are accepted, with their binary signature checked too.
 - **Shapes:** rectangle, rounded, ellipse, triangle, star, line and arrow, with independent fill and border, or color and width in the case of the line and the arrow.
-- **Frame:** ten decorative styles around the video, among them solid, double, dashed, dotted, rounded with adjustable radius, shadow, neon, gradient, vignette and polaroid.
+- **Frame:** twenty-four styles split into four tabbed categories. Classic (solid, double, dashed, dotted, rounded, corners, polaroid, shadow, vignette and gradient), light (neon, double neon and glow), cinema (film strip, cinema bars and viewfinder) and moving ones (pulsing neon, spinning border, chasing lights, running tape, rainbow, breathing border, living corners and recording). Each one offers only the controls that fit it, such as color, second color, thickness, distance from the edge, corners, speed and opacity, and it looks the same in the preview and in the exported file.
 
 Every layer is moved and resized with eight handles in the preview, keeping its proportions if you hold **Shift**, and on the timeline you decide from which second to which second it appears.
 
@@ -123,7 +123,7 @@ Every layer is moved and resized with eight handles in the preview, keeping its 
 
 - **Overall volume** for the project, from 0 to 200 %, with a mute button that remembers the previous level.
 - **Per-clip audio:** when you pick a video clip, the Audio panel lets you set its volume, its fade in and fade out and its mute, not just the overall sound or the standalone audios.
-- **Volume regions:** you add a stretch, place it and trim it on the timeline, and give it its own gain between 0 and 200 %. Handy for dropping the music right where somebody speaks, or for muting just one fragment.
+- **Volume regions:** you drag the region icon from the panel onto the audio lane, trim it on the timeline and give it its own gain between 0 and 200 %. Handy for dropping the music right where somebody speaks, or for muting just one fragment.
 
 ### Canvas
 

@@ -4,6 +4,40 @@ Este documento recoge los cambios importantes de Video Editor, de la versión m�
 
 El formato sigue la convención de [Keep a Changelog](https://keepachangelog.com/es/) y el versionado es [semántico](https://semver.org/lang/es/). El primer número marca los cambios mayores, el segundo las funciones nuevas y el tercero las correcciones.
 
+## 2.51.0 (2026-10-10)
+
+- **El video entra con la orientación del archivo.** La exportación rápida ahora aplica la rotación que
+  los teléfonos guardan como dato aparte, igual que el visor, así que un video grabado en vertical o con
+  la rotación marcada se ve y se exporta como en cualquier reproductor, y el giro manual parte de ahí.
+- **Panel de Lienzo más simple.** El tamaño exacto en píxeles funciona también con la proporción libre y
+  se ve al instante en el visor. Se elimina el recorte del lienzo sobre el visor. Acomodar el video y
+  Alinear objetos solo aparecen cuando hay algo seleccionado. Al elegir una proporción, el primer video
+  entra completo y lo más grande posible, tomando su área ya recortada como tamaño real.
+- **Recorte del video con contexto.** El video completo se ve atenuado por fuera del recuadro, hay líneas
+  que se imantan a proporciones conocidas con una etiqueta que indica a cuál se pegan, y recortar con la
+  tecla C o con doble clic ya no cambia la pestaña del panel. Al recortar un borde en la línea de tiempo,
+  el cabezal hace de tope.
+- **Marcos con categorías y movimiento.** Veinticuatro estilos en cuatro pestañas (clásicos, luz, cine
+  y movimiento), con solo los controles que sirven para cada uno, como segundo color, separación del
+  borde, velocidad y opacidad. Los marcos animados se ven igual en el visor y en la exportación.
+- **Figuras más simples.** La rejilla muestra solo el dibujo de cada figura, tres por fila.
+- **Dibujo más estable.** Las opciones se quedan visibles mientras se dibuja, al soltar el lápiz queda
+  activo el modo de selección, cada dibujo es independiente y tiene sus botones de dibujar, seleccionar
+  y borrar trazos. La pestaña del panel ya no salta. Se elimina la sección Borrador del riel.
+- **Audio con franjas arrastrables.** La franja de volumen se crea arrastrando su icono hasta el carril
+  de audio, los botones pasan a ser pequeños con icono, se elimina "Silenciar todo" y lo que se edita
+  afecta solo a la franja seleccionada.
+- **Medios con selección múltiple.** Se seleccionan varios con un recuadro o con Shift y se borran
+  juntos. La confirmación se reutiliza y, para un medio suelto, tiene una casilla para no volver a
+  preguntar.
+- **Línea de tiempo más dinámica.** Soltar un clip en un hueco más corto empuja hacia la derecha los
+  clips siguientes del nivel. "Nueva pista aquí" crea la pista de verdad, también al duplicar con Alt y
+  con audio y texto. La vista ya no salta al soltar un recorte.
+- **Deshacer sin tope.** Se puede volver hasta el estado en que estaba el proyecto al abrirlo.
+- **Nombre del proyecto automático.** Mientras no se escriba uno a mano, el proyecto se llama como su
+  primer medio y lo sigue al borrarlo, reordenarlo o subir uno nuevo. Un nombre escrito a mano ya no
+  cambia.
+
 ## 2.50.0 (2026-10-10)
 
 - **Textos del sitio y de la aplicación reescritos con un lenguaje más claro.** Se deja de usar "montar"
