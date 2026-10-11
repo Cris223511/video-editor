@@ -274,7 +274,17 @@ export default function Timeline({
   const recortando = useEditorStore((s) => s.previsualizacion) !== null
   const anchoRef = useRef(0)
   if (!recortando) anchoRef.current = anchoBase
-  const anchoContenido = recortando ? Math.max(anchoBase, anchoRef.current) : anchoBase
+  // al soltar el recorte el contenido sí se acorta, y si la vista estaba al final el navegador la
+  // corría de golpe. por eso se recuerda hasta dónde llegaba lo visible mientras se recortaba y se
+  // mantiene ese ancho hasta que la persona vuelva a desplazar o a cambiar el zoom
+  const retenidoRef = useRef({ ancho: 0, px: pxPorSegundo })
+  if (retenidoRef.current.px !== pxPorSegundo) retenidoRef.current = { ancho: 0, px: pxPorSegundo }
+  if (recortando && scrollRef.current) {
+    retenidoRef.current.ancho = scrollRef.current.scrollLeft + scrollRef.current.clientWidth
+  }
+  const anchoContenido = recortando
+    ? Math.max(anchoBase, anchoRef.current)
+    : Math.max(anchoBase, retenidoRef.current.ancho)
 
   // instantes a los que se imantan clips y capas: el cero, el cabezal y los
   // bordes de todos los elementos
@@ -771,7 +781,14 @@ export default function Timeline({
           vertical. antes había un overflow anidado que sacaba dos barras y
           descuadraba las columnas; ahora la columna de cabeceras va pegada a la
           izquierda y acompaña el mismo scroll, así que nunca se desalinean */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
+      <div
+        ref={scrollRef}
+        onScroll={() => {
+          // en cuanto la persona se desplaza por su cuenta, el ancho retenido tras un recorte ya no hace falta
+          if (!recortando) retenidoRef.current.ancho = 0
+        }}
+        className="min-h-0 flex-1 overflow-auto"
+      >
         <div className="flex w-max gap-3">
           {/* columna de cabeceras anclada a la izquierda: sube y baja con las
               filas al desplazar en vertical, pero se queda fija al desplazar en
